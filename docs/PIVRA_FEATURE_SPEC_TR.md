@@ -116,3 +116,39 @@
 | Codec/RAW/HDR/PSD/JPEG XL desteğinin tam sınırları | **UYGULAMA TESTLERİYLE DOĞRULANACAK.** |
 
 > Bu doküman özellik ve davranış kararlarının kaydıdır; geliştirme veya commit edilmiş kaynak kod değildir. Push sırasında otomatik CI istenmiyor; yeni workflow eklenirse yalnızca manuel çalıştırma düşünülmeli.
+
+
+## 8. Teknik mimari kararı — Rust (20.10.2026)
+
+**Karar:** Pivra'nın ana uygulama dili **Rust** olacaktır. GNOME'a doğal uyumlu bir arayüz ve medya işlevleri birbirinden ayrılmış modüler bir yapı hedeflenir. Bu bölüm teknoloji tercihini kaydeder; henüz kodlama başlatma yetkisi değildir.
+
+| Katman / araç | Tercih | Durum ve not |
+|---|---|---|
+| Ana dil | **Rust** | **KARARLAŞTIRILDI** |
+| Kullanıcı arayüzü | **GTK4 + libadwaita**, Rust için gtk4-rs / libadwaita bindings | **HEDEF MİMARİ**; GNOME arayüzü |
+| Video motoru | **GStreamer** / gstreamer-rs | **İLK TERCİH**; GTK4 içinde oynatma, ses, altyazı, seek, frame-step ve zoom prototipte doğrulanacak |
+| Görsel çözümleme | **Glycin** ve formatlara özgü uygun çözücüler | **İLK ADAY**; RAW, HDR, HEIC, JXL, PSD vb. gerçek destek tek tek test edilecek |
+| Görüntü işleme | **libvips** ve gerektiğinde özel görüntü işlemleri | **İLK ADAY**; Rust entegrasyonu, kalite ve işlem kapsamı test edilecek |
+| Dosya ve klasör olayları | **GIO** | **HEDEF ALTYAPI** |
+| Kalıcı uygulama ayarları | **GSettings** | **HEDEF ALTYAPI**; görüntüleme geçmişi varsayılan kapalı |
+| Derleme/bağımlılıklar | **Cargo** | **KARARLAŞTIRILDI** |
+| Dağıtım | Flatpak öncelikli **değerlendirme adayı** | **AÇIK**; paketleme/dağıtım biçimi henüz seçilmedi |
+
+### Modüler sorumluluklar
+
+1. **Medya/katalog yöneticisi:** Nautilus'tan açılan dosya ve klasör, doğal sıralama, dosya olayları, gezinme konumu.
+2. **Görüntüleme motoru:** Decode, fotoğraf/video viewport'u, zoom/pan, renk profilleri, kaynak kontrollü hazırlama.
+3. **Video motoru:** GStreamer oynatma yaşam döngüsü, ses/altyazı, kare adımı, seek ve video önizlemesi.
+4. **Düzenleme motoru:** Geri alınabilir, kayda kadar tahribatsız işlemler; format dönüştürme ve atomik yazma.
+5. **Arka plan iş yöneticisi:** Kaynak önceliği, iptal, duraklat/devam, durum/ilerleme ve bildirimler.
+6. **GTK4/libadwaita sunum katmanı:** Pencere, şerit, paneller, kısayollar ve etkileşimler; medya işlemleriyle gevşek bağlılık.
+
+### Kodlama öncesi doğrulama ölçütleri
+
+- Büyük fotoğraf/RAW açılışı, zoom ve RAM tüketimi; önizlemeden tam çözüme geçiş.
+- GTK4 içinde 4K video, donanım hızlandırma ve yazılımsal fallback; fotoğraf ↔ video geçişleri.
+- Frame-step, harici/gömülü altyazı ve ASS biçimlendirme; video kaynağından orijinal çözünürlükte kare kaydı.
+- ICC/HDR ve desteklenen gerçek formatların her birinin platforma göre doğrulanması.
+- Her aşamada birim/entegrasyon testleri ve gerçek GNOME kullanım testi; otomatik push tetiklemeli CI yok (eklenirse yalnız manuel workflow_dispatch).
+
+**Sınır:** Bu karar, daha önce kabul edilmiş 72 özellik ve 7. bölümdeki açık maddeleri değiştirmez. Teknik doğrulamada bir aday uygun çıkmazsa kullanıcıyla alternatif belirlenir. **Henüz kaynak kodu değiştirilmeyecek; kalan tasarım kararları sonraki görüşmeye bırakıldı.**

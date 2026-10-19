@@ -1,0 +1,118 @@
+# Pivra — Kararlaştırılan Özellikler ve Davranışlar
+
+**Durum:** Mantıksal tasarım; **henüz kod yazılmadı**.  
+**Hedef:** GNOME/Linux için Nautilus'tan açılan resimden başlayıp aynı klasördeki fotoğraf ve videolar arasında tek pencerede gezinilen hızlı görüntüleyici. Varsayılan video oynatıcısı olmayacak.  
+**Güncelleme:** 20.10.2026
+
+## 1. Temel kullanım ve arayüz
+
+| No | Özellik | Kabul edilen davranış |
+|---|---|---|
+| 1 | Başlatma | Nautilus'ta fotoğrafa çift tık; klasördeki fotoğraf+videolara geçiş. Dahili dosya yöneticisi veya kütüphane yok. |
+| 2 | Video ilişkisi | Video dosyasına doğrudan çift tıklamada GNOME'un varsayılan oynatıcısı kullanılır. |
+| 3 | Sıralama | Karışık medyalar doğal dosya adı sırasıyla (1, 2, 10); Nautilus sıralamasından bağımsız. |
+| 4 | Gezinti | Sol/sağ ok önceki/sonraki medya; normal gezinmede başa sarma ayarlardan açılabilir. |
+| 5 | Başlangıç görüntüsü | Her yeni medya merkezlenir ve kullanılabilir alana sığdırılır; önceki zoom/konum aktarılmaz. |
+| 6 | Görüntü ölçeği | Ekrana sığdır, en-boy oranını koruyarak doldur (gerekirse kırp), gerçek boyut (%100). Esnetme yok. |
+| 7 | Yakınlaştırma | Fare tekerleği imleç merkezli zoom, %10–3200; interpolasyon veya nearest-neighbor seçimi. |
+| 8 | Taşıma | Yakınlaşmış görsel fare sol tuşuyla sürüklenir. |
+| 9 | Mini harita | Fotoğraf/video görüntüsü ekrandan taştığında sağ altta otomatik görünür; görsel alanı gösterir ve sürüklenebilir. Tam sığıyorsa gizlenir. |
+| 10 | Küçük resim şeridi | Altta, fare yaklaşınca ana medyanın üzerine açılır; görüntüyü yeniden ölçeklemez; yatay kaydırılabilir, aktif medya ortalanır. |
+| 11 | Şerit seçimi | Normalde tıklama medyayı açar; ayrı **Seç** modu, çoklu/aralık/Tümünü Seç/Seçimi Temizle ve adet gösterimi. |
+| 12 | Şerit önbelleği | Pivra küçük resimleri **yalnız RAM'de** tutar; kalıcı disk önbelleği yazmaz; bellek basıncında azaltır. |
+| 13 | Ön yükleme | Yakın fotoğraflar akıllı hazırlanır; RAM/CPU/GPU baskısına uyum; videolar bütünüyle belleğe alınmaz. |
+| 14 | Ağır RAW/TIFF | Varsa gömülü düşük çözünürlüklü önizleme hemen; tam çözümleme arka planda, hafif ilerleme göstergesi. |
+| 15 | Canlı klasör | Dosya ekleme/silme/yeniden adlandırma listeye yansır. Açık dosya haricen değişirse otomatik yenilenmez, **Yenile** bildirimi. |
+| 16 | Hatalı medya | Yalnız gerçekten okunabilen kısım gösterilir; bozuk dosya uyarısı; navigasyon kesilmez. |
+| 17 | Bilgi paneli | İsteğe bağlı sağ panel EXIF/fotoğraf ve codec/FPS/süre/bitrate/video bilgileridir; açılınca viewport daralır, medya refit olur. |
+| 18 | Arayüz | Minimal GNOME'a uygun; sabit alt toolbar yok; uygun zamanda beliren overlay kontroller. |
+| 19 | Tam ekran | F11; slayt gösterisinden ayrı. |
+| 20 | Renk/şeffaflık | Şeffaf alanlarda dama tahtası varsayılan; beyaz/koyu/sistem arka planı ayarlanabilir. |
+| 21 | Renk yönetimi | Gömülü ICC/ekran profili otomatik, HDR destekli oturumda HDR, değilse SDR ton eşleme; gösterme dosyayı değiştirmez. |
+| 22 | Yön | EXIF orientation ve video rotation metadata'sı uygulanır; kaydederken çift döndürme önlenir. |
+| 23 | Pencereler | Nautilus'ta her ayrı dosya açılışı ayrı pencere; son pencere boyutu saklanır, konumu GNOME yönetir. |
+| 24 | Tema | GNOME sistem teması varsayılan; Sistem/Açık/Koyu seçimi. |
+| 25 | Geçmiş | Varsayılan kapalı; açılırsa son dosyalar/klasörler; temizlenebilir. Ayarlar geçmişten bağımsız kalıcıdır. |
+| 26 | Kısayollar | Klavye ve desteklenen fare hareketleri yeniden atanabilir; çakışma denetimi ve sıfırlama. |
+
+## 2. Video ve animasyon
+
+| No | Özellik | Kabul edilen davranış |
+|---|---|---|
+| 27 | Oynatma | Navigasyonla video açılınca otomatik oynar; başka medyaya geçince durur, ses kesilir. |
+| 28 | Video sonu | Varsayılan son karede bekle; seçeneklerden farklı bitiş davranışı ayarlanabilir. |
+| 29 | Video kontrolü | Oynarken 2 sn hareketsizlikte gizlenir, duraklatıldığında kalır, imleç kontrol üzerindeyken gizlenmez. |
+| 30 | Kısayollar | Space oynat/duraklat; Ctrl+sol/sağ 5 sn sarma; virgül/nokta duraklatılmışken kare geri/ileri; yukarı/aşağı ses. |
+| 31 | Kare adımı | Mümkün olan en doğru kare hassasiyetinde ileri/geri, değişken FPS zamanlaması gözetilir. |
+| 32 | Zaman çizgisi | Hover ile önizleme karesi+zaman; tıklamadan oynatma pozisyonu değişmez. |
+| 33 | Zoom ve pan | Aynı videoda oynatma, duraklama, seek ve kare adımında korunur; yeni medyada ekrana sığdırılır. |
+| 34 | Pozisyon | Aynı pencere içinde videoya dönülünce kaldığı yerden otomatik oynar; pencere kapanınca unutulur. |
+| 35 | Ses | Ses seviyesi ve mute durumu uygulamanın sonraki açılışlarında korunur. |
+| 36 | Video kare kaydetme | Kaynak çözünürlüğünde, ekran/zoom'dan bağımsız; PNG varsayılan, JPEG/WebP, önerilen zaman damgalı ad. |
+| 37 | Alt yazı/parçalar | Gömülü/harici SRT ve ASS; aynı adlı harici altyazıyı otomatik algılama; birden fazla ses parçası seçimi. |
+| 38 | Alt yazı stili | ASS'nin özgün biçimi varsayılan korunur; yazı boyutu/renk/çerçeve/arka plan ayarı ve sıfırlama. |
+| 39 | Formatlar | MP4/MKV/MOV/WebM/AVI/WMV/MPEG/3GP gibi konteynerler; H264/HEVC/VP8/VP9/AV1 vb.; donanım çözme, yazılıma geri düşme. Gerçek destek platforma bağlı. |
+| 40 | Hareketli fotoğraf | GIF, animasyonlu WebP, APNG otomatik ve sonsuz döngü; Space ile duraklat; ayrılınca durur. |
+| 41 | Güç yönetimi | Slayt gösterisi boyunca (duraklatılsa bile) ve normal modda video oynatılırken ekranın otomatik kapanması engellenir; normal video duraklayınca güç yönetimi normale döner. |
+
+## 3. Slayt gösterisi
+
+| No | Özellik | Kabul edilen davranış |
+|---|---|---|
+| 42 | Başlatma | F5: geçerli medyadan tam ekran slayt; F11'den bağımsız. |
+| 43 | Süre ve döngü | Fotoğraf süresi ayarlanabilir; video tamamen oynatılır; son dosyadan ilkine döner, normal gezinme döngüsü ayarından bağımsız. |
+| 44 | Kumanda | Space duraklat/devam; oklarla elle geçiş; Esc çıkış. |
+| 45 | Geçiş | Sadece slayt fotoğraflarında kısa, yaklaşık 300 ms crossfade; normal navigasyon kesintisiz/anlık. |
+
+## 4. Düzenleme
+
+| No | Özellik | Kabul edilen davranış |
+|---|---|---|
+| 46 | Mod | Düzenleme yalnız ayrı modda; normal görüntüleme kalabalıklaşmaz; kayda kadar tahribatsız. |
+| 47 | Döndürme/çevirme | 90/180/270°, yatay/dikey çevirme, +/-180° serbest açı ve ufuk hizalama; boş köşelerin otomatik en az kayıplı kırpılması. |
+| 48 | Kırpma | Serbest, özgün, 1:1, 4:3, 3:2, 16:9, 9:16, özel oran; en-boy oranı bozulmaz. |
+| 49 | Boyut | Hedef piksel ölçüsü veya dosya boyutu; kalite/çözünürlük optimizasyonu ve tahmini sonuç. |
+| 50 | Ton/renk | Parlaklık, kontrast, doygunluk ve renk düzeltmeleri. |
+| 51 | Otomatik iyileştirme | Gerçek zamanlı önizleme; etki %0–100. |
+| 52 | Kırmızı göz | Otomatik tespit/düzeltme, manuel seçim/düzeltme. |
+| 53 | Keskinlik | Keskinlik (Sharpen), gürültü azaltma (Denoise), netlik (Clarity): üç ayrı kaydırıcı. |
+| 54 | Öncesi/sonrası | Sürüklenebilir **dikey ayırıcı**, sol orijinal/sağ düzenlenmiş, ortak zoom/konum. |
+| 55 | Geri alma | Ctrl+Z ve uygun işlemlerde yinele. |
+| 56 | Kaydetme | Ctrl+S ve Ctrl+Shift+S Farklı Kaydet; mümkünse kayıpsız JPEG dönüşümü, ICC/EXIF koruma, güvenli atomik yazma. |
+| 57 | Kaydedilmemiş değişiklik | Medya değişiminde, düzenleme modundan çıkışta, pencere kapatmada **Kaydet / Kaydetmeden Devam Et / İptal**. |
+| 58 | Kapsam sınırı | Metin, ok, şekil, anotasyon yok; genel fotoğraf editörü değil. |
+
+## 5. Dosya işlemleri, toplu dönüştürme, karşılaştırma
+
+| No | Özellik | Kabul edilen davranış |
+|---|---|---|
+| 59 | Format dönüşümü | Tek dosyada Farklı Kaydet, çoklu şerit seçiminde toplu resim dönüştürme; hedef format, kalite, yeniden boyut, çıktı klasörü. |
+| 60 | Arka plan işlemi | Dönüşüm sürerken fotoğraf/video gezinme açık; ilerleme ve per-file hata; iptal. |
+| 61 | Çakışma | Mevcut dosyaların üzerine yazılmaz: foto.webp varsa foto (1).webp vb. ilk uygun yeni ad. |
+| 62 | Duraklat/devam | Aktif dosya tamamlandıktan sonra kuyruk duraklar; devam kalanlardan; tamamlananlar tekrar işlenmez. |
+| 63 | Bildirim | Pivra öndeyken uygulama içi, arka planda GNOME bildirimi; çift bildirim yok; sonuç sayıları ve çıktı klasörünü açma. |
+| 64 | Kapanış | Aktif dönüştürmede **İşlemi İptal Et ve Çık / Pivra'ya Dön** sorulur; tamamlanan çıktılar kalır; yarım dosya bırakılmaz. |
+| 65 | Dosya silme | Delete ile onaysız Çöp Kutusu; sonraki medyaya geç; Geri Al bildirimi; kalıcı silme yok. |
+| 66 | Dosya adlandırma | F2 yalnız açık dosya; uzantı varsayılan korunur, isim çakışması önlenir; sıra yeniden hesaplanır. Toplu rename yok. |
+| 67 | İki dosya karşılaştırma | Sağ tık Compare, aynı klasörden ikinci görsel; yan yana; ayrı gezinti; aktif paneli tıklayarak seç. |
+| 68 | Eşzamanlı zoom | Karşılaştırmada açılabilir; her görsel kendi fit boyutuna göre aynı oranda büyür; başlangıç merkezi ortak. Transparan üst üste bindirme yok. |
+| 69 | GNOME duvar kâğıdı | Açık resmi masaüstü duvar kâğıdı yap. |
+
+## 6. Medya formatı ve ek kapsam
+
+| No | Özellik | Kabul edilen davranış |
+|---|---|---|
+| 70 | Görsel formatları | JPEG, PNG, GIF, WebP, AVIF, HEIC, BMP, TIFF, APNG, RAW DNG/CR2/CR3/NEF/ARW, SVG, JPEG XL, ICO, PSD ve mümkün diğerleri. |
+| 71 | Çoklu sayfa/katman | TIFF sayfaları, ICO çözünürlükleri ve decoder destekliyorsa PSD katmanları için yalnız gerektiğinde panel. |
+| 72 | Desteklenmeyenler | Kendi dosya yöneticisi, medya kütüphanesi, histogram, kapsamlı panoya kopyalama, genel sürükle-bırak ve ek sıralama seçenekleri yok. |
+
+## 7. Henüz karara bağlanmayanlar / teknik doğrulama
+
+| Konu | Durum |
+|---|---|
+| Pozlama, Highlights, Shadows, Temperature, Tint, Vibrance | **AÇIK:** Kullanıcı henüz seçenek belirtmedi. |
+| Çoklu seçim modunda videoların toplu seçime dahil edilip edilmeyeceği | **AÇIK:** Ayrı seçim modu kararlaştırıldı; medya kapsamı ayrıca kararlaştırılmadı. |
+| HiDPI, çoklu monitör, dokunmatik/touchpad ve dağıtım modeli | **AÇIK:** Ayrıntılandırılmadı. |
+| Codec/RAW/HDR/PSD/JPEG XL desteğinin tam sınırları | **UYGULAMA TESTLERİYLE DOĞRULANACAK.** |
+
+> Bu doküman özellik ve davranış kararlarının kaydıdır; geliştirme veya commit edilmiş kaynak kod değildir. Push sırasında otomatik CI istenmiyor; yeni workflow eklenirse yalnızca manuel çalıştırma düşünülmeli.

@@ -63,6 +63,12 @@ Her takip girdisi için:
 
 Takip durumları: `TODO`, `IN_PROGRESS`, `BLOCKED`, `CODED`, `TESTING`, `DONE`. Belge planlandığında tüm satırlar `TODO` durumundadır.
 
+## PIV-04 test stratejisi
+
+GNOME/Wayland birincil hedef, X11 ikincil uyumluluk hedefidir. Rust/CLI, X11/Xvfb, headless Wayland compositor ve fiziksel GNOME/Wayland sonuçları ayrı raporlanır; biri diğerinin yerine geçmez. Headless Wayland için gerçek mapped yüzey kanıtı gerekir; yalnız PID/socket yeterli değildir. Normal kapatma kontrolü yapılamayan bir compositor için bu alan ayrıca NOT RUN kalır.
+
+Deterministik küçük fixture'lar, kaynak/lisans durumu ve SHA-256 manifesti `tests/fixtures/README.md` içinde tanımlıdır. Model testleri gerçek decoder/tür algılama iddiası taşımaz; yazma/temizlik yalnız testin özel geçici dizininde yapılır. Fiziksel GNOME/Wayland, HiDPI, touchpad, çoklu monitör, erişilebilirlik ve donanım render ayrı gelecek doğrulamalarıdır. Yerel komutlar ve kategori bazlı güncel kanıtlar README ve commit takip tablosundadır.
+
 ## Ölçüm başlıkları (eşik uydurulmaz)
 
 - Soğuk/sıcak ilk görüntü açılışı, 1/10/1000+ dosyalı klasör açılışı.

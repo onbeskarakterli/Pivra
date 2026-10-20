@@ -3,7 +3,7 @@ A fast, lightweight GNOME image viewer with seamless photo and video navigation,
 
 ## Development status
 
-**PIV-01: DONE. PIV-02: GTK4/libadwaita shell implemented and validated on 2026-10-21, on `dev`.** No image/video functionality, media engine or CI is included. PIV-03 separates application, window, CLI and core data responsibilities without changing that behavior. PIV-04 has not started.
+**PIV-01: DONE. PIV-02: GTK4/libadwaita shell implemented and validated on 2026-10-21, on `dev`.** No image/video functionality, media engine or CI is included. PIV-03 separates application, window, CLI and core data responsibilities without changing that behavior. PIV-04 adds deterministic fixtures and isolated Rust/X11/headless Wayland test infrastructure. PIV-05 has not started.
 
 Launching without arguments opens a blank `Pivra` window with a native libadwaita header and system theme. Each process owns an independent application/window (`io.github.onbeskarakterli.Pivra`, GIO NON_UNIQUE); file associations and Nautilus file-opening integration are future work. Closing the last window ends that process normally. If GTK cannot initialize a graphical session, the program prints a controlled error to stderr and exits 1. Help/version flags and invalid-argument exit 2 work without initializing GTK.
 
@@ -20,7 +20,7 @@ Launching without arguments opens a blank `Pivra` window with a native libadwait
 | `src/catalog.rs` | `MediaCollection`: caller-ordered items and a bounded selection; depends only on media |
 | `src/settings.rs` | In-memory window defaults (960×640); no globals, persistence or GSettings |
 
-The core library has no GTK/GIO imports and no dependency back into app/CLI/window. The binary depends on it, not the reverse. The only core module edge is `catalog -> media`; there are no module dependency cycles. Existing native Cargo dependencies and Cargo.lock are unchanged.
+The core library has no GTK/GIO imports and no dependency back into app/CLI/window. The binary depends on it, not the reverse. The only core module edge is `catalog -> media`; there are no module dependency cycles. PIV-03 left native Cargo dependencies and Cargo.lock unchanged; PIV-04 adds only the test-only `tempfile` dependency.
 
 A collection starts with its first item selected, or no selection if empty. Selecting an out-of-range index returns false and leaves the current item unchanged; callers receive an immutable item slice. Input order is preserved exactly. Directory discovery, natural sorting, next/previous actions, looping, file watching and UI/catalog wiring are deliberately outside PIV-03. The media kind is caller-provided metadata, not proof that a file is supported or readable. Settings currently carry only the dimensions actually used by the window; system theme behavior remains inherited.
 
@@ -31,6 +31,53 @@ A collection starts with its first item selected, or no selection if empty. Sele
 - Core independence: `rustc +stable --edition=2024 --test src/lib.rs -o /tmp/pivra-piv03-core-tests` followed by `/tmp/pivra-piv03-core-tests` passed the same five core tests without Cargo or GTK linkage. These are not five additional unique tests.
 - Existing Xvfb/D-Bus GUI smoke: PASS for two independent `Pivra` windows and normal closure with exit 0 and empty stdout/stderr. The geometry assertion now checks the unchanged 960×640 dimensions, verifying that the settings model is actually consumed. CLI help/version/error outputs and headless exit 1 are unchanged.
 - No physical GNOME/Wayland or hardware-renderer test is claimed. No decoder, playback, directory scan, zoom, edit, GSettings integration, new dependency or CI was added. See the commit tracker for closure SHAs and push evidence.
+
+### PIV-04 test infrastructure — 2026-10-21
+
+**Desktop priority: GNOME/Wayland first, X11 compatibility second.** Test categories below are independent: a PASS in one never substitutes for another.
+
+| Category | Current result and exact scope |
+|---|---|
+| Rust and CLI | PASS: 9 unit + 7 integration tests, 0 failed/ignored. Existing tests preserved; headless launch checks both forced X11 and forced Wayland with a fresh socket-free runtime directory |
+| X11/Xvfb smoke | PASS: two independent mapped Pivra windows, title, 960×640, normal WM_DELETE_WINDOW close, exit 0 and empty stdout/stderr |
+| Headless Wayland / Sway 1.10.1 (wlroots 0.18.2) | PASS: two real mapped `xdg_shell` surfaces observed through compositor IPC; title/app ID/PID/960×640 checked; normal Wayland close requests, exit 0, empty stdout/stderr, independent lifetime |
+| Headless Wayland / Weston 14.0.2 | Surface checks PASS: server scene graph contains Pivra's `xdg_toplevel` on the headless output with a SHM buffer; server protocol confirms title, 960×640 window geometry, configure acknowledgement and buffer attach/commit. **Normal close NOT RUN**: this Weston setup lacks standard close-control IPC; cleanup SIGTERM is not a passing close test |
+| Physical GNOME Shell/Wayland | **NOT RUN**: desktop theme/integration, HiDPI, touchpad, multiple monitors, accessibility and hardware acceleration remain separate future validation |
+
+Production Rust/GTK code is unchanged. Fixtures and temporary-directory strategy are documented in [tests/fixtures/README.md](tests/fixtures/README.md). The 86-byte original PNG and 83-byte text placeholder are generated from source values, with SHA-256 and provenance in a manifest. The text placeholder is **not playable video**; no decoder or playback success is claimed. JPEG, WebP, animation and real video needs are documented for later work without downloading media or selecting a license.
+
+Test audit: existing unit tests already cover empty/single/multiple catalogs, preserved order and invalid indices, so these are not copied into redundant tests. The new model integration test covers actual private fixture copies with Turkish/Unicode/space-containing names, explicit Image/Video kinds, selection and unchanged bytes. Two helper tests check cleanup after normal scope/panic unwinding and parallel filename isolation. Test-only `tempfile` provides private unique directories and RAII cleanup; no process-global environment is modified by Rust tests. CLI checks now use socket-free runtime directories, avoiding accidental connection to a developer's real Wayland session. Python GUI subprocess operations have bounded timeouts and shared owned-process cleanup; forced cleanup is never reported as normal closure.
+
+After activating the existing cloud environment, fetch test dependencies once if not cached, then run the core checks:
+
+```sh
+source /workspace/pivra-environment/gtk-activate.sh
+cargo +stable fetch --locked
+bash tests/check.sh
+# Or let the check runner activate the existing environment:
+PIVRA_ENV_ACTIVATE=/workspace/pivra-environment/gtk-activate.sh bash tests/check.sh
+```
+
+The runner performs the read-only fixture integrity check, fmt/check/build/test/Clippy with locked offline dependencies. It does not silently skip or claim GUI tests. Run graphical categories separately after build:
+
+```sh
+# X11 compatibility; Xvfb and its D-Bus session end with the test.
+GTK_A11Y=none GSK_RENDERER=cairo GDK_BACKEND=x11 \
+  xvfb-run -a dbus-run-session -- python3 tests/gui_smoke.py
+
+# Native Wayland lifecycle: creates a private headless Sway compositor.
+dbus-run-session -- python3 tests/wayland_smoke.py
+
+# Additional Weston 14 surface-only check; full close test is NOT RUN.
+PIVRA_WESTON_PREFIX=/workspace/pivra-environment/weston/usr \
+  dbus-run-session -- python3 tests/weston_smoke.py
+```
+
+On a standard Debian 13 test machine, `sway` supplies sway/swaymsg and `weston` supplies Weston 14/debug helpers. The cloud instance has no administrative installation access: official signed Debian packages were downloaded with APT and extracted locally. Sway helpers are under the existing `/workspace/pivra-environment/native` tool tree, and Weston is separately under `/workspace/pivra-environment/weston`; no system package was installed/upgraded and Rust/GTK installation or activation was not reset. Weston relocation uses per-test library/module/data/client paths, not system configuration edits. The prefix option currently targets Debian amd64 Weston 14; other layouts/versions require adaptation and are not claimed tested.
+
+Both Wayland tests create private 0700 runtime/cache/config/data directories and use an isolated `dbus-run-session`. `GDK_BACKEND=wayland` is forced, DISPLAY removed and XWayland disabled. Sway uses wlroots headless/Pixman; Weston uses headless/Pixman and a debug subscription restricted to its private runtime. Each compositor is stopped and temporary state removed when the test ends. Accessibility initialization is disabled only for these minimal test sessions, and GTK uses Cairo software rendering; these are not accessibility/hardware-renderer tests.
+
+Missing compositor tools cause the relevant script to report **BLOCKED** and exit 77; startup/assertion failures are nonzero **FAIL**, never a passing skip. Record the actual result rather than relabeling it as X11 success. If headless Wayland is unavailable, PIV-04's fixture/core infrastructure may still be complete, but Wayland support must not be claimed validated.
 
 ### Native prerequisites
 

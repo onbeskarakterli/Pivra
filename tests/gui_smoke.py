@@ -12,10 +12,12 @@ import subprocess
 import sys
 import time
 
+from gui_support import stop
+
 
 def xdo(*args):
     return subprocess.run(
-        ["xdotool", *map(str, args)], capture_output=True, text=True, check=True
+        ["xdotool", *map(str, args)], capture_output=True, text=True, check=True, timeout=5
     ).stdout.strip()
 
 
@@ -25,7 +27,7 @@ def wait_window(process):
         assert process.poll() is None, "Pivra exited before mapping a window"
         result = subprocess.run(
             ["xdotool", "search", "--all", "--onlyvisible", "--pid", str(process.pid),
-             "--name", "^Pivra$"], capture_output=True, text=True
+             "--name", "^Pivra$"], capture_output=True, text=True, timeout=5
         )
         if result.returncode == 0 and result.stdout.strip():
             return int(result.stdout.splitlines()[0])
@@ -103,9 +105,7 @@ def main():
         print("PASS two independent launches; no stdout/stderr, crash or forced termination")
     finally:
         for process in processes:
-            if process.poll() is None:
-                process.terminate()
-                process.communicate(timeout=10)
+            stop(process)
 
 
 if __name__ == "__main__":

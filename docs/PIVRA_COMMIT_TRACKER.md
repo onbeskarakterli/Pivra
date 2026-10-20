@@ -1,7 +1,7 @@
 # Pivra — Planlı Commit ve İlerleme Takibi
 
 **Kaynak:** [Özellik Şartnamesi](PIVRA_FEATURE_SPEC_TR.md) · [Yol Haritası](PIVRA_DEVELOPMENT_ROADMAP.md)  
-**Branch:** `dev` · **Durum:** PIV-01 **DONE (21.10.2026)**; PIV-02–60 TODO, başlatılmadı. Güncel kapanış kanıtı son bölümde; 20.10.2026 kayıtları tarihçedir. Burada listelenen `PIV-xx` kimlikleri gerçek Git commit SHA'sı **değildir**.
+**Branch:** `dev` · **Durum:** PIV-01 **DONE (21.10.2026)**; PIV-02 **DONE (21.10.2026, Xvfb GTK pencere doğrulaması)**; PIV-03–60 TODO, başlatılmadı. Güncel kapanış kanıtı son bölümde; 20.10.2026 kayıtları tarihçedir. Burada listelenen `PIV-xx` kimlikleri gerçek Git commit SHA'sı **değildir**.
 
 ## Kullanım kuralları
 
@@ -17,7 +17,7 @@
 | ID | Planlı commit başlığı | Kabul / test kontrolü | Durum | SHA |
 |---|---|---|---|---|
 | PIV-01 | `chore: initialize Rust Cargo app` | Cargo derlenir; temel dizin ve lisans/README korunur | **DONE — 21.10.2026** | `b246ee7`, `27315e6`, `90d495b`; doğrulama/lock/README: `2950193ca038b91c29ed97a7c46d773502d68dd4` |
-| PIV-02 | `feat: create GTK4 libadwaita application shell` | GNOME'da boş/sade ana pencere açılır; düzgün kapanır | TODO | — |
+| PIV-02 | `feat: create GTK4 libadwaita application shell` | GNOME stili boş/sade GTK pencere; açılış/kapanış Xvfb X11 üzerinde doğrulandı | **DONE — 21.10.2026** | `59bac1da79456cb39f42d2215b9ad670e1f3f900`, `9b8fa621fbfff7d26f61746d040fd7033afe8606` |
 | PIV-03 | `refactor: define app media and settings boundaries` | Mantıksal modüller ayrılır; birim testleri çalışır | TODO | — |
 | PIV-04 | `test: establish fixtures and local verification commands` | Deterministik örnek medya/fixture kuralları ve cargo test komutları | TODO | — |
 | PIV-05 | `docs: record dependency capability probes` | GTK/Glycin/GStreamer sürüm ve yetenekleri, risk kararı yazılır | TODO | — |
@@ -121,7 +121,7 @@
 
 | Faz | ID aralığı | Planlı commit | Tamamlanan |
 |---|---|---:|---:|
-| 0 — Temel | 01–05 | 5 | 1 |
+| 0 — Temel | 01–05 | 5 | 2 |
 | 1 — Fotoğraf | 06–12 | 7 | 0 |
 | 2 — Zoom/performans | 13–18 | 6 | 0 |
 | 3 — Video temel | 19–24 | 6 | 0 |
@@ -130,9 +130,9 @@
 | 6 — Uyumluluk/paket | 40–47 | 8 | 0 |
 | 7 — Edit (en son özellik geliştirmesi) | 48–57 | 10 | 0 |
 | 8 — Son doğrulama | 58–60 | 3 | 0 |
-| **TOPLAM** | **PIV-01–60** | **60** | **1** |
+| **TOPLAM** | **PIV-01–60** | **60** | **2** |
 
-> PIV-01 tamamlandı; PIV-02–60 gelecekteki işlerdir. Görev kimlikleri commit SHA'sı değildir. İlk planlama ve önceki engel kayıtları aşağıda tarihçe olarak korunur.
+> PIV-01 ve PIV-02 tamamlandı; PIV-03–60 gelecekteki işlerdir. Görev kimlikleri commit SHA'sı değildir. İlk planlama ve önceki engel kayıtları aşağıda tarihçe olarak korunur.
 
 ## PIV-01 ayrıntılı ilerleme — 20.10.2026
 
@@ -256,3 +256,88 @@ Komutlar depo kökünde, stable toolchain ile çalıştırıldı. `cargo run` so
 Bu son takip kaydının kendi commit SHA'sı öz referans oluşturmaz; `git log -1 --format=%H -- docs/PIVRA_COMMIT_TRACKER.md` ile alınır. Yukarıdaki `2950193` commit'i doğrulanan kaynakla aynı Cargo.toml/src içeriğini taşır; eklenen kilit üçüncü taraf bağımlılık getirmez.
 
 **Kapanış kararı:** PIV-01'in derleme, temel yapı/README, test, CLI davranışı, kilit ve commit kanıtı koşulları sağlandı: **DONE**. Lisans seçimi açık tutulur. PIV-02 **TODO**, başlatılmadı; sonraki aşamaya otomatik geçiş yok.
+
+
+## PIV-02 kapanışı — 21.10.2026
+
+**Güncel sonuç: DONE.** Kullanıcının PIV-02 görev metnindeki gerçek grafik pencere açılış/kapanış koşulu Xvfb X11 üzerinde sağlandı. Bu gerçek GTK pencere testidir; fiziksel GNOME/Wayland oturumu testi değildir. Önceki PIV-01 bölümleri tarihçedir. **PIV-03 başlatılmadı; Faz 0 tamamlanmış sayılmaz.**
+
+### Başlangıç ve korunan durum
+
+- Başlangıç yerel dev ve uzak dev: `04870b901333fe3dd0439d6bf75fbcd61d127f95`; çalışma dizini temizdi, PIV-01 DONE doğrulandı.
+- Depo: `/workspace/Pivra`, `onbeskarakterli/Pivra`. Güncel şartname, yol haritası, takip tablosu, Cargo.toml ve README okundu. AGENTS.md bulunmadı.
+- Uzak `main`: `5d55ee599df4617bd51c09b1c7a008b8d0ece480`; öncesinde ve uygulama push'u sonrasında aynı. Main'e yazılmadı, force-push/rebase/reset yapılmadı.
+- Rust kurulumu ve önceki yapılandırma korundu; yeni Rust kurulumu yapılmadı. rustc/Cargo 1.99.1, rustfmt 1.10.0-stable, Clippy 0.1.99.
+
+### Bağımlılıklar ve ortam
+
+| Katman | Seçim / sürüm |
+|---|---|
+| Rust | Stable 1.99.1 ile doğrulandı; manifest minimumu 1.85 (2024 edition ve bağımlılık metaverisi) |
+| Rust GTK bağlayıcısı | gtk4 0.10.3; Cargo adı `gtk`, `v4_6` API özelliği |
+| Rust libadwaita bağlayıcısı | libadwaita 0.8.1; Cargo adı `adw`, `v1_2` API özelliği |
+| Sistem GTK | Debian 13 GTK 4.18.6 |
+| Sistem libadwaita | Debian 13 libadwaita 1.7.6 |
+| Sistem GLib | 2.84.4 |
+| Seçilen asgari API tabanı | GTK >=4.6, libadwaita >=1.2, GLib >=2.66; en düşük sürümlerle ayrı matris testi yapılmadı |
+
+Dağıtımın sürümleri daha yüksek alt bağımlılık gereksinimleri taşıyabilir. İki doğrudan Rust bağımlılığı eklendi, geçişli bağımlılıklar Cargo.lock ile kilitlendi; medya motoru eklenmedi. Sistem geliştirme paketleri `libgtk-4-dev`, `libadwaita-1-dev` ve gerekli bağımlılıklarıdır. GUI test araçları: Xvfb, xauth, xdotool, Python 3 ve dbus-run-session.
+
+Bu kullanıcıda yönetici paket kurulumu yok. APT'nin imza/checksum doğrulaması korunarak resmi Debian paketleri indirildi; `/workspace/pivra-environment/native` altına açıldı, mevcut sistem runtime kütüphaneleri yerel geliştirme bağlantıları üzerinden tekrar kullanıldı. Temel sistem paketleri değiştirilmedi. `gtk-activate.sh` pkg-config, linker/runtime ve yazılabilir XDG dizinlerini hazırlar; Rust için mevcut activate.sh kullanılır. `prepare-gtk.sh` bu yerel GTK hazırlığını tekrarlar. Bu yardımcılar ortam dosyalarıdır, proje dağıtım/paketleme kodu değildir.
+
+### PIV-02.a–i durumları
+
+| Alt görev | Durum | Kanıt |
+|---|---|---|
+| PIV-02.a Ortam/uyumluluk | DONE | Native sürümler pkg-config ile; gerçek yüklenen GTK/adwaita/GLib yolları ldd ile doğrulandı; Rust korunuyor |
+| PIV-02.b Cargo | DONE | Uyumlu iki bağlayıcı ve Cargo.lock; check/build PASS |
+| PIV-02.c Yaşam döngüsü | DONE | adw::Application activation ile pencere kurar; son pencere kapanınca normal çıkış 0 |
+| PIV-02.d GNOME penceresi | DONE | AdwApplicationWindow, native HeaderBar ve boş genişleyen viewport; render görüntüsü incelendi |
+| PIV-02.e Kimlik | DONE | `io.github.onbeskarakterli.Pivra`; GIO id_is_valid testi PASS; pencere başlığı Pivra. MIME/desktop dosyası ve dosya açma ileriki görevlerde |
+| PIV-02.f Pencere yaşamı | DONE | Xvfb üzerinde iki bağımsız süreç/pencere, biri kapanırken diğeri açık; ikisi de WM_DELETE_WINDOW ile çıkış 0; displaysiz kontrollü çıkış 1 |
+| PIV-02.g CLI regresyonu | DONE | --help/-h, --version/-V; geçersiz argümanlar stderr + exit 2; üç eski unit test değişmeden korunuyor |
+| PIV-02.h Doğrulama | DONE | fmt/check/build/test/Clippy ve gerçek GTK X11 smoke PASS; atlanan Rust testi yok |
+| PIV-02.i GitHub/takip | DONE | Bağımlılık ve uygulama/test commit'leri normal push ile origin/dev'e gönderildi ve uzak HEAD doğrulandı; bu kapanış kaydı ayrıca commit edilir |
+
+### Son doğrulama sonuçları
+
+Tüm Cargo komutları depo kökünde `source /workspace/pivra-environment/gtk-activate.sh` sonrasında stable toolchain ile çalıştırıldı. Derleme paralelliği `-j 2`; Cargo lock korunarak önceden indirilen crate'ler kullanıldı.
+
+| Komut / kontrol | Gerçek sonuç |
+|---|---|
+| `cargo +stable fmt --check` | PASS — çıkış 0 |
+| `cargo +stable check --locked --offline -j 2` | PASS — çıkış 0 |
+| `cargo +stable build --locked --offline -j 2` | PASS — çıkış 0 |
+| `cargo +stable test --locked --offline -j 2` | PASS — 4 unit + 4 integration; 0 başarısız, 0 ignored |
+| `cargo +stable clippy --locked --offline --all-targets -j 2 -- -D warnings` | PASS — çıkış 0, uyarı yok |
+| CLI help/alias | PASS — --help/-h için PIV-01 ile aynı tam stdout, stderr boş, exit 0 |
+| CLI version/alias | PASS — --version/-V için Pivra 0.1.0 + newline, stderr boş, exit 0 |
+| CLI geçersiz argümanlar | PASS — --unknown, one two, --help --version: stdout boş, stderr `Pivra: invalid arguments; use --help` + newline, exit 2 |
+| Argümansız, DISPLAY/WAYLAND_DISPLAY yok, GDK_BACKEND=x11 | PASS — stdout boş; `Pivra: unable to initialize GTK; a graphical session is required:` ile başlayan kontrollü stderr, exit 1; panic yok |
+| `GTK_A11Y=none GSK_RENDERER=cairo GDK_BACKEND=x11 xvfb-run -a dbus-run-session -- python3 tests/gui_smoke.py` | PASS — iki ayrı 960x640 mapped GTK penceresi, başlık Pivra; normal kapatmalar exit 0; stdout/stderr boş; ilk kapanış ikincisini etkilemedi |
+| Render görüntüsü | PASS — aynı Xvfb ortamında ImageMagick import ile alınan pencere görüntüsünde başlık, minimize/maximize/close kontrolleri ve boş alan incelendi; görüntü ortamda `piv02-window.png` olarak tutuluyor |
+| `git diff --check` | PASS — whitespace hatası yok |
+
+Unit testler: PIV-01'in `no_arguments_starts_app`, `help_and_version_flags`, `invalid_arguments_are_rejected` testleri ve yeni `application_id_is_valid`. Dört integration testi yedi CLI argüman senaryosunu ve tek displaysiz başlatmayı process seviyesinde stdout/stderr/exit assertions ile doğrular.
+
+**İlk denemelerde bulunan ve giderilen sorunlar:** İlk check, GLib ExitCode için olmayan `.value()` çağrısı nedeniyle FAIL oldu; desteklenen Into dönüşümüyle düzeltildi. İlk link, çıkarılan geliştirme paketlerinin mevcut sistem runtime hedeflerine erişemeyen bağları nedeniyle FAIL oldu; yerel sysroot bağlantıları tamamlandı. İlk GUI testinde xdotool araması PID ve başlığı OR ile eşleştiriyordu; `--all` ile düzeltildi. Sonraki GUI denemesi yazılamayan varsayılan cache dizinleri nedeniyle stderr kontrolünde FAIL oldu; uygulama davranışını gizlemeden yazılabilir XDG dizinleri tanımlandı. Yukarıdaki son komut seti düzeltmelerden sonra bütünüyle PASS oldu. Debian snapshot adresinin 403 yanıtı, doğrulaması korunmuş resmi deb.debian.org deposu kullanılarak aşıldı.
+
+### Gerçek grafik testinin kapsamı
+
+Xvfb bir X11 grafik sunucusudur: uygulamanın gerçek GTK pencereleri map edildi ve Cairo ile render edildi. WM_DELETE_WINDOW standart kapatma protokolüdür; test başarı durumunda süreçleri kill/timeout ile kapatmaz. Pivra'ya test için otomatik kapanma bayrağı veya zamanlayıcı eklenmedi. Erişilebilirlik başlatımı yalnız minimal test oturumunda GTK_A11Y=none ile kapatıldı; uygulama erişilebilirliği veya sistem teması zorlamıyor.
+
+**Yapılmayanlar:** Fiziksel GNOME Shell/Wayland oturumu, HiDPI/çok monitör, donanım renderer, erişilebilirlik ve Nautilus dosya ilişkisi testi. Bunlar PASS olarak işaretlenmez; bu görev metnindeki gerçek GTK grafik açılış/kapanış kriteri Xvfb ile doğrulandı. Lisans kararı açık. GTK/adwaita alt sürüm matrisi test edilmedi.
+
+### Commit ve uzak dal kanıtı
+
+| Tam SHA | Kapsam / uzak durum |
+|---|---|
+| `04870b901333fe3dd0439d6bf75fbcd61d127f95` | Başlangıç yerel/uzak dev; PIV-01 kapanış kaydı |
+| `59bac1da79456cb39f42d2215b9ad670e1f3f900` | build(PIV-02): GTK/adwaita bağımlılıkları, minimum Rust ve Cargo.lock; origin/dev'e gönderildi |
+| `9b8fa621fbfff7d26f61746d040fd7033afe8606` | feat(PIV-02): native pencere, CLI/GUI testleri ve README; normal push sonrası origin/dev HEAD olarak doğrulandı |
+
+Bu son takip kaydının kendi SHA'sı `git log -1 --format=%H -- docs/PIVRA_COMMIT_TRACKER.md` ile alınır; commit kendi SHA'sını içermez. Son push'un uzak HEAD kanıtı ayrıca görev sonuç raporunda verilir.
+
+**Değişen proje dosyaları:** Cargo.toml, Cargo.lock, src/main.rs, README.md, docs/PIVRA_COMMIT_TRACKER.md; yeni tests/cli.rs ve tests/gui_smoke.py. Ürün kararları, şartname ve yol haritası değiştirilmedi. Görsel/video çözme, katalog, zoom/pan, önizleme, edit, slayt, paketleme ve CI kapsamına girilmedi.
+
+**Kapanış:** PIV-02 **DONE**; gerçek grafik açılış/kapanış, CLI regresyonu, tüm Rust kontrolleri ve kod push'u doğrulandı. PIV-03'e teknik ön koşul sağlandı; **PIV-03 başlatılmadı ve bu görevde ilerlenmeyecek.**

@@ -3,20 +3,21 @@ A fast, lightweight GNOME image viewer with seamless photo and video navigation,
 
 ## Development status
 
-**PIV-01: DONE. PIV-02: GTK4/libadwaita shell implemented and validated on 2026-10-21, on `dev`.** No image/video functionality, media engine or CI is included. PIV-03 separates application, window, CLI and core data responsibilities without changing that behavior. PIV-04 adds deterministic fixtures and isolated Rust/X11/headless Wayland test infrastructure. PIV-05 records versioned GTK/Glycin/GStreamer capability probes and explicit runtime gaps; production dependencies are unchanged. PIV-06 has not started.
+**PIV-01: DONE. PIV-02: GTK4/libadwaita shell implemented and validated on 2026-10-21, on `dev`.** No image/video functionality, media engine or CI is included. PIV-03 separates application, window, CLI and core data responsibilities without changing that behavior. PIV-04 adds deterministic fixtures and isolated Rust/X11/headless Wayland test infrastructure. PIV-05 records versioned GTK/Glycin/GStreamer capability probes and explicit runtime gaps; production dependencies are unchanged. PIV-06 adds local photo path/URI input and a decoder-free file placeholder. PIV-07 has not started.
 
 See [technical capabilities and open prerequisites](docs/PIVRA_TECHNICAL_CAPABILITIES.md) and [verified results and commit evidence](docs/PIVRA_COMMIT_TRACKER.md). PIV-05 is DONE; Phase 0 remains INCOMPLETE because a fresh native environment installation has not been independently reproduced. A clean Cargo target build and the existing headless regressions passed.
 
-Launching without arguments opens a blank `Pivra` window with a native libadwaita header and system theme. Each process owns an independent application/window (`io.github.onbeskarakterli.Pivra`, GIO NON_UNIQUE); file associations and Nautilus file-opening integration are future work. Closing the last window ends that process normally. If GTK cannot initialize a graphical session, the program prints a controlled error to stderr and exits 1. Help/version flags and invalid-argument exit 2 work without initializing GTK.
+Launching without arguments opens a blank `Pivra` window with a native libadwaita header and system theme. Each process owns an independent application/window (`io.github.onbeskarakterli.Pivra`, GIO NON_UNIQUE); one local photo path or file URI opens a file-associated placeholder through GIO `open`. The source desktop entry is ready for later native installation; actual Nautilus/default-application behavior is NOT RUN. Closing the last window ends that process normally. If GTK cannot initialize a graphical session, the program prints a controlled error to stderr and exits 1. Help/version flags and invalid-argument exit 2 work without initializing GTK.
 
 ### PIV-03 module boundaries
 
 | Module | Responsibility and allowed dependencies |
 |---|---|
 | `src/main.rs` | Dispatch CLI commands or launch the application; process exit codes |
-| `src/cli.rs` | Parse arguments and print help; app name only, no GTK initialization |
-| `src/app.rs` | GTK initialization, application identity/activation/lifetime; window builder and settings |
-| `src/window.rs` | Construct the existing header and empty viewport; read window dimensions from settings |
+| `src/cli.rs` | Parse OS arguments and print help; no GTK initialization or file I/O |
+| `src/input.rs` | Binary-side local path/URI, regular-file/readability and extension checks; GFile + MediaItem association; no decode |
+| `src/app.rs` | GTK initialization, NON_UNIQUE + HANDLES_OPEN, activate/open lifecycle; input boundary, windows and settings |
+| `src/window.rs` | Native header/viewport, optional file-owned context and decoder-free placeholder; window dimensions from settings |
 | `src/lib.rs` | Expose the small GUI-independent model modules and shared application name |
 | `src/media.rs` | `MediaItem`: supplied path and explicit `MediaKind`; no existence checks, extension guessing or decoding |
 | `src/catalog.rs` | `MediaCollection`: caller-ordered items and a bounded selection; depends only on media |
@@ -143,3 +144,94 @@ The validated source is commit `86a54f7094639d6a75a0c8798d8b48e7a65e8f12`; this 
 Earlier audits on 2026-10-20 were BLOCKED by the unavailable execution environment; those historical results are preserved in the tracker and are superseded by the successful run above. The feature specification and roadmap also contain historical pre-code wording; their accepted product decisions remain unchanged.
 
 See the [development roadmap](docs/PIVRA_DEVELOPMENT_ROADMAP.md), [feature specification](docs/PIVRA_FEATURE_SPEC_TR.md), and [commit tracker](docs/PIVRA_COMMIT_TRACKER.md). License selection remains open; no license is assumed. The PIV-01 results above describe the earlier CLI-only bootstrap; PIV-02 intentionally replaces its no-argument placeholder with the GTK window.
+
+
+### PIV-06 local file input — 2026-10-21
+
+PIV-06 provides input infrastructure, **not image decoding**. One readable regular
+local `.jpg`, `.jpeg` or `.png` file is admitted (case-insensitive extension).
+The file name appears in the title; the viewport and subtitle explicitly say
+`Image decoding is not implemented yet.` A malformed image with an admitted
+extension can still reach this placeholder. Other formats and videos are rejected
+at this boundary; this is not a decoder support matrix.
+
+```sh
+pivra
+pivra /home/user/Pictures/photo.jpg
+pivra './fotoğraf örneği.png'
+pivra 'file:///home/user/Pictures/foto%C4%9Fraf%20%C3%B6rne%C4%9Fi.png'
+pivra --help
+pivra --version
+```
+
+CLI parsing uses `args_os`, so local non-UTF-8 filenames do not panic. Plain paths
+are not percent-decoded; `file:` URIs use strict GLib parsing and filename
+conversion. Unicode, spaces, literal `#`, `?`, `%` and encoded URI bytes are tested.
+Only an empty authority or `localhost` is admitted; remote schemes/hosts,
+query/fragment/credentials/ports and malformed escapes are rejected. Prefix an
+ambiguous colon-containing or `-`-starting relative filename with `./`. Exactly
+one file argument is accepted; multiple positional arguments and unknown flags
+retain exit 2 and the previous invalid-argument diagnostic. Help/version flags
+and aliases still work without GTK; help adds the file-input syntax.
+
+`input` checks metadata, opens read-only, checks the descriptor's regular-file
+type, and drops the handle **without reading file contents**. Symlinks to readable
+regular files are accepted with the requested alias retained; dangling links,
+directories, special files, unreadable files and unsupported extensions fail
+with a controlled stderr diagnostic/exit 2 before GTK initialization. GTK/session
+failure remains exit 1. At GIO `open`, the file is checked again; a now-invalid/missing
+file fails with exit 1 and no success window. Each window owns its GFile/MediaItem
+association for its lifetime. Core library modules remain GTK/GIO independent.
+
+These are point-in-time checks. **TOCTOU remains:** a path/symlink may be replaced
+between checks or before future decoding; no persistent descriptor/content
+identity is promised. Local filesystem checks are synchronous; mounted network
+filesystems and adversarial replacement with a blocking special file require
+later cancellation/descriptor policy. Remote/network/VFS support is not claimed.
+Decoder integration must revalidate the actual resource; no sandbox bypass or
+Glycin integration was added. The 8 GiB sparse-file test verifies admission
+without loading its contents; it is not a decoder performance benchmark.
+
+Native desktop source: [`data/io.github.onbeskarakterli.Pivra.desktop`](data/io.github.onbeskarakterli.Pivra.desktop).
+`Exec=pivra %u` admits one URI; `MimeType=image/jpeg;image/png;` lists input
+candidates; `DBusActivatable=false` matches independent Exec launches, not remote
+single-instance activation. A future native installation must place `pivra` on
+PATH and install the entry under the distribution's applications directory.
+This task **installs nothing and changes no MIME defaults**, including video defaults.
+`desktop-file-validate`, GIO parsing, and real `gio launch` of the source entry
+with a temporary PATH binary and isolated XDG directories passed on Xvfb.
+This technical launch test is distinct from **real Nautilus double-click/default
+photo application testing: NOT RUN (gate DESKTOP-06)**. JPEG/PNG decode is also
+NOT RUN; that is PIV-09. No default photo-viewer change is recommended for this
+placeholder-only development build.
+
+Validation: **26 Rust tests passed (16 unit + 10 integration), 0 failed/ignored**;
+fmt/check/build/Clippy and fixture integrity passed. Original empty-window
+X11/Sway/Weston checks passed. Additional path + encoded-URI windows passed X11
+and Sway with independent normal close/exit 0; Weston proved an associated
+native Wayland surface and real buffer commit for URI input. Weston normal
+close and physical GNOME/Wayland remain NOT RUN. The GIO desktop launch test
+observes normal WM close/process termination, but cannot retrieve the detached
+application exit status; direct GUI tests check exit 0 separately.
+
+Run additional file-input checks after the existing activation/build:
+
+```sh
+GTK_A11Y=none GSK_RENDERER=cairo GDK_BACKEND=x11 \
+  xvfb-run -a dbus-run-session -- python3 tests/gui_smoke.py target/debug/pivra --files
+dbus-run-session -- python3 tests/wayland_smoke.py target/debug/pivra --files
+PIVRA_WESTON_PREFIX=/workspace/pivra-environment/weston/usr \
+  dbus-run-session -- python3 tests/weston_smoke.py target/debug/pivra --files
+desktop-file-validate data/io.github.onbeskarakterli.Pivra.desktop
+GTK_A11Y=none GSK_RENDERER=cairo GDK_BACKEND=x11 \
+  xvfb-run -a dbus-run-session -- python3 tests/desktop_smoke.py
+```
+
+**PIV-06 DONE** covers the tested input/placeholder/desktop-entry infrastructure;
+the final Nautilus double-click acceptance remains DESKTOP-06, NOT RUN. Phase 0's
+independent clean-native-install gate remains INCOMPLETE as recorded in PIV-05;
+this explicit PIV-06 request authorized this limited work without declaring that
+gate passed. Glycin loader/ABI/SDK and Codex sandbox restrictions, GStreamer
+SDK/gtk4paintablesink/Libav gaps remain in the technical capabilities document.
+Before later decoder/player work those runtime gates must pass. PIV-07 is TODO;
+folder discovery/sorting/navigation has not been implemented.

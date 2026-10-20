@@ -1,7 +1,7 @@
 # Pivra — Planlı Commit ve İlerleme Takibi
 
 **Kaynak:** [Özellik Şartnamesi](PIVRA_FEATURE_SPEC_TR.md) · [Yol Haritası](PIVRA_DEVELOPMENT_ROADMAP.md)  
-**Branch:** `dev` · **Durum:** PIV-01 **DONE (21.10.2026)**; PIV-02 **DONE (21.10.2026, Xvfb GTK pencere doğrulaması)**; PIV-03 **DONE (21.10.2026)**; PIV-04–60 TODO, başlatılmadı. Güncel kapanış kanıtı son bölümde; 20.10.2026 kayıtları tarihçedir. Burada listelenen `PIV-xx` kimlikleri gerçek Git commit SHA'sı **değildir**.
+**Branch:** `dev` · **Durum:** PIV-01 **DONE (21.10.2026)**; PIV-02 **DONE (21.10.2026, Xvfb GTK pencere doğrulaması)**; PIV-03 **DONE (21.10.2026)**; PIV-04 **DONE (21.10.2026; grafik test kategorileri ayrı)**; PIV-05–60 TODO, başlatılmadı. Güncel kapanış kanıtı son bölümde; 20.10.2026 kayıtları tarihçedir. Burada listelenen `PIV-xx` kimlikleri gerçek Git commit SHA'sı **değildir**.
 
 ## Kullanım kuralları
 
@@ -19,7 +19,7 @@
 | PIV-01 | `chore: initialize Rust Cargo app` | Cargo derlenir; temel dizin ve lisans/README korunur | **DONE — 21.10.2026** | `b246ee7`, `27315e6`, `90d495b`; doğrulama/lock/README: `2950193ca038b91c29ed97a7c46d773502d68dd4` |
 | PIV-02 | `feat: create GTK4 libadwaita application shell` | GNOME stili boş/sade GTK pencere; açılış/kapanış Xvfb X11 üzerinde doğrulandı | **DONE — 21.10.2026** | `59bac1da79456cb39f42d2215b9ad670e1f3f900`, `9b8fa621fbfff7d26f61746d040fd7033afe8606` |
 | PIV-03 | `refactor: define app media and settings boundaries` | Modül sınırları, GTK bağımsız modeller, CLI/GUI regresyonları doğrulandı | **DONE — 21.10.2026** | `7a1f867d5021a83014f8f4f72c5ef772327bc85d`, `4eaa34bf949f9cc77238198b499f45d21bdd569b` |
-| PIV-04 | `test: establish fixtures and local verification commands` | Deterministik örnek medya/fixture kuralları ve cargo test komutları | TODO | — |
+| PIV-04 | `test: establish fixtures and local verification commands` | Deterministik fixture/geçici dizin testleri, Rust/CLI ve ayrı X11/Wayland kanıtları | **DONE — 21.10.2026** | `42d9a35efaabef16e93a74354d2684c0f5937a7c`, `875bc07f92ceca4c6588d4ab8ef05c6b3a531d28` |
 | PIV-05 | `docs: record dependency capability probes` | GTK/Glycin/GStreamer sürüm ve yetenekleri, risk kararı yazılır | TODO | — |
 
 ## Faz 1 — Fotoğraf görüntüleme çekirdeği
@@ -121,7 +121,7 @@
 
 | Faz | ID aralığı | Planlı commit | Tamamlanan |
 |---|---|---:|---:|
-| 0 — Temel | 01–05 | 5 | 3 |
+| 0 — Temel | 01–05 | 5 | 4 |
 | 1 — Fotoğraf | 06–12 | 7 | 0 |
 | 2 — Zoom/performans | 13–18 | 6 | 0 |
 | 3 — Video temel | 19–24 | 6 | 0 |
@@ -130,9 +130,9 @@
 | 6 — Uyumluluk/paket | 40–47 | 8 | 0 |
 | 7 — Edit (en son özellik geliştirmesi) | 48–57 | 10 | 0 |
 | 8 — Son doğrulama | 58–60 | 3 | 0 |
-| **TOPLAM** | **PIV-01–60** | **60** | **3** |
+| **TOPLAM** | **PIV-01–60** | **60** | **4** |
 
-> PIV-01–03 tamamlandı; PIV-04–60 gelecekteki işlerdir. Görev kimlikleri commit SHA'sı değildir. İlk planlama ve önceki engel kayıtları aşağıda tarihçe olarak korunur.
+> PIV-01–04 tamamlandı; PIV-05–60 gelecekteki işlerdir. Görev kimlikleri commit SHA'sı değildir. İlk planlama ve önceki engel kayıtları aşağıda tarihçe olarak korunur.
 
 ## PIV-01 ayrıntılı ilerleme — 20.10.2026
 
@@ -413,3 +413,93 @@ Bu kapanış kaydının kendi SHA'sı öz referans oluşturmak yerine `git log -
 **Değişen dosyalar:** src/main.rs, README.md, docs/PIVRA_COMMIT_TRACKER.md, tests/gui_smoke.py; yeni src/lib.rs, src/app.rs, src/cli.rs, src/window.rs, src/media.rs, src/catalog.rs, src/settings.rs. Şartname ve yol haritası değiştirilmedi. Decoder, video oynatma, klasör tarama, zoom, Edit, Flatpak/AppImage, CI veya lisans eklenmedi.
 
 **Kapanış:** PIV-03 **DONE**. PIV-04 ve sonrası **TODO; başlatılmadı**. Görev burada durur.
+
+
+## PIV-04 kapanışı — 21.10.2026
+
+**Güncel sonuç: DONE.** Deterministik test/fixture altyapısı ve mevcut regresyonlar doğrulandı. Grafik kategorileri aşağıda ayrı tutulur. **Fiziksel GNOME/Wayland NOT RUN; Weston normal kapanış NOT RUN.** Bunlar X11 veya Sway başarısıyla PASS sayılmadı. Kullanıcının PIV-04 koşulları bu kayıtlı kapsam sınırlarıyla sağlandı. **PIV-05 başlatılmadı; Faz 0 bütünüyle tamamlanmadı.**
+
+### Başlangıç ve ortamın korunması
+
+- Başlangıç yerel ve uzak `dev`: `2b425fa5b5808fff26ccf994559459be4b80a4aa`; çalışma dizini temizdi. PIV-01–03 DONE ve PIV-03 commit'leri doğrulandı.
+- Depo `/workspace/Pivra`. Şartname, yol haritası, takip tablosu, README, mevcut unit/integration/CLI testleri ve Xvfb smoke okundu. AGENTS.md yok.
+- Rust/Cargo 1.99.1, native GTK 4.18.6, libadwaita 1.7.6, GLib 2.84.4 korundu. Mevcut `gtk-activate.sh` kullanıldı; Rust/GTK kurulumu veya activation dosyası değiştirilmedi, yeniden kurulmadı.
+- Production `src/` dosyaları değişmedi. Yalnız dev-dependency `tempfile 3.27.0` ve kilitli test bağımlılıkları eklendi; gerçek medya decoder/video motoru veya tarama işlevi yok.
+- Başlangıç/uygulama push'u sonrası uzak main: `5d55ee599df4617bd51c09b1c7a008b8d0ece480`; main'e yazılmadı. Force-push/rebase/geçmiş değişikliği yapılmadı.
+
+### PIV-04.a–h durumları
+
+| Alt görev | Durum | Kanıt |
+|---|---|---|
+| PIV-04.a Test denetimi | DONE | Eski 9 unit + 4 integration korundu. Mevcut boş/tek/sınır katalog testleri gereksiz kopyalanmadı. CLI'nin yanlışlıkla gerçek Wayland socket'ine bağlanma riski özel runtime ile giderildi; GUI alt süreç timeout/cleanup ortaklaştırıldı |
+| PIV-04.b Fixture stratejisi | DONE | 86-byte original PNG, 83-byte açıkça oynatılamaz video-model metni, deterministik generator ve SHA-256 manifest. JPEG/WebP/animasyon/video gereksinimleri belgeli; lisans seçilmedi |
+| PIV-04.c Geçici dosyalar | DONE | tempfile özel dizinleri, Türkçe/boşluk/Unicode yollar; normal scope ve panic-unwind temizliği, 8 paralel aynı-ad dosya izolasyonu test edildi |
+| PIV-04.d Model testleri | DONE | Eski boş/tek/çoklu/sıra/geçersiz indeks unit testleri PASS; yeni fixture integration testi gerçek kopyalarla Unicode path, Image/Video metadata, seçimin ve byte'ların korunmasını doğruladı |
+| PIV-04.e CLI/GUI regresyonu | DONE | Help/-h/version/-V, üç invalid argüman exit 2; displaysiz X11 ve Wayland exit 1. Xvfb ve Sway'de başlık/boyut/iki bağımsız pencere/normal kapanış ve boş stdout/stderr doğrulandı |
+| PIV-04.f Wayland + X11 | DONE — kapsamları ayrı | Xvfb PASS; Sway headless native Wayland yaşam döngüsü PASS; Weston headless gerçek yüzey/protokol PASS, Weston normal kapanış NOT RUN; fiziksel GNOME/Wayland NOT RUN |
+| PIV-04.g Çalıştırma/belge | DONE | tests/check.sh, fixture integrity, 16 Rust testi ve tüm zorunlu Cargo kontrolleri PASS; README ve kısa yol haritası stratejisi güncellendi |
+| PIV-04.h Commit/push/takip | DONE | İki test commit'i normal push ile origin/dev'e gönderildi ve uzak HEAD doğrulandı; gerçek SHA'lar bu tabloya kaydedildi. Bu kapanış belgesi ayrıca commit/push edilir |
+
+### Fixture ve yeni test listesi
+
+- `tests/fixtures/pixels-2x2.png`: orijinal sabit RGBA değerlerinden üretilmiş 2x2 PNG, 86 byte; dışarıdan indirilmiş içerik yok.
+- `tests/fixtures/model-video.txt`: 83 byte **NOT playable media** metni; yalnız explicit Video metadata testi. Bu dosya gerçek video veya codec doğrulaması değildir.
+- `tests/fixtures/generate.py`, `manifest.json`, `README.md`: sabit stored-DEFLATE PNG üretimi, SHA-256/uzunluk/provenance, proje lisansının hâlâ kararsız olduğu bilgisi; lisans dosyası/grant eklenmedi. JPEG/WebP/iki kare animasyon ve küçük gerçek video ihtiyaçları ileriki testlere belgeli.
+- `tests/support/mod.rs`: test başına private tempfile dizini. `tests/models.rs` içindeki üç yeni integration testi: mixed_catalog_preserves_unicode_paths_kinds_order_and_file_contents; temporary_files_are_removed_after_normal_scope_and_unwinding; parallel_tests_can_use_the_same_filename_without_sharing_files.
+- `tests/cli.rs`: mevcut dört test korundu; boş runtime ve zorlanmış backend ile headless hata artık X11 ve Wayland için ayrı alt senaryolarda doğrulanıyor.
+- `tests/check.sh`: fixture + fmt/check/build/test/Clippy runner; GUI kategorilerini sessizce atlayıp başarılı saymaz. `tests/gui_support.py`: yalnız teste ait süreçler için bounded cleanup; cleanup bir normal kapatma kanıtı değildir.
+- `tests/wayland_smoke.py`: Sway native Wayland yaşam döngüsü; `tests/weston_smoke.py`: ayrıca Weston 14 server-side yüzey/protokol testi. Eski `tests/gui_smoke.py` X11 kategorisi olarak korundu.
+
+### Gerçek çalıştırma sonuçları
+
+Mevcut GTK activation sonrasında komutlar `/workspace/Pivra` içinde çalıştırıldı; `cargo fetch --locked` ile yeni dev-dependency cache'i bir kez hazırlandı. İlk offline test girişimi henüz cache'te bulunmayan cfg-if nedeniyle FAIL oldu; kilitli fetch'ten sonra ilgili tüm kontroller PASS oldu. Bu kurulum/cache sorunu, test assertion başarısı olarak gizlenmedi.
+
+| Komut / kontrol | Gerçek sonuç |
+|---|---|
+| `python3 tests/fixtures/generate.py --check` | PASS — PNG/metin/manifest beklenen byte'larla aynı |
+| Geçici kopyada PNG'nin tek byte'ını bozup aynı --check'i çalıştırma | PASS negatif kontrol — bozulmuş kopya nonzero ve FAIL fixture differs ile reddedildi; repodaki fixture değiştirilmedi |
+| `cargo +stable fmt --check` | PASS — exit 0 |
+| `cargo +stable check --locked --offline -j 2` | PASS — exit 0 |
+| `cargo +stable build --locked --offline -j 2` | PASS — exit 0 |
+| `cargo +stable test --locked --offline -j 2` | PASS — **9 unit + 7 integration = 16**, 0 fail, 0 ignored; 0 doctest doğrulama kanıtı sayılmaz |
+| `cargo +stable clippy --locked --offline --all-targets -j 2 -- -D warnings` | PASS — exit 0, uyarı yok |
+| `PIVRA_ENV_ACTIVATE=/workspace/pivra-environment/gtk-activate.sh bash tests/check.sh` | PASS — aynı fixture ve Cargo seti gerçekten tamamlandı |
+| PIV-01 CLI regresyonları | PASS — help/-h, version/-V tam stdout, boş stderr, exit 0; üç invalid argüman stdout boş, kontrollü stderr, exit 2 |
+| Displaysiz CLI başlangıcı | PASS — özel socket-free runtime içinde hem GDK_BACKEND=x11 hem wayland için stdout boş, kontrollü GTK hata stderr'i, exit 1, panic yok |
+| `GTK_A11Y=none GSK_RENDERER=cairo GDK_BACKEND=x11 xvfb-run -a dbus-run-session -- python3 tests/gui_smoke.py` | **PASS X11/Xvfb** — iki ayrı mapped 960x640 Pivra pencere, WM_DELETE_WINDOW normal kapanışları exit 0; stdout/stderr boş ve bağımsız yaşam |
+| `dbus-run-session -- python3 tests/wayland_smoke.py` | **PASS headless Wayland/Sway** — iki native xdg_shell yüzey, PID/app ID/başlık/960x640, Wayland close isteği sonrası exit 0; stdout/stderr boş ve bağımsız yaşam |
+| `PIVRA_WESTON_PREFIX=/workspace/pivra-environment/weston/usr dbus-run-session -- python3 tests/weston_smoke.py` | **PASS Weston yüzey kontrolleri / normal kapanış NOT RUN** — aşağıdaki server-side kanıtlar; cleanup SIGTERM sonucu exit-0 kapanış testi sayılmaz |
+| Fiziksel GNOME Shell/Wayland | **NOT RUN** — headless/X11 sonuçları bunun yerine geçmez |
+| `git diff --check`, production src fark kontrolü | PASS — whitespace hatası yok; uygulama kaynakları değişmedi |
+
+### Headless Wayland / Sway kanıtı
+
+Başlangıçta compositor bulunmadı. Resmi Debian 13 APT paketleri, imza/checksum doğrulaması korunarak download-only ile indirildi; sway 1.10.1 ve wlroots 0.18.2 gerekli runtime'ları mevcut yerel native araç ağacına açıldı. Sistem paketleri kurulmadı/yükseltilmedi. Geçici config, wlroots headless/Pixman renderer, 1280x1024 çıkış, floating borderless pencereler ve `xwayland disable` kullanıyor.
+
+Her test ayrı 0700 runtime/cache/config/data dizini ve D-Bus oturumunda çalışır. GDK_BACKEND=wayland zorlanır, DISPLAY kaldırılır. Başarılı sonuç yalnız PID/socket'e dayanmaz: compositor IPC ağacında her PID ve `io.github.onbeskarakterli.Pivra` için visible **xdg_shell** yüzey, Pivra başlığı ve 960x640 window_rect zorunludur. Kapatmada Sway'in con_id kill komutu xdg_toplevel.close gönderir; test app process exit 0, boş stdout/stderr, yüzeyin ağaçtan kalkması ve diğer pencerenin açık kalmasını doğrular. Test hook'u veya otomatik kapanma uygulamaya eklenmedi.
+
+### Kullanıcının ek Weston araştırması ve kanıtı
+
+- Sistem ve önceki native ağaçta Weston/libweston yoktu; temel Wayland client/server, Pixman ve DRM runtime'ları zaten vardı. Yönetici paket kurulumu yok; resmi Debian weston 14.0.2/libweston-14 ve gerekli runtime paketleri download-only ile alınıp **ayrı** `/workspace/pivra-environment/weston` altına açıldı.
+- Rust/GTK kurulumu, mevcut activation ve sistem `/usr`/paket veritabanı değiştirilmedi. Weston'un relocated library path, WESTON_MODULE_MAP, veri ve desktop-shell/keyboard client yolları yalnız testin environment/config dosyasında tanımlı; kalıcı sistem ayarı yok.
+- İlk absolute --backend path girişimi Weston tarafından reddedildi; belgelenen backend adı `headless` ve desteklenen WESTON_MODULE_MAP ile düzeltildi. Sonraki hard-coded /usr/libexec client hatası geçici weston.ini içindeki extracted client yollarıyla düzeltildi. Headless/Pixman bundan sonra başarıyla çalıştı.
+- Test özel 0700 runtime, ayrı dbus-run-session, GDK_BACKEND=wayland, DISPLAY olmaması, xwayland=false ve Pixman/Cairo kullanır. Weston debug uzantısı yalnız bu izole test süresince etkin; compositor test sonunda durdurulur.
+- **Gerçek yüzey kanıtı:** Weston scene-graph içinde app PID'sine ait xdg_toplevel, Pivra başlığı, headless output üzerinde mapped View ve gerçek SHM buffer. Sunucunun proto akışı aynı PID için set_title, set_window_geometry(...,960,640), ack_configure ve non-null wl_buffer attach/commit gösterir. Sadece process/socket başarısı PASS sayılmadı. Buffer'ın CSD gölgeleri nedeniyle pencere geometrisinden büyük olması hata değildir; 960x640 kontrolü xdg window geometry üzerinden yapılır.
+- **Weston normal kapanış: NOT RUN.** Bu packaged headless kurulumun arayüzlerinde normal pencere kapatmayı otomatikleştiren standart kontrol IPC'si bulunmadı. Test cleanup sırasında yalnız kendi Pivra sürecine SIGTERM gönderir; bu exit-0/normal kapanış iddiası değildir. stdout/stderr'in boş olduğu ayrıca kontrol edilir. Normal native Wayland kapanışı Sway kategorisinde test edildi, Weston'a aktarılmadı.
+- Fiziksel GNOME Shell/Wayland, HiDPI, touchpad, çoklu monitör, erişilebilirlik ve donanım render **NOT RUN**; gelecek doğrulamalar olarak ayrı tutulur. GTK_A11Y=none yalnız minimal test oturumu içindir.
+
+Eksik compositor aracı ilgili scriptte BLOCKED/exit 77; startup/assertion hatası nonzero FAIL olur. Bu oturumdaki nihai Sway ve Weston surface kontrolleri gerçekten çalıştı. Test araçlarının tekrar hazırlanması ortam yardımcısı `prepare-wayland.sh` ile download-only/extract olarak doğrulandı; mevcut Rust/GTK yeniden kurulmaz.
+
+### Commit ve uzak dal kanıtı
+
+| Tam SHA | Kapsam / uzak durum |
+|---|---|
+| `2b425fa5b5808fff26ccf994559459be4b80a4aa` | Başlangıç yerel/uzak dev; PIV-03 DONE |
+| `42d9a35efaabef16e93a74354d2684c0f5937a7c` | Deterministik fixture'lar, tempfile/test-only lock, private runtime CLI regresyonu, model/cleanup testleri ve core runner |
+| `875bc07f92ceca4c6588d4ab8ef05c6b3a531d28` | Ayrı Sway/Weston native Wayland testleri, ortak GUI cleanup/timeout ve README/yol haritası; normal push sonrası origin/dev HEAD doğrulandı |
+
+Bu son kapanış kaydının kendi SHA'sı öz referans yerine `git log -1 --format=%H -- docs/PIVRA_COMMIT_TRACKER.md` ile alınır. Son push ve uzak HEAD doğrulaması görev sonuç raporunda verilir.
+
+**Değişen/eklenen dosyalar:** .gitignore, Cargo.toml/Cargo.lock, README, yol haritası/takip tablosu; tests/cli.rs, gui_smoke.py, check.sh, gui_support.py, models.rs, support/mod.rs, wayland_smoke.py, weston_smoke.py ve fixtures/{README.md,generate.py,manifest.json,model-video.txt,pixels-2x2.png}. Production src ve şartname değişmedi. Uygulama decoder, oynatıcı, tarama, zoom/pan/Edit, paketleme/Flatpak/AppImage veya CI içermiyor; lisans seçilmedi.
+
+**Kapanış:** PIV-04 **DONE**. Weston normal kapanış ve fiziksel GNOME/Wayland sınırlamaları ayrı ve açık kayıttadır. PIV-05 **TODO; başlatılmadı**. Görev burada durur.

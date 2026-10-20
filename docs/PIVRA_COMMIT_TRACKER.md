@@ -1,7 +1,7 @@
 # Pivra — Planlı Commit ve İlerleme Takibi
 
 **Kaynak:** [Özellik Şartnamesi](PIVRA_FEATURE_SPEC_TR.md) · [Yol Haritası](PIVRA_DEVELOPMENT_ROADMAP.md)  
-**Branch:** `dev` · **Durum:** PIV-01 **DONE (21.10.2026)**; PIV-02 **DONE (21.10.2026, Xvfb GTK pencere doğrulaması)**; PIV-03 **DONE (21.10.2026)**; PIV-04 **DONE (21.10.2026; grafik test kategorileri ayrı)**; PIV-05–60 TODO, başlatılmadı. Güncel kapanış kanıtı son bölümde; 20.10.2026 kayıtları tarihçedir. Burada listelenen `PIV-xx` kimlikleri gerçek Git commit SHA'sı **değildir**.
+**Branch:** `dev` · **Durum:** PIV-01 **DONE (21.10.2026)**; PIV-02 **DONE (21.10.2026, Xvfb GTK pencere doğrulaması)**; PIV-03 **DONE (21.10.2026)**; PIV-04 **DONE (21.10.2026; grafik test kategorileri ayrı)**; PIV-05 **DONE (21.10.2026; belgeleme/probe kapsamı)**; PIV-06–60 TODO, başlatılmadı. Faz 0 **INCOMPLETE** (temiz native kurulum yeniden üretimi NOT RUN). Güncel kapanış kanıtı son bölümde; 20.10.2026 kayıtları tarihçedir. Burada listelenen `PIV-xx` kimlikleri gerçek Git commit SHA'sı **değildir**.
 
 ## Kullanım kuralları
 
@@ -20,7 +20,7 @@
 | PIV-02 | `feat: create GTK4 libadwaita application shell` | GNOME stili boş/sade GTK pencere; açılış/kapanış Xvfb X11 üzerinde doğrulandı | **DONE — 21.10.2026** | `59bac1da79456cb39f42d2215b9ad670e1f3f900`, `9b8fa621fbfff7d26f61746d040fd7033afe8606` |
 | PIV-03 | `refactor: define app media and settings boundaries` | Modül sınırları, GTK bağımsız modeller, CLI/GUI regresyonları doğrulandı | **DONE — 21.10.2026** | `7a1f867d5021a83014f8f4f72c5ef772327bc85d`, `4eaa34bf949f9cc77238198b499f45d21bdd569b` |
 | PIV-04 | `test: establish fixtures and local verification commands` | Deterministik fixture/geçici dizin testleri, Rust/CLI ve ayrı X11/Wayland kanıtları | **DONE — 21.10.2026** | `42d9a35efaabef16e93a74354d2684c0f5937a7c`, `875bc07f92ceca4c6588d4ab8ef05c6b3a531d28` |
-| PIV-05 | `docs: record dependency capability probes` | GTK/Glycin/GStreamer sürüm ve yetenekleri, risk kararı yazılır | TODO | — |
+| PIV-05 | `docs: record dependency capability probes` | Sürümlü araştırma, izole probe, açık risk/ön koşullar ve Rust/X11/Sway/Weston regresyonları | **DONE — 21.10.2026** | `83e3590c1d4dbe7fd9cc89d9e352031198a3319e`, `aca1fb215fc7b23bdc5cfaa6fff3171bd11bddd5` |
 
 ## Faz 1 — Fotoğraf görüntüleme çekirdeği
 
@@ -121,7 +121,7 @@
 
 | Faz | ID aralığı | Planlı commit | Tamamlanan |
 |---|---|---:|---:|
-| 0 — Temel | 01–05 | 5 | 4 |
+| 0 — Temel | 01–05 | 5 | 5 |
 | 1 — Fotoğraf | 06–12 | 7 | 0 |
 | 2 — Zoom/performans | 13–18 | 6 | 0 |
 | 3 — Video temel | 19–24 | 6 | 0 |
@@ -130,9 +130,9 @@
 | 6 — Uyumluluk/paket | 40–47 | 8 | 0 |
 | 7 — Edit (en son özellik geliştirmesi) | 48–57 | 10 | 0 |
 | 8 — Son doğrulama | 58–60 | 3 | 0 |
-| **TOPLAM** | **PIV-01–60** | **60** | **4** |
+| **TOPLAM** | **PIV-01–60** | **60** | **5** |
 
-> PIV-01–04 tamamlandı; PIV-05–60 gelecekteki işlerdir. Görev kimlikleri commit SHA'sı değildir. İlk planlama ve önceki engel kayıtları aşağıda tarihçe olarak korunur.
+> PIV-01–05 tamamlandı; PIV-06–60 gelecekteki işlerdir. Görev sayacı 5/5 olsa da Faz 0 kapısı INCOMPLETE: temiz native kurulum yeniden üretimi NOT RUN. Görev kimlikleri commit SHA'sı değildir. İlk planlama ve önceki engel kayıtları aşağıda tarihçe olarak korunur.
 
 ## PIV-01 ayrıntılı ilerleme — 20.10.2026
 
@@ -503,3 +503,97 @@ Bu son kapanış kaydının kendi SHA'sı öz referans yerine `git log -1 --form
 **Değişen/eklenen dosyalar:** .gitignore, Cargo.toml/Cargo.lock, README, yol haritası/takip tablosu; tests/cli.rs, gui_smoke.py, check.sh, gui_support.py, models.rs, support/mod.rs, wayland_smoke.py, weston_smoke.py ve fixtures/{README.md,generate.py,manifest.json,model-video.txt,pixels-2x2.png}. Production src ve şartname değişmedi. Uygulama decoder, oynatıcı, tarama, zoom/pan/Edit, paketleme/Flatpak/AppImage veya CI içermiyor; lisans seçilmedi.
 
 **Kapanış:** PIV-04 **DONE**. Weston normal kapanış ve fiziksel GNOME/Wayland sınırlamaları ayrı ve açık kayıttadır. PIV-05 **TODO; başlatılmadı**. Görev burada durur.
+
+
+## PIV-05 kapanış — 21.10.2026
+
+**PIV-05: DONE; Faz 0: INCOMPLETE.** Önceki PIV-04 sonundaki "PIV-05 başlatılmadı"
+kaydı tarihçedir. Yalnız PIV-05 araştırma, probe ve belgelemesi yapıldı; PIV-06
+ve sonraki özellikler başlatılmadı. Production `src/`, `Cargo.toml`, `Cargo.lock`,
+mevcut fixture ve smoke testleri değiştirilmedi. Ortam sıfırlanmadı; sistem paketi,
+CI, decoder/player, Flatpak/AppImage veya lisans eklenmedi.
+
+### Başlangıç ve gerçek commit kanıtı
+
+- Başlangıç: temiz `dev`, `origin/dev` ile eşit: `8b3947215c54dfd2515df61a50dd05c080eccf31`.
+- İzole probe + envanter: `83e3590c1d4dbe7fd9cc89d9e352031198a3319e`.
+- Teknik karar belgesi + README/yol haritası: `aca1fb215fc7b23bdc5cfaa6fff3171bd11bddd5`.
+- Bu kapanış kaydı ayrı takip commit'idir; kendi SHA'sı kendi dosyasına yazılamaz.
+  Kesin bitiş SHA'sı Git log/uzak HEAD ve teslim raporunda doğrulanır.
+- `main` referansı: `5d55ee599df4617bd51c09b1c7a008b8d0ece480`; değiştirilmedi.
+
+### PIV-05.a–h kabul durumu
+
+| Alt görev | Durum | Kanıt ve sınır |
+|---|---|---|
+| a Ortam | DONE | Debian 13 x86_64; Rust/Cargo 1.99.1, GTK 4.18.6/adw 1.7.6/GLib 2.84.4; 190 pkg-config modülü ve factory snapshot'ı `docs/probes/PIV05_ENVIRONMENT.json` |
+| b GTK | DONE | Sentetik texture/pixel/Paintable/Picture, GSK TextureNode, gesture/scroll nesneleri, realized surface scale=1; gerçek gesture, GPU ve fractional scale NOT RUN |
+| c Glycin | DONE — araştırma | 3.0.8 wrapper hattı aday; format/loader/ICC/orientation/bellek/sandbox sürümlü kaynak değerlendirmesi. Loader/SDK eksik, sandbox probe BLOCKED; gerçek decode NOT RUN |
+| d GStreamer | DONE — araştırma | 1.26.2 registry sorgusu, plugin grupları ve sürümlü sink/seek/audio/subtitle/export değerlendirmesi. Sıfır pipeline; playback NOT RUN |
+| e Backend | DONE | Aşağıdaki gerçek Pivra X11/Sway/Weston regresyonları; fiziksel GNOME ve Weston normal kapanış NOT RUN |
+| f Risk | DONE | Teknik belge bölümleri 8–10: byte bütçesi, iptal, codec, renk, driver, loader/ABI ve dağıtım riskleri |
+| g Belge | DONE | `docs/PIVRA_TECHNICAL_CAPABILITIES.md`; çalıştırıldı/kaynak/NOT RUN/BLOCKED açıkça ayrı |
+| h Kapanış | DONE | Küçük dev commit'leri, gerçek SHA/test kaydı; normal origin/dev push ve uzak HEAD eşitliği teslim sırasında doğrulanır |
+
+### Gerçek komut sonuçları
+
+Ortam: `source /workspace/pivra-environment/gtk-activate.sh`.
+
+| Komut / deney | Sonuç |
+|---|---|
+| `bash tests/check.sh` | PASS: fixture, fmt/check/build/test/clippy |
+| `cargo +stable fmt --check` | PASS |
+| `cargo +stable check --locked --offline -j 2` | PASS |
+| `cargo +stable build --locked --offline -j 2` | PASS |
+| `cargo +stable test --locked --offline -j 2` | PASS: 9 unit + 7 integration = **16**, 0 failed/ignored; 0 doctest |
+| `cargo +stable clippy --locked --offline --all-targets -j 2 -- -D warnings` | PASS |
+| `python3 tests/fixtures/generate.py --check` | PASS: PNG/model-video/manifest deterministik bütünlüğü; decode iddiası yok |
+| PIV-01 CLI regresyonları | PASS: mevcut integration testlerindeki help/version/no-args/hatalı argüman davranışları |
+| `tests/gui_smoke.py` (Xvfb + D-Bus, GDK_BACKEND=x11, Cairo) | PASS: iki mapped 960x640 Pivra penceresi, normal WM_DELETE_WINDOW, exit 0 ve boş stdout/stderr |
+| `tests/wayland_smoke.py` (D-Bus, Sway headless) | PASS: iki native xdg_shell yüzeyi, DISPLAY yok/XWayland kapalı; iki normal close, exit 0 ve boş stdout/stderr |
+| `tests/weston_smoke.py` (D-Bus, Weston headless/Pixman) | PASS: native xdg_toplevel, title/geometri, ack_configure + buffer attach/commit; **normal close NOT RUN**, SIGTERM cleanup başarı sayılmaz |
+| Ayrı boş Cargo target | PASS: locked/offline build 1m28s, test 1m07s, aynı 16 test. Yeni native kurulum değildir |
+| Temiz target ikilisiyle X11/Sway/Weston | PASS: yukarıdaki üç kapsam ayrı ayrı tekrar doğrulandı; Weston normal close hâlâ NOT RUN |
+| `bash tests/probes/run_gtk_api.sh` (Xvfb) | PASS: texture pixel round-trip, snapshot node, gesture/scroll nesneleri, scale=1. İlk realize trait derleme belirsizliği düzeltildi; nihai çalıştırma geçti |
+| `bash tests/probes/resolve_media.sh` | RESOLVED ONLY: gtk/gdk 0.10.3, adw 0.8.1, glib/gio 0.21.5, glycin 3.0.8, common 1.0.3, utils 4.0.4, Gst 0.24.5. **Compile/link/runtime NOT RUN** |
+| `python3 tests/probes/environment.py` | REGISTRY INSPECTED ONLY: runtime 1.26.2; 0 pipeline, medya decode edilmedi |
+| Probe rustfmt, bash syntax, Python AST, JSON parse ve `git diff --check` | PASS |
+
+Temiz target: `/workspace/pivra-environment/piv05/clean-target`.
+GUI betikleri bu dizinin `debug/pivra` ikilisini positional argümanla aldı.
+Mevcut target üzerinde de aynı üç GUI regresyonu geçti. Weston prefix'i
+`/workspace/pivra-environment/weston/usr`; aktivasyon betikleri değiştirilmedi.
+
+### Glycin hatasının katmanları ve açık medya kapıları
+
+`bwrap --unshare-all --die-with-parent --new-session --ro-bind /usr /usr
+--symlink usr/lib /lib --symlink usr/lib64 /lib64 -- /usr/bin/true` exit 1:
+`bwrap: setting up uid map: Read-only file system`.
+Paketli bubblewrap 0.12.0'ın ldd bağımlılıkları çözülüyor; Codex'te `/proc` read-only,
+NoNewPrivs=1, Seccomp=2. Bu ortamın UID map yazma kısıtı **genel Debian/Glycin
+uyumsuzluğu kanıtı değildir**. Codex dışındaki native sandbox NOT RUN. Güvenlik
+izolasyonu, mount veya yetki sınırları değiştirilmedi; bypass/fallback yapılmadı.
+
+Ayrı risk: Debian aday loader 1.2.1 (1+) araştırılan Glycin 3.0.8 (2+) ile
+protokol hattı bakımından eşleşmiyor; kurulu loader yok. Bu gerçek paketleme/ABI
+riski sandbox kısıtından bağımsızdır. Glycin hâlâ koşullu ilk adaydır; decode PASS değil.
+PIV-06'nın decoder gerektirmeyen dosya/URI sınırları ile gerçek fotoğraf açılışı
+ayrılmalı; görüntü entegrasyonundan önce eşleşen loader/SDK, çalışan sandbox ve
+JPEG/PNG/orientation deneyleri ön koşul (PIV-09 kapısı).
+
+GStreamer video adayı olarak kalır. SDK, gtk4paintablesink ve Libav yok;
+avdec_h264/avdec_h265 bulunmuyor. PIV-19 öncesi sink availability/aynı viewport'a
+embedding ve iki backend'de gerçek pipeline testi gerekir. Libav kullanan codec
+fixture'ları ayrıca paket+decode testi ister; diğer decoder factory'lerinin varlığı
+oynatma kanıtı değildir. Ses/donanım/subtitle/seek/frame-step/export **NOT RUN**.
+Fiziksel GNOME/Wayland, GPU, fractional scale ve Weston normal kapanış **NOT RUN**.
+
+### Ayrı Faz 0 kararı
+
+Görevler **5/5 DONE**. Buna rağmen literal faz kapısındaki **temiz native kurulumda**
+derleme/test/pencere davranışı bağımsız yeniden üretilmedi. Boş Cargo target
+sonuçları mevcut native SDK ortamını kullanır; temiz makine veya snapshot restore
+kanıtı sayılmaz. Dolayısıyla **Faz 0 INCOMPLETE**, temiz kurulum kapısı **NOT RUN**.
+Ortamı koruma talimatına uyuldu; kapıyı kapatmak için ortam sıfırlanmadı. Eksik
+gelecek medya testleri belgelendi; bu araştırmanın DONE olması entegrasyona PASS vermez.
+**PIV-06 başlatılmadı.**

@@ -117,11 +117,21 @@
 | Monitör geçişi | Pencere farklı çözünürlük ve ölçekli monitöre taşınırken gereksiz sıfırlama ve görüntü bozulması önlenir. |
 | Dosya | HiDPI davranışı kaynak medyayı veya kaydedilen çözünürlüğü değiştirmez. |
 
+## 6B. Touchpad ve dokunmatik hareketleri — 70. madde (KARARLAŞTIRILDI)
+
+| Hareket/bağlam | Kabul edilen davranış |
+|---|---|
+| Pinch (iki parmakla açma/kapatma) | İmleç/dokunma odağına uygun biçimde zoom in/out. |
+| Büyütülmüş medya | Yatay/dikey kaydırma öncelikle fotoğraf veya videonun görünür alanını pan eder; yanlışlıkla dosya değişimini engeller. |
+| Medya ekrana sığıyorsa | Yatay hareket önceki/sonraki medyaya geçiş yapabilir. |
+| Dokunmatik ekran | Desteklenen donanımda uygun pan ve pinch hareketleri; fare/klavye davranışları daima kullanılabilir. |
+| Uygulanabilirlik | Touchpad ve dokunmatik sürücü/Wayland gesture olayları gerçek donanımla test edilecek. |
+
 ## 7. Henüz karara bağlanmayanlar / teknik doğrulama
 
 | Konu | Durum |
 |---|---|
-| Dokunmatik/touchpad ve dağıtım modeli | **AÇIK:** Ayrıntılandırılmadı. |
+| Dağıtım modeli | **AÇIK:** Flatpak öncelikli aday; dağıtım biçimi henüz kararlaştırılmadı. |
 | Codec/RAW/HDR/PSD/JPEG XL desteğinin tam sınırları | **UYGULAMA TESTLERİYLE DOĞRULANACAK.** |
 
 > Bu doküman özellik ve davranış kararlarının kaydıdır; geliştirme veya commit edilmiş kaynak kod değildir. Push sırasında otomatik CI istenmiyor; yeni workflow eklenirse yalnızca manuel çalıştırma düşünülmeli.
@@ -169,3 +179,5 @@
 - **68. madde — KARARLAŞTIRILDI (20.10.2026):** Küçük resim şeridindeki ayrı Seç modunda Fotoğraf / Video / Tümü filtresi bulunur. Bu filtre çoklu seçim kapsamını belirler. İşlemler yalnız destekledikleri medya türlerine uygulanır.
 
 - **69. madde — KARARLAŞTIRILDI (20.10.2026):** Çoklu monitörde akıllı HiDPI uyarlaması; Fit/Fill yeniden hesaplanır, kullanıcı zoom/pan tercihi mümkün olduğunca korunur.
+
+- **70. madde — KARARLAŞTIRILDI (20.10.2026):** Akıllı touchpad/dokunmatik hareketler; pinch zoom, büyütülmüş görüntüde öncelikle pan, ekrana sığdığında yatay hareketle medya geçişi. Donanım desteği gerçek cihazlarda doğrulanacak.

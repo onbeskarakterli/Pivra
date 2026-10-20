@@ -18,7 +18,7 @@
 | 8 | Taşıma | Yakınlaşmış görsel fare sol tuşuyla sürüklenir. |
 | 9 | Mini harita | Fotoğraf/video görüntüsü ekrandan taştığında sağ altta otomatik görünür; görsel alanı gösterir ve sürüklenebilir. Tam sığıyorsa gizlenir. |
 | 10 | Küçük resim şeridi | Altta, fare yaklaşınca ana medyanın üzerine açılır; görüntüyü yeniden ölçeklemez; yatay kaydırılabilir, aktif medya ortalanır. |
-| 11 | Şerit seçimi | Normalde tıklama medyayı açar; ayrı **Seç** modu, çoklu/aralık/Tümünü Seç/Seçimi Temizle ve adet gösterimi. |
+| 11 | Şerit seçimi | Normalde tıklama medyayı açar; ayrı **Seç** modu, çoklu/aralık/Tümünü Seç/Seçimi Temizle ve adet gösterimi. Seçim modunda **Fotoğraf / Video / Tümü** filtresiyle seçilebilecek medya türü değiştirilebilir. Yalnız desteklenen dosyalar başlatılan toplu işleme alınır; uygun olmayan seçimler açıklanır. |
 | 12 | Şerit önbelleği | Pivra küçük resimleri **yalnız RAM'de** tutar; kalıcı disk önbelleği yazmaz; bellek basıncında azaltır. |
 | 13 | Ön yükleme | Yakın fotoğraflar akıllı hazırlanır; RAM/CPU/GPU baskısına uyum; videolar bütünüyle belleğe alınmaz. |
 | 14 | Ağır RAW/TIFF | Varsa gömülü düşük çözünürlüklü önizleme hemen; tam çözümleme arka planda, hafif ilerleme göstergesi. |
@@ -111,7 +111,6 @@
 
 | Konu | Durum |
 |---|---|
-| Çoklu seçim modunda videoların toplu seçime dahil edilip edilmeyeceği | **AÇIK:** Ayrı seçim modu kararlaştırıldı; medya kapsamı ayrıca kararlaştırılmadı. |
 | HiDPI, çoklu monitör, dokunmatik/touchpad ve dağıtım modeli | **AÇIK:** Ayrıntılandırılmadı. |
 | Codec/RAW/HDR/PSD/JPEG XL desteğinin tam sınırları | **UYGULAMA TESTLERİYLE DOĞRULANACAK.** |
 
@@ -156,3 +155,5 @@
 ### Karar günlüğü — 20.10.2026
 
 - **67. madde — KARARLAŞTIRILDI:** Gelişmiş ışık ve renk kontrollerinin altısı da eklenecek (Exposure, Highlights, Shadows, Temperature, Tint, Vibrance). Normal görüntüleme ekranında değil, düzenleme modunda bağımsız ayarlar olarak bulunacak; anlık önizleme ve geri alma davranışı diğer düzenlemelerle aynı olacak.
+
+- **68. madde — KARARLAŞTIRILDI (20.10.2026):** Küçük resim şeridindeki ayrı Seç modunda Fotoğraf / Video / Tümü filtresi bulunur. Bu filtre çoklu seçim kapsamını belirler. İşlemler yalnız destekledikleri medya türlerine uygulanır.

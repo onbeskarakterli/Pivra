@@ -1,6 +1,6 @@
 # Pivra — Geliştirme Yol Haritası
 
-**Durum:** PIV-01–06 DONE (PIV-06 dosya/URI altyapısı); PIV-07–60 TODO. Faz 0 INCOMPLETE: temiz native kurulumun bağımsız yeniden üretimi NOT RUN; temiz Cargo target derlemesi ve headless regresyonlar geçti. [PIV-05 kanıtı ve ayrı faz kapısı](PIVRA_TECHNICAL_CAPABILITIES.md#102-piv-05-ve-faz-0-kapanışını-ayrı-değerlendirme).
+**Durum:** PIV-01–07 DONE (PIV-06 giriş altyapısı, PIV-07 sırasız klasör adayları); PIV-08–60 TODO. Faz 0 INCOMPLETE: temiz native kurulumun bağımsız yeniden üretimi NOT RUN; temiz Cargo target derlemesi ve headless regresyonlar geçti. [PIV-05 kanıtı ve ayrı faz kapısı](PIVRA_TECHNICAL_CAPABILITIES.md#102-piv-05-ve-faz-0-kapanışını-ayrı-değerlendirme).
 **Başlangıç branch:** `dev` · **Kararlı sürümler:** `main`  
 **Kaynak şartname:** [PIVRA_FEATURE_SPEC_TR.md](PIVRA_FEATURE_SPEC_TR.md)  
 **Görev ve commit takibi:** [PIVRA_COMMIT_TRACKER.md](PIVRA_COMMIT_TRACKER.md)
@@ -116,3 +116,16 @@ başlatılmadı; öncesinde bu giriş sözleşmesi korunmalı, tarama yeni göre
 ayrıca yetkilendirilmeli. DESKTOP-06 ve decoder/player ortam kapıları uygun gerçek
 native oturum/sonraki entegrasyon doğrulamasında izlenmeli; X11/Sway headless testi
 fiziksel GNOME doğrulamasının yerine geçmez.
+
+## PIV-07 keşif sınırı — 21.10.2026
+
+Tek üst dizinde, std-only keşif modülü fotoğraf/video uzantı adaylarını aynı
+MediaCollection'a toplar; açılan alias/yol seçili kalır. UI taramayı GIO worker'ına
+verir; pencere başına model ve kooperatif iptal vardır. Sıra read_dir sırasıdır ve
+**garantili değildir**. PIV-08 doğal sıralama henüz uygulanmadı/yetkilendirilmedi.
+Kısmi tarama uyarıları ile fatal erişim hataları açık UI/stderr durumlarıdır;
+uzantı adaylığı decode/playback başarısı sayılmaz. Doğrudan giriş/desktop MIME
+sözleşmesi genişletilmedi. Ayrıntılı politika/testler README ve takip tablosunda.
+
+PIV-05 medya/sandbox riskleri, DESKTOP-06 gerçek Nautilus ve Faz 0 temiz native
+kurulum kapıları açık kalır. Fiziksel GNOME ve Weston normal kapanış NOT RUN.

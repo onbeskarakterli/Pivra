@@ -3,7 +3,7 @@ A fast, lightweight GNOME image viewer with seamless photo and video navigation,
 
 ## Development status
 
-**PIV-01: DONE. PIV-02: GTK4/libadwaita shell implemented and validated on 2026-10-21, on `dev`.** No image/video functionality, media engine or CI is included. PIV-03 separates application, window, CLI and core data responsibilities without changing that behavior. PIV-04 adds deterministic fixtures and isolated Rust/X11/headless Wayland test infrastructure. PIV-05 records versioned GTK/Glycin/GStreamer capability probes and explicit runtime gaps; production dependencies are unchanged. PIV-06 adds local photo path/URI input and a decoder-free file placeholder. PIV-07 has not started.
+**PIV-01: DONE. PIV-02: GTK4/libadwaita shell implemented and validated on 2026-10-21, on `dev`.** No image/video functionality, media engine or CI is included. PIV-03 separates application, window, CLI and core data responsibilities without changing that behavior. PIV-04 adds deterministic fixtures and isolated Rust/X11/headless Wayland test infrastructure. PIV-05 records versioned GTK/Glycin/GStreamer capability probes and explicit runtime gaps; production dependencies are unchanged. PIV-06 adds local photo path/URI input and a decoder-free file placeholder. PIV-07 discovers unsorted neighboring image/video candidates on a worker and preserves the opened selection. PIV-08 has not started.
 
 See [technical capabilities and open prerequisites](docs/PIVRA_TECHNICAL_CAPABILITIES.md) and [verified results and commit evidence](docs/PIVRA_COMMIT_TRACKER.md). PIV-05 is DONE; Phase 0 remains INCOMPLETE because a fresh native environment installation has not been independently reproduced. A clean Cargo target build and the existing headless regressions passed.
 
@@ -17,13 +17,14 @@ Launching without arguments opens a blank `Pivra` window with a native libadwait
 | `src/cli.rs` | Parse OS arguments and print help; no GTK initialization or file I/O |
 | `src/input.rs` | Binary-side local path/URI, regular-file/readability and extension checks; GFile + MediaItem association; no decode |
 | `src/app.rs` | GTK initialization, NON_UNIQUE + HANDLES_OPEN, activate/open lifecycle; input boundary, windows and settings |
-| `src/window.rs` | Native header/viewport, optional file-owned context and decoder-free placeholder; window dimensions from settings |
-| `src/lib.rs` | Expose the small GUI-independent model modules and shared application name |
+| `src/window.rs` | Native header/viewport, window-owned file/catalog context, worker completion/cancellation and decoder-free status; settings dimensions |
+| `src/lib.rs` | Expose GUI-independent models, std-only folder discovery and shared application name |
+| `src/discovery.rs` | Nonrecursive candidate classification, read-only inspection, unsorted catalog/selection and explicit scan issues; no GTK/GIO |
 | `src/media.rs` | `MediaItem`: supplied path and explicit `MediaKind`; no existence checks, extension guessing or decoding |
 | `src/catalog.rs` | `MediaCollection`: caller-ordered items and a bounded selection; depends only on media |
 | `src/settings.rs` | In-memory window defaults (960×640); no globals, persistence or GSettings |
 
-The core library has no GTK/GIO imports and no dependency back into app/CLI/window. The binary depends on it, not the reverse. The only core module edge is `catalog -> media`; there are no module dependency cycles. PIV-03 left native Cargo dependencies and Cargo.lock unchanged; PIV-04 adds only the test-only `tempfile` dependency.
+The core library has no GTK/GIO imports and no dependency back into app/CLI/window. The binary depends on it, not the reverse. Core edges are `catalog -> media` and `discovery -> catalog/media`; there are no module dependency cycles. PIV-03 left native Cargo dependencies and Cargo.lock unchanged; PIV-04 adds only the test-only `tempfile` dependency.
 
 A collection starts with its first item selected, or no selection if empty. Selecting an out-of-range index returns false and leaves the current item unchanged; callers receive an immutable item slice. Input order is preserved exactly. Directory discovery, natural sorting, next/previous actions, looping, file watching and UI/catalog wiring are deliberately outside PIV-03. The media kind is caller-provided metadata, not proof that a file is supported or readable. Settings currently carry only the dimensions actually used by the window; system theme behavior remains inherited.
 
@@ -233,5 +234,95 @@ independent clean-native-install gate remains INCOMPLETE as recorded in PIV-05;
 this explicit PIV-06 request authorized this limited work without declaring that
 gate passed. Glycin loader/ABI/SDK and Codex sandbox restrictions, GStreamer
 SDK/gtk4paintablesink/Libav gaps remain in the technical capabilities document.
-Before later decoder/player work those runtime gates must pass. PIV-07 is TODO;
-folder discovery/sorting/navigation has not been implemented.
+Before later decoder/player work those runtime gates must pass. The following PIV-07 section records folder discovery; sorting/navigation remain unimplemented.
+
+
+### PIV-07 neighboring media discovery — 2026-10-21
+
+Opening a PIV-06 photo now starts **one nonrecursive folder-discovery job per
+window** on GIO's blocking I/O pool. `src/discovery.rs` uses only std and existing
+core models; it returns a `MediaCollection` plus explicit per-entry issues.
+The window retains its own GFile, opened item and catalog. GTK updates run on the
+main context after completion; no directory walk runs on the GTK thread. The
+PIV-06 initial input checks remain unchanged. No production dependency was added.
+
+| Candidate kind | Case-insensitive extensions |
+|---|---|
+| Image | jpg, jpeg, png, webp, gif, bmp, tif, tiff |
+| Video | mp4, mkv, webm, mov, avi |
+
+These are **candidate extensions, not decoder/playback support**. Direct CLI/GIO
+admission remains one local jpg/jpeg/png file; the desktop entry still lists
+only image/jpeg and image/png. Video defaults are untouched. No image decoding,
+video playback, natural sorting, navigation, thumbnails or watching was added.
+
+The scanner uses the opened path's lexical parent (relative paths are made
+absolute), without canonicalizing to a symlink target's directory. Readable
+regular-file symlinks are followed for inspection while their **alias paths stay
+in the catalog**. Different aliases/hard links are distinct entries; no inode
+or canonical-target deduplication occurs. A target may be outside the folder,
+but discovery never recurses there. Directory links, subdirectories and special
+files are excluded; hidden regular candidate files are admitted. Broken links,
+disappearing entries and unreadable candidate files produce explicit issues.
+Unsupported extensions are ignored without decoding or content sniffing.
+Linux non-UTF-8 filename bytes are retained in paths; only display text is lossy.
+
+Selection uses the **opened alias/path**, not the first enumerated entry or
+canonical target. The folder's enumeration order is unspecified and preserved;
+there is no lexical/natural order promise before PIV-08. If the opened entry has
+disappeared or is no longer an accessible candidate, neighbor discovery fails.
+A standalone empty/no-candidate directory yields an empty collection with no
+selection; the app never substitutes an arbitrary neighbor for its opened file.
+
+Successful file-window titles append the real catalog count, for example
+`photo.png — Pivra (3 candidates)`; the selected name is read from the completed
+catalog. The placeholder still explicitly states that image decoding is not
+implemented. Per-entry errors display a warning count and incomplete status,
+with escaped-path stderr diagnostics. A fatal folder error displays
+`folder scan failed`, retains only the opened item, and reports stderr. Closing
+such a valid placeholder normally still exits 0; this indicates window lifecycle,
+**not a successful folder scan**. No-argument windows remain unchanged.
+
+Jobs check a per-window cancellation flag between entries and before returning;
+close/destroy sets it, and weak UI references prevent late updates to closed
+windows. Cancellation returns an error rather than a successful partial catalog.
+**Limits:** cancellation cannot interrupt a blocked kernel/network filesystem
+call. Metadata/read-only descriptor checks are point-in-time, not a stable
+snapshot; symlink/TOCTOU replacement remains possible. Scanning is O(entries)
+in time and O(candidates + issues) in memory, with no hard directory-size/RAM
+cap. Shared GIO workers may be delayed on slow mounts. The 1,200-candidate test
+is a correctness test, not a latency benchmark; real network mounts, very large
+directories and close-during-blocked-I/O behavior are NOT RUN. Descriptor checks
+read no media bytes and never modify user contents.
+
+Validation: **40 Rust tests passed (18 unit + 22 integration), 0 failed/ignored**;
+fmt/check/build/Clippy, fixtures and desktop-file validation passed. New tests
+cover mixed formats/case, selection, empty/single/many (1,200 candidates plus
+100 excluded files), Unicode/raw Linux names, relative/alias parents, file/link
+errors, inaccessible folders and cancellation. A deterministic iterator seam
+removes an entry between enumeration and inspection and injects an iteration
+error; healthy candidates survive with explicit issues. Permission tests actually
+ran as an unprivileged user. The library also compiled directly with rustc,
+without Cargo/GTK/GIO linkage.
+
+X11 and Sway passed both original empty-window regressions and two independent
+file/URI windows whose titles prove the **selected catalog entry and exact count**
+(two PNGs + one text-only video-model fixture; an unsupported file and nested PNG
+are excluded). Both windows closed normally with exit 0 and empty diagnostics.
+Weston proved the same selected URI/catalog count in a real native Wayland
+surface with SHM buffer/configure/commit evidence; normal close remains NOT RUN.
+The video model is not playable video. X11 additionally verified visible partial
+warning and fatal permission-error states with controlled diagnostics; real GIO
+desktop launch still passed with the single-candidate title. Fixture copies
+remained unchanged. Physical GNOME/Wayland and Nautilus DESKTOP-06 remain NOT RUN.
+
+Existing `--files` smoke commands above now validate catalog completion as well.
+Additional error-state check (after build/activation):
+
+```sh
+GTK_A11Y=none GSK_RENDERER=cairo GDK_BACKEND=x11 \
+  xvfb-run -a dbus-run-session -- python3 tests/discovery_smoke.py
+```
+
+**PIV-07 DONE; PIV-08 not started.** PIV-05 media/sandbox risks, PIV-06
+DESKTOP-06, and the separate Phase 0 clean-native-install gate remain open.

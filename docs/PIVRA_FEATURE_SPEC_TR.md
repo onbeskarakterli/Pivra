@@ -127,11 +127,23 @@
 | Dokunmatik ekran | Desteklenen donanımda uygun pan ve pinch hareketleri; fare/klavye davranışları daima kullanılabilir. |
 | Uygulanabilirlik | Touchpad ve dokunmatik sürücü/Wayland gesture olayları gerçek donanımla test edilecek. |
 
+## 6C. Yerel Linux paketleri — 71. madde (KARARLAŞTIRILDI)
+
+| Konu | Karar |
+|---|---|
+| Genel ilke | Pivra Linux dağıtımlarında **yerel (native) paket** olarak sunulacak; Flatpak/AppImage öncelikli veya zorunlu dağıtım kanalı olmayacak. |
+| Arch tabanlı | PKGBUILD ile paketleme; uygun olduğunda AUR üzerinden erişim. |
+| Debian/Ubuntu tabanlı | DEB paketleme. |
+| Fedora/RHEL/openSUSE ailesi | Hedef dağıtıma uygun RPM paketleme. |
+| Diğer dağıtımlar | Uygun yerel paket biçimi veya dağıtımın doğal build/kurulum yönergeleri; bütün dağıtımlara tek bir evrensel paket vaat edilmez. |
+| Kütüphaneler | Dağıtımların güncel ve desteklenen GTK4, libadwaita, GStreamer vb. yerel sistem paketlerinden yararlanılır. Asgari sürümler ve codec/eklenti bulunabilirliği doğrulanır. |
+| Dosya izinleri | Normal Linux kullanıcı ve dosya sistemi izinleri geçerlidir; Flatpak sandbox/portal sınırlamaları hedeflenmez. |
+| Doğrulama | Desteklenen dağıtım/sürüm matrisi, GTK/GStreamer sürüm farkları ve paket kurulumu gerçek sistemlerde test edilecek. |
+
 ## 7. Henüz karara bağlanmayanlar / teknik doğrulama
 
 | Konu | Durum |
 |---|---|
-| Dağıtım modeli | **AÇIK:** Flatpak öncelikli aday; dağıtım biçimi henüz kararlaştırılmadı. |
 | Codec/RAW/HDR/PSD/JPEG XL desteğinin tam sınırları | **UYGULAMA TESTLERİYLE DOĞRULANACAK.** |
 
 > Bu doküman özellik ve davranış kararlarının kaydıdır; geliştirme veya commit edilmiş kaynak kod değildir. Push sırasında otomatik CI istenmiyor; yeni workflow eklenirse yalnızca manuel çalıştırma düşünülmeli.
@@ -151,7 +163,7 @@
 | Dosya ve klasör olayları | **GIO** | **HEDEF ALTYAPI** |
 | Kalıcı uygulama ayarları | **GSettings** | **HEDEF ALTYAPI**; görüntüleme geçmişi varsayılan kapalı |
 | Derleme/bağımlılıklar | **Cargo** | **KARARLAŞTIRILDI** |
-| Dağıtım | Flatpak öncelikli **değerlendirme adayı** | **AÇIK**; paketleme/dağıtım biçimi henüz seçilmedi |
+| Dağıtım | **Dağıtıma özgü yerel paketler** (Arch PKGBUILD; Debian/Ubuntu DEB; Fedora/RHEL RPM; diğerleri için uygun yerel biçim) | **KARARLAŞTIRILDI**; Flatpak/AppImage hedef değil; her dağıtımın güncel sistem kütüphaneleri kullanılır, sürüm/bağımlılık uyumluluğu ayrıca test edilir |
 
 ### Modüler sorumluluklar
 
@@ -181,3 +193,5 @@
 - **69. madde — KARARLAŞTIRILDI (20.10.2026):** Çoklu monitörde akıllı HiDPI uyarlaması; Fit/Fill yeniden hesaplanır, kullanıcı zoom/pan tercihi mümkün olduğunca korunur.
 
 - **70. madde — KARARLAŞTIRILDI (20.10.2026):** Akıllı touchpad/dokunmatik hareketler; pinch zoom, büyütülmüş görüntüde öncelikle pan, ekrana sığdığında yatay hareketle medya geçişi. Donanım desteği gerçek cihazlarda doğrulanacak.
+
+- **71. madde — KARARLAŞTIRILDI (20.10.2026):** Tüm hedef Linux dağıtımları için dağıtıma özgü yerel paketleme; Flatpak tercih edilmez. Güncel sistem kütüphaneleri ve medya motorları kullanılır; fiili paket kapsamı desteklenen dağıtım/sürüm matrisi ile doğrulanır.

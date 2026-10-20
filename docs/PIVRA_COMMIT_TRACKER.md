@@ -1,7 +1,7 @@
 # Pivra — Planlı Commit ve İlerleme Takibi
 
 **Kaynak:** [Özellik Şartnamesi](PIVRA_FEATURE_SPEC_TR.md) · [Yol Haritası](PIVRA_DEVELOPMENT_ROADMAP.md)  
-**Branch:** `dev` · **Durum:** PIV-01 **DONE (21.10.2026)**; PIV-02 **DONE (21.10.2026, Xvfb GTK pencere doğrulaması)**; PIV-03–60 TODO, başlatılmadı. Güncel kapanış kanıtı son bölümde; 20.10.2026 kayıtları tarihçedir. Burada listelenen `PIV-xx` kimlikleri gerçek Git commit SHA'sı **değildir**.
+**Branch:** `dev` · **Durum:** PIV-01 **DONE (21.10.2026)**; PIV-02 **DONE (21.10.2026, Xvfb GTK pencere doğrulaması)**; PIV-03 **DONE (21.10.2026)**; PIV-04–60 TODO, başlatılmadı. Güncel kapanış kanıtı son bölümde; 20.10.2026 kayıtları tarihçedir. Burada listelenen `PIV-xx` kimlikleri gerçek Git commit SHA'sı **değildir**.
 
 ## Kullanım kuralları
 
@@ -18,7 +18,7 @@
 |---|---|---|---|---|
 | PIV-01 | `chore: initialize Rust Cargo app` | Cargo derlenir; temel dizin ve lisans/README korunur | **DONE — 21.10.2026** | `b246ee7`, `27315e6`, `90d495b`; doğrulama/lock/README: `2950193ca038b91c29ed97a7c46d773502d68dd4` |
 | PIV-02 | `feat: create GTK4 libadwaita application shell` | GNOME stili boş/sade GTK pencere; açılış/kapanış Xvfb X11 üzerinde doğrulandı | **DONE — 21.10.2026** | `59bac1da79456cb39f42d2215b9ad670e1f3f900`, `9b8fa621fbfff7d26f61746d040fd7033afe8606` |
-| PIV-03 | `refactor: define app media and settings boundaries` | Mantıksal modüller ayrılır; birim testleri çalışır | TODO | — |
+| PIV-03 | `refactor: define app media and settings boundaries` | Modül sınırları, GTK bağımsız modeller, CLI/GUI regresyonları doğrulandı | **DONE — 21.10.2026** | `7a1f867d5021a83014f8f4f72c5ef772327bc85d`, `4eaa34bf949f9cc77238198b499f45d21bdd569b` |
 | PIV-04 | `test: establish fixtures and local verification commands` | Deterministik örnek medya/fixture kuralları ve cargo test komutları | TODO | — |
 | PIV-05 | `docs: record dependency capability probes` | GTK/Glycin/GStreamer sürüm ve yetenekleri, risk kararı yazılır | TODO | — |
 
@@ -121,7 +121,7 @@
 
 | Faz | ID aralığı | Planlı commit | Tamamlanan |
 |---|---|---:|---:|
-| 0 — Temel | 01–05 | 5 | 2 |
+| 0 — Temel | 01–05 | 5 | 3 |
 | 1 — Fotoğraf | 06–12 | 7 | 0 |
 | 2 — Zoom/performans | 13–18 | 6 | 0 |
 | 3 — Video temel | 19–24 | 6 | 0 |
@@ -130,9 +130,9 @@
 | 6 — Uyumluluk/paket | 40–47 | 8 | 0 |
 | 7 — Edit (en son özellik geliştirmesi) | 48–57 | 10 | 0 |
 | 8 — Son doğrulama | 58–60 | 3 | 0 |
-| **TOPLAM** | **PIV-01–60** | **60** | **2** |
+| **TOPLAM** | **PIV-01–60** | **60** | **3** |
 
-> PIV-01 ve PIV-02 tamamlandı; PIV-03–60 gelecekteki işlerdir. Görev kimlikleri commit SHA'sı değildir. İlk planlama ve önceki engel kayıtları aşağıda tarihçe olarak korunur.
+> PIV-01–03 tamamlandı; PIV-04–60 gelecekteki işlerdir. Görev kimlikleri commit SHA'sı değildir. İlk planlama ve önceki engel kayıtları aşağıda tarihçe olarak korunur.
 
 ## PIV-01 ayrıntılı ilerleme — 20.10.2026
 
@@ -341,3 +341,75 @@ Bu son takip kaydının kendi SHA'sı `git log -1 --format=%H -- docs/PIVRA_COMM
 **Değişen proje dosyaları:** Cargo.toml, Cargo.lock, src/main.rs, README.md, docs/PIVRA_COMMIT_TRACKER.md; yeni tests/cli.rs ve tests/gui_smoke.py. Ürün kararları, şartname ve yol haritası değiştirilmedi. Görsel/video çözme, katalog, zoom/pan, önizleme, edit, slayt, paketleme ve CI kapsamına girilmedi.
 
 **Kapanış:** PIV-02 **DONE**; gerçek grafik açılış/kapanış, CLI regresyonu, tüm Rust kontrolleri ve kod push'u doğrulandı. PIV-03'e teknik ön koşul sağlandı; **PIV-03 başlatılmadı ve bu görevde ilerlenmeyecek.**
+
+
+## PIV-03 kapanışı — 21.10.2026
+
+**Güncel sonuç: DONE.** Yalnız PIV-03 uygulandı. Önceki bölümler kendi görevlerinin tarihçesidir. **PIV-04 başlatılmadı; Faz 0 bütünüyle tamamlanmadı.**
+
+### Başlangıç, ortam ve kapsam
+
+- Başlangıç yerel/uzak `dev`: `129a9826a75de0b5aaa4440a35df8871933fb2dc`; çalışma dizini temizdi. PIV-01 ve PIV-02 DONE kayıtları doğrulandı.
+- Depo `/workspace/Pivra`; güncel şartname, yol haritası, takip tablosu ve README okundu. Mevcut main.rs, Cargo.toml, CLI regresyonları ve GTK/Xvfb smoke testi incelendi. AGENTS.md yok.
+- Mevcut `/workspace/pivra-environment/gtk-activate.sh` kullanıldı. Yeni paket kurulmadı; Rust, GTK ve ortam yapılandırması sıfırlanmadı/değiştirilmedi.
+- Doğrulanan sürümler: rustc/Cargo 1.99.1, native GTK 4.18.6, libadwaita 1.7.6, GLib 2.84.4. Mevcut rustfmt/Clippy kullanıldı.
+- Cargo.toml, Cargo.lock ve tests/cli.rs değişmedi; yeni bağımlılık yok. Lisans kararı ve mevcut ürün kararları korundu.
+- Korunan uzak main: `5d55ee599df4617bd51c09b1c7a008b8d0ece480`; kod push'u öncesi/sonrası aynı. Main'e yazılmadı, rebase/force-push/geçmiş değişikliği yapılmadı.
+
+### PIV-03.a–h durumları
+
+| Alt görev | Durum | Gerçek uygulama ve kanıt |
+|---|---|---|
+| PIV-03.a Sorumluluk analizi | DONE | Önce tek main.rs içindeki CLI parse/help, process dispatch, GTK init/activation ve widget kurma sorumlulukları belirlendi |
+| PIV-03.b Modül ayrımı | DONE | main: dispatch/exit; cli: parse/help; app: GTK/kimlik/activation; window: mevcut pencere ağacı. Önceki CLI çıktıları ve pencere davranışı korundu |
+| PIV-03.c Medya modeli | DONE | GUI bağımsız MediaItem(path, explicit MediaKind Image/Video); uzantıdan tür tahmini, varlık/okunabilirlik testi veya decoder yok |
+| PIV-03.d Gezinme sınırları | DONE | MediaCollection: çağıranın verdiği sıralı liste ve geçerli seçili indeks; boş/tek öğe ve sınır aşımı testleri. Tarama, doğal sıralama, ileri/geri eylemi ve döngü politikası uygulanmadı |
+| PIV-03.e Ayarlar | DONE | Settings yalnız bellekteki window_width/window_height varsayılanları; app üzerinden window tarafından kullanılıyor. 960x640 gerçek GUI boyutu doğrulandı; GSettings/global durum/persistence yok |
+| PIV-03.f Bağımlılık yönleri | DONE | main -> cli/app, app -> window/settings, window -> settings; core'da yalnız catalog -> media. Geri yön/döngü yok; core doğrudan rustc ile GTK bağlamadan derlenip test edildi |
+| PIV-03.g Testler | DONE | Format/check/build/Clippy, 9 unit + 4 integration, bağımsız core ve gerçek Xvfb pencere smoke PASS |
+| PIV-03.h Commit/push/takip | DONE | İki kod commit'i normal push ile origin/dev'e gönderildi, uzak HEAD doğrulandı; gerçek SHA'lar bu kayda işlendi ve kapanış kaydı ayrıca commit edilir |
+
+### Modül sözleşmeleri ve sınırlamalar
+
+- `src/lib.rs`, `media`, `catalog`, `settings` çekirdeğini ve ortak APP_NAME sabitini sunar; GTK/GIO/app/window/CLI import etmez.
+- MediaItem sadece çağıranın verdiği PathBuf ve MediaKind değerini taşır. Tür bilgisi dosyanın desteklendiği veya var olduğu iddiası değildir; dosya I/O yok.
+- MediaCollection verilen sırayı değiştirmez; boş listede seçim None, dolu listede başlangıç 0. select(index) geçersiz indeks için false döndürüp önceki seçimi korur. Dışarıya yalnız immutable öğe slice'ı verir; indeks/listenin tutarlılığı dışarıdan bozulamaz.
+- Settings mevcut pencere varsayılanlarını taşır; geleceğe yönelik kullanılmayan tema/geçmiş/decoder/ayar backend soyutlaması eklenmedi. Tema hâlâ GTK/libadwaita ve oturumdan miras alınır.
+- App'in activation closure'ı yalnız Settings değerine sahiptir; Application referansını tutmaz, yeni bir referans döngüsü oluşturmaz. Pencere widget sahipliği ve kapanış davranışı PIV-02 ile aynı kaldı.
+- Catalog/medya modeli henüz pencereye bağlanmadı; boş pencereye sahte medya/katalog akışı eklenmedi. Klasör keşfi, sıralama ve gerçek klavye gezinmesi sonraki görevlerin işi.
+
+### Gerçek test sonuçları
+
+Tüm komutlar depo kökünde, mevcut GTK activation betiği sonrasında çalıştırıldı; native kütüphaneler ve kilitli crate cache'i kullanıldı.
+
+| Komut / kontrol | Sonuç |
+|---|---|
+| `cargo +stable fmt --check` | PASS — çıkış 0 |
+| `cargo +stable check --offline --locked -j 2` | PASS — çıkış 0 |
+| `cargo +stable build --offline --locked -j 2` | PASS — çıkış 0 |
+| `cargo +stable test --offline --locked -j 2` | PASS — 5 core unit + 4 binary unit + 4 CLI integration; toplam 13 geçti, 0 başarısız, 0 ignored. Doctest sayısı 0; doğrulama kanıtı sayılmaz |
+| `cargo +stable clippy --offline --locked --all-targets -j 2 -- -D warnings` | PASS — çıkış 0, uyarı yok |
+| `rustc +stable --edition=2024 --test src/lib.rs -o /tmp/pivra-piv03-core-tests` ve üretilen binary | PASS — GTK/Cargo/extern olmadan aynı 5 core testi geçti; bunlar ek benzersiz test sayılmaz |
+| `ldd /tmp/pivra-piv03-core-tests` | PASS — yalnız standart sistem runtime'ları; GTK, GLib, GIO veya libadwaita bağlantısı yok |
+| PIV-01 CLI regresyonu | PASS — üç eski parse testi cli modülüne taşındı; değiştirilmemiş CLI integration testleri help/-h, version/-V, üç invalid argüman ve displaysiz açılışın tam stdout/stderr/exit sonuçlarını doğruladı |
+| `GTK_A11Y=none GSK_RENDERER=cairo GDK_BACKEND=x11 xvfb-run -a dbus-run-session -- python3 tests/gui_smoke.py` | PASS — iki ayrı gerçek GTK pencere, Pivra başlığı, tam 960x640 boyut; WM_DELETE_WINDOW ile exit 0, boş stdout/stderr; bir pencere kapanırken diğeri açık |
+| Import/bağımlılık yönü incelemesi | PASS — core GUI katmanlarını import etmiyor; catalog yalnız media'ya bağlı; geri referans yok |
+| `git diff --check` ve korunan manifest/lock/CLI test fark kontrolü | PASS — whitespace hatası yok; Cargo.toml, Cargo.lock, tests/cli.rs değişmedi |
+
+Core testleri: verilen path/türün tahminsiz korunması, boş listede seçim olmaması, verilen sıranın korunarak ilk/son öğenin seçimi, sınır dışı seçimde mevcut öğenin korunması ve tek öğeli liste sınırı. Binary testler: önceki üç CLI parse testi ve application ID geçerliliği. Yeni GUI geometri assertion'ı 960x640 varsayılanlarının ayar modelinden pencereye gerçekten aktarıldığını doğrular.
+
+Fiziksel GNOME Shell/Wayland, donanım renderer ve erişilebilirlik testi yapılmadı; PASS olarak raporlanmaz. Xvfb yalnız test süresince başlatıldı; uygulamada otomatik kapanma/test bayrağı yok. Başarılı GUI testinde süreçler normal pencere kapatma protokolüyle sonlandı. Açık PIV-03 blokajı yok; gerçek dosya/tür algılama ve kalıcı ayar gereksinimleri bu görevde uygulanmış sayılmaz.
+
+### Commit ve push kanıtı
+
+| Tam SHA | Kapsam / uzak durum |
+|---|---|
+| `129a9826a75de0b5aaa4440a35df8871933fb2dc` | Başlangıç yerel ve uzak dev |
+| `7a1f867d5021a83014f8f4f72c5ef772327bc85d` | refactor(PIV-03): GUI bağımsız medya/katalog/ayar modelleri, core testleri |
+| `4eaa34bf949f9cc77238198b499f45d21bdd569b` | refactor(PIV-03): CLI/app/window ayrımı, README ve güçlendirilmiş GUI boyut assertion'ı; normal push sonrası origin/dev HEAD doğrulandı |
+
+Bu kapanış kaydının kendi SHA'sı öz referans oluşturmak yerine `git log -1 --format=%H -- docs/PIVRA_COMMIT_TRACKER.md` ile alınır; son uzak HEAD kontrolü görev sonuç raporunda verilir. Kod commit'leri origin/dev'e gönderildi; takip commit'i de aynı normal push ile gönderilir.
+
+**Değişen dosyalar:** src/main.rs, README.md, docs/PIVRA_COMMIT_TRACKER.md, tests/gui_smoke.py; yeni src/lib.rs, src/app.rs, src/cli.rs, src/window.rs, src/media.rs, src/catalog.rs, src/settings.rs. Şartname ve yol haritası değiştirilmedi. Decoder, video oynatma, klasör tarama, zoom, Edit, Flatpak/AppImage, CI veya lisans eklenmedi.
+
+**Kapanış:** PIV-03 **DONE**. PIV-04 ve sonrası **TODO; başlatılmadı**. Görev burada durur.

@@ -1,6 +1,7 @@
-//! GUI-independent data models. No GTK, filesystem I/O or settings persistence.
+//! GUI-independent models and local discovery. No GTK/GIO or settings persistence.
 
 pub mod catalog;
+pub mod discovery;
 pub mod media;
 pub mod settings;
 

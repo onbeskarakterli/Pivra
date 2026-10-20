@@ -2,17 +2,25 @@
 
 mod app;
 mod cli;
+mod input;
 mod window;
 
 use pivra::APP_NAME;
 
 fn main() {
-    match cli::parse_args(std::env::args().skip(1)) {
+    match cli::parse_args(std::env::args_os().skip(1)) {
         cli::Command::Version => println!("{APP_NAME} {}", env!("CARGO_PKG_VERSION")),
         cli::Command::Help => cli::print_help(),
         cli::Command::Launch => {
-            std::process::exit(app::launch().into());
+            std::process::exit(app::launch(None).into());
         }
+        cli::Command::Open(argument) => match input::OpenedFile::from_argument(&argument) {
+            Ok(file) => std::process::exit(app::launch(Some(file)).into()),
+            Err(error) => {
+                eprintln!("{APP_NAME}: {error}");
+                std::process::exit(2);
+            }
+        },
         cli::Command::Invalid => {
             eprintln!("{APP_NAME}: invalid arguments; use --help");
             std::process::exit(2);

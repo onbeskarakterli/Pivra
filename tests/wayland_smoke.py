@@ -15,7 +15,7 @@ import sys
 import tempfile
 import time
 
-from gui_support import stop
+from gui_support import stop, file_launches, check_file_copies
 
 APP_ID = "io.github.onbeskarakterli.Pivra"
 
@@ -38,7 +38,7 @@ def ipc(env, kind, command=None):
     return data
 
 
-def wait_surface(process, env):
+def wait_surface(process, env, title="Pivra"):
     deadline = time.monotonic() + 15
     while time.monotonic() < deadline:
         assert process.poll() is None, "Pivra exited before mapping a Wayland surface"
@@ -47,7 +47,7 @@ def wait_surface(process, env):
                 continue
             assert node.get("shell") == "xdg_shell", node
             assert node.get("visible") is True, node
-            assert node.get("name") == "Pivra", node
+            assert node.get("name") == title, node
             rect = node["window_rect"]
             assert (rect["width"], rect["height"]) == (960, 640), node
             return node["id"]
@@ -108,13 +108,14 @@ def main():
                 print(f"Headless Wayland compositor: {version['human_readable']}; "
                       "GDK_BACKEND=wayland, XWayland disabled, DISPLAY absent")
                 surfaces = []
-                for _ in range(2):
-                    process = subprocess.Popen([binary], env=env, stdout=subprocess.PIPE,
+                cases = file_launches(root) if "--files" in sys.argv[2:] else [([], "Pivra")] * 2
+                for args, title in cases:
+                    process = subprocess.Popen([binary, *args], env=env, stdout=subprocess.PIPE,
                                                stderr=subprocess.PIPE, text=True)
                     processes.append(process)
-                    surface = wait_surface(process, env)
+                    surface = wait_surface(process, env, title)
                     surfaces.append(surface)
-                    print(f"PASS mapped xdg_shell surface {surface}: Pivra, 960x640")
+                    print(f"PASS mapped xdg_shell surface {surface}: {title}, 960x640")
                 assert surfaces[0] != surfaces[1]
 
                 for index, (process, surface) in enumerate(zip(processes, surfaces)):
@@ -128,8 +129,9 @@ def main():
                     assert not any(node.get("id") == surface for node in tree)
                     if index == 0:
                         assert processes[1].poll() is None
-                        assert wait_surface(processes[1], env) == surfaces[1]
+                        assert wait_surface(processes[1], env, cases[1][1]) == surfaces[1]
                     print(f"PASS Wayland normal close of {surface}: exit 0, empty stdout/stderr")
+                check_file_copies(root)
                 print("PASS headless Wayland: two independent native Wayland surfaces")
             finally:
                 for process in processes:

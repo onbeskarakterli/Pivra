@@ -14,7 +14,7 @@ import sys
 import tempfile
 import time
 
-from gui_support import stop
+from gui_support import stop, file_launches, check_file_copies
 
 
 def main():
@@ -34,6 +34,7 @@ def main():
     binary = str(Path(sys.argv[1] if len(sys.argv) > 1 else "target/debug/pivra").resolve())
     with tempfile.TemporaryDirectory(prefix="pivra-weston-") as temp:
         root = Path(temp)
+        args, title = file_launches(root)[1] if "--files" in sys.argv[2:] else ([], "Pivra")
         env = os.environ.copy()
         for name in ["DISPLAY", "WAYLAND_DISPLAY", "WAYLAND_DEBUG", "SWAYSOCK", "I3SOCK"]:
             env.pop(name, None)
@@ -80,7 +81,7 @@ def main():
                     if time.monotonic() > deadline:
                         raise AssertionError("Weston protocol trace did not subscribe")
                     time.sleep(0.1)
-                app = subprocess.Popen([binary], env=env, stdout=subprocess.PIPE,
+                app = subprocess.Popen([binary, *args], env=env, stdout=subprocess.PIPE,
                                        stderr=subprocess.PIPE, text=True)
                 deadline = time.monotonic() + 15
                 while True:
@@ -90,7 +91,7 @@ def main():
                     views = re.split(r"(?=\tView \d+ |Layer \d+ )", scene)
                     mapped = any(
                         f"role xdg_toplevel, PID {app.pid}," in view
-                        and "top-level window 'Pivra'" in view
+                        and f"top-level window '{title}'" in view
                         and "outputs: 0 (headless)" in view and "SHM buffer" in view
                         for view in views
                     )
@@ -98,7 +99,7 @@ def main():
                     messages = "\n".join(line for line in proto.read().splitlines()
                                          if f"(PID {app.pid})" in line)
                     geometry = re.search(r"set_window_geometry\(-?\d+, -?\d+, 960, 640\)", messages)
-                    if mapped and geometry and '.set_title("Pivra")' in messages:
+                    if mapped and geometry and f'.set_title("{title}")' in messages:
                         assert re.search(r"\.attach\(wl_buffer@\d+,", messages)
                         assert ".ack_configure(" in messages
                         assert ".commit()" in messages
@@ -106,7 +107,8 @@ def main():
                     if time.monotonic() > deadline:
                         raise AssertionError(f"no configured/rendered Pivra surface:\n{scene}\n{messages}")
                     time.sleep(0.1)
-                print("PASS Weston 14 headless/Pixman: mapped xdg_toplevel Pivra on headless output")
+                print(f"PASS Weston 14 headless/Pixman: mapped xdg_toplevel {title} on headless output")
+                check_file_copies(root)
                 print("PASS server protocol: title, 960x640 window geometry, ack_configure, buffer attach/commit")
                 print("PASS native Wayland: GDK_BACKEND=wayland, DISPLAY absent, XWayland disabled")
                 print("NOT RUN Weston normal close: no standard close-control IPC; cleanup uses SIGTERM")

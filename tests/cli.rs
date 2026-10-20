@@ -20,7 +20,7 @@ fn run_on_backend(args: &[&str], backend: &str) -> Output {
 
 #[test]
 fn help_and_alias_work_without_a_display() {
-    let expected = b"Pivra 0.1.0\nUsage: pivra [--help | --version]\nGNOME image viewing will be available in a later development stage.\n";
+    let expected = b"Pivra 0.1.0\nUsage: pivra [--help | --version]\n       pivra <local-photo-path | file://URI>\nGNOME image viewing will be available in a later development stage.\nAccepts one local .jpg/.jpeg/.png file; opens a placeholder, without decoding.\n";
     for flag in ["--help", "-h"] {
         let output = run(&[flag]);
         assert_eq!(output.status.code(), Some(0));
@@ -64,5 +64,46 @@ fn launch_without_a_display_fails_cleanly() {
             error.starts_with("Pivra: unable to initialize GTK; a graphical session is required:")
         );
         assert!(!error.contains("panicked"));
+    }
+}
+
+#[test]
+fn valid_local_path_and_uri_reach_graphical_initialization_without_decoding() {
+    let directory = support::temp_dir();
+    let path = directory.path().join("fotoğraf # % örneği.png");
+    std::fs::write(&path, include_bytes!("fixtures/pixels-2x2.png")).unwrap();
+    let uri = gtk::glib::filename_to_uri(&path, None).unwrap();
+    for argument in [path.to_str().unwrap(), uri.as_str()] {
+        let output = run(&[argument]);
+        assert_eq!(output.status.code(), Some(1));
+        assert!(output.stdout.is_empty());
+        assert!(
+            String::from_utf8(output.stderr)
+                .unwrap()
+                .starts_with("Pivra: unable to initialize GTK;")
+        );
+    }
+}
+
+#[test]
+fn invalid_file_inputs_fail_before_graphical_initialization() {
+    let directory = support::temp_dir();
+    let unsupported = directory.path().join("video.mp4");
+    std::fs::write(&unsupported, include_bytes!("fixtures/model-video.txt")).unwrap();
+    let missing = directory.path().join("missing.png");
+    for argument in [
+        directory.path().to_str().unwrap(),
+        unsupported.to_str().unwrap(),
+        missing.to_str().unwrap(),
+        "https://example.org/a.png",
+        "file:///tmp/a%GG.png",
+        "",
+    ] {
+        let output = run(&[argument]);
+        assert_eq!(output.status.code(), Some(2), "{argument}");
+        assert!(output.stdout.is_empty());
+        let error = String::from_utf8(output.stderr).unwrap();
+        assert!(error.starts_with("Pivra: "));
+        assert!(!error.contains("initialize GTK") && !error.contains("panicked"));
     }
 }

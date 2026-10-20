@@ -7,12 +7,14 @@ No application test flags, timers, or auto-close hooks are added to Pivra.
 
 import ctypes
 import os
+import re
+import tempfile
 from pathlib import Path
 import subprocess
 import sys
 import time
 
-from gui_support import stop
+from gui_support import stop, file_launches, check_file_copies
 
 
 def xdo(*args):
@@ -21,13 +23,13 @@ def xdo(*args):
     ).stdout.strip()
 
 
-def wait_window(process):
+def wait_window(process, title="Pivra"):
     deadline = time.monotonic() + 15
     while time.monotonic() < deadline:
         assert process.poll() is None, "Pivra exited before mapping a window"
         result = subprocess.run(
             ["xdotool", "search", "--all", "--onlyvisible", "--pid", str(process.pid),
-             "--name", "^Pivra$"], capture_output=True, text=True, timeout=5
+             "--name", "^" + re.escape(title) + "$"], capture_output=True, text=True, timeout=5
         )
         if result.returncode == 0 and result.stdout.strip():
             return int(result.stdout.splitlines()[0])
@@ -77,19 +79,22 @@ def main():
     assert os.environ.get("DISPLAY"), "run under an X11 display (e.g. xvfb-run)"
     binary = str(Path(sys.argv[1] if len(sys.argv) > 1 else "target/debug/pivra").resolve())
     processes = []
+    temporary = tempfile.TemporaryDirectory(prefix="pivra-x11-input-")
+    root = Path(temporary.name)
+    cases = file_launches(root) if "--files" in sys.argv[2:] else [([], "Pivra")] * 2
     try:
         windows = []
-        for _ in range(2):
-            process = subprocess.Popen([binary], stdout=subprocess.PIPE,
+        for args, title in cases:
+            process = subprocess.Popen([binary, *args], stdout=subprocess.PIPE,
                                        stderr=subprocess.PIPE, text=True)
             processes.append(process)
-            window = wait_window(process)
-            assert xdo("getwindowname", window) == "Pivra"
+            window = wait_window(process, title)
+            assert xdo("getwindowname", window) == title
             geometry = xdo("getwindowgeometry", "--shell", window)
             dimensions = dict(line.split("=", 1) for line in geometry.splitlines())
             assert (int(dimensions["WIDTH"]), int(dimensions["HEIGHT"])) == (960, 640)
             windows.append(window)
-            print(f"PASS mapped window {window}: title=Pivra; {geometry!r}")
+            print(f"PASS mapped window {window}: title={title}; {geometry!r}")
 
         assert windows[0] != windows[1], "launches must own separate windows"
         for index, (process, window) in enumerate(zip(processes, windows)):
@@ -100,12 +105,14 @@ def main():
             assert not stderr, stderr
             if index == 0:
                 assert processes[1].poll() is None, "closing one launch killed the other"
-                assert xdo("getwindowname", windows[1]) == "Pivra"
+                assert xdo("getwindowname", windows[1]) == cases[1][1]
             print(f"PASS normal WM_DELETE_WINDOW close: exit={process.returncode}")
+        check_file_copies(root)
         print("PASS two independent launches; no stdout/stderr, crash or forced termination")
     finally:
         for process in processes:
             stop(process)
+        temporary.cleanup()
 
 
 if __name__ == "__main__":

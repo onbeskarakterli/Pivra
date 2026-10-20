@@ -1,7 +1,7 @@
 # Pivra — Planlı Commit ve İlerleme Takibi
 
 **Kaynak:** [Özellik Şartnamesi](PIVRA_FEATURE_SPEC_TR.md) · [Yol Haritası](PIVRA_DEVELOPMENT_ROADMAP.md)  
-**Branch:** `dev` · **Durum:** PIV-01 kodlandı, doğrulama BLOCKED; PIV-02–60 plan aşamasında. Burada listelenen `PIV-xx` kimlikleri gerçek Git commit SHA'sı **değildir**.
+**Branch:** `dev` · **Durum:** PIV-01 **DONE (21.10.2026)**; PIV-02–60 TODO, başlatılmadı. Güncel kapanış kanıtı son bölümde; 20.10.2026 kayıtları tarihçedir. Burada listelenen `PIV-xx` kimlikleri gerçek Git commit SHA'sı **değildir**.
 
 ## Kullanım kuralları
 
@@ -16,7 +16,7 @@
 
 | ID | Planlı commit başlığı | Kabul / test kontrolü | Durum | SHA |
 |---|---|---|---|---|
-| PIV-01 | `chore: initialize Rust Cargo app` | Cargo derlenir; temel dizin ve lisans/README korunur | **BLOCKED (çalıştırma ortamı yok)** | `b246ee7`, `27315e6`, `90d495b`, `4bb5ba9`, `d6db4aa`, `9f13bc8` |
+| PIV-01 | `chore: initialize Rust Cargo app` | Cargo derlenir; temel dizin ve lisans/README korunur | **DONE — 21.10.2026** | `b246ee7`, `27315e6`, `90d495b`; doğrulama/lock/README: `2950193ca038b91c29ed97a7c46d773502d68dd4` |
 | PIV-02 | `feat: create GTK4 libadwaita application shell` | GNOME'da boş/sade ana pencere açılır; düzgün kapanır | TODO | — |
 | PIV-03 | `refactor: define app media and settings boundaries` | Mantıksal modüller ayrılır; birim testleri çalışır | TODO | — |
 | PIV-04 | `test: establish fixtures and local verification commands` | Deterministik örnek medya/fixture kuralları ve cargo test komutları | TODO | — |
@@ -121,7 +121,7 @@
 
 | Faz | ID aralığı | Planlı commit | Tamamlanan |
 |---|---|---:|---:|
-| 0 — Temel | 01–05 | 5 | 0 |
+| 0 — Temel | 01–05 | 5 | 1 |
 | 1 — Fotoğraf | 06–12 | 7 | 0 |
 | 2 — Zoom/performans | 13–18 | 6 | 0 |
 | 3 — Video temel | 19–24 | 6 | 0 |
@@ -130,9 +130,9 @@
 | 6 — Uyumluluk/paket | 40–47 | 8 | 0 |
 | 7 — Edit (en son özellik geliştirmesi) | 48–57 | 10 | 0 |
 | 8 — Son doğrulama | 58–60 | 3 | 0 |
-| **TOPLAM** | **PIV-01–60** | **60** | **0** |
+| **TOPLAM** | **PIV-01–60** | **60** | **1** |
 
-> Plan ve takip dokümanlarının oluşturulması gerçek Git commit'i üretir; ancak tabloda yer alan **60 gelecekteki uygulama commit'i** henüz gerçekleştirilmemiştir.
+> PIV-01 tamamlandı; PIV-02–60 gelecekteki işlerdir. Görev kimlikleri commit SHA'sı değildir. İlk planlama ve önceki engel kayıtları aşağıda tarihçe olarak korunur.
 
 ## PIV-01 ayrıntılı ilerleme — 20.10.2026
 
@@ -196,3 +196,63 @@ Bu takip güncellemesini içeren belge commit'inin kendi SHA'sı, öz referans o
 **GNOME GUI:** Gerçek grafik oturumu testi yapılmadı; PIV-01 kapanış koşulu değil. PIV-02'de ayrıca doğrulanacak.
 
 **Kapanış:** PIV-01 tamamlandı mı? **HAYIR — BLOCKED.** Önce kullanılabilir bir Rust çalıştırma ortamında tüm kontroller ve CLI çıkış kodları doğrulanmalı; üretilen Cargo.lock ve varsa gerekli minimum düzeltmeler ayrıca incelenip dev'e kaydedilmeli. Lisans kararı ayrı açık konu olarak kalabilir. **PIV-02'ye teknik geçiş kapısı henüz geçilmedi; PIV-02 başlatılmadı.**
+
+
+## PIV-01 kapanışı — 21.10.2026
+
+**Güncel sonuç: DONE.** Önceki BLOCKED kayıtları tarihçedir; kullanılabilir Rust ortamında yapılan bu doğrulama onları günceller. Kullanıcı yalnız PIV-01 kapanışını yetkilendirdi; PIV-02 başlatılmadı. Faz 0'ın bütünü tamamlanmış değildir.
+
+### Kapsam, ortam ve inceleme
+
+- Dal: `dev`; doğrulanan kaynak başlangıcı `86a54f7094639d6a75a0c8798d8b48e7a65e8f12`.
+- README, şartname, yol haritası, takip tablosu, Cargo.toml, src/main.rs ve ignore kuralları okundu; AGENTS.md yok.
+- rustc `1.99.1 (58cf8f9c3 2026-10-13)`; Cargo `1.99.1 (5f94df478 2026-08-27)`; rustfmt `1.10.0-stable`; Clippy `0.1.99`.
+- Gerçek check/build/test/Clippy ve CLI çalıştırmaları başlangıçta boş `/tmp/pivra-piv01-validation` dizinini `CARGO_TARGET_DIR` olarak kullandı. Harici crate yok; komutlar çevrimdışı ve kilitli çalıştı. Cargo.lock v4 yalnız `pivra 0.1.0` içeriyor; incelendi ve dev'e kaydedildi.
+- Kaynak kodu ve manifest değiştirilmedi. Mevcut argüman ayrıştırma, kontrollü exit(2), stdout/stderr ayrımı incelendi ve çalıştırıldı. Bu CLI dosya/medya yazmıyor, decoder veya arka plan işi başlatmıyor; medya/disk/bellek regresyon testleri sonraki özelliklerin kapsamındadır.
+- Lisans kararı açık; LICENSE veya manifest lisansı uydurulmadı. Önceki kapanış tanımı bu kararı ayrı açık konu olarak bırakmaya izin veriyor.
+- Gerçek GNOME/GUI manuel testi **yapılmadı ve PASS sayılmadı**; CLI bootstrap için gerekli değil, PIV-02 ve sonrasının işi. GTK, medya motoru ve CI eklenmedi.
+- `main` uzak uç SHA'sı okuma ile doğrulandı: `5d55ee599df4617bd51c09b1c7a008b8d0ece480`; bu görev main'e yazmadı ve hiçbir dala push yapmadı.
+
+### Gerçek doğrulama sonuçları
+
+Komutlar depo kökünde, stable toolchain ile çalıştırıldı. `cargo run` sonuçlarında stdout/stderr tam metni ve process çıkış kodu Python subprocess assertions ile karşılaştırıldı.
+
+| Komut | Gerçek sonuç |
+|---|---|
+| `cargo +stable fmt --check` | PASS — çıkış 0 |
+| `cargo +stable check --offline --locked` | PASS — çıkış 0 |
+| `cargo +stable build --offline --locked` | PASS — çıkış 0 |
+| `cargo +stable test --offline --locked` | PASS — 3 geçti, 0 başarısız, 0 ignored; çıkış 0 |
+| `cargo +stable clippy --offline --locked --all-targets -- -D warnings` | PASS — uyarı yok, çıkış 0 |
+| `cargo +stable run --offline --locked --quiet -- --help` ve `-h` | PASS — stdout: `Pivra 0.1.0`, `Usage: pivra [--help \| --version]`, gelecek GNOME işlevi açıklaması; stderr boş; çıkış 0 |
+| `cargo +stable run --offline --locked --quiet -- --version` ve `-V` | PASS — stdout `Pivra 0.1.0` + newline; stderr boş; çıkış 0 |
+| `cargo +stable run --offline --locked --quiet --` | PASS — stdout `Pivra: graphical application is not yet implemented` + newline; stderr boş; çıkış 0 |
+| `cargo +stable run --offline --locked --quiet -- --unknown` | PASS — stdout boş, stderr `Pivra: invalid arguments; use --help` + newline; beklenen çıkış 2 |
+| Aynı run komutuyla `one two` ve `--help --version` | PASS — aynı kontrollü stderr, stdout boş; beklenen çıkış 2 |
+
+Üç birim testi: `no_arguments_starts_app`, `help_and_version_flags`, `invalid_arguments_are_rejected`. Toplam sekiz CLI senaryosu doğrulandı; test atlanmadı veya devre dışı bırakılmadı.
+
+### Alt görev kapanışları
+
+| Alt görev | Güncel durum | Kanıt |
+|---|---|---|
+| PIV-01.a | DONE | dev ve Rust araç sürümleri gerçek ortamda doğrulandı |
+| PIV-01.b | DONE | Cargo manifesti ve kilidi; check/build PASS |
+| PIV-01.c | DONE | src/ + docs/ düzeni korundu; gereksiz crate/dizin yok |
+| PIV-01.d | DONE | Cargo.lock ve güncel README kaydedildi; lisans ayrı açık konu |
+| PIV-01.e | DONE | Üç unit test ve sekiz CLI senaryosu PASS |
+| PIV-01.f | DONE | fmt/check/build/test/Clippy PASS |
+| PIV-01.g | DONE | Aşağıdaki gerçek commit kanıtları ve bu kapanış kaydı dev'e işlendi |
+
+### Gerçek commit kanıtları
+
+| Tam SHA | Kapsam |
+|---|---|
+| `b246ee75303ed36a2ffa88bc45f735419c3494ae` | Cargo.toml iskeleti |
+| `27315e62a99db9106c0560547773a9278a88a849` | Rust CLI ve üç birim testi |
+| `90d495bf9b9956ab77d29ce69ee995f2e4d959a8` | Rust ignore kuralları |
+| `2950193ca038b91c29ed97a7c46d773502d68dd4` | Cargo.lock ve README; başarılı doğrulama sonuçları |
+
+Bu son takip kaydının kendi commit SHA'sı öz referans oluşturmaz; `git log -1 --format=%H -- docs/PIVRA_COMMIT_TRACKER.md` ile alınır. Yukarıdaki `2950193` commit'i doğrulanan kaynakla aynı Cargo.toml/src içeriğini taşır; eklenen kilit üçüncü taraf bağımlılık getirmez.
+
+**Kapanış kararı:** PIV-01'in derleme, temel yapı/README, test, CLI davranışı, kilit ve commit kanıtı koşulları sağlandı: **DONE**. Lisans seçimi açık tutulur. PIV-02 **TODO**, başlatılmadı; sonraki aşamaya otomatik geçiş yok.

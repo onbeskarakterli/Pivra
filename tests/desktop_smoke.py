@@ -5,6 +5,7 @@ Normal window close and process disappearance are observed; the detached app's
 exit code is unavailable here (direct CLI GUI tests check exit 0 separately).
 """
 import os
+import re
 from pathlib import Path
 import select
 import signal
@@ -34,7 +35,7 @@ def main():
         path = root / f"{root.name} fotoğraf # % 🦀.png"
         payload = (repo / "tests/fixtures/pixels-2x2.png").read_bytes()
         path.write_bytes(payload)
-        title = f"{path.name} — Pivra"
+        title = f"{path.name} — Pivra (1 candidate)"
         descriptor = None
         with (root / "launch.log").open("w+") as log:
             try:
@@ -42,7 +43,7 @@ def main():
                                stdout=log, stderr=log, check=True, timeout=10)
                 deadline = time.monotonic() + 15
                 while True:
-                    result = subprocess.run(["xdotool", "search", "--onlyvisible", "--name", title],
+                    result = subprocess.run(["xdotool", "search", "--onlyvisible", "--name", "^" + re.escape(title) + "$"],
                                             capture_output=True, text=True, timeout=5)
                     if result.returncode == 0 and result.stdout.strip():
                         window = int(result.stdout.splitlines()[0])

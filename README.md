@@ -3,9 +3,34 @@ A fast, lightweight GNOME image viewer with seamless photo and video navigation,
 
 ## Development status
 
-**PIV-01: DONE. PIV-02: GTK4/libadwaita shell implemented and validated on 2026-10-21, on `dev`.** No image/video functionality, media engine or CI is included. PIV-03 has not started.
+**PIV-01: DONE. PIV-02: GTK4/libadwaita shell implemented and validated on 2026-10-21, on `dev`.** No image/video functionality, media engine or CI is included. PIV-03 separates application, window, CLI and core data responsibilities without changing that behavior. PIV-04 has not started.
 
 Launching without arguments opens a blank `Pivra` window with a native libadwaita header and system theme. Each process owns an independent application/window (`io.github.onbeskarakterli.Pivra`, GIO NON_UNIQUE); file associations and Nautilus file-opening integration are future work. Closing the last window ends that process normally. If GTK cannot initialize a graphical session, the program prints a controlled error to stderr and exits 1. Help/version flags and invalid-argument exit 2 work without initializing GTK.
+
+### PIV-03 module boundaries
+
+| Module | Responsibility and allowed dependencies |
+|---|---|
+| `src/main.rs` | Dispatch CLI commands or launch the application; process exit codes |
+| `src/cli.rs` | Parse arguments and print help; app name only, no GTK initialization |
+| `src/app.rs` | GTK initialization, application identity/activation/lifetime; window builder and settings |
+| `src/window.rs` | Construct the existing header and empty viewport; read window dimensions from settings |
+| `src/lib.rs` | Expose the small GUI-independent model modules and shared application name |
+| `src/media.rs` | `MediaItem`: supplied path and explicit `MediaKind`; no existence checks, extension guessing or decoding |
+| `src/catalog.rs` | `MediaCollection`: caller-ordered items and a bounded selection; depends only on media |
+| `src/settings.rs` | In-memory window defaults (960×640); no globals, persistence or GSettings |
+
+The core library has no GTK/GIO imports and no dependency back into app/CLI/window. The binary depends on it, not the reverse. The only core module edge is `catalog -> media`; there are no module dependency cycles. Existing native Cargo dependencies and Cargo.lock are unchanged.
+
+A collection starts with its first item selected, or no selection if empty. Selecting an out-of-range index returns false and leaves the current item unchanged; callers receive an immutable item slice. Input order is preserved exactly. Directory discovery, natural sorting, next/previous actions, looping, file watching and UI/catalog wiring are deliberately outside PIV-03. The media kind is caller-provided metadata, not proof that a file is supported or readable. Settings currently carry only the dimensions actually used by the window; system theme behavior remains inherited.
+
+### PIV-03 validation — 2026-10-21
+
+- Format, check, build and Clippy: PASS with the existing activated Rust/GTK environment, offline and locked builds.
+- Cargo tests: **9 unit + 4 CLI integration tests passed; 0 failed, 0 ignored**. The original three CLI parsing tests, application ID test and CLI process regressions remain in place. Five core tests cover empty/single lists, valid/invalid selection, preserved order, and explicit media metadata.
+- Core independence: `rustc +stable --edition=2024 --test src/lib.rs -o /tmp/pivra-piv03-core-tests` followed by `/tmp/pivra-piv03-core-tests` passed the same five core tests without Cargo or GTK linkage. These are not five additional unique tests.
+- Existing Xvfb/D-Bus GUI smoke: PASS for two independent `Pivra` windows and normal closure with exit 0 and empty stdout/stderr. The geometry assertion now checks the unchanged 960×640 dimensions, verifying that the settings model is actually consumed. CLI help/version/error outputs and headless exit 1 are unchanged.
+- No physical GNOME/Wayland or hardware-renderer test is claimed. No decoder, playback, directory scan, zoom, edit, GSettings integration, new dependency or CI was added. See the commit tracker for closure SHAs and push evidence.
 
 ### Native prerequisites
 

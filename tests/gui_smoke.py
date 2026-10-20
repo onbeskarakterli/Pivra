@@ -84,7 +84,8 @@ def main():
             window = wait_window(process)
             assert xdo("getwindowname", window) == "Pivra"
             geometry = xdo("getwindowgeometry", "--shell", window)
-            assert "WIDTH=" in geometry and "HEIGHT=" in geometry
+            dimensions = dict(line.split("=", 1) for line in geometry.splitlines())
+            assert (int(dimensions["WIDTH"]), int(dimensions["HEIGHT"])) == (960, 640)
             windows.append(window)
             print(f"PASS mapped window {window}: title=Pivra; {geometry!r}")
 

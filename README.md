@@ -3,25 +3,43 @@ A fast, lightweight GNOME image viewer with seamless photo and video navigation,
 
 ## Development status
 
-PIV-01 bootstrap is in progress. The current Rust binary is a CLI scaffold only; the GTK4/libadwaita window will be introduced in PIV-02. No image or video functionality is implemented yet.
+**PIV-01: DONE — verified on 2026-10-21, on `dev`.** The dependency-free Rust 2024 CLI scaffold builds and passes its existing tests. PIV-02 has not started: no GTK window, image/video functionality, media engine or CI is included.
 
-Requires Rust toolchain with Rust 2024 edition support. Once available, validate with:
+## Development and validation
+
+Use a Rust stable toolchain supporting the Rust 2024 edition, with rustfmt and Clippy. The prepared cloud environment can be activated in each shell with:
 
 ```sh
-cargo fmt --check
-cargo check
-cargo test
-cargo clippy --all-targets -- -D warnings
-cargo run -- --help
-cargo run -- --version
-cargo run --
-cargo run -- --unknown
+source /workspace/pivra-environment/activate.sh
+cd /workspace/Pivra
 ```
 
-The initial PIV-01 environment did not have `cargo` or `rustc`. During the subsequent Work audit on 2026-10-20, the execution service returned `No usable execution environment is available` on both attempts, before any shell command could start. Rust/Cargo versions and installation availability could not be checked; the commands above remain **BLOCKED, not executed**. No build, unit-test, formatting, lint, or CLI runtime result is claimed. PIV-01 remains incomplete.
+That activation path is specific to the prepared cloud environment; other machines can use their own Rust stable installation. Work on `dev`; do not change `main`.
 
-Source review found a dependency-free Rust 2024 binary and three existing unit tests. The CLI source handles help/version aliases, prints a scaffold message with no arguments, and exits with code 2 for invalid arguments; these are source observations, not runtime verification. Once execution is available, verify exit codes and stdout/stderr as well as successful compilation. `cargo run -- --unknown` must return a nonzero exit code and a controlled error.
+```sh
+cargo +stable fmt --check
+cargo +stable check --offline --locked
+cargo +stable build --offline --locked
+cargo +stable test --offline --locked
+cargo +stable clippy --offline --locked --all-targets -- -D warnings
+cargo +stable run --offline --locked --quiet -- --help
+cargo +stable run --offline --locked --quiet -- --version
+cargo +stable run --offline --locked --quiet --
+cargo +stable run --offline --locked --quiet -- --unknown
+```
 
-The existing feature specification and roadmap contain historical pre-code status wording even though the PIV-01 scaffold now exists. Their accepted product decisions are unchanged; current implementation and verification status is recorded in the commit tracker.
+The last command intentionally exits **2** with a controlled error; do not treat it as an unexpected test failure. The other commands exit 0.
 
-See [development roadmap](docs/PIVRA_DEVELOPMENT_ROADMAP.md) and [commit tracker](docs/PIVRA_COMMIT_TRACKER.md). License selection is pending and must not be assumed.
+### Verified results — 2026-10-21
+
+- Toolchain: rustc 1.99.1, Cargo 1.99.1, rustfmt 1.10.0-stable, Clippy 0.1.99.
+- Format, check, build and Clippy: PASS, exit 0; Clippy treats warnings as errors.
+- Unit tests: **3 passed, 0 failed, 0 ignored**.
+- Eight CLI scenarios: PASS, exact stdout/stderr and exit codes checked. `--help`/`-h` print usage (exit 0); `--version`/`-V` print `Pivra 0.1.0` (exit 0); no arguments print `Pivra: graphical application is not yet implemented` (exit 0). `--unknown`, `one two`, and `--help --version` print `Pivra: invalid arguments; use --help` to stderr, leave stdout empty, and exit 2.
+- Compilation and CLI validation used a separate initially empty target directory, `/tmp/pivra-piv01-validation`, with the checked-in dependency-free Cargo.lock and offline/locked commands.
+
+The validated source is commit `86a54f7094639d6a75a0c8798d8b48e7a65e8f12`; this closure only adds Cargo.lock and updates documentation. Actual closure commit SHAs are recorded in the [commit tracker](docs/PIVRA_COMMIT_TRACKER.md), with the final documentation commit available from its Git history.
+
+Earlier audits on 2026-10-20 were BLOCKED by the unavailable execution environment; those historical results are preserved in the tracker and are superseded by the successful run above. The feature specification and roadmap also contain historical pre-code wording; their accepted product decisions remain unchanged.
+
+See the [development roadmap](docs/PIVRA_DEVELOPMENT_ROADMAP.md), [feature specification](docs/PIVRA_FEATURE_SPEC_TR.md), and [commit tracker](docs/PIVRA_COMMIT_TRACKER.md). License selection remains open; no license is assumed. GUI/GNOME validation belongs to PIV-02 and later tasks, not this CLI bootstrap closure.

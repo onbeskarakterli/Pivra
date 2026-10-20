@@ -75,6 +75,7 @@
 | 50 | Ton/renk | Parlaklık, kontrast, doygunluk ve renk düzeltmeleri. |
 | 51 | Otomatik iyileştirme | Gerçek zamanlı önizleme; etki %0–100. |
 | 52 | Kırmızı göz | Otomatik tespit/düzeltme, manuel seçim/düzeltme. |
+| 52A | Gelişmiş ışık ve renk | Pozlama (Exposure), parlak bölgeler (Highlights), gölgeler (Shadows), renk sıcaklığı (Temperature), yeşil-magenta renk tonu (Tint) ve canlılık (Vibrance): altı bağımsız kontrol, anlık önizleme ve geri alma. |
 | 53 | Keskinlik | Keskinlik (Sharpen), gürültü azaltma (Denoise), netlik (Clarity): üç ayrı kaydırıcı. |
 | 54 | Öncesi/sonrası | Sürüklenebilir **dikey ayırıcı**, sol orijinal/sağ düzenlenmiş, ortak zoom/konum. |
 | 55 | Geri alma | Ctrl+Z ve uygun işlemlerde yinele. |
@@ -110,7 +111,6 @@
 
 | Konu | Durum |
 |---|---|
-| Pozlama, Highlights, Shadows, Temperature, Tint, Vibrance | **AÇIK:** Kullanıcı henüz seçenek belirtmedi. |
 | Çoklu seçim modunda videoların toplu seçime dahil edilip edilmeyeceği | **AÇIK:** Ayrı seçim modu kararlaştırıldı; medya kapsamı ayrıca kararlaştırılmadı. |
 | HiDPI, çoklu monitör, dokunmatik/touchpad ve dağıtım modeli | **AÇIK:** Ayrıntılandırılmadı. |
 | Codec/RAW/HDR/PSD/JPEG XL desteğinin tam sınırları | **UYGULAMA TESTLERİYLE DOĞRULANACAK.** |
@@ -152,3 +152,7 @@
 - Her aşamada birim/entegrasyon testleri ve gerçek GNOME kullanım testi; otomatik push tetiklemeli CI yok (eklenirse yalnız manuel workflow_dispatch).
 
 **Sınır:** Bu karar, daha önce kabul edilmiş 72 özellik ve 7. bölümdeki açık maddeleri değiştirmez. Teknik doğrulamada bir aday uygun çıkmazsa kullanıcıyla alternatif belirlenir. **Henüz kaynak kodu değiştirilmeyecek; kalan tasarım kararları sonraki görüşmeye bırakıldı.**
+
+### Karar günlüğü — 20.10.2026
+
+- **67. madde — KARARLAŞTIRILDI:** Gelişmiş ışık ve renk kontrollerinin altısı da eklenecek (Exposure, Highlights, Shadows, Temperature, Tint, Vibrance). Normal görüntüleme ekranında değil, düzenleme modunda bağımsız ayarlar olarak bulunacak; anlık önizleme ve geri alma davranışı diğer düzenlemelerle aynı olacak.

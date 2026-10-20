@@ -1,7 +1,7 @@
 # Pivra — Planlı Commit ve İlerleme Takibi
 
 **Kaynak:** [Özellik Şartnamesi](PIVRA_FEATURE_SPEC_TR.md) · [Yol Haritası](PIVRA_DEVELOPMENT_ROADMAP.md)  
-**Branch:** `dev` · **Durum:** PIV-01 **DONE (21.10.2026)**; PIV-02 **DONE (21.10.2026, Xvfb GTK pencere doğrulaması)**; PIV-03 **DONE (21.10.2026)**; PIV-04 **DONE (21.10.2026; grafik test kategorileri ayrı)**; PIV-05 **DONE (21.10.2026; belgeleme/probe kapsamı)**; PIV-06–60 TODO, başlatılmadı. Faz 0 **INCOMPLETE** (temiz native kurulum yeniden üretimi NOT RUN). Güncel kapanış kanıtı son bölümde; 20.10.2026 kayıtları tarihçedir. Burada listelenen `PIV-xx` kimlikleri gerçek Git commit SHA'sı **değildir**.
+**Branch:** `dev` · **Durum:** PIV-01 **DONE (21.10.2026)**; PIV-02 **DONE (21.10.2026, Xvfb GTK pencere doğrulaması)**; PIV-03 **DONE (21.10.2026)**; PIV-04 **DONE (21.10.2026; grafik test kategorileri ayrı)**; PIV-05 **DONE (21.10.2026; belgeleme/probe kapsamı)**; PIV-06 **DONE (21.10.2026; dosya/URI ve desktop giriş altyapısı; gerçek Nautilus NOT RUN)**; PIV-07–60 TODO, başlatılmadı. Faz 0 **INCOMPLETE** (temiz native kurulum yeniden üretimi NOT RUN). Güncel kapanış kanıtı son bölümde; 20.10.2026 kayıtları tarihçedir. Burada listelenen `PIV-xx` kimlikleri gerçek Git commit SHA'sı **değildir**.
 
 ## Kullanım kuralları
 
@@ -26,7 +26,7 @@
 
 | ID | Planlı commit başlığı | Kabul / test kontrolü | Durum | SHA |
 |---|---|---|---|---|
-| PIV-06 | `feat: accept image path from Nautilus` | Fotoğrafa çift tıklama Pivra açar; videonun varsayılan uygulaması değişmez | TODO | — |
+| PIV-06 | `feat: accept image path from Nautilus` | Nihai hedef: fotoğrafa çift tıklama. Dosya/URI + GIO/desktop Exec doğrulandı; gerçek Nautilus DESKTOP-06 NOT RUN; video varsayılanı değiştirilmedi | **DONE — 21.10.2026 (giriş altyapısı)** | `ad0bcde080ee36c88dc74bd58844d73e7bff8986`, `cac751927b6e3a967cf0ca31b04d06971a5f9fbc`, `69feda8d5cc7342d941b71d5e8878081f2792211` |
 | PIV-07 | `feat: scan neighboring media in folder` | Fotoğraf/video adaylarını tek klasörde listeler, izin hataları yönetilir | TODO | — |
 | PIV-08 | `feat: apply natural filename ordering` | 1,2,10 ve karma medya testleri geçer | TODO | — |
 | PIV-09 | `feat: render JPEG PNG with orientation` | Görsel merkezde fit açılır; EXIF orientation doğru | TODO | — |
@@ -122,7 +122,7 @@
 | Faz | ID aralığı | Planlı commit | Tamamlanan |
 |---|---|---:|---:|
 | 0 — Temel | 01–05 | 5 | 5 |
-| 1 — Fotoğraf | 06–12 | 7 | 0 |
+| 1 — Fotoğraf | 06–12 | 7 | 1 |
 | 2 — Zoom/performans | 13–18 | 6 | 0 |
 | 3 — Video temel | 19–24 | 6 | 0 |
 | 4 — Video gelişmiş | 25–31 | 7 | 0 |
@@ -130,9 +130,9 @@
 | 6 — Uyumluluk/paket | 40–47 | 8 | 0 |
 | 7 — Edit (en son özellik geliştirmesi) | 48–57 | 10 | 0 |
 | 8 — Son doğrulama | 58–60 | 3 | 0 |
-| **TOPLAM** | **PIV-01–60** | **60** | **5** |
+| **TOPLAM** | **PIV-01–60** | **60** | **6** |
 
-> PIV-01–05 tamamlandı; PIV-06–60 gelecekteki işlerdir. Görev sayacı 5/5 olsa da Faz 0 kapısı INCOMPLETE: temiz native kurulum yeniden üretimi NOT RUN. Görev kimlikleri commit SHA'sı değildir. İlk planlama ve önceki engel kayıtları aşağıda tarihçe olarak korunur.
+> PIV-01–06 tamamlandı (PIV-06 giriş altyapısı); PIV-07–60 gelecekteki işlerdir. Görev sayacı 5/5 olsa da Faz 0 kapısı INCOMPLETE: temiz native kurulum yeniden üretimi NOT RUN. Görev kimlikleri commit SHA'sı değildir. İlk planlama ve önceki engel kayıtları aşağıda tarihçe olarak korunur.
 
 ## PIV-01 ayrıntılı ilerleme — 20.10.2026
 
@@ -597,3 +597,100 @@ kanıtı sayılmaz. Dolayısıyla **Faz 0 INCOMPLETE**, temiz kurulum kapısı *
 Ortamı koruma talimatına uyuldu; kapıyı kapatmak için ortam sıfırlanmadı. Eksik
 gelecek medya testleri belgelendi; bu araştırmanın DONE olması entegrasyona PASS vermez.
 **PIV-06 başlatılmadı.**
+
+
+## PIV-06 kapanış — 21.10.2026
+
+**PIV-06: DONE (yetkilendirilen giriş altyapısı kapsamı).** PIV-05 sonundaki
+"PIV-06 başlatılmadı" kaydı tarihçedir. Kullanıcının açık PIV-06 talimatıyla yerel
+dosya/URI, GIO open ve decoder içermeyen pencere ilişkisi tamamlandı. Nihai Nautilus
+çift tıklama kabulünün masaüstü kısmı **DESKTOP-06 NOT RUN** olarak açık bırakıldı.
+**PIV-07 başlatılmadı. Faz 0 INCOMPLETE** kaydı korunur: bağımsız temiz native
+kurulum doğrulaması bu görevde yapılmadı; PIV-06 talimatı kapının PASS olduğu anlamına gelmez.
+
+### Git kanıtı ve değişiklikler
+
+- Başlangıç: temiz `dev`; `origin/dev` uzak HEAD'i ile eşit `242ff09bcbd2d9cdaa87341b68a5b102bb41ee2b`.
+- Dosya/URI, GIO open, pencere ilişkisi ve ilgili testler: `ad0bcde080ee36c88dc74bd58844d73e7bff8986`.
+- Desktop kaydı ve GIO parse/launch testleri: `cac751927b6e3a967cf0ca31b04d06971a5f9fbc`.
+- README sözleşmesi, yol haritası ve DESKTOP-06 kapısı: `69feda8d5cc7342d941b71d5e8878081f2792211`.
+- Bu sonuç tablosu ayrı kapanış commit'inde; kendi SHA'sı kendi dosyasına yazılamaz.
+  Kesin bitiş SHA'sı teslim raporu ve Git/uzak HEAD'den doğrulanır.
+- `main`: `5d55ee599df4617bd51c09b1c7a008b8d0ece480`; değiştirilmedi.
+- Değişenler: `src/{main,cli,app,window}.rs`, yeni `src/input.rs`; `tests/cli.rs`,
+  `tests/gui_support.py`, üç GUI smoke; yeni `tests/desktop.rs`, `tests/desktop_smoke.py`,
+  `data/io.github.onbeskarakterli.Pivra.desktop`; README, yol haritası, bu tablo.
+- `Cargo.toml`, `Cargo.lock`, core modeller, fixture kaynakları ve PIV-05 teknik
+  risk belgesi değişmedi. Sistem kurulumu/CI/lisans/decoder/player eklenmedi.
+
+### PIV-06.a–g
+
+| Alt görev | Durum | Gerçek kabul / sınır |
+|---|---|---|
+| a CLI | DONE | Tek yerel yol veya file URI, Unicode/boşluk/reserved byte/percent encoding; OS argümanları non-UTF-8 yerel isimleri korur. Help syntax genişledi; flag/alias/exit davranışları korundu; çoklu argüman reddedilir |
+| b GIO | DONE | GFile -> NON_UNIQUE + HANDLES_OPEN -> activate/app.open -> connect_open yeniden kontrolü -> pencere. D-Bus single-instance activation ilan edilmedi; uzak URI/VFS uygulanmadı |
+| c Pencere | DONE | Pencere ömrüne ait GFile/MediaItem, dosya adı başlığı ve açık decoder-yok placeholder. Global current-file yok; X11/Sway bağımsız kapanışları geçti |
+| d Doğrulama | DONE | Regular-file/read-only open/descriptor kontrolü, içerik okunmaz; symlink alias korunur. Eksik/okunamayan/klasör/special/unsupported kontrollü hata. TOCTOU ve senkron yerel I/O sınırları README'de |
+| e Desktop/MIME | DONE — teknik altyapı | desktop-file-validate, GIO parse ve kaynak entry ile gerçek gio launch geçti. Exec=pivra %u, image/jpeg + image/png, DBusActivatable=false. Kurulum/default değişikliği yok; **Nautilus DESKTOP-06 NOT RUN** |
+| f Test | DONE | Aşağıda 26 Rust testi, zorunlu Cargo/fixture ve üç backend'in eski+yeni smoke sonuçları ayrı |
+| g Belge/commit | DONE | README sözleşme/komutlar, yol haritası açık gate, bu gerçek SHA/sonuç tablosu; normal dev push ve uzak HEAD eşitliği teslim sırasında doğrulanır |
+
+### Gerçek test sonuçları
+
+Aktivasyon: `source /workspace/pivra-environment/gtk-activate.sh`.
+`bash tests/check.sh` çalıştırıldı; bütün zorunlu Cargo kontrolleri tamamlandı:
+
+| Kontrol | Sonuç |
+|---|---|
+| `cargo +stable fmt --check` | PASS |
+| `cargo +stable check --locked --offline -j 2` | PASS |
+| `cargo +stable build --locked --offline -j 2` | PASS |
+| `cargo +stable test --locked --offline -j 2` | PASS: **26 = 16 unit + 10 integration**, 0 failed/ignored; 0 doctest |
+| `cargo +stable clippy --locked --offline --all-targets -j 2 -- -D warnings` | PASS |
+| `python3 tests/fixtures/generate.py --check` | PASS; kaynak fixture/manifest byte'ları değişmedi |
+| Eski CLI | PASS: help/-h, version/-V, invalid flags/multiple args exit 2; no-display X11/Wayland exit 1. Help dosya sözleşmesiyle genişletildi |
+| Yeni input/CLI | PASS: yol ve URI, localhost, Türkçe/boşluk/#/?/%/emoji, relative/non-UTF-8; malformed/remote/query/fragment URI, missing/directory/special/unsupported, symlink/dangling ve okunabilirlik. Geçerli CLI girdileri no-display durumda GTK aşamasına ulaşıyor |
+| Boyut/decode sınırı | PASS: 8 GiB sparse .jpg admission, içerik yüklemeden; geçerli uzantı decode iddiası değil. Bu performans/codec testi değil |
+| Desktop entry | PASS: desktop-file-validate; GIO KeyFile/DesktopAppInfo parse ve yalnız iki image MIME adayı. Kurulmamış uygulama için parse testi build executable'ını geçici KeyFile'a açıkça koyuyor |
+| GIO gerçek desktop launch (Xvfb) | PASS: değiştirilmemiş kaynak entry, private PATH symlink/XDG dizinleri, gio launch percent-encoded Unicode URI; doğru dosya başlığı, normal WM close ve process termination. Detached uygulama exit kodu **OBSERVED değil**; doğrudan GUI testleri exit 0 kontrol ediyor |
+| Python syntax / git diff --check | PASS |
+
+Grafik komutlarının her biri hem eski boş pencere modunda hem de aşağıdaki dosya
+modunda çalıştırıldı; dosya kopyalarının içerikleri değişmedi:
+
+```sh
+GTK_A11Y=none GSK_RENDERER=cairo GDK_BACKEND=x11 \
+  xvfb-run -a dbus-run-session -- python3 tests/gui_smoke.py target/debug/pivra --files
+dbus-run-session -- python3 tests/wayland_smoke.py target/debug/pivra --files
+PIVRA_WESTON_PREFIX=/workspace/pivra-environment/weston/usr \
+  dbus-run-session -- python3 tests/weston_smoke.py target/debug/pivra --files
+GTK_A11Y=none GSK_RENDERER=cairo GDK_BACKEND=x11 \
+  xvfb-run -a dbus-run-session -- python3 tests/desktop_smoke.py
+```
+
+| Backend | Boş pencere regresyonu | Yeni dosya açılışı |
+|---|---|---|
+| X11/Xvfb | PASS: iki mapped pencere, 960x640, normal close/exit 0, boş stdout/stderr | PASS: local path + encoded URI, dosya adları doğru; birinin kapanışı diğerini etkilemez; iki normal close/exit 0 |
+| Sway 1.10.1 headless/Pixman | PASS: iki native xdg_shell, normal Wayland close/exit 0 | PASS: local path + encoded URI, app ID/PID/title/960x640; bağımsız iki normal close/exit 0; XWayland kapalı/DISPLAY yok |
+| Weston 14.0.2 headless/Pixman | PASS: gerçek xdg_toplevel + buffer/protocol kanıtı | PASS: encoded URI, Unicode dosya başlığı, mapped SHM surface, ack_configure + buffer attach/commit; XWayland kapalı/DISPLAY yok |
+| Weston normal kapanış | **NOT RUN** | **NOT RUN**; SIGTERM cleanup PASS sayılmadı |
+| Fiziksel GNOME/Wayland | **NOT RUN** | **NOT RUN** |
+| Gerçek Nautilus çift tıklama / default photo handler | **NOT RUN — DESKTOP-06** | gio launch/CLI başarısı bunun yerine geçmez |
+
+### Açık risk ve sonraki kapılar
+
+- **DESKTOP-06:** native kurulumdan sonra gerçek Nautilus dosya gönderimi, mevcut
+  fotoğraf/video default'ları ve bağımsız pencere davranışı gerçek oturumda ayrıca
+  doğrulanmalı. Bu geliştirme placeholder'ı sistem varsayılanı yapılmadı.
+- Symlink/path kontrolleri noktasaldır; sonraki açılışa kadar kaynak değişebilir.
+  Senkron metadata/open, yerel görünen network mount veya özel dosyayla kötü niyetli
+  değiştirme karşısında gecikme yapabilir. Decoder entegrasyonu güvenli descriptor,
+  iptal ve gerçek kaynağın yeniden doğrulanmasını ayrıca ele almalı; burada decoder yok.
+- PIV-05 Glycin loader/ABI/SDK ve Codex bubblewrap `/proc` sandbox engeli, GStreamer
+  SDK/gtk4paintablesink/Libav eksikleri aynen açık. Güvenlik izolasyonu kapatılmadı.
+  PIV-09/PIV-19 gerçek görüntü/video kapıları PASS sayılmadı.
+- PIV-07 için mevcut tek-file/URI hata ve pencere sözleşmesi korunmalı; klasör
+  keşfi/sıralaması/gezinme ayrı, ayrıca yetkilendirilecek iştir. Uzantı/MIME adayları
+  gerçek içerik veya decoder başarısı olarak kullanılmamalı.
+
+**Kapanış: PIV-06 DONE; PIV-07 TODO, başlatılmadı.**

@@ -1,7 +1,7 @@
 # Pivra — Planlı Commit ve İlerleme Takibi
 
 **Kaynak:** [Özellik Şartnamesi](PIVRA_FEATURE_SPEC_TR.md) · [Yol Haritası](PIVRA_DEVELOPMENT_ROADMAP.md)  
-**Branch:** `dev` · **Durum:** yalnız plan. Burada listelenen `PIV-xx` kimlikleri gerçek Git commit SHA'sı **değildir**.
+**Branch:** `dev` · **Durum:** PIV-01 kodlandı, doğrulama BLOCKED; PIV-02–60 plan aşamasında. Burada listelenen `PIV-xx` kimlikleri gerçek Git commit SHA'sı **değildir**.
 
 ## Kullanım kuralları
 
@@ -16,7 +16,7 @@
 
 | ID | Planlı commit başlığı | Kabul / test kontrolü | Durum | SHA |
 |---|---|---|---|---|
-| PIV-01 | `chore: initialize Rust Cargo app` | Cargo derlenir; temel dizin ve lisans/README korunur | **TESTING (ortam engeli)** | `b246ee7`, `27315e6`, `90d495b`, `4bb5ba9` |
+| PIV-01 | `chore: initialize Rust Cargo app` | Cargo derlenir; temel dizin ve lisans/README korunur | **BLOCKED (çalıştırma ortamı yok)** | `b246ee7`, `27315e6`, `90d495b`, `4bb5ba9`, `d6db4aa`, `9f13bc8` |
 | PIV-02 | `feat: create GTK4 libadwaita application shell` | GNOME'da boş/sade ana pencere açılır; düzgün kapanır | TODO | — |
 | PIV-03 | `refactor: define app media and settings boundaries` | Mantıksal modüller ayrılır; birim testleri çalışır | TODO | — |
 | PIV-04 | `test: establish fixtures and local verification commands` | Deterministik örnek medya/fixture kuralları ve cargo test komutları | TODO | — |
@@ -147,3 +147,52 @@
 | PIV-01.g Commit ve takip | PARTIAL | Kod commitleri: `b246ee7`, `27315e6`, `90d495b`; README: `4bb5ba9`. Test kanıtı ve nihai kapanış bekliyor. |
 
 **Bekleyen doğrulama komutları:** `cargo fmt --check`, `cargo check`, `cargo test`, `cargo clippy --all-targets -- -D warnings`, `cargo run -- --help`, `cargo run -- --version`. Bunlar yerel veya Work içindeki uygun Rust ortamında çalıştırılabilir; kullanıcının bilgisayarına erişimi şu anda yok. PIV-01 **DONE değil**. Özellikler, GTK penceresi veya medya fonksiyonları henüz uygulanmadı.
+
+## PIV-01 Work denetimi — 20.10.2026
+
+Bu kayıt yukarıdaki ilk iskelet çalışmasının ortam ve doğrulama durumunu günceller; önceki kayıt tarihçe olarak korunur.
+
+- İncelenen depo/branch: `onbeskarakterli/Pivra`, `dev`.
+- Başlangıç HEAD: `d6db4aa92792e39bfbb2ffaa4c12b3b45ff2f9b3`.
+- Korunan `main` başlangıç HEAD: `5d55ee599df4617bd51c09b1c7a008b8d0ece480`; bu görevde yazılmadı.
+- Dört bağlayıcı belge, Cargo.toml, src/main.rs, .gitignore ve tam depo ağacı okundu. Ağaçta AGENTS.md, LICENSE, Cargo.lock veya workflow yok.
+- Rust/Cargo sürümleri: **BELİRLENEMEDİ**. İki komut çalıştırma girişimi shell başlamadan `No usable execution environment is available` hatası verdi. Bu oturumda `command not found` sonucu alınmadı; toolchain'in eksik olduğu sonucuna varılamaz. Kurulum da çalıştırılamadı.
+- Kaynak kodu, bağımlılıklar ve mimari değiştirilmedi. Yeni kod commit'i oluşturulmadı. CI ve PIV-02 kodu eklenmedi.
+- Statik inceleme Cargo geçerliliği, derleme veya runtime PASS kanıtı değildir.
+
+| Alt görev | Güncel durum | Kanıt / kalan iş |
+|---|---|---|
+| PIV-01.a | BLOCKED | Depo, dev HEAD ve dosya ağacı doğrulandı; Rust/Cargo ortamı ve sürümleri çalıştırma servisi nedeniyle doğrulanamadı. |
+| PIV-01.b | CODED / doğrulama BLOCKED | Manifestte isim, sürüm, Rust 2024, repository ve publish=false var; üçüncü taraf bağımlılık yok. Cargo ile manifest ve kaynak doğrulaması bekliyor. |
+| PIV-01.c | DONE (statik denetim) | src/main.rs ve mevcut docs yeterli; gereksiz crate/dizin veya erken GTK/medya katmanı yok. |
+| PIV-01.d | DONE (statik denetim) | target/editor/OS ignore kuralları incelendi; Cargo.lock ignore edilmiyor. README güncellendi. Lisans dosyası yok; seçim açık konu olarak bırakıldı. |
+| PIV-01.e | BLOCKED | Kaynakta --help/-h, --version/-V, argümansız mesaj ve invalid için stderr + exit(2) var. Üç unit test mevcut; CLI çıktıları ve çıkış kodları çalıştırılmadı. |
+| PIV-01.f | BLOCKED | Aşağıdaki sekiz komut çalıştırılamadı; hiçbirine PASS/FAIL atanmadı. |
+| PIV-01.g | PARTIAL | README belge commit'i ve bu denetim kaydı dev'e işlendi; test kanıtı ve nihai kapanış bekliyor. |
+
+| Doğrulama komutu | Gerçek sonuç | Beklenti |
+|---|---|---|
+| `cargo fmt --check` | BLOCKED — çalıştırılmadı | Çıkış 0 |
+| `cargo check` | BLOCKED — çalıştırılmadı | Manifest/kaynak doğrulaması, çıkış 0 |
+| `cargo test` | BLOCKED — çalıştırılmadı | Mevcut üç birim testi geçer |
+| `cargo clippy --all-targets -- -D warnings` | BLOCKED — çalıştırılmadı | Uyarısız, çıkış 0 |
+| `cargo run -- --help` | BLOCKED — çalıştırılmadı | Yardım stdout, çıkış 0 |
+| `cargo run -- --version` | BLOCKED — çalıştırılmadı | Pivra 0.1.0 stdout, çıkış 0 |
+| `cargo run --` | BLOCKED — çalıştırılmadı | GUI henüz yok mesajı stdout, çıkış 0 |
+| `cargo run -- --unknown` | BLOCKED — çalıştırılmadı | Kontrollü hata stderr, sıfırdan farklı çıkış (kaynakta 2) |
+
+### Commit kanıtı ve test durumunun ayrımı
+
+| Commit | Kapsam | Test durumu |
+|---|---|---|
+| `b246ee7`, `27315e6`, `90d495b`, `4bb5ba9` | Önceki Cargo, Rust, ignore ve README commitleri | Önceki kayıtta test edilmedi; bu oturumda da BLOCKED |
+| `d6db4aa92792e39bfbb2ffaa4c12b3b45ff2f9b3` | Önceki takip kaydı / bu denetimin başlangıç HEAD'i | Belge; test başarısı anlamına gelmez |
+| `9f13bc811be0244fbd7c72cd9ff1f5bbb2cb83e6` | `docs(PIV-01): record Work audit execution blocker` — README ve eksik iki CLI kontrolünün yönergesi | Belge; Cargo/CLI kontrolleri BLOCKED |
+
+Bu takip güncellemesini içeren belge commit'inin kendi SHA'sı, öz referans oluşturmak yerine bu dosyanın Git geçmişinden alınır. Kodda değişiklik yoktur; test durumu belge commit'lerinden bağımsızdır.
+
+**Belge tutarsızlığı:** Şartname ve yol haritasında “henüz kod yazılmadı/kaynak kodu değiştirilmeyecek”, takip başlığında ise tüm 60 işin gelecekte olduğu yönünde tarihsel ifadeler var. PIV-01 iskeleti artık mevcut. Bu görev talimatı yalnız PIV-01 denetimini yetkilendirir; kabul edilen ürün kararları ve diğer görevlerin kapsamı değiştirilmedi.
+
+**GNOME GUI:** Gerçek grafik oturumu testi yapılmadı; PIV-01 kapanış koşulu değil. PIV-02'de ayrıca doğrulanacak.
+
+**Kapanış:** PIV-01 tamamlandı mı? **HAYIR — BLOCKED.** Önce kullanılabilir bir Rust çalıştırma ortamında tüm kontroller ve CLI çıkış kodları doğrulanmalı; üretilen Cargo.lock ve varsa gerekli minimum düzeltmeler ayrıca incelenip dev'e kaydedilmeli. Lisans kararı ayrı açık konu olarak kalabilir. **PIV-02'ye teknik geçiş kapısı henüz geçilmedi; PIV-02 başlatılmadı.**

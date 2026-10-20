@@ -1,0 +1,11 @@
+[package]
+name = "pivra"
+version = "0.1.0"
+edition = "2024"
+description = "A lightweight GNOME image viewer with seamless photo and video navigation"
+repository = "https://github.com/onbeskarakterli/Pivra"
+publish = false
+
+# GTK4, libadwaita, Glycin and GStreamer dependencies will be chosen
+# in later PIV tasks after capability checks.
+[dependencies]

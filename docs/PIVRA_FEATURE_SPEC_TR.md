@@ -68,7 +68,7 @@
 
 | No | Özellik | Kabul edilen davranış |
 |---|---|---|
-| 46 | Mod | Düzenleme yalnız ayrı modda; normal görüntüleme kalabalıklaşmaz; kayda kadar tahribatsız. |
+| 46 | Mod | **Yalnız Edit seçeneğiyle erişilen tamamen ayrı düzenleme modu**; normal fotoğraf/video görüntüleyici hiçbir düzenleme aracıyla kalabalıklaşmaz. Düzenleme geliştirmesi görüntüleme ve video tamamlandıktan sonra, en son aşamada yapılır; kayda kadar tahribatsız. |
 | 47 | Döndürme/çevirme | 90/180/270°, yatay/dikey çevirme, +/-180° serbest açı ve ufuk hizalama; boş köşelerin otomatik en az kayıplı kırpılması. |
 | 48 | Kırpma | Serbest, özgün, 1:1, 4:3, 3:2, 16:9, 9:16, özel oran; en-boy oranı bozulmaz. |
 | 49 | Boyut | Hedef piksel ölçüsü veya dosya boyutu; kalite/çözünürlük optimizasyonu ve tahmini sonuç. |
@@ -140,6 +140,17 @@
 | Dosya izinleri | Normal Linux kullanıcı ve dosya sistemi izinleri geçerlidir; Flatpak sandbox/portal sınırlamaları hedeflenmez. |
 | Doğrulama | Desteklenen dağıtım/sürüm matrisi, GTK/GStreamer sürüm farkları ve paket kurulumu gerçek sistemlerde test edilecek. |
 
+## 6D. Geliştirme ve ilk sürüm öncelikleri — 72. madde (KARARLAŞTIRILDI)
+
+| Öncelik | Kapsam / ilke |
+|---|---|
+| 1 — Görüntüleyici çekirdeği | Rust + GTK4/libadwaita temel pencere, Nautilus'tan açılış, klasör listeleme, doğal sıralama, fotoğraf gösterme, zoom/pan, hızlı gezinme ve performans. |
+| 2 — Video | Fotoğraf/video karma gezinme, GStreamer oynatma, ses, kontrol, altyazı, seek ve planlanmış video davranışları. |
+| 3 — Görüntüleme deneyiminin tamamlanması | Şerit, mini harita, slayt gösterisi, bilgi paneli, kısayollar, format uyumluluğu, yerel paketleme, kararlılık ve testler. |
+| 4 — Son geliştirme aşaması: Edit | **Bütün fotoğraf düzenleme özellikleri**, yalnız ayrı **Edit** seçeneğiyle açılacak modda geliştirilir. Normal görüntüleme arayüzüne düzenleme paneli veya kalıcı araç çubuğu eklenmez. Toplu dönüştürme gibi düzenleme/işleme temelli özellikler de çekirdek görüntüleme ve videodan sonra planlanır. |
+
+**İlk sürüm yaklaşımı:** Önce görüntüleme ve video işlevleri sağlam ve kullanılabilir hale getirilir; Edit modunun tamamlanması ilk görüntüleme/video test sürümleri için ön koşul değildir. Edit modu ayrı ve son geliştirme aşamasıdır. Nihai sürüm numarası / yayın eşiği ayrıca belirlenebilir.
+
 ## 7. Henüz karara bağlanmayanlar / teknik doğrulama
 
 | Konu | Durum |
@@ -195,3 +206,5 @@
 - **70. madde — KARARLAŞTIRILDI (20.10.2026):** Akıllı touchpad/dokunmatik hareketler; pinch zoom, büyütülmüş görüntüde öncelikle pan, ekrana sığdığında yatay hareketle medya geçişi. Donanım desteği gerçek cihazlarda doğrulanacak.
 
 - **71. madde — KARARLAŞTIRILDI (20.10.2026):** Tüm hedef Linux dağıtımları için dağıtıma özgü yerel paketleme; Flatpak tercih edilmez. Güncel sistem kütüphaneleri ve medya motorları kullanılır; fiili paket kapsamı desteklenen dağıtım/sürüm matrisi ile doğrulanır.
+
+- **72. madde — KARARLAŞTIRILDI (20.10.2026):** Önce fotoğraf görüntüleme ve video oynatma; görüntüleme arayüzü sade kalacak. Fotoğraf düzenleme yalnız Edit seçeneği ile açılan bağımsız modda yer alacak ve en son geliştirilecek.

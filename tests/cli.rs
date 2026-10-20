@@ -1,11 +1,19 @@
+mod support;
+
 use std::process::{Command, Output};
 
 fn run(args: &[&str]) -> Output {
+    run_on_backend(args, "x11")
+}
+
+fn run_on_backend(args: &[&str], backend: &str) -> Output {
+    let runtime = support::temp_dir();
     Command::new(env!("CARGO_BIN_EXE_pivra"))
         .args(args)
         .env_remove("DISPLAY")
         .env_remove("WAYLAND_DISPLAY")
-        .env("GDK_BACKEND", "x11")
+        .env("XDG_RUNTIME_DIR", runtime.path())
+        .env("GDK_BACKEND", backend)
         .output()
         .expect("run Pivra")
 }
@@ -47,10 +55,14 @@ fn invalid_arguments_keep_exit_code_and_streams() {
 
 #[test]
 fn launch_without_a_display_fails_cleanly() {
-    let output = run(&[]);
-    assert_eq!(output.status.code(), Some(1));
-    assert!(output.stdout.is_empty());
-    let error = String::from_utf8(output.stderr).expect("UTF-8 error");
-    assert!(error.starts_with("Pivra: unable to initialize GTK; a graphical session is required:"));
-    assert!(!error.contains("panicked"));
+    for backend in ["x11", "wayland"] {
+        let output = run_on_backend(&[], backend);
+        assert_eq!(output.status.code(), Some(1));
+        assert!(output.stdout.is_empty());
+        let error = String::from_utf8(output.stderr).expect("UTF-8 error");
+        assert!(
+            error.starts_with("Pivra: unable to initialize GTK; a graphical session is required:")
+        );
+        assert!(!error.contains("panicked"));
+    }
 }

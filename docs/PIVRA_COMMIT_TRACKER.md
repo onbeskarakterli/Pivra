@@ -16,7 +16,7 @@
 
 | ID | Planlı commit başlığı | Kabul / test kontrolü | Durum | SHA |
 |---|---|---|---|---|
-| PIV-01 | `chore: initialize Rust Cargo app` | Cargo derlenir; temel dizin ve lisans/README korunur | TODO | — |
+| PIV-01 | `chore: initialize Rust Cargo app` | Cargo derlenir; temel dizin ve lisans/README korunur | **TESTING (ortam engeli)** | `b246ee7`, `27315e6`, `90d495b`, `4bb5ba9` |
 | PIV-02 | `feat: create GTK4 libadwaita application shell` | GNOME'da boş/sade ana pencere açılır; düzgün kapanır | TODO | — |
 | PIV-03 | `refactor: define app media and settings boundaries` | Mantıksal modüller ayrılır; birim testleri çalışır | TODO | — |
 | PIV-04 | `test: establish fixtures and local verification commands` | Deterministik örnek medya/fixture kuralları ve cargo test komutları | TODO | — |
@@ -133,3 +133,17 @@
 | **TOPLAM** | **PIV-01–60** | **60** | **0** |
 
 > Plan ve takip dokümanlarının oluşturulması gerçek Git commit'i üretir; ancak tabloda yer alan **60 gelecekteki uygulama commit'i** henüz gerçekleştirilmemiştir.
+
+## PIV-01 ayrıntılı ilerleme — 20.10.2026
+
+| Alt görev | Durum | Kanıt / not |
+|---|---|---|
+| PIV-01.a Depo/ortam denetimi | DONE | `dev` incelendi; Cargo.toml, main.rs, .gitignore ve LICENSE başlangıçta yok; Git erişimi çalışıyor. Bu çalışma ortamında rustc/cargo komutları yok. |
+| PIV-01.b Cargo iskeleti | CODED | `Cargo.toml`, `src/main.rs` eklendi. Rust 2024, üçüncü taraf bağımlılık yok. Derleme henüz doğrulanamadı. |
+| PIV-01.c Dizin düzeni | CODED | `src/` uygulama girişi, mevcut `docs/` korunuyor; gereksiz boş dizin/crate eklenmedi. |
+| PIV-01.d Git/metaveri | PARTIAL | `.gitignore` ve README güncellendi. **Lisans seçilmedi**; sonradan kullanıcı onayı gerekir. |
+| PIV-01.e Başlangıç davranışı | CODED | `--help`, `--version`, tanımsız parametre için kontrollü hata; GUI PIV-02'de. Üç Rust unit test yazıldı, çalıştırılamadı. |
+| PIV-01.f Otomatik doğrulama | BLOCKED | `rustc: command not found`, `cargo: command not found`. Bu nedenle fmt/check/test/clippy PASS olarak işaretlenmedi. |
+| PIV-01.g Commit ve takip | PARTIAL | Kod commitleri: `b246ee7`, `27315e6`, `90d495b`; README: `4bb5ba9`. Test kanıtı ve nihai kapanış bekliyor. |
+
+**Bekleyen doğrulama komutları:** `cargo fmt --check`, `cargo check`, `cargo test`, `cargo clippy --all-targets -- -D warnings`, `cargo run -- --help`, `cargo run -- --version`. Bunlar yerel veya Work içindeki uygun Rust ortamında çalıştırılabilir; kullanıcının bilgisayarına erişimi şu anda yok. PIV-01 **DONE değil**. Özellikler, GTK penceresi veya medya fonksiyonları henüz uygulanmadı.

@@ -107,11 +107,21 @@
 | 71 | Çoklu sayfa/katman | TIFF sayfaları, ICO çözünürlükleri ve decoder destekliyorsa PSD katmanları için yalnız gerektiğinde panel. |
 | 72 | Desteklenmeyenler | Kendi dosya yöneticisi, medya kütüphanesi, histogram, kapsamlı panoya kopyalama, genel sürükle-bırak ve ek sıralama seçenekleri yok. |
 
+## 6A. Çoklu monitör ve HiDPI — 69. madde (KARARLAŞTIRILDI)
+
+| Alan | Kabul edilen davranış |
+|---|---|
+| Arayüz ölçeği | GTK arayüzü pencerenin bulunduğu monitörün HiDPI / kesirli ölçeklendirme ayarına otomatik uyarlanır. |
+| Fit / Fill | Monitör ya da kullanılabilir viewport değiştiğinde hedef ekrana göre yeniden hesaplanır, en-boy oranı korunur. |
+| Elle zoom ve pan | Kullanıcının elle yaptığı zoom ve kaydırma mümkün olduğunca korunur; yeni viewport'ta geçerli sınırlar içine alınabilir. |
+| Monitör geçişi | Pencere farklı çözünürlük ve ölçekli monitöre taşınırken gereksiz sıfırlama ve görüntü bozulması önlenir. |
+| Dosya | HiDPI davranışı kaynak medyayı veya kaydedilen çözünürlüğü değiştirmez. |
+
 ## 7. Henüz karara bağlanmayanlar / teknik doğrulama
 
 | Konu | Durum |
 |---|---|
-| HiDPI, çoklu monitör, dokunmatik/touchpad ve dağıtım modeli | **AÇIK:** Ayrıntılandırılmadı. |
+| Dokunmatik/touchpad ve dağıtım modeli | **AÇIK:** Ayrıntılandırılmadı. |
 | Codec/RAW/HDR/PSD/JPEG XL desteğinin tam sınırları | **UYGULAMA TESTLERİYLE DOĞRULANACAK.** |
 
 > Bu doküman özellik ve davranış kararlarının kaydıdır; geliştirme veya commit edilmiş kaynak kod değildir. Push sırasında otomatik CI istenmiyor; yeni workflow eklenirse yalnızca manuel çalıştırma düşünülmeli.
@@ -157,3 +167,5 @@
 - **67. madde — KARARLAŞTIRILDI:** Gelişmiş ışık ve renk kontrollerinin altısı da eklenecek (Exposure, Highlights, Shadows, Temperature, Tint, Vibrance). Normal görüntüleme ekranında değil, düzenleme modunda bağımsız ayarlar olarak bulunacak; anlık önizleme ve geri alma davranışı diğer düzenlemelerle aynı olacak.
 
 - **68. madde — KARARLAŞTIRILDI (20.10.2026):** Küçük resim şeridindeki ayrı Seç modunda Fotoğraf / Video / Tümü filtresi bulunur. Bu filtre çoklu seçim kapsamını belirler. İşlemler yalnız destekledikleri medya türlerine uygulanır.
+
+- **69. madde — KARARLAŞTIRILDI (20.10.2026):** Çoklu monitörde akıllı HiDPI uyarlaması; Fit/Fill yeniden hesaplanır, kullanıcı zoom/pan tercihi mümkün olduğunca korunur.

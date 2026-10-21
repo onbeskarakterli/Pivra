@@ -1,7 +1,7 @@
 [Desktop Entry]
 Type=Application
 Name=Pivra
-Comment=Open a local photo placeholder; image decoding is not implemented yet
+Comment=Open a local JPEG or PNG photo using a sandboxed image loader
 Exec=pivra %u
 Terminal=false
 Categories=Graphics;Viewer;

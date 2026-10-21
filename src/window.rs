@@ -31,8 +31,7 @@ pub(super) fn build(app: &adw::Application, settings: &Settings, file: Option<Op
     placeholder.set_valign(gtk::Align::Center);
     placeholder.set_vexpand(true);
     if file.is_some() {
-        placeholder
-            .set_text("Discovering neighboring media. Image decoding is not implemented yet.");
+        placeholder.set_text("Discovering neighboring media…");
         viewport.append(&placeholder);
     }
     let content = gtk::Box::new(gtk::Orientation::Vertical, 0);
@@ -69,8 +68,12 @@ pub(super) fn build(app: &adw::Application, settings: &Settings, file: Option<Op
                 .to_string_lossy();
             window.set_title(Some(&format!("{name} — {APP_NAME}")));
             mapped_title.set_title(&name);
-            mapped_title.set_subtitle("Image decoding is not implemented yet.");
+            mapped_title.set_subtitle("Local photo");
         });
+        let image =
+            crate::image_view::build(&window, context.borrow().opened.item.path().to_owned());
+        viewport.prepend(&image);
+        placeholder.set_vexpand(false);
         window.present();
         discover(&window, &title, &placeholder, context);
     } else {
@@ -99,37 +102,77 @@ fn discover(
     // Only std paths, atomics and model data cross the worker boundary.
     let job = gio::spawn_blocking(move || discovery::scan_neighbors(&path, &cancelled));
     glib::MainContext::default().spawn_local(async move {
-        let result = job.await.unwrap_or_else(|_| Err(std::io::Error::other("folder worker failed")));
-        let (Some(window), Some(title), Some(placeholder)) = (window.upgrade(), title.upgrade(), placeholder.upgrade()) else { return };
-        if !window.is_visible() { return; }
+        let result = job
+            .await
+            .unwrap_or_else(|_| Err(std::io::Error::other("folder worker failed")));
+        let (Some(window), Some(title), Some(placeholder)) =
+            (window.upgrade(), title.upgrade(), placeholder.upgrade())
+        else {
+            return;
+        };
+        if !window.is_visible() {
+            return;
+        }
         let mut context = context.borrow_mut();
         context.discovery_finished = true;
         match result {
             Ok(report) => {
                 let warnings = report.issues.len();
                 for issue in report.issues {
-                    eprintln!("{APP_NAME}: folder scan incomplete: {:?}: {}", issue.path, issue.error);
+                    eprintln!(
+                        "{APP_NAME}: folder scan incomplete: {:?}: {}",
+                        issue.path, issue.error
+                    );
                 }
                 context.collection = report.collection;
                 // Selection comes from the catalog, not the directory's first entry.
-                let selected = context.collection.current().expect("scanner selected opened file");
-                let name = selected.path().file_name().unwrap_or_default().to_string_lossy();
+                let selected = context
+                    .collection
+                    .current()
+                    .expect("scanner selected opened file");
+                let name = selected
+                    .path()
+                    .file_name()
+                    .unwrap_or_default()
+                    .to_string_lossy();
                 let count = context.collection.items().len();
-                let candidates = format!("{count} {}", if count == 1 { "candidate" } else { "candidates" });
-                let suffix = if warnings == 0 { candidates } else {
-                    format!("{candidates}, {warnings} {}", if warnings == 1 { "warning" } else { "warnings" })
+                let candidates = format!(
+                    "{count} {}",
+                    if count == 1 {
+                        "candidate"
+                    } else {
+                        "candidates"
+                    }
+                );
+                let suffix = if warnings == 0 {
+                    candidates
+                } else {
+                    format!(
+                        "{candidates}, {warnings} {}",
+                        if warnings == 1 { "warning" } else { "warnings" }
+                    )
                 };
                 window.set_title(Some(&format!("{name} — {APP_NAME} ({suffix})")));
                 title.set_title(&name);
-                title.set_subtitle(if warnings == 0 { "Image decoding is not implemented yet." } else { "Folder scan incomplete. Image decoding is not implemented yet." });
-                placeholder.set_text(&format!("{suffix}. Image decoding is not implemented yet."));
+                title.set_subtitle(if warnings == 0 {
+                    "Local photo"
+                } else {
+                    "Folder scan incomplete."
+                });
+                placeholder.set_text(&format!("{suffix}."));
             }
             Err(error) => {
                 eprintln!("{APP_NAME}: folder scan failed: {error}");
-                let name = context.opened.item.path().file_name().unwrap_or_default().to_string_lossy();
+                let name = context
+                    .opened
+                    .item
+                    .path()
+                    .file_name()
+                    .unwrap_or_default()
+                    .to_string_lossy();
                 window.set_title(Some(&format!("{name} — {APP_NAME} (folder scan failed)")));
-                title.set_subtitle("Folder scan failed. Image decoding is not implemented yet.");
-                placeholder.set_text("Folder scan failed. Keeping only the opened file. Image decoding is not implemented yet.");
+                title.set_subtitle("Folder scan failed.");
+                placeholder.set_text("Folder scan failed. Keeping only the opened file.");
             }
         }
     });

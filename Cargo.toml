@@ -7,10 +7,12 @@ description = "A lightweight GNOME image viewer with seamless photo and video na
 repository = "https://github.com/onbeskarakterli/Pivra"
 publish = false
 
-# GTK 4.6 / libadwaita 1.2 API baseline; use native distribution libraries.
+# Glycin 3.0 gdk integration requires native GTK >= 4.16; libadwaita >= 1.2.
 [dependencies]
-gtk = { package = "gtk4", version = "0.10", features = ["v4_6"] }
+gtk = { package = "gtk4", version = "0.10", features = ["v4_16"] }
 adw = { package = "libadwaita", version = "0.8", features = ["v1_2"] }
+
+glycin = { version = "=3.0.8", features = ["gdk4"] }
 
 [dev-dependencies]
 tempfile = "3"

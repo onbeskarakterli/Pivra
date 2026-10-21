@@ -20,7 +20,7 @@ fn run_on_backend(args: &[&str], backend: &str) -> Output {
 
 #[test]
 fn help_and_alias_work_without_a_display() {
-    let expected = b"Pivra 0.1.0\nUsage: pivra [--help | --version]\n       pivra <local-photo-path | file://URI>\nGNOME image viewing will be available in a later development stage.\nAccepts one local .jpg/.jpeg/.png file; opens a placeholder, without decoding.\n";
+    let expected = b"Pivra 0.1.0\nUsage: pivra [--help | --version]\n       pivra <local-photo-path | file://URI>\nJPEG/PNG viewing requires a working sandboxed Glycin loader.\nAccepts one local .jpg/.jpeg/.png file; reports loading and decoder errors.\n";
     for flag in ["--help", "-h"] {
         let output = run(&[flag]);
         assert_eq!(output.status.code(), Some(0));

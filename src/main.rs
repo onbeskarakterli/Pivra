@@ -2,6 +2,8 @@
 
 mod app;
 mod cli;
+mod image_loader;
+mod image_view;
 mod input;
 mod window;
 

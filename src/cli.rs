@@ -33,8 +33,8 @@ pub(super) fn print_help() {
     println!("{APP_NAME} {}", env!("CARGO_PKG_VERSION"));
     println!("Usage: pivra [--help | --version]");
     println!("       pivra <local-photo-path | file://URI>");
-    println!("GNOME image viewing will be available in a later development stage.");
-    println!("Accepts one local .jpg/.jpeg/.png file; opens a placeholder, without decoding.");
+    println!("JPEG/PNG viewing requires a working sandboxed Glycin loader.");
+    println!("Accepts one local .jpg/.jpeg/.png file; reports loading and decoder errors.");
 }
 
 #[cfg(test)]

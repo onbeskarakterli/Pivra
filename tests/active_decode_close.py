@@ -333,7 +333,8 @@ def observe(process, baseline, evidence, diagnostics, arm, timeout=15):
                 stop_and_certify(pid, birth, held[2], entry, frame, process, evidence, diagnostics, sample)
                 transferred = True
                 return held, frame, observed
-            diagnostics.flush()
+            # Keep stdout (including a potentially blocked pipe/terminal) out
+            # of the entire live sampling interval. run() flushes on completion.
             if process.poll() is not None:
                 raise AssertionError('probe exited while observing loader')
             if loaders and all(select.select([pin], [], [], 0)[0] for _, pin, _ in loaders.values()):

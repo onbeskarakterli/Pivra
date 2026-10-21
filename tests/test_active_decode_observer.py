@@ -222,10 +222,11 @@ class DiagnosisAndRaceGuards(unittest.TestCase):
              mock.patch('active_decode_close.os.open', side_effect=lambda *_: os.dup(frame)), \
              mock.patch('active_decode_close.signal.pidfd_send_signal'), \
              mock.patch('active_decode_close.frame_sample', side_effect=progress), \
-             mock.patch('builtins.print'), \
+             mock.patch.object(probe.Diagnostics, 'flush') as flush, \
              mock.patch('active_decode_close.stop_and_certify', side_effect=probe.NotRun('candidate reached')):
             with self.assertRaisesRegex(probe.NotRun, 'candidate reached'):
                 probe.observe(process, set(), evidence, diagnostics, arm=lambda: armed.append(True))
+        flush.assert_not_called()
         self.assertEqual(len(reads), 4)
         self.assertEqual(discover.call_count, 2, 'cached polling must not repeat tree scans')
         self.assertEqual(diagnostics.data['counts']['fd_discovery_race'], 1)

@@ -1,7 +1,7 @@
 # Pivra — Planlı Commit ve İlerleme Takibi
 
 **Kaynak:** [Özellik Şartnamesi](PIVRA_FEATURE_SPEC_TR.md) · [Yol Haritası](PIVRA_DEVELOPMENT_ROADMAP.md)  
-**Branch:** `dev` · **Durum:** PIV-01 **DONE (21.10.2026)**; PIV-02 **DONE (21.10.2026, Xvfb GTK pencere doğrulaması)**; PIV-03 **DONE (21.10.2026)**; PIV-04 **DONE (21.10.2026; grafik test kategorileri ayrı)**; PIV-05 **DONE (21.10.2026; belgeleme/probe kapsamı)**; PIV-06 **DONE (21.10.2026; dosya/URI ve desktop giriş altyapısı; gerçek Nautilus NOT RUN)**; PIV-07 **DONE (21.10.2026; sırasız komşu medya keşfi)**; PIV-08–60 TODO, başlatılmadı. Faz 0 **INCOMPLETE** (temiz native kurulum yeniden üretimi NOT RUN). Güncel kapanış kanıtı son bölümde; 20.10.2026 kayıtları tarihçedir. Burada listelenen `PIV-xx` kimlikleri gerçek Git commit SHA'sı **değildir**.
+**Branch:** `dev` · **Durum:** PIV-01 **DONE (21.10.2026)**; PIV-02 **DONE (21.10.2026, Xvfb GTK pencere doğrulaması)**; PIV-03 **DONE (21.10.2026)**; PIV-04 **DONE (21.10.2026; grafik test kategorileri ayrı)**; PIV-05 **DONE (21.10.2026; belgeleme/probe kapsamı)**; PIV-06 **DONE (21.10.2026; dosya/URI ve desktop giriş altyapısı; gerçek Nautilus NOT RUN)**; PIV-07 **DONE (21.10.2026; sırasız komşu medya keşfi)**; PIV-08 **DONE (21.10.2026; deterministik doğal sıra)**; PIV-09–60 TODO, başlatılmadı. Faz 0 **INCOMPLETE** (temiz native kurulum yeniden üretimi NOT RUN). Güncel kapanış kanıtı son bölümde; 20.10.2026 kayıtları tarihçedir. Burada listelenen `PIV-xx` kimlikleri gerçek Git commit SHA'sı **değildir**.
 
 ## Kullanım kuralları
 
@@ -28,7 +28,7 @@
 |---|---|---|---|---|
 | PIV-06 | `feat: accept image path from Nautilus` | Nihai hedef: fotoğrafa çift tıklama. Dosya/URI + GIO/desktop Exec doğrulandı; gerçek Nautilus DESKTOP-06 NOT RUN; video varsayılanı değiştirilmedi | **DONE — 21.10.2026 (giriş altyapısı)** | `ad0bcde080ee36c88dc74bd58844d73e7bff8986`, `cac751927b6e3a967cf0ca31b04d06971a5f9fbc`, `69feda8d5cc7342d941b71d5e8878081f2792211` |
 | PIV-07 | `feat: scan neighboring media in folder` | Tek dizinde sırasız fotoğraf/video adayları, açılan alias seçimi, arka plan keşfi ve açık hata durumları | **DONE — 21.10.2026** | `9255519e8c576f067184a2818e5917bfcb9ec724`, `91c81e895cd3859981805690af01a7cafddbf30a`, `9a998ba40c793ff49a6ee4fe7e617a6041f48cfe` |
-| PIV-08 | `feat: apply natural filename ordering` | 1,2,10 ve karma medya testleri geçer | TODO | — |
+| PIV-08 | `feat: apply natural filename ordering` | Doğal karma medya sırası, alias seçimi ve deterministik byte politikası doğrulandı | **DONE — 21.10.2026** | `5a109ac26bd98201e8de9f5a3971189e5969a8ba`, `5cf8469070b4b574c6d2292a92e0d8167763d8a1` |
 | PIV-09 | `feat: render JPEG PNG with orientation` | Görsel merkezde fit açılır; EXIF orientation doğru | TODO | — |
 | PIV-10 | `feat: navigate previous and next media` | Sol/sağ; ilk/son sınırları; tek ve boş klasör | TODO | — |
 | PIV-11 | `feat: watch folder changes and external modifications` | Ekle/sil/ad değiştir listeyi yeniler; açık dosyada elle Yenile isteği | TODO | — |
@@ -122,7 +122,7 @@
 | Faz | ID aralığı | Planlı commit | Tamamlanan |
 |---|---|---:|---:|
 | 0 — Temel | 01–05 | 5 | 5 |
-| 1 — Fotoğraf | 06–12 | 7 | 2 |
+| 1 — Fotoğraf | 06–12 | 7 | 3 |
 | 2 — Zoom/performans | 13–18 | 6 | 0 |
 | 3 — Video temel | 19–24 | 6 | 0 |
 | 4 — Video gelişmiş | 25–31 | 7 | 0 |
@@ -130,9 +130,9 @@
 | 6 — Uyumluluk/paket | 40–47 | 8 | 0 |
 | 7 — Edit (en son özellik geliştirmesi) | 48–57 | 10 | 0 |
 | 8 — Son doğrulama | 58–60 | 3 | 0 |
-| **TOPLAM** | **PIV-01–60** | **60** | **7** |
+| **TOPLAM** | **PIV-01–60** | **60** | **8** |
 
-> PIV-01–07 tamamlandı (PIV-06 giriş altyapısı; PIV-07 sırasız keşif); PIV-08–60 gelecekteki işlerdir. Görev sayacı 5/5 olsa da Faz 0 kapısı INCOMPLETE: temiz native kurulum yeniden üretimi NOT RUN. Görev kimlikleri commit SHA'sı değildir. İlk planlama ve önceki engel kayıtları aşağıda tarihçe olarak korunur.
+> PIV-01–08 tamamlandı; PIV-09–60 gelecekteki işlerdir. Görev sayacı 5/5 olsa da Faz 0 kapısı INCOMPLETE: temiz native kurulum yeniden üretimi NOT RUN. Görev kimlikleri commit SHA'sı değildir. İlk planlama ve önceki engel kayıtları aşağıda tarihçe olarak korunur.
 
 ## PIV-01 ayrıntılı ilerleme — 20.10.2026
 
@@ -795,3 +795,86 @@ Değişen dosyalar: `src/lib.rs`, yeni `src/discovery.rs`, `src/window.rs`, yeni
 `tests/desktop_smoke.py`, README, yol haritası ve bu takip tablosu.
 
 **Kapanış: PIV-07 DONE; PIV-08 TODO, başlatılmadı.**
+
+
+## PIV-08 kapanış — 21.10.2026
+
+**PIV-08: DONE; PIV-09 TODO, başlatılmadı.** Önceki görevlerin PIV-08
+başlatılmadı/sıra garantisiz kayıtları tarihçedir. Kullanıcının PIV-08 talimatıyla
+worker'ın tamamladığı aday listesine doğal sıra eklendi; decoder/player/gezinme yok.
+
+### Git ve dosya kanıtı
+
+- Başlangıç: temiz dev, origin/dev ile eşit `c0492a40c920fe2ca6cbd550a82243865c4c2bbd`; PIV-07 DONE/push doğrulandı.
+- Comparator, worker entegrasyonu ve testler: `5a109ac26bd98201e8de9f5a3971189e5969a8ba`.
+- Politika/README/yol haritası: `5cf8469070b4b574c6d2292a92e0d8167763d8a1`.
+- Bu takip kaydı ayrı kapanış commit'idir; kendi SHA'sı kendi içeriğine yazılamaz.
+  Kesin bitiş SHA'sı Git/uzak HEAD ve teslim raporunda doğrulanır.
+- main referansı `5d55ee599df4617bd51c09b1c7a008b8d0ece480` değişmedi.
+- Değişenler: yeni `src/natural.rs`, `src/lib.rs`, `src/discovery.rs`,
+  `tests/discovery.rs`, README, yol haritası, bu tablo. Cargo.toml/lock, CLI/input,
+  app/window, core media/catalog, desktop entry ve orijinal fixture'lar değişmedi.
+
+### PIV-08.a–h
+
+| Alt görev | Durum | Gerçek kanıt / sınır |
+|---|---|---|
+| a Denetim | DONE | PIV-07 read_dir sırası garantisizdi; selection opened exact path üzerinden. Belgeler/model/worker sınırları incelendi |
+| b Comparator | DONE | Std-only natural::compare_paths; ASCII katlama, sayı significant-length/digit karşılaştırması; integer parse yok. Primary eşitse ilk farklı sayı bloğu genişliği, sonra raw filename/full-path byte tie-break |
+| c Karma medya | DONE | Bütün adaylar toplandıktan sonra tek sort_unstable_by; tür gruplama yok; path/kind değişmez. Gerçek karma katalog sırası opposite creation order ile test edildi |
+| d Seçim | DONE | Sıralama katalog kurulmadan önce; scan_neighbors opened exact alias/yolu sonra bulup seçiyor. foto10.jpg seçimi, alias/raw ad, boş/tek öğe testleri geçti |
+| e Mimari | DONE | Worker'da in-place sort, comparator filesystem I/O/heap allocation yapmaz; crate eklenmedi. Cancel check sort öncesi/sonrası; sort içi preemption yok. Kapanış/weak UI guards değişmedi |
+| f Test | DONE | 5 yeni comparator unit, 2 yeni real-filesystem integration; mevcut 1,200 aday testine tam sıra ve index 917 eklendi. 18-name corpus'ta antisimetri/transitivity/equality + 18 rotated/reversed permutation; finite test, formal proof değil |
+| g Regresyon | DONE | Aşağıda 47 Rust ve tüm Cargo/fixture/desktop/X11/Sway/Weston kapsamları; normal Weston/physical GNOME NOT RUN |
+| h Belge/Git | DONE | README açık locale/tie/cancellation politikası, gerçek SHA/test tablosu; normal origin/dev push ve uzak HEAD eşitliği teslim sırasında doğrulanır |
+
+### Gerçek test sonuçları
+
+Mevcut `source /workspace/pivra-environment/gtk-activate.sh` kullanıldı. Ortam veya
+bağımlılık kurulumu/değişikliği yapılmadı. `bash tests/check.sh` nihai çalışması PASS:
+
+| Kontrol | Sonuç |
+|---|---|
+| cargo +stable fmt --check | PASS |
+| cargo +stable check --locked --offline -j 2 | PASS |
+| cargo +stable build --locked --offline -j 2 | PASS |
+| cargo +stable test --locked --offline -j 2 | **47 PASS: 23 unit + 24 integration**, 0 failed/ignored, 0 doctest |
+| cargo +stable clippy --locked --offline --all-targets -j 2 -- -D warnings | PASS; ilk unnecessary_lazy_evaluations uyarıları unwrap_or ile düzeltildi; nihai tam check runner geçti |
+| python3 tests/fixtures/generate.py --check | PASS |
+| Comparator testleri | PASS: 1/2/10, karma uzantılar, aynı kök, padding/all-zero, çoklu sayı blokları, 10,000-digit değerler/padding, ASCII case, Türkçe/Unicode/raw byte, full-path fallback ve total-order corpus |
+| Gerçek katalog testleri | PASS: iki ters dosya oluşturma sırasında aynı tam sıra; foto10.jpg index 6; alias/raw byte korunur. 1,200 aday tam 0..1199 doğal sıra + seçili 917.png index 917 |
+| PIV-07 ve CLI/URI | PASS: empty/single, permissions, removed entry/iteration error, symlinks, cancellation; eski flag/exit/URI davranışları |
+| Bağımsız core derleme | PASS: rustc +stable --edition=2024 --crate-type lib src/lib.rs -o /tmp/pivra-piv08-core.rlib; Cargo/GTK/GIO linkage olmadan |
+| Desktop entry / GIO | PASS: desktop-file-validate, GIO parse ve kaynak entry/private PATH/XDG gerçek gio launch. Detached exit status NOT OBSERVED; normal WM close/process termination doğrulandı |
+| git diff --check | PASS |
+
+| Grafik kategori | Sonuç |
+|---|---|
+| X11/Xvfb, eski + --files | PASS: iki mapped pencere; dosya/URI selected name + 3 candidates; bağımsız normal WM close, exit 0, boş stdout/stderr ve değişmeyen fixture byte'ları |
+| Sway headless, eski + --files | PASS: iki native xdg_shell, app ID/PID/geometri ve selection/count; normal Wayland close/exit 0; XWayland kapalı/DISPLAY yok |
+| Weston headless/Pixman, eski + --files | PASS: gerçek mapped xdg_toplevel/SHM buffer; title/geometri, ack_configure + attach/commit; native Wayland, XWayland kapalı/DISPLAY yok |
+| X11 discovery warning/fatal UI | PASS: partial warning ve permission-error başlıkları + controlled stderr; normal window close. Scan başarısızlığı lifecycle başarısıyla karıştırılmadı |
+| Weston normal close | **NOT RUN**, cleanup SIGTERM başarı sayılmadı |
+| Fiziksel GNOME/Wayland, gerçek Nautilus | **NOT RUN**, DESKTOP-06 açık |
+
+Komutlar: README'deki Xvfb `tests/gui_smoke.py`, D-Bus Sway
+`tests/wayland_smoke.py`, Weston prefix ile `tests/weston_smoke.py`; her biri
+argsız ve `target/debug/pivra --files` modunda. Ek olarak Xvfb+D-Bus altında
+`tests/desktop_smoke.py` ve `tests/discovery_smoke.py`. Gerçek sıra filesystem
+catalog testlerinde doğrulandı; sıralı liste/gezinme UI'si eklenmedi.
+
+### Politika ve açık riskler
+
+ASCII 0–9 numeric token; non-ASCII byte'lar opak. Whole filename/extension primary
+karşılaştırılır. Leading-zero width yalnız tüm primary eşitliğinde uygulanır:
+foto2 < foto02 < foto002; a02b3 < a2b10. Sonra exact raw filename/full path;
+aynı byte path eşit. İşaret/decimal/Unicode digit özel sayısal anlam taşımaz.
+Türkçe locale collation, NFC veya Unicode case folding **uygulanmadı**; ASCII I/i
+birincilde eşitken İ/ı ayrı kalır. Raw Linux filename byte'ları değişmez.
+
+Sort O(N log N × L) byte işi, benchmark/latency garantisi değil. Std sort iptali
+araya almaz; cancel sort öncesi/sonrasında ve enumeration sırasında kontrol edilir.
+Network/blocked syscall, extreme-scale/RAM/TOCTOU riskleri PIV-07'deki gibi açık.
+PIV-05 Glycin loader/ABI/SDK/Codex sandbox, Gst SDK/sink/Libav ve Faz 0 temiz native
+kurulum kapıları açık; güvenlik bypass yok. DESKTOP-06 NOT RUN. Video default'ları,
+MIME giriş kuralları, lisans ve CI değişmedi. **PIV-09 başlatılmadı.**

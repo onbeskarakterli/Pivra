@@ -1,6 +1,6 @@
 # Pivra — Teknik Yetenekler ve Faz 0 Kararları
 
-**Tarih:** 21.10.2026 · **Dal:** dev · **Güncel durum:** PIV-09 TESTING; aşağıdaki ilk kayıt yalnız PIV-05 tarihçesidir.
+**Tarih:** 21.10.2026 · **Dal:** dev · **Güncel durum:** PIV-09 DONE, PIV-10 TESTING; aşağıdaki ilk kayıt yalnız PIV-05 tarihçesidir.
 Başlangıç commit'i: `8b3947215c54dfd2515df61a50dd05c080eccf31`.
 PIV-06 uygulanmadı. Production kaynakları, Cargo.toml ve Cargo.lock değiştirilmedi;
 görüntü decoder'ı veya video oynatıcı yazılmadı. Proje lisansı seçilmedi.
@@ -677,3 +677,22 @@ Gerçek V3 probe **NOT RUN/77**, baseline secure decode engeli sürer.
 [Codex V3 JSON](probes/PIV09_ACTIVE_DECODE_OBSERVER_V3_CODEX.json) ·
 [Kesin native komut ve detay](PIV09_ACTIVE_DECODE_TEST.md).
 PIV-09 TESTING; native V3 kapanış sonucu bekleniyor. PIV-10 başlamadı.
+
+
+## 18. PIV-10 gezinme — 22.10.2026
+
+PIV-09 kapanışı `8991b78`/`c11c7b7` kullanıcı Arch/GNOME native kanıtıdır ve
+korunmuştur; eski TESTING bölümleri tarihçedir. PIV-10 yeni native sonuç bekler.
+Katalogda sınırlı previous/next seçimi GUI'den bağımsızdır; doğal sıralama/discovery
+aynıdır. Window-local action/key controller, tek yeniden kullanılan ImageView ve
+Cancellable kimliği ile late-result guard eklendi. Default Fit her seçimde yenilenir.
+Video ve diğer desteklenmeyen formatlar açık mesajla yerini korur; playback yoktur.
+Üretim image_loader Bwrap/limit/transform yolu ve Cargo bağımlılıkları değişmedi.
+
+54 Rust + 30 Python observer PASS; fmt/check/build/Clippy PASS. 12 scoped GUI çağrısı
+(8 eski + 4 yeni) PASS. Kontrollü-error race probe yalnız GTK/GIO callback yaşam
+döngüsünü ispatlar, decoder/piksel başarısı değildir. Gerçek yeni navigation_probe
+Codex'te secure loader başlamadığı için exit77; başarılı frame/Fit/bozuk decode
+recovery ve fiziksel GNOME keyboard/focus NOT RUN. [Tam matris ve native komut](PIV10_VALIDATION.md).
+PIV-10 TESTING, PIV-11 başlamadı; Phase 0 clean install, DESKTOP-06 ve PIV-05 video
+SDK/sink/Libav riskleri kendi durumlarını korur.

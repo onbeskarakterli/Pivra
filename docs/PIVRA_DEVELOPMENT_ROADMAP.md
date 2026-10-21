@@ -1,6 +1,6 @@
 # Pivra — Geliştirme Yol Haritası
 
-**Durum:** PIV-01–08 DONE (giriş, keşif ve doğal sıra); PIV-09 DONE (Arch gerçek JPEG/PNG/EXIF, geometri ve aktif-decode kapanış/temizlik PASS); PIV-10–60 TODO. Faz 0 INCOMPLETE: temiz native kurulumun bağımsız yeniden üretimi NOT RUN; temiz Cargo target derlemesi ve headless regresyonlar geçti. [PIV-05 kanıtı ve ayrı faz kapısı](PIVRA_TECHNICAL_CAPABILITIES.md#102-piv-05-ve-faz-0-kapanışını-ayrı-değerlendirme).
+**Durum:** PIV-01–08 DONE (giriş, keşif ve doğal sıra); PIV-09 DONE (Arch gerçek JPEG/PNG/EXIF, geometri ve aktif-decode kapanış/temizlik PASS); PIV-10 TESTING (sol/sağ gezinme kodlandı; yeni native piksel/focus doğrulaması bekleniyor); PIV-11–60 TODO. Faz 0 INCOMPLETE: temiz native kurulumun bağımsız yeniden üretimi NOT RUN; temiz Cargo target derlemesi ve headless regresyonlar geçti. [PIV-05 kanıtı ve ayrı faz kapısı](PIVRA_TECHNICAL_CAPABILITIES.md#102-piv-05-ve-faz-0-kapanışını-ayrı-değerlendirme).
 **Başlangıç branch:** `dev` · **Kararlı sürümler:** `main`  
 **Kaynak şartname:** [PIVRA_FEATURE_SPEC_TR.md](PIVRA_FEATURE_SPEC_TR.md)  
 **Görev ve commit takibi:** [PIVRA_COMMIT_TRACKER.md](PIVRA_COMMIT_TRACKER.md)
@@ -213,3 +213,19 @@ Komut `bash tests/run_active_decode_close.sh`; PIV-09 TESTING, PIV-10 başlamad�
 Kullanıcı gerçek Arch Linux / GNOME Wayland üzerinde `c3e0aaf9e1d19ee73f35d1167b7363ce48c70d86` commit'inde `bash tests/run_active_decode_close.sh` çalıştırdı: **exit 0**, JSON `result=PASS`. Mevcut Glycin image-rs pool loader'ının tekrar kullanımı (`reuse_observed=true`), hedefe ait taze 96 MB kısmi RGB frame, zorunlu Bwrap izolasyonu, SIGSTOP sonrası fd/inode/mapping ve worker pending doğrulandı. Aktif decode sırasında gerçek pencere kapatıldı; iptal, job join, widget bırakma, sıfır stale mutation, diğer pencere piksel bütünlüğü ve tüm çocuk süreç temizliği **PASS**; kapanıştan temizliğe **0,318 sn**. Önceki gerçek JPEG/PNG, EXIF 1–8 ve otomatik Fit/resize kanıtları da PASS. Bunlar **kullanıcı kaynaklı native sonuçlar**, Codex çalıştırması değil.
 
 **PIV-09 DONE**; decoder'ların zamansal çakışması `NOT MEASURED`. Faz 0 temiz native kurulum ve DESKTOP-06 Nautilus kontrolleri kendi bağımsız kapılarıyla açık kalır. PIV-10 **TODO**. Ayrıntılar [commit tracker](PIVRA_COMMIT_TRACKER.md#piv-09-native-v3-kapanışı--21102026--done) içindedir.
+
+
+## PIV-10 — 22.10.2026, TESTING
+
+Pencereye ait doğal sıralı karışık MediaCollection üzerinde sınırlı previous/next
+seçim, capture-phase sol/sağ controller ve pencere başlığı entegrasyonu eklendi.
+Tek ImageView yeniden kullanılır; önceki token iptal edilir ve geç callback yalnız
+güncel kimlikle kabul edilir. Her yeni JPEG/PNG Fit/center başlar; videolar atlanmaz,
+oynatma yerine açık unavailable durumuna geçilir. Bozuk/silinmiş öğeden devam mümkündür.
+Sınır/tek/boş ve pending callback guard'ları otomatik kontrollüdür.
+
+54 Rust + 30 Python observer PASS; 12 scoped GUI/helper PASS. Strict yeni piksel
+testi Codex sandbox kapısında exit77/BLOCKED. [Detay ve native tek komut](PIV10_VALIDATION.md).
+Yeni native render/rapid sonuç ve fiziksel GNOME tuş/focus kanıtı olmadan DONE yok.
+PIV-09 kullanıcı native kanıtıyla DONE kalır. PIV-11, Faz 0 temiz native kurulum
+ve DESKTOP-06 kapsamında yeni başarı iddiası yok; bu görevler ilerletilmedi.

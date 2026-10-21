@@ -3,17 +3,18 @@ A fast, lightweight GNOME image viewer with seamless photo and video navigation,
 
 ## Development status
 
-**PIV-09: TESTING (2026-10-21).** User-reported tests on real Arch Linux / GNOME
-Wayland at `459fbea` passed secure JPEG/PNG decode, EXIF 1–8 pixels and manual
-Fit/resize/normal close. These were not independently run by Codex. Codex still
-cannot start the Bwrap loader because its `/proc` UID-map write returns EROFS.
-The user additionally reports `image_gui_probe` exit0 at `7d1acf4`: two loaded
-views, automatic Fit/center snapshots, resize and independent post-decode close.
-Only close during proven active decode and its cleanup gate remain pending. PIV-10 has not started. Historical delivery
-records below retain their original scope; the latest validation section supersedes
-the earlier overall BLOCKED status.
+**PIV-01–09: DONE. PIV-10: TESTING (2026-10-22), on `dev`.**
+Pivra accepts one local JPEG/PNG path or file URI and discovers a naturally ordered
+photo/video catalog. Left/Right now navigate that window's catalog without
+wrapping; video entries show an explicit unavailable-playback message. Every new
+photo uses the existing secure Glycin path and starts in centered Fit.
+PIV-10's real GNOME/Wayland pixel and physical-key validation is pending.
 
-**PIV-01: DONE. PIV-02: GTK4/libadwaita shell implemented and validated on 2026-10-21, on `dev`.** No image/video functionality, media engine or CI is included. PIV-03 separates application, window, CLI and core data responsibilities without changing that behavior. PIV-04 adds deterministic fixtures and isolated Rust/X11/headless Wayland test infrastructure. PIV-05 records versioned GTK/Glycin/GStreamer capability probes and explicit runtime gaps; production dependencies are unchanged. PIV-06 adds local photo path/URI input and a decoder-free file placeholder. PIV-07 discovers unsorted neighboring image/video candidates on a worker and preserves the opened selection. PIV-08 naturally orders the unified catalog while preserving the opened selection. PIV-09 is now in TESTING (see the latest validation record).
+PIV-09 DONE is backed by **user-reported Arch/GNOME Wayland tests**, including
+active secure-decode cancellation; see the tracker closure at `8991b78`/`c11c7b7`.
+Codex still cannot start the Bwrap decoder under its read-only `/proc` UID-map
+restriction. That environment limitation is separate from the native results.
+Earlier milestone descriptions below are historical; the current status is above.
 
 See [technical capabilities and open prerequisites](docs/PIVRA_TECHNICAL_CAPABILITIES.md) and [verified results and commit evidence](docs/PIVRA_COMMIT_TRACKER.md). PIV-05 is DONE; Phase 0 remains INCOMPLETE because a fresh native environment installation has not been independently reproduced. A clean Cargo target build and the existing headless regressions passed.
 
@@ -734,3 +735,36 @@ bash tests/run_active_decode_close.sh
 ```
 
 [Current design, origin fields and cleanup interpretation](docs/PIV09_ACTIVE_DECODE_TEST.md).
+
+
+### PIV-10 previous/next navigation — TESTING, 2026-10-22
+
+Use **Left/Right** to move through the existing natural mixed-media order in each
+window. Navigation stops at the ends; empty/single-item catalogs keep their
+selection. Video entries are included and show `Video playback is not available
+yet.`; only JPEG/PNG rendering is implemented. Broader image candidates show an
+unsupported-format message. Source media and desktop/default player associations
+are unchanged. Ctrl/Alt/Super arrows are left for other bindings.
+
+The window keeps one ImageView. New selections cancel the old request, clear its
+paintable and reset ScaleDown Fit. Both cancellation and current-token identity
+gate late callbacks. Errors do not disable navigation. Directory discovery remains
+a one-time snapshot; file watching/refresh, wrapping settings and later tasks are
+not part of this change. No new toolbar, zoom tool or playback engine was added.
+
+Codex: **54 Rust + 30 existing Python observer tests PASS**; mandatory Cargo checks
+PASS. Twelve GUI/helper calls pass their stated scopes, including real X11 keys,
+Sway navigation and deterministic controlled-error callback races. These do not
+claim real photo pixels: strict new pixel navigation exits77/BLOCKED here.
+
+In the working native GNOME/Wayland environment, update `dev` and run:
+
+```sh
+bash tests/run_navigation_probe.sh
+```
+
+This requires real secure JPEG/PNG results, validates current texture pixels and
+Fit/center snapshots across navigation, error recovery and independent windows.
+Also confirm physical Left/Right after changing focus between the picture/header
+controls in normal Pivra. [Commands, actual results and exact remaining gates](docs/PIV10_VALIDATION.md).
+PIV-10 remains TESTING pending those native results; PIV-11 has not started.

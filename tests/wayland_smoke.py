@@ -109,6 +109,18 @@ def main():
                 version = ipc(env, "get_version")
                 print(f"Headless Wayland compositor: {version['human_readable']}; "
                       "GDK_BACKEND=wayland, XWayland disabled, DISPLAY absent")
+                if "--navigation-probe" in sys.argv[2:]:
+                    args = [binary] + (["--expect-image-error"] if blocked else [])
+                    result = subprocess.run(args, env={**env, "G_DEBUG": "fatal-criticals"},
+                                            capture_output=True, text=True, timeout=60)
+                    print(result.stdout, end="")
+                    if result.returncode == 77:
+                        print(result.stderr, file=sys.stderr, end="")
+                        return 77
+                    assert result.returncode == 0, (result.returncode, result.stdout, result.stderr)
+                    assert "panicked" not in result.stderr and "CRITICAL" not in result.stderr, result.stderr
+                    print("PASS headless native Wayland navigation probe; GTK key signals, not compositor keyboard injection")
+                    return 0
                 surfaces = []
                 cases = file_launches(root) if "--files" in sys.argv[2:] else [([], "Pivra")] * 2
                 for args, title in cases:

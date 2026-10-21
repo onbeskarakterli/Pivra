@@ -14,7 +14,7 @@ import sys
 import tempfile
 import time
 
-from gui_support import stop, file_launches, check_file_copies
+from gui_support import stop, file_launches, check_file_copies, wait_image_error, check_image_diagnostics
 
 
 def main():
@@ -31,6 +31,7 @@ def main():
             print(f"BLOCKED Weston 14 surface check: missing {required}", file=sys.stderr)
             return 77
     assert os.environ.get("DBUS_SESSION_BUS_ADDRESS"), "run inside dbus-run-session"
+    blocked = "--expect-image-error" in sys.argv[2:]
     binary = str(Path(sys.argv[1] if len(sys.argv) > 1 else "target/debug/pivra").resolve())
     with tempfile.TemporaryDirectory(prefix="pivra-weston-") as temp:
         root = Path(temp)
@@ -112,11 +113,13 @@ def main():
                 print("PASS server protocol: title, 960x640 window geometry, ack_configure, buffer attach/commit")
                 print("PASS native Wayland: GDK_BACKEND=wayland, DISPLAY absent, XWayland disabled")
                 print("NOT RUN Weston normal close: no standard close-control IPC; cleanup uses SIGTERM")
+                image_error = wait_image_error(app) if blocked else ""
                 # Cleanup termination is not counted as a normal window close or exit-0 check.
                 app.terminate()
                 stdout, stderr = app.communicate(timeout=5)
-                assert stdout == "" and stderr == "", (stdout, stderr)
-                print("PASS Weston application stdout/stderr empty (termination exit status not validated)")
+                assert stdout == "", stdout
+                check_image_diagnostics(image_error + stderr, blocked)
+                print("PASS Weston application has no unexpected diagnostics (termination exit status not validated)")
             finally:
                 stop(app)
                 stop(trace)

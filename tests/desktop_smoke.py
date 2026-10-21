@@ -15,10 +15,12 @@ import tempfile
 import time
 
 from gui_smoke import xdo, request_close
+from gui_support import check_image_diagnostics
 
 
 def main():
     assert os.environ.get("DISPLAY"), "run under Xvfb + dbus-run-session"
+    blocked = "--expect-image-error" in sys.argv[2:]
     binary = Path(sys.argv[1] if len(sys.argv) > 1 else "target/debug/pivra").resolve()
     repo = Path(__file__).resolve().parent.parent
     entry = repo / "data/io.github.onbeskarakterli.Pivra.desktop"
@@ -55,10 +57,17 @@ def main():
                     time.sleep(0.1)
                 pid = int(xdo("getwindowpid", window))
                 descriptor = os.pidfd_open(pid)
+                if blocked:
+                    deadline = time.monotonic() + 15
+                    while True:
+                        log.seek(0)
+                        if "Pivra: image load failed:" in log.read(): break
+                        assert time.monotonic() < deadline, "no controlled loader failure"
+                        time.sleep(0.1)
                 request_close(window)
                 assert select.select([descriptor], [], [], 10)[0], "desktop-launched app did not terminate"
                 log.seek(0)
-                assert log.read() == "", "desktop/app emitted diagnostics"
+                check_image_diagnostics(log.read(), blocked)
                 assert path.read_bytes() == payload
                 print("PASS GIO desktop Exec=pivra %u: percent-encoded Unicode URI -> associated X11 window")
                 print("PASS normal WM close + process termination; detached exit code NOT OBSERVED")

@@ -15,7 +15,7 @@ import sys
 import tempfile
 import time
 
-from gui_support import stop, file_launches, check_file_copies
+from gui_support import stop, file_launches, check_file_copies, wait_image_error, check_image_diagnostics
 
 APP_ID = "io.github.onbeskarakterli.Pivra"
 
@@ -63,6 +63,8 @@ def main():
     assert os.environ.get("DBUS_SESSION_BUS_ADDRESS"), "run inside dbus-run-session"
     binary = str(Path(sys.argv[1] if len(sys.argv) > 1 else "target/debug/pivra").resolve())
     processes = []
+    diagnostics = []
+    blocked = "--expect-image-error" in sys.argv[2:]
     with tempfile.TemporaryDirectory(prefix="pivra-wayland-") as temp:
         root = Path(temp)
         env = os.environ.copy()
@@ -114,6 +116,7 @@ def main():
                                                stderr=subprocess.PIPE, text=True)
                     processes.append(process)
                     surface = wait_surface(process, env, title)
+                    diagnostics.append(wait_image_error(process) if blocked else "")
                     surfaces.append(surface)
                     print(f"PASS mapped xdg_shell surface {surface}: {title}, 960x640")
                 assert surfaces[0] != surfaces[1]
@@ -122,7 +125,8 @@ def main():
                     # Sway sends xdg_toplevel.close; it does not kill the client process.
                     ipc(env, "command", f"[con_id={surface}] kill")
                     stdout, stderr = process.communicate(timeout=10)
-                    assert (process.returncode, stdout, stderr) == (0, "", ""), (
+                    check_image_diagnostics(diagnostics[index] + stderr, blocked)
+                    assert (process.returncode, stdout) == (0, ""), (
                         process.returncode, stdout, stderr
                     )
                     tree = list(nodes(ipc(env, "get_tree")))
@@ -130,7 +134,7 @@ def main():
                     if index == 0:
                         assert processes[1].poll() is None
                         assert wait_surface(processes[1], env, cases[1][1]) == surfaces[1]
-                    print(f"PASS Wayland normal close of {surface}: exit 0, empty stdout/stderr")
+                    print(f"PASS Wayland normal close of {surface}: exit 0, no unexpected diagnostics")
                 check_file_copies(root)
                 print("PASS headless Wayland: two independent native Wayland surfaces")
             finally:

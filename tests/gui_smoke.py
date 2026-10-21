@@ -14,7 +14,7 @@ import subprocess
 import sys
 import time
 
-from gui_support import stop, file_launches, check_file_copies
+from gui_support import stop, file_launches, check_file_copies, wait_image_error, check_image_diagnostics
 
 
 def xdo(*args):
@@ -79,6 +79,8 @@ def main():
     assert os.environ.get("DISPLAY"), "run under an X11 display (e.g. xvfb-run)"
     binary = str(Path(sys.argv[1] if len(sys.argv) > 1 else "target/debug/pivra").resolve())
     processes = []
+    diagnostics = []
+    blocked = "--expect-image-error" in sys.argv[2:]
     temporary = tempfile.TemporaryDirectory(prefix="pivra-x11-input-")
     root = Path(temporary.name)
     cases = file_launches(root) if "--files" in sys.argv[2:] else [([], "Pivra")] * 2
@@ -93,6 +95,7 @@ def main():
             geometry = xdo("getwindowgeometry", "--shell", window)
             dimensions = dict(line.split("=", 1) for line in geometry.splitlines())
             assert (int(dimensions["WIDTH"]), int(dimensions["HEIGHT"])) == (960, 640)
+            diagnostics.append(wait_image_error(process) if blocked else "")
             windows.append(window)
             print(f"PASS mapped window {window}: title={title}; {geometry!r}")
 
@@ -102,13 +105,13 @@ def main():
             stdout, stderr = process.communicate(timeout=10)
             assert process.returncode == 0, (process.returncode, stdout, stderr)
             assert not stdout, stdout
-            assert not stderr, stderr
+            check_image_diagnostics(diagnostics[index] + stderr, blocked)
             if index == 0:
                 assert processes[1].poll() is None, "closing one launch killed the other"
                 assert xdo("getwindowname", windows[1]) == cases[1][1]
             print(f"PASS normal WM_DELETE_WINDOW close: exit={process.returncode}")
         check_file_copies(root)
-        print("PASS two independent launches; no stdout/stderr, crash or forced termination")
+        print("PASS two independent launches; no unexpected diagnostics, crash or forced termination")
     finally:
         for process in processes:
             stop(process)

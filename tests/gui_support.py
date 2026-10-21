@@ -41,3 +41,27 @@ def check_file_copies(root):
         assert (root / "neighbor.MP4").read_bytes() == (Path(__file__).parent / "fixtures/model-video.txt").read_bytes()
         assert (root / "unsupported.txt").read_text() == "not a candidate"
         assert (root / "nested/hidden.png").read_bytes() == payload
+
+
+def wait_image_error(process):
+    """Explicit blocked-runtime mode: wait for a real loader failure, not a timer."""
+    import os
+    import select
+    import time
+    captured = b""
+    deadline = time.monotonic() + 15
+    while b"Pivra: image load failed:" not in captured:
+        assert process.poll() is None, "app exited before controlled image failure"
+        assert time.monotonic() < deadline, "image failure did not arrive"
+        if select.select([process.stderr], [], [], 0.1)[0]:
+            captured += os.read(process.stderr.fileno(), 65536)
+    return captured.decode(errors="replace")
+
+
+def check_image_diagnostics(stderr, blocked=False):
+    if not blocked:
+        assert stderr == "", stderr
+        return
+    assert stderr.startswith("Pivra: image load failed:"), stderr
+    assert "panicked" not in stderr and "CRITICAL" not in stderr, stderr
+    print("BLOCKED image decode/pixels: secure loader failure observed; lifecycle/catalog checks only")

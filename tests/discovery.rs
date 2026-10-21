@@ -259,6 +259,26 @@ fn large_directory_returns_exact_count_and_selected_file() {
     let opened = dir.path().join("917.png");
     let report = neighbors(&opened);
     assert_eq!(report.collection.items().len(), 1200);
+    let ordered_names: Vec<_> = report
+        .collection
+        .items()
+        .iter()
+        .map(|item| {
+            item.path()
+                .file_name()
+                .unwrap()
+                .to_str()
+                .unwrap()
+                .to_owned()
+        })
+        .collect();
+    assert_eq!(
+        ordered_names,
+        (0..1200)
+            .map(|index| format!("{index}.png"))
+            .collect::<Vec<_>>()
+    );
+    assert_eq!(report.collection.selected_index(), Some(917));
     assert!(report.issues.is_empty());
     assert_eq!(report.collection.current().unwrap().path(), opened);
 }
@@ -271,5 +291,77 @@ fn cancellation_is_an_error_not_a_successful_empty_catalog() {
             .unwrap_err()
             .kind(),
         io::ErrorKind::Interrupted
+    );
+}
+
+#[test]
+fn real_catalog_natural_order_is_independent_of_creation_order_and_preserves_opened_photo() {
+    let names = [
+        "foto10.jpg",
+        "foto002.jpg",
+        "foto1.png",
+        "foto2.jpg",
+        "foto1.mp4",
+        "foto02.jpg",
+        "foto1.jpg",
+    ];
+    let expected = [
+        "foto1.jpg",
+        "foto1.mp4",
+        "foto1.png",
+        "foto2.jpg",
+        "foto02.jpg",
+        "foto002.jpg",
+        "foto10.jpg",
+    ];
+    for reverse in [false, true] {
+        let dir = support::temp_dir();
+        let mut creation = names.to_vec();
+        if reverse {
+            creation.reverse();
+        }
+        for name in creation {
+            fixture(dir.path(), name);
+        }
+        let opened = dir.path().join("foto10.jpg");
+        let report = neighbors(&opened);
+        assert_eq!(
+            report
+                .collection
+                .items()
+                .iter()
+                .map(|item| item.path().file_name().unwrap().to_str().unwrap())
+                .collect::<Vec<_>>(),
+            expected
+        );
+        assert_eq!(report.collection.current().unwrap().path(), opened);
+        assert_eq!(report.collection.selected_index(), Some(6));
+        assert_eq!(report.collection.items()[1].kind(), MediaKind::Video);
+        assert_eq!(report.collection.items()[0].kind(), MediaKind::Image);
+    }
+}
+
+#[test]
+fn natural_sort_preserves_alias_selection_and_raw_linux_filename_bytes() {
+    let dir = support::temp_dir();
+    let target = fixture(dir.path(), "foto2.png");
+    let alias = dir.path().join("foto10.png");
+    symlink(&target, &alias).unwrap();
+    let raw = std::ffi::OsString::from_vec(b"foto\xff1.PNG".to_vec());
+    let raw_path = fixture(dir.path(), raw.clone());
+    let report = neighbors(&alias);
+    assert_eq!(
+        report
+            .collection
+            .items()
+            .iter()
+            .map(|item| item.path().to_owned())
+            .collect::<Vec<_>>(),
+        [target, alias.clone(), raw_path]
+    );
+    assert_eq!(report.collection.current().unwrap().path(), alias);
+    assert_eq!(
+        report.collection.items()[2].path().file_name(),
+        Some(raw.as_os_str())
     );
 }

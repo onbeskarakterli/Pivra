@@ -1,4 +1,4 @@
-//! One-directory candidate discovery. No GTK/GIO, sorting, decoding or watching.
+//! One-directory candidate discovery. No GTK/GIO, decoding or watching.
 
 use std::{
     fs, io,
@@ -17,7 +17,7 @@ pub struct ScanIssue {
     pub error: io::Error,
 }
 
-/// An unsorted snapshot. Nonempty issues mean the scan was incomplete.
+/// A naturally ordered snapshot. Nonempty issues mean the scan was incomplete.
 #[derive(Debug)]
 pub struct ScanReport {
     pub collection: MediaCollection,
@@ -125,6 +125,8 @@ fn collect_entries(
             Err(error) => issues.push(ScanIssue { path, error }),
         }
     }
+    check_cancelled(cancelled)?;
+    items.sort_unstable_by(|a, b| crate::natural::compare_paths(a.path(), b.path()));
     check_cancelled(cancelled)?;
     Ok(ScanReport {
         collection: MediaCollection::new(items),

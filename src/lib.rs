@@ -3,6 +3,7 @@
 pub mod catalog;
 pub mod discovery;
 pub mod media;
+pub mod natural;
 pub mod settings;
 
 pub const APP_NAME: &str = "Pivra";

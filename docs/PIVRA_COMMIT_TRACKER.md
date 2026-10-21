@@ -1,7 +1,7 @@
 # Pivra — Planlı Commit ve İlerleme Takibi
 
 **Kaynak:** [Özellik Şartnamesi](PIVRA_FEATURE_SPEC_TR.md) · [Yol Haritası](PIVRA_DEVELOPMENT_ROADMAP.md)  
-**Branch:** `dev` · **Durum:** PIV-01 **DONE (21.10.2026)**; PIV-02 **DONE (21.10.2026, Xvfb GTK pencere doğrulaması)**; PIV-03 **DONE (21.10.2026)**; PIV-04 **DONE (21.10.2026; grafik test kategorileri ayrı)**; PIV-05 **DONE (21.10.2026; belgeleme/probe kapsamı)**; PIV-06 **DONE (21.10.2026; dosya/URI ve desktop giriş altyapısı; gerçek Nautilus NOT RUN)**; PIV-07 **DONE (21.10.2026; sırasız komşu medya keşfi)**; PIV-08 **DONE (21.10.2026; deterministik doğal sıra)**; PIV-09–60 TODO, başlatılmadı. Faz 0 **INCOMPLETE** (temiz native kurulum yeniden üretimi NOT RUN). Güncel kapanış kanıtı son bölümde; 20.10.2026 kayıtları tarihçedir. Burada listelenen `PIV-xx` kimlikleri gerçek Git commit SHA'sı **değildir**.
+**Branch:** `dev` · **Durum:** PIV-01 **DONE (21.10.2026)**; PIV-02 **DONE (21.10.2026, Xvfb GTK pencere doğrulaması)**; PIV-03 **DONE (21.10.2026)**; PIV-04 **DONE (21.10.2026; grafik test kategorileri ayrı)**; PIV-05 **DONE (21.10.2026; belgeleme/probe kapsamı)**; PIV-06 **DONE (21.10.2026; dosya/URI ve desktop giriş altyapısı; gerçek Nautilus NOT RUN)**; PIV-07 **DONE (21.10.2026; sırasız komşu medya keşfi)**; PIV-08 **DONE (21.10.2026; deterministik doğal sıra)**; PIV-09 **BLOCKED (21.10.2026; loader 2+ yok, Codex UID-map engeli)**; PIV-10–60 TODO, başlatılmadı. Faz 0 **INCOMPLETE** (temiz native kurulum yeniden üretimi NOT RUN). Güncel kapanış kanıtı son bölümde; 20.10.2026 kayıtları tarihçedir. Burada listelenen `PIV-xx` kimlikleri gerçek Git commit SHA'sı **değildir**.
 
 ## Kullanım kuralları
 
@@ -29,7 +29,7 @@
 | PIV-06 | `feat: accept image path from Nautilus` | Nihai hedef: fotoğrafa çift tıklama. Dosya/URI + GIO/desktop Exec doğrulandı; gerçek Nautilus DESKTOP-06 NOT RUN; video varsayılanı değiştirilmedi | **DONE — 21.10.2026 (giriş altyapısı)** | `ad0bcde080ee36c88dc74bd58844d73e7bff8986`, `cac751927b6e3a967cf0ca31b04d06971a5f9fbc`, `69feda8d5cc7342d941b71d5e8878081f2792211` |
 | PIV-07 | `feat: scan neighboring media in folder` | Tek dizinde sırasız fotoğraf/video adayları, açılan alias seçimi, arka plan keşfi ve açık hata durumları | **DONE — 21.10.2026** | `9255519e8c576f067184a2818e5917bfcb9ec724`, `91c81e895cd3859981805690af01a7cafddbf30a`, `9a998ba40c793ff49a6ee4fe7e617a6041f48cfe` |
 | PIV-08 | `feat: apply natural filename ordering` | Doğal karma medya sırası, alias seçimi ve deterministik byte politikası doğrulandı | **DONE — 21.10.2026** | `5a109ac26bd98201e8de9f5a3971189e5969a8ba`, `5cf8469070b4b574c6d2292a92e0d8167763d8a1` |
-| PIV-09 | `feat: render JPEG PNG with orientation` | Görsel merkezde fit açılır; EXIF orientation doğru | TODO | — |
+| PIV-09 | `feat: render JPEG PNG with orientation` | Güvenli istemci/view derlendi; gerçek decode/EXIF/Fit kapıları kapanmadı | **BLOCKED — 21.10.2026** | `1685139d47afdd55ac47699726f49a66aa270bfc`, `018d9d91648ff582b8f6b19981a4e7ed741334f0`, `bebf6f232625cfdf6a6d02f5cf71b38e441aed9e` |
 | PIV-10 | `feat: navigate previous and next media` | Sol/sağ; ilk/son sınırları; tek ve boş klasör | TODO | — |
 | PIV-11 | `feat: watch folder changes and external modifications` | Ekle/sil/ad değiştir listeyi yeniler; açık dosyada elle Yenile isteği | TODO | — |
 | PIV-12 | `test: harden media failures and window isolation` | Bozuk medya gezinmeyi bozmaz; pencereler bağımsız | TODO | — |
@@ -132,7 +132,7 @@
 | 8 — Son doğrulama | 58–60 | 3 | 0 |
 | **TOPLAM** | **PIV-01–60** | **60** | **8** |
 
-> PIV-01–08 tamamlandı; PIV-09–60 gelecekteki işlerdir. Görev sayacı 5/5 olsa da Faz 0 kapısı INCOMPLETE: temiz native kurulum yeniden üretimi NOT RUN. Görev kimlikleri commit SHA'sı değildir. İlk planlama ve önceki engel kayıtları aşağıda tarihçe olarak korunur.
+> PIV-01–08 tamamlandı; PIV-09 BLOCKED, PIV-10–60 gelecekteki işlerdir. Görev sayacı 5/5 olsa da Faz 0 kapısı INCOMPLETE: temiz native kurulum yeniden üretimi NOT RUN. Görev kimlikleri commit SHA'sı değildir. İlk planlama ve önceki engel kayıtları aşağıda tarihçe olarak korunur.
 
 ## PIV-01 ayrıntılı ilerleme — 20.10.2026
 
@@ -878,3 +878,130 @@ Network/blocked syscall, extreme-scale/RAM/TOCTOU riskleri PIV-07'deki gibi aç�
 PIV-05 Glycin loader/ABI/SDK/Codex sandbox, Gst SDK/sink/Libav ve Faz 0 temiz native
 kurulum kapıları açık; güvenlik bypass yok. DESKTOP-06 NOT RUN. Video default'ları,
 MIME giriş kuralları, lisans ve CI değişmedi. **PIV-09 başlatılmadı.**
+
+
+## PIV-09 doğrulama kaydı — 21.10.2026 — BLOCKED
+
+**PIV-09 DONE değildir. PIV-10 başlatılmadı.** Kaynak kodu, fixture'lar, derleme ve
+decoder öncesi kontroller hazır; gerçek JPEG/PNG/EXIF/Fit başarısı yok. Önceki
+“PIV-09 başlatılmadı” kayıtları kendi görevlerinin tarihçesidir. DONE sayacı **8**
+olarak kalır; Faz 0 INCOMPLETE ve DESKTOP-06 NOT RUN kapıları korunur.
+
+### Başlangıç ve commit'ler
+
+- Başlangıç: temiz dev, origin/dev ile eşit `310dc16e6b49a51586384200fcadead9c9f3cdfa`; PIV-08 DONE/push doğrulandı.
+- Glycin/GTK source + lock/CLI/help: `1685139d47afdd55ac47699726f49a66aa270bfc`.
+- 18 orijinal asset/probe/harness: `018d9d91648ff582b8f6b19981a4e7ed741334f0`.
+- README/teknik belge/yol haritası: `bebf6f232625cfdf6a6d02f5cf71b38e441aed9e`.
+- Bu takip kaydı ayrı commit'tir; kendi SHA'sı kendi dosyasına yazılamaz. Kesin
+  bitiş SHA'sı Git/uzak HEAD ve teslim raporunda doğrulanır.
+- main `5d55ee599df4617bd51c09b1c7a008b8d0ece480` değişmedi. Yalnız dev normal push.
+
+### PIV-09.a–j
+
+| Alt görev | Durum | Kanıt ve açık kapı |
+|---|---|---|
+| a Sürüm | DONE | Glycin =3.0.8, common 1.0.3/utils 4.0.4; gtk/gdk 0.10.3, GLib/GIO 0.21.5/adw 0.8.1; actual compile/link geçti. 3.x COMPAT_VERSION=2. Debian aday loader 1.2.1+ds-2 hâlâ 1+ |
+| b Loader/sandbox | **BLOCKED** | Kurulu 2+ loader/config yok. Resmi tag 2.0.0 kaynak eşleşmesi incelendi, build/install edilmedi. Bwrap true probe exit 1, UID-map read-only; mevcut yetkiyle güvenli runtime sağlanmadı. Bypass yapılmadı |
+| c Çözümleme | CODED / BLOCKED runtime | image_loader: GIO -> forced Bwrap -> MIME JPEG/PNG -> Glycin Frame; boyut/boyut bütçesi/pre-cancel testli. Başarılı gerçek decode NOT RUN |
+| d GTK | CODED / BLOCKED pixels | Worker frame -> main-thread GdkTexture/Picture; loading/error label ve weak references. Hata/lifecycle gözlendi, actual image sunumu NOT RUN |
+| e Fit | CODED / BLOCKED | Picture ScaleDown/can_shrink; amaç aspect/center/contain, intrinsic logical-size cap. Gerçek küçük/büyük fotoğraf ve resize/HiDPI sonucu NOT RUN |
+| f EXIF | **BLOCKED** | apply_transformations(true), view'da ikinci dönüş yok. Fixture tag 1–8 yapısı doğrulandı; gerçek yön/piksel testleri NOT RUN. Double-rotation olmadığı runtime ile henüz sertifikalanmadı |
+| g Async/ömür | TESTING | Worker GLib context, Cancellable + close/destroy, weak UI; iki bağımsız hata penceresi normal kapandı. Aktif gerçek decode sırasında close, başarılı paralel frame ve peak RSS NOT RUN |
+| h Fixture | CODED / TESTING | 18 küçük deterministik asset, golden RGB/corner/hash/size manifest, tekrarlı encode aynı çıktı. Pixel probe derlendi, baseline kapısı exit 77; olumlu piksel/EXIF branch NOT RUN |
+| i Regresyon | TESTING | 49 Rust + Cargo + eski boş pencere/core/desktop/keşif/sıra kontrolleri PASS. File-window scoped lifecycle/error PASS; görüntü başarı kapısı BLOCKED. Gerçek X11/native Wayland image piksel/Fit kapısı kapanmadı |
+| j Git/belge | DONE | Gerçek SHA/test kaydı, README/teknik karar güncellemesi; dev normal push ve uzak HEAD eşitliği teslim sırasında doğrulanır |
+
+### Ortam / iki bağımsız engel
+
+Resmi imzalı Debian APT metaverisi üzerinden yalnız gerekli SDK'lar download-only
+alınıp mevcut kullanıcı prefix'ine çıkarıldı: liblcms2-dev 2.16-2+deb13u2 ve
+libseccomp-dev 2.6.0-2 (.pc 2.16/2.6.0). Rust/GTK activation ve sistem kurulumu
+sıfırlanmadı/yükseltilmedi. Yardımcı prepare-image-sdk.sh mevcut prefix'i korur.
+
+Glycin gdk4 özelliği nedeniyle etkili native GTK tabanı artık **4.16**; manifest
+v4_16 kullanır. Mevcut **GTK 4.18.6/adw 1.7.6** uygundur. Rust/Cargo **1.99.1**;
+deklarasyon 1.85, ayrı 1.85 derlemesi NOT RUN. Cargo.lock yeni Glycin istemci
+bağımlılıklarını sabitler; GStreamer veya başka production codec eklenmedi.
+
+Resmi GNOME glycin tag 2.0.0, tag objesi 902fc5525180cd18d281afcfc977cefa40a684c1,
+commit **724f18c5f3519885995428a7e2e6e5df9ca2ab27** incelendi: client 3.0.0 /
+utils 4.0.0 / loaders 2.0.0 eşleşmesi. Bu cache checkout'u derlenmiş/kurulmuş loader
+sayılmaz; gereksiz geniş codec/editor bileşenleri kurulmadı. Yapılandırılmış
+Debian 13 kaynaklarında uyumlu 2+ binary yok; loader hazırlığı açık kalır.
+
+Ayrı bwrap 0.12.0 probe:
+`bwrap --unshare-all --die-with-parent --new-session --ro-bind /usr /usr
+--symlink usr/lib /lib --symlink usr/lib64 /lib64 -- /usr/bin/true` -> **exit 1**,
+`setting up uid map: Read-only file system`. Yeniden gözlem: /proc ro,nosuid,nodev,
+noexec,relatime; NoNewPrivs=1, Seccomp=2/1 filter. Bu Codex UID-map kısıtı genel
+native Linux/Glycin uyumsuzluğu değildir. Namespace/seccomp/mount/privilege sınırı
+kurcalanmadı. Source **SandboxSelector::Bwrap** ister; Auto/NotSandboxed/fallback
+kullanmaz; source directory expose kapalıdır. Loader eksikliği giderilse de bu
+sandbox kapısı ayrıca geçmeden DONE olmaz.
+
+### Gerçek komutlar ve sonuçlar
+
+Mevcut gtk-activate.sh kullanıldı. Nihai `bash tests/check.sh` PASS:
+
+| Kontrol | Gerçek sonuç |
+|---|---|
+| cargo +stable fmt --check | PASS |
+| cargo +stable check --locked --offline -j 2 | PASS |
+| cargo +stable build --locked --offline -j 2 | PASS |
+| cargo +stable test --locked --offline -j 2 | **49 PASS = 25 unit + 24 integration**, 0 failed/ignored; 0 doctest |
+| cargo +stable clippy --locked --offline --all-targets -j 2 -- -D warnings | PASS; probe'daki constant assertion const block'a alınarak ilk uyarı düzeltildi |
+| Orijinal fixture --check | PASS; eski PNG/model bytes/manifest değişmedi |
+| images/generate.py --check | PASS: 18 hash/size, decode iddiası yok |
+| images/generate.py --write tekrar | PASS: aynı manifest hash'i; Pillow 12.3.0 yalnız trusted synthetic encoder. TIFF orientation tag 1–8 struct ile bağımsız kontrol edildi; yön sunumu değil |
+| İki yeni image_loader unit | PASS: zero/extreme/pixel count; missing/sparse oversized/pre-cancel decoder başlamadan hata. Gerçek image decode testi sayılmaz |
+| desktop-file-validate / GIO parse | PASS: aynı Exec=pivra %u ve JPEG/PNG MIME; yalnız açıklama source entegrasyona göre güncellendi |
+| PNG real image_probe | **BLOCKED, exit 77:** No image loaders are configured. Config image_loader/image_editor boş |
+| JPEG real image_probe --jpeg-first | **BLOCKED, exit 77:** aynı gerçek loader/config hatası |
+| EXIF 1–8 / texture pixels / malformed metadata | **NOT RUN**, valid baseline başarısızken diğer error/metadata sonuçları PASS sayılmadı |
+| Gerçek app Fit/resize/küçük/büyük/HiDPI/presented pixels | **NOT RUN/BLOCKED** |
+| Python AST / git diff --check | PASS |
+
+Probe komutu (Xvfb+D-Bus, GDK_BACKEND=x11/GSK_RENDERER=cairo/GTK_A11Y=none):
+`cargo +stable run --locked --offline -j 2 --example image_probe`, ayrıca
+`-- --jpeg-first`. Başarılı branch frame boyutu + gerçek texture.download quadrant
+RGB/premultiplied-alpha kontrolü ve orientation 1–8 golden mapping içerir, fakat
+bu makinede o branch çalışmadı. Bu application screenshot/Fit testi yerine geçmez.
+
+### Grafik regresyonları ve anlamları
+
+Boş pencere smoke'ları strict eski modda; dosya modları açık
+`--files --expect-image-error` ile çalıştırıldı. Bu harness seçeneği app'e
+aktarılmaz: gerçek image-error stderr'ini bekler ve **BLOCKED image decode/pixels**
+yazar. Seçenek yoksa strict boş-stderr kontrolü korunur. Hata sessizce yutulmadı
+ve hiçbir pozitif görüntü assertion'ı kapatılarak PASS üretilmedi.
+
+| Backend / test | Sonuç ve sınır |
+|---|---|
+| X11/Xvfb boş pencere | PASS: iki mapped 960x640 Pivra; normal close/exit 0, boş stdout/stderr |
+| X11/Xvfb file/URI | PASS yalnız katalog/lifecycle/error: doğru Unicode selected title + 3 candidates, iki kontrollü gerçek loader hatası ve normal bağımsız close/exit 0. **Image pixels BLOCKED** |
+| Sway headless eski + file | PASS aynı scoped davranış: gerçek native xdg_shell, app ID/PID/geometri, normal Wayland close/exit 0; XWayland kapalı/DISPLAY yok. **Image pixels BLOCKED** |
+| Weston headless eski + file | PASS yalnız mapped xdg_toplevel, SHM buffer/title/geometri/ack_configure/attach/commit ve kontrollü loader hatası; **fotoğraf pikselleri BLOCKED** |
+| Weston normal close | **NOT RUN**; SIGTERM cleanup normal kapanış değildir |
+| GIO desktop launch Xvfb | PASS source entry/private PATH/XDG -> associated file/catalog window + kontrollü loader hatası. Normal WM close/process disappearance; detached exit status NOT OBSERVED; fotoğraf başarısı değil |
+| X11 discovery error UI | PASS partial warning/fatal scan durumları ve controlled loader error ayrı; fixture byte'ları değişmedi |
+| Fiziksel GNOME/Wayland / Nautilus | **NOT RUN**, DESKTOP-06 açık |
+
+Aynı README komutları kullanıldı; Sway/Weston private compositor ve mevcut native
+prefix korundu. Fotoğraf piksellerinin X11/Wayland gerçek sunumu doğrulanamadı.
+
+### Kaynak sınırları ve devam koşulu
+
+64 MiB compressed, 32 MP/32768 edge ve 512 MiB returned-frame limitleri compile ve
+preflight testlidir. Post-info/frame sınırı loader'ın metadata/transform/ara kopya
+peak RSS'ini veya çoklu pencere toplamını hard-limit etmez. Tam decode latency,
+iptal süresi, kaynak temizliği ve Fit resize gerçek fixture ile test bekler.
+Glycin tek orientation uygular; view ikinci dönüş yapmaz. Picture ScaleDown/can_shrink
+amaçlanan Fit/center/no-stretch ve logical intrinsic-size cap'tir; gerçek piksel
+sunumu olmadığından bu davranış PASS değildir; fiziksel HiDPI %100 kanıtı yok.
+
+2+ JPEG/PNG loader + namespace-capable güvenli native oturum sağlanınca aynı görevde
+pozitif pixel/EXIF kapısı, gerçek app Fit/resize, bozuk image ve eşzamanlı/active
+load close testleri tamamlanmalı. Bwrap bypass veya başka korumasız decoder
+alternatifi bu kaydın çözümü değildir. PIV-05 GStreamer SDK/sink/Libav riskleri ve
+Faz 0 temiz native kurulum kapısı açık. **PIV-09 BLOCKED; PIV-10 başlamadı.**

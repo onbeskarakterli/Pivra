@@ -1,6 +1,6 @@
 # Pivra — Geliştirme Yol Haritası
 
-**Durum:** PIV-01–08 DONE (giriş, keşif ve doğal sıra); PIV-09 TESTING (Arch kullanıcı decode/EXIF ve otomatik geometri PASS; yalnız aktif decode kapanış/temizlik sonucu açık); PIV-10–60 TODO. Faz 0 INCOMPLETE: temiz native kurulumun bağımsız yeniden üretimi NOT RUN; temiz Cargo target derlemesi ve headless regresyonlar geçti. [PIV-05 kanıtı ve ayrı faz kapısı](PIVRA_TECHNICAL_CAPABILITIES.md#102-piv-05-ve-faz-0-kapanışını-ayrı-değerlendirme).
+**Durum:** PIV-01–08 DONE (giriş, keşif ve doğal sıra); PIV-09 DONE (Arch gerçek JPEG/PNG/EXIF, geometri ve aktif-decode kapanış/temizlik PASS); PIV-10–60 TODO. Faz 0 INCOMPLETE: temiz native kurulumun bağımsız yeniden üretimi NOT RUN; temiz Cargo target derlemesi ve headless regresyonlar geçti. [PIV-05 kanıtı ve ayrı faz kapısı](PIVRA_TECHNICAL_CAPABILITIES.md#102-piv-05-ve-faz-0-kapanışını-ayrı-değerlendirme).
 **Başlangıç branch:** `dev` · **Kararlı sürümler:** `main`  
 **Kaynak şartname:** [PIVRA_FEATURE_SPEC_TR.md](PIVRA_FEATURE_SPEC_TR.md)  
 **Görev ve commit takibi:** [PIVRA_COMMIT_TRACKER.md](PIVRA_COMMIT_TRACKER.md)
@@ -206,3 +206,10 @@ Arch'ta gerçek reuse native sonuç olmadan iddia edilmez. Origin ve target yaş
 döngüsü raporlanır; cleanup hedef kaynak bırakma + normal app/çocuk exit olarak
 aynı 10 s bütçede korunur. 49 Rust + 30 Python PASS; native test Codex'te NOT RUN.
 Komut `bash tests/run_active_decode_close.sh`; PIV-09 TESTING, PIV-10 başlamadı.
+
+
+### PIV-09 V3 native kapanış — DONE (21.10.2026)
+
+Kullanıcı gerçek Arch Linux / GNOME Wayland üzerinde `c3e0aaf9e1d19ee73f35d1167b7363ce48c70d86` commit'inde `bash tests/run_active_decode_close.sh` çalıştırdı: **exit 0**, JSON `result=PASS`. Mevcut Glycin image-rs pool loader'ının tekrar kullanımı (`reuse_observed=true`), hedefe ait taze 96 MB kısmi RGB frame, zorunlu Bwrap izolasyonu, SIGSTOP sonrası fd/inode/mapping ve worker pending doğrulandı. Aktif decode sırasında gerçek pencere kapatıldı; iptal, job join, widget bırakma, sıfır stale mutation, diğer pencere piksel bütünlüğü ve tüm çocuk süreç temizliği **PASS**; kapanıştan temizliğe **0,318 sn**. Önceki gerçek JPEG/PNG, EXIF 1–8 ve otomatik Fit/resize kanıtları da PASS. Bunlar **kullanıcı kaynaklı native sonuçlar**, Codex çalıştırması değil.
+
+**PIV-09 DONE**; decoder'ların zamansal çakışması `NOT MEASURED`. Faz 0 temiz native kurulum ve DESKTOP-06 Nautilus kontrolleri kendi bağımsız kapılarıyla açık kalır. PIV-10 **TODO**. Ayrıntılar [commit tracker](PIVRA_COMMIT_TRACKER.md#piv-09-native-v3-kapanışı--21102026--done) içindedir.

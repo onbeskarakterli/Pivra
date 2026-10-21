@@ -3,8 +3,8 @@ A fast, lightweight GNOME image viewer with seamless photo and video navigation,
 
 ## Development status
 
-**PIV-09: BLOCKED (2026-10-21).** Glycin 3.0.8 integration compiles, but compatible
-2+ loaders are absent and this Codex session rejects bubblewrap UID-map setup.
+**PIV-09: BLOCKED (2026-10-21).** Glycin 3.0.8 integration compiles; the official 2+ JPEG/PNG loader is now built
+and discovered. This Codex session still rejects bubblewrap UID-map setup.
 Real JPEG/PNG pixels, EXIF orientation and application Fit have **not** passed.
 PIV-01–08 remain DONE; PIV-10 has not started. Details below supersede the older
 placeholder-only delivery descriptions, which record their respective milestones.
@@ -486,3 +486,86 @@ Resume PIV-09 in a namespace-capable native environment with a matching minimal
 errors and active-load lifecycle on X11/native Wayland. The current source is
 **not a DONE image viewer**. PIV-10 has not started. PIV-05 video risks, DESKTOP-06
 and the independent Phase 0 clean-native-install gate remain open.
+
+
+### PIV-09 continuation: loader prepared, sandbox still BLOCKED — 2026-10-21
+
+This update supersedes the earlier missing-loader observation; application source,
+dependencies and existing tests were preserved. The official unmodified GNOME
+**2.0.0** tag, commit `724f18c5f3519885995428a7e2e6e5df9ca2ab27`, was built with its
+own frozen lockfile (`cargo +stable build --locked -p glycin-image-rs -j 2`).
+The resulting **glycin-image-rs 2.0.0** uses utils 4.0.0/common 1.0.0; the client
+remains Glycin **3.0.8**, family **2+**. No source/protocol/version patches or hacks.
+
+Only this necessary image-rs executable was installed under the isolated user
+prefix. Its unmodified upstream bundle inherently compiles several Rust formats
+and editor helpers; no independent HEIF/JXL/RAW/SVG loader or system codec package
+was installed. **Only image/jpeg and image/png loader entries are configured;
+no editor entries** are registered. No Edit feature or extra format support is
+claimed. Build/version/hash evidence is in
+[the loader manifest](docs/probes/PIV09_LOADER_BUILD.json).
+
+Reproducible preparation (existing SDK/activation required, no system installation):
+
+```sh
+bash tests/probes/prepare_glycin_loader.sh
+source /workspace/pivra-environment/piv09/image-activate.sh
+cargo +stable run --locked --offline --example loader_probe
+```
+
+The helper verifies exact source HEAD and a clean source checkout, uses the pinned
+upstream lock, builds only the image-rs package, preserves modified user configs,
+and creates `loader-build.json`/`image-activate.sh` in the environment directory.
+It was rerun successfully with cached outputs. The activation sources existing
+GTK setup and sets GLYCIN_DATA_DIR to
+`/workspace/pivra-environment/piv09/loader-prefix/share`. Loader executable:
+`.../loader-prefix/libexec/glycin-image-rs`; config:
+`.../share/glycin-loaders/2+/conf.d/pivra-jpeg-png.conf`. GTK activation itself was
+not changed. Use **image-activate.sh** for the following PIV-09 checks.
+
+**Discovery PASS:** the real Glycin 3.0.8 supported_mime_types API returns exactly
+JPEG/PNG; the probe also checks config groups and executable existence/mode.
+This is configuration discovery, **not a successful loader IPC handshake/decode**.
+With that config, actual PNG/JPEG attempts now advance past the missing-loader
+error and issue Bwrap commands selecting the correct executable. Both still
+return **77/BLOCKED** because the sandbox child exits before running the loader.
+No positive pixel assertion was removed or weakened.
+
+**Precise Codex cause, traced:** clone with CLONE_NEWUSER and the other requested
+namespaces succeeds; `/proc/<child>/uid_map` then fails open(O_RDWR) with **EROFS**.
+The /proc mount is read-only. UID/GID1000, effective capabilities0, NoNewPrivs1,
+Seccomp2/one filter; user namespace limit2147483647. The high limit is not a
+functional-sandbox guarantee. This is not a general native Linux/Glycin failure.
+No mount, sysctl, seccomp or privilege change was attempted.
+
+**Permitted alternate route checked:** the available Docker daemon's built-in
+seccomp/default isolation was retained. A checksum-pinned official Debian trixie
+image plus the existing bwrap/runtime libraries was tested with user1000:1000,
+all capabilities dropped, no-new-privileges, read-only rootfs, no network, and no
+host bind mounts. Final Bwrap result: namespace creation is not permitted (exit1).
+The exact Docker seccomp/LSM/kernel subpolicy was not identified; no profile was
+relaxed to investigate further. No privileged container, added capability, host
+PID namespace or sandbox escape was used. This route therefore cannot provide
+safe image testing with its present permissions either.
+
+A separate **approved native Linux/VM environment** must already permit ordinary
+unprivileged user namespaces, UID/GID map writes through its normal procfs and
+the nested mount/PID/network/etc. namespaces required by Bwrap. Its existing
+seccomp/LSM policy must permit that workflow; no host security changes are part of
+this task. It needs the same client/GTK libraries, matching 2+ loader/config and
+private writable runtime directories. First require the minimal sandboxed true
+probe to succeed, then loader discovery and the existing actual image_probe.
+Current tools expose no other verified namespace-capable native environment.
+
+Continuation results: **49 Rust tests PASS**, all mandatory Cargo checks, both
+fixture checks and desktop validation PASS; **8 scoped GUI/helper runs PASS**
+(X11 empty/file + desktop + discovery-error, Sway empty/file, Weston empty/file).
+File tests explicitly expect a secure-loader failure, not image success. The
+separate loader discovery probe PASS; the two real PNG/JPEG gates BLOCKED.
+EXIF1–8, color/pixel correctness, actual app Fit/centering/resize, successful
+parallel images and close during active decode remain **NOT RUN/BLOCKED**.
+Weston normal close, physical GNOME/Wayland and Nautilus DESKTOP-06 remain NOT RUN.
+
+**PIV-09 remains BLOCKED; PIV-10 has not started.** No application code rewrite,
+production dependency change, system package change or security bypass occurred
+in this continuation. Earlier SDK/Phase0/video risks remain as separately recorded.

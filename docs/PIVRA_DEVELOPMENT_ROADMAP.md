@@ -1,6 +1,6 @@
 # Pivra — Geliştirme Yol Haritası
 
-**Durum:** PIV-01–08 DONE (giriş, keşif ve doğal sıra); PIV-09 BLOCKED (Glycin loader 2+ ve Codex namespace kapısı); PIV-10–60 TODO. Faz 0 INCOMPLETE: temiz native kurulumun bağımsız yeniden üretimi NOT RUN; temiz Cargo target derlemesi ve headless regresyonlar geçti. [PIV-05 kanıtı ve ayrı faz kapısı](PIVRA_TECHNICAL_CAPABILITIES.md#102-piv-05-ve-faz-0-kapanışını-ayrı-değerlendirme).
+**Durum:** PIV-01–08 DONE (giriş, keşif ve doğal sıra); PIV-09 BLOCKED (loader discovery PASS; Codex UID-map sandbox kapısı); PIV-10–60 TODO. Faz 0 INCOMPLETE: temiz native kurulumun bağımsız yeniden üretimi NOT RUN; temiz Cargo target derlemesi ve headless regresyonlar geçti. [PIV-05 kanıtı ve ayrı faz kapısı](PIVRA_TECHNICAL_CAPABILITIES.md#102-piv-05-ve-faz-0-kapanışını-ayrı-değerlendirme).
 **Başlangıç branch:** `dev` · **Kararlı sürümler:** `main`  
 **Kaynak şartname:** [PIVRA_FEATURE_SPEC_TR.md](PIVRA_FEATURE_SPEC_TR.md)  
 **Görev ve commit takibi:** [PIVRA_COMMIT_TRACKER.md](PIVRA_COMMIT_TRACKER.md)
@@ -150,3 +150,12 @@ sandbox probe read-only /proc nedeniyle başarısız. Bypass yok. PIV-09 **BLOCK
 gerçek JPEG/PNG/EXIF/Fit/resize/lifecycle kapıları kapanmadı. Olumlu source branch
 compile olması PASS değildir. 49 Rust ve scoped window/catalog regresyon kanıtı
 README/teknik belge/takip tablosundadır. PIV-10 başlamadı; Faz 0 INCOMPLETE sürer.
+
+### PIV-09 devam güncellemesi — 21.10.2026
+
+Resmi2.0.0 image-rs loader kullanıcı prefix'inde hazır ve client3.0.8 ile yalnız
+JPEG/PNG discovery PASS. Native Codex'te clone başarılı ama uid_map open EROFS;
+standart kısıtlı Docker yolu da namespace oluşturmaya izin vermedi. Güvenlik
+profili gevşetilmedi. PIV-09 BLOCKED kalır: gerçek piksel/EXIF/Fit/resize/lifecycle
+kapıları için önceden izinli namespace destekli ayrı native oturum gerekir.
+49 Rust + 8 scoped GUI/helper regresyonu PASS, image success değil. PIV-10 başlamadı.

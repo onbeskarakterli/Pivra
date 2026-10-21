@@ -472,3 +472,62 @@ kontrollü image error ister ve decode/pixels BLOCKED yazar; varsayılan strict
 stderr kontrolleri korunur. Weston normal close, fiziksel GNOME ve DESKTOP-06
 NOT RUN. PIV-09 **BLOCKED**, PIV-10 başlamadı; PIV-19 SDK/sink/Libav riskleri ve
 Faz 0 temiz native kurulum kapısı açık. Tam komut/SHA sonuçları takip tablosunda.
+
+
+## 13. PIV-09 devamı — 21.10.2026: discovery PASS, sandbox BLOCKED
+
+Bölüm12'deki eksik-loader kaydı ilk denemenin snapshot'ıdır. Artık resmi GNOME
+2.0.0 / commit724f18c5f3519885995428a7e2e6e5df9ca2ab27 kaynağı **değiştirilmeden**,
+upstream Cargo.lock ile yalnız glycin-image-rs paketi derlendi (ilk build1m46s,
+-j2). Loader2.0.0, utils4.0.0/common1.0.0; istemci3.0.8'in 2+ ailesine uyumlu
+kaynak hattı. Gerçek IPC handshake henüz çalışmadı; source-family uyumu ve binary
+hazırlığı runtime handshake başarısı diye sunulmaz.
+
+Kullanıcı prefix'i: /workspace/pivra-environment/piv09/loader-prefix. Sadece
+image/jpeg ve image/png loader kaydı; editor kaydı yok. Unmodified upstream
+image-rs bundle kendi diğer Rust codec/editor yardımcılarını içerir; ayrı HEIF,
+JXL, RAW, SVG loader'ları veya sistem codec paketleri kurulmadı. Böylece ABI veya
+sürüm patch'i yapılmadan gerekli tek bileşen hazırlandı. Binary ve upstream lock
+hash/sürüm kaynak kanıtı docs/probes/PIV09_LOADER_BUILD.json içindedir.
+
+`tests/probes/prepare_glycin_loader.sh` exact HEAD/clean source/pinned lock kontrolü,
+build/install ve config/activation üretimini tekrar edilebilir kılar; kullanıcı
+config'i değiştirilmişse üzerine yazmaz. image-activate.sh mevcut gtk-activate.sh'yi
+source eder ve GLYCIN_DATA_DIR'ı yalnız private loader share dizinine yöneltir.
+Sistem paketi, Rust/GTK kurulumu ve production Cargo kaynakları değiştirilmedi.
+
+**Genuine discovery PASS:** Glycin3.0.8 Loader::supported_mime_types API'si tam
+image/jpeg,image/png döndürdü; config grupları ve executable file/execute mode
+ayrıca doğrulandı. MIME keşfi dış loader'ı başlatmaz. Sonraki PNG ve JPEG probe'ları
+artık doğru Exec yoluyla Bwrap başlatıyor; missing-loader hatası çözüldü.
+
+**Gerçek runtime hâlâ BLOCKED:** actual Glycin/JPEG çağrısının strace'inde
+CLONE_NEWUSER dahil clone başarılı, ardından openat(...,"uid_map",O_RDWR|O_CLOEXEC)
+**EROFS**. Minimal bwrap true aynı sonucu verir. Proc mount ro; UID1000/CapEff0/
+NoNewPrivs1/Seccomp2. Kullanıcı namespace oluşturma izni bu Codex oturumunda var,
+map yazımı read-only procfs nedeniyle yok. Seccomp'un bu EROFS'nin nedeni olduğu
+iddia edilmez; dağıtımın genel uyumsuzluğu sonucu çıkarılmaz.
+
+İzinli alternatif olarak erişilebilir Docker28.4.0 daemon'unda standart built-in
+seccomp korunarak minimal probe denendi. Resmi Debian trixie-slim digest
+sha256:62bd423aeee912639ca8ee681c2b762cb3e25137e0a92b20be455898a9f034ad;
+user1000:1000, cap-drop=ALL, no-new-privileges, read-only rootfs, network=none,
+host bind mount yok. Sonuç bwrap namespace permissions denied/exit1. Bu Docker
+kısıtının tam seccomp/LSM/kernel alt kaynağı doğrulanmadı. Privileged/cap-add/
+seccomp-unconfined veya host security değişikliği denenmedi. Dolayısıyla bu
+alternatif ortam da mevcut güvenlik profiliyle uygun değil.
+
+Gerekli dış test oturumu: owner tarafından önceden izinli native Linux/VM,
+unprivileged namespace + normal uid/gid map yazımı/procfs ve Bwrap'in nested
+mount/PID/network vb. işlemlerine izin veren mevcut seccomp/LSM politikası;
+GTK>=4.16/adw>=1.2 + mevcut bağımlılıklar, 2+ loader/config, private runtime.
+Önce minimal sandbox true=0; sonra discovery ve image_probe pozitif piksel/EXIF;
+sonra gerçek app Fit/resize/lifecycle. Mevcut host mekanizmalarını değiştirmek
+bu şartların sağlanması için bir yöntem değildir; güvenli ayrı oturum gerekir.
+
+Aktif image ortamında 49 Rust ve tüm zorunlu Cargo kontrolleri PASS; 8 GUI/helper
+çağrısı scoped window/catalog/error PASS. 1 discovery probe PASS. 2 PNG/JPEG
+actual gates exit77/BLOCKED (loader erken exit1). EXIF1–8/renk/pikseller, app Fit,
+merkezleme/resize ve gerçek başarılı concurrent/active-load close NOT RUN/BLOCKED.
+Weston normal close ve fiziksel GNOME/Nautilus NOT RUN. Uygulama/assertion'lar
+korundu; PIV-09 **BLOCKED**, PIV-10 başlamadı. Tam komut/SHA/test takip kaydında.

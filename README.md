@@ -3,13 +3,16 @@ A fast, lightweight GNOME image viewer with seamless photo and video navigation,
 
 ## Development status
 
-**PIV-09: BLOCKED (2026-10-21).** Glycin 3.0.8 integration compiles; the official 2+ JPEG/PNG loader is now built
-and discovered. This Codex session still rejects bubblewrap UID-map setup.
-Real JPEG/PNG pixels, EXIF orientation and application Fit have **not** passed.
-PIV-01–08 remain DONE; PIV-10 has not started. Details below supersede the older
-placeholder-only delivery descriptions, which record their respective milestones.
+**PIV-09: TESTING (2026-10-21).** User-reported tests on real Arch Linux / GNOME
+Wayland at `459fbea` passed secure JPEG/PNG decode, EXIF 1–8 pixels and manual
+Fit/resize/normal close. These were not independently run by Codex. Codex still
+cannot start the Bwrap loader because its `/proc` UID-map write returns EROFS.
+Pending: successful concurrent-load coverage, automatic rendered-image geometry,
+and close during proven active decode. PIV-10 has not started. Historical delivery
+records below retain their original scope; the latest validation section supersedes
+the earlier overall BLOCKED status.
 
-**PIV-01: DONE. PIV-02: GTK4/libadwaita shell implemented and validated on 2026-10-21, on `dev`.** No image/video functionality, media engine or CI is included. PIV-03 separates application, window, CLI and core data responsibilities without changing that behavior. PIV-04 adds deterministic fixtures and isolated Rust/X11/headless Wayland test infrastructure. PIV-05 records versioned GTK/Glycin/GStreamer capability probes and explicit runtime gaps; production dependencies are unchanged. PIV-06 adds local photo path/URI input and a decoder-free file placeholder. PIV-07 discovers unsorted neighboring image/video candidates on a worker and preserves the opened selection. PIV-08 naturally orders the unified catalog while preserving the opened selection. PIV-09 has not started.
+**PIV-01: DONE. PIV-02: GTK4/libadwaita shell implemented and validated on 2026-10-21, on `dev`.** No image/video functionality, media engine or CI is included. PIV-03 separates application, window, CLI and core data responsibilities without changing that behavior. PIV-04 adds deterministic fixtures and isolated Rust/X11/headless Wayland test infrastructure. PIV-05 records versioned GTK/Glycin/GStreamer capability probes and explicit runtime gaps; production dependencies are unchanged. PIV-06 adds local photo path/URI input and a decoder-free file placeholder. PIV-07 discovers unsorted neighboring image/video candidates on a worker and preserves the opened selection. PIV-08 naturally orders the unified catalog while preserving the opened selection. PIV-09 is now in TESTING (see the latest validation record).
 
 See [technical capabilities and open prerequisites](docs/PIVRA_TECHNICAL_CAPABILITIES.md) and [verified results and commit evidence](docs/PIVRA_COMMIT_TRACKER.md). PIV-05 is DONE; Phase 0 remains INCOMPLETE because a fresh native environment installation has not been independently reproduced. A clean Cargo target build and the existing headless regressions passed.
 
@@ -569,3 +572,69 @@ Weston normal close, physical GNOME/Wayland and Nautilus DESKTOP-06 remain NOT R
 **PIV-09 remains BLOCKED; PIV-10 has not started.** No application code rewrite,
 production dependency change, system package change or security bypass occurred
 in this continuation. Earlier SDK/Phase0/video risks remain as separately recorded.
+
+
+### PIV-09 Arch Linux evidence and remaining gates — 2026-10-21
+
+**Evidence source: user-reported local tests, not Codex execution.** Tested local
+commit: `459fbea40cc3048eabc14d8c996db1ab7023c726` on real Arch Linux / GNOME
+Wayland. Reported versions: Rust/Cargo 1.99.1, GTK4 4.24.1, libadwaita 1.10.0,
+Glycin 2.2.3 with compatible 2+ loaders, Bubblewrap 0.13.1. Glycin 2.2.3 is the
+user's reported native environment version; the project Cargo dependency remains
+locked to client 3.0.8. Exact Arch package/loader executable inventories and raw
+logs were not supplied; no additional package or ABI claims are inferred.
+
+The user reports user namespaces and Bwrap isolation PASS; PNG and JPEG
+`image_probe` exit 0; EXIF orientation 1–8 pixel checks, Unicode paths and controlled
+invalid-image errors PASS. In the real Pivra GNOME/Wayland window, photos were
+visible, centered, aspect-preserving Fit worked, resizing refit the image and
+normal close completed without error. These are **user-reported PASS**, including
+manual geometry; they are not automated application geometry measurements.
+The user also reports fmt/check/build/test/Clippy (locked where applicable) PASS,
+49 tests, zero failures and a clean worktree. This does not establish a clean
+native installation reproduction or close the separate Phase 0 gate.
+
+Codex reran `bash tests/check.sh` using the existing image activation: fmt,
+check/build/test/Clippy locked/offline all PASS; **49 tests = 25 unit + 24 integration**,
+0 failed/ignored. Both fixture manifests and CLI/catalog/natural-order/desktop
+regressions remain intact. Eight existing GUI/helper calls passed their scoped
+checks: four X11/Xvfb, two Sway, two Weston. File modes explicitly expected the
+real secure-loader error; no decoded photo success is claimed for those runs.
+Weston normal close remains NOT RUN. The user's real GNOME window close result
+is a separate PASS; real Nautilus DESKTOP-06 was not reported.
+
+New executable gate (not included in the user's `459fbea` results):
+
+```sh
+# In a graphical session with working secure Glycin 2+ loaders:
+GDK_BACKEND=wayland cargo run --locked --example image_gui_probe
+```
+
+`image_gui_probe` imports the actual production `image_view` and `image_loader`;
+it does not add application switches or another decoder. It schedules two real
+view loads before pumping the main context (large PNG and EXIF-6 JPEG), requires
+both texture results, and uses actual GTK WidgetPaintable/GSK rendered snapshots
+to measure image alpha bounds against intrinsic-size ScaleDown geometry and
+centering. It repeats after a resize and after closing the first window, requiring
+the other to remain visible. This is automatic offscreen snapshot geometry of the
+real view, not compositor screenshot or physical-display proof. Concurrent job
+scheduling does not prove that the decoder execution intervals overlap.
+
+The new probe compiles and passes Clippy here; its Codex Xvfb run returns **77 /
+BLOCKED** at real secure decode. Geometry and successful two-image assertions
+were **not executed successfully**. No synthetic texture, mock decoder, assertion
+removal, NotSandboxed or sandbox fallback was used to produce a passing result.
+
+Remaining PIV-09 acceptance gaps only:
+
+- Run the new two-image load/automatic geometry/resize/independent-close gate in
+  the working native environment and record its result at its actual commit.
+- Verify close while a secure decoder is demonstrably active, with a second
+  loaded window surviving; verify no stale UI callback/crash and bounded worker/
+  loader cleanup. Existing pre-cancel tests and post-load normal close do not
+  establish this. A fast small fixture or closing immediately without observing
+  active decode is insufficient; no production delay or unsafe loader was added.
+
+**PIV-09 TESTING**, not DONE. The Codex-specific sandbox restriction remains;
+the user-reported native successes resolve the earlier global absence of runtime
+evidence. PIV-10 remains untouched.

@@ -1,6 +1,6 @@
 # Pivra — Teknik Yetenekler ve Faz 0 Kararları
 
-**Tarih:** 21.10.2026 · **Dal:** dev · **Kapsam:** yalnız PIV-05.
+**Tarih:** 21.10.2026 · **Dal:** dev · **Güncel durum:** PIV-09 TESTING; aşağıdaki ilk kayıt yalnız PIV-05 tarihçesidir.
 Başlangıç commit'i: `8b3947215c54dfd2515df61a50dd05c080eccf31`.
 PIV-06 uygulanmadı. Production kaynakları, Cargo.toml ve Cargo.lock değiştirilmedi;
 görüntü decoder'ı veya video oynatıcı yazılmadı. Proje lisansı seçilmedi.
@@ -531,3 +531,48 @@ actual gates exit77/BLOCKED (loader erken exit1). EXIF1–8/renk/pikseller, app 
 merkezleme/resize ve gerçek başarılı concurrent/active-load close NOT RUN/BLOCKED.
 Weston normal close ve fiziksel GNOME/Nautilus NOT RUN. Uygulama/assertion'lar
 korundu; PIV-09 **BLOCKED**, PIV-10 başlamadı. Tam komut/SHA/test takip kaydında.
+
+
+## 14. PIV-09 Arch Linux kullanıcı doğrulaması — TESTING
+
+Kanıt kaynağı **kullanıcının aktardığı yerel sonuçlardır**; Codex bağımsız olarak
+Arch/GNOME üzerinde çalıştırmadı. Test edilen commit
+`459fbea40cc3048eabc14d8c996db1ab7023c726`.
+
+| Kullanıcı ortamı / kontrol | Kullanıcının bildirdiği sonuç |
+|---|---|
+| Arch Linux, gerçek GNOME Wayland | Rust/Cargo 1.99.1; GTK4 4.24.1; libadwaita 1.10.0; Glycin 2.2.3 ve uyumlu 2+ loader; Bwrap 0.13.1 |
+| User namespace / Bwrap izolasyonu | PASS |
+| PNG ve JPEG image_probe | PASS, exit 0 |
+| EXIF 1–8 piksel, Unicode, hatalı görüntü | PASS |
+| Gerçek fotoğraf, merkezleme, oran koruyan Fit / resize | PASS, manuel gözlem |
+| Normal pencere kapanışı | PASS |
+| fmt/check/build/test/Clippy | PASS, locked belirtildiği yerlerde; 49 test, 0 başarısız; temiz Git |
+
+Glycin 2.2.3 kullanıcının native sürüm bildirimidir; Cargo istemcisi 3.0.8 olarak
+kalır. Ham log ve tam Arch loader/paket envanteri aktarılmadığından ek ABI/paket
+iddiası üretilmedi. Kullanıcı bildirimi Codex'in read-only /proc UID-map EROFS
+kaydını geçersiz kılmaz: bunlar farklı ortamlardır. Codex sandbox politikası,
+Bwrap zorunluluğu ve üretim bağımlılıkları değiştirilmedi.
+
+Codex'te yeniden yapılan core regresyon: 49 PASS (25 unit+24 integration),
+fmt/check/build/Clippy PASS ve fixture bütünlüğü PASS. Sekiz GUI/helper çağrısı
+(4 X11, 2 Sway, 2 Weston) yalnız önceki pencere/katalog/hata kapsamlarında PASS.
+Weston normal kapanışı NOT RUN; Arch normal GNOME kapanışı kullanıcı PASS'idir.
+Fiziksel HiDPI/donanım ve gerçek Nautilus testleri bildirilmedi; bunlardan yeni
+başarı çıkarılmadı. Faz 0 temiz native kurulum yeniden üretimi hâlâ açık.
+
+Yeni `examples/image_gui_probe.rs` üretim view/loader'ını kullanarak iki işi
+birlikte başlatır, başarılı texture yüklemelerini şart koşar; gerçek view'ın GTK/GSK
+snapshot alpha sınırlarını Fit/merkezleme beklentisine göre ölçer, resize ve bir
+pencere kapandıktan sonra diğerinin görüntüsünü kontrol eder. Bu compositor ekran
+fotoğrafı değildir ve decoder sürelerinin çakıştığını ölçmez. Codex'te compile ve
+Clippy PASS; gerçek secure decode exit77/BLOCKED olduğundan pozitif geometri ve
+iki başarılı görüntü yolları **NOT RUN**. Kullanıcı bu yeni probe'u henüz çalıştırmadı.
+
+Kalan kapılar: bu probe'un çalışan güvenli native ortamda başarılı çalışması ve
+**aktif decode kanıtlanmışken** pencere kapatma/ikinci pencere bağımsızlığı/worker
+ve loader temizliği kontrolü. Pre-cancel unit testi, yalnız thread başlatılması,
+hata-yolu veya yükleme sonrası kapanış bu testi karşılamaz. Yapay gecikme veya
+sandbox bypass eklenmedi. Gerçek decode/EXIF/manual Fit kullanıcı kanıtıyla PASS;
+bu kalan kontroller nedeniyle genel durum **PIV-09 TESTING**, PIV-10 başlamadı.

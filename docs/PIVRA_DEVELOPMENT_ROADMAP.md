@@ -1,6 +1,6 @@
 # Pivra — Geliştirme Yol Haritası
 
-**Durum:** PIV-01–08 DONE (giriş, keşif ve doğal sıra); PIV-09 BLOCKED (loader discovery PASS; Codex UID-map sandbox kapısı); PIV-10–60 TODO. Faz 0 INCOMPLETE: temiz native kurulumun bağımsız yeniden üretimi NOT RUN; temiz Cargo target derlemesi ve headless regresyonlar geçti. [PIV-05 kanıtı ve ayrı faz kapısı](PIVRA_TECHNICAL_CAPABILITIES.md#102-piv-05-ve-faz-0-kapanışını-ayrı-değerlendirme).
+**Durum:** PIV-01–08 DONE (giriş, keşif ve doğal sıra); PIV-09 TESTING (Arch kullanıcı decode/EXIF/manual Fit PASS; otomatik geometri ve aktif yükleme kapanış kapıları açık); PIV-10–60 TODO. Faz 0 INCOMPLETE: temiz native kurulumun bağımsız yeniden üretimi NOT RUN; temiz Cargo target derlemesi ve headless regresyonlar geçti. [PIV-05 kanıtı ve ayrı faz kapısı](PIVRA_TECHNICAL_CAPABILITIES.md#102-piv-05-ve-faz-0-kapanışını-ayrı-değerlendirme).
 **Başlangıç branch:** `dev` · **Kararlı sürümler:** `main`  
 **Kaynak şartname:** [PIVRA_FEATURE_SPEC_TR.md](PIVRA_FEATURE_SPEC_TR.md)  
 **Görev ve commit takibi:** [PIVRA_COMMIT_TRACKER.md](PIVRA_COMMIT_TRACKER.md)
@@ -159,3 +159,16 @@ standart kısıtlı Docker yolu da namespace oluşturmaya izin vermedi. Güvenli
 profili gevşetilmedi. PIV-09 BLOCKED kalır: gerçek piksel/EXIF/Fit/resize/lifecycle
 kapıları için önceden izinli namespace destekli ayrı native oturum gerekir.
 49 Rust + 8 scoped GUI/helper regresyonu PASS, image success değil. PIV-10 başlamadı.
+
+
+### PIV-09 Arch Linux kullanıcı kanıtı — TESTING
+
+`459fbea` üzerinde kullanıcı gerçek Arch/GNOME Wayland oturumunda güvenli Bwrap,
+PNG/JPEG image_probe exit0, EXIF 1–8 pikselleri ve manuel Fit/resize/normal kapanış
+PASS bildirdi. Bu Codex tarafından bağımsız yürütülmedi. Codex UID-map EROFS
+kısıtı ayrı kalır; önceki BLOCKED genel durumunu bu yeni kanıtla TESTING izler.
+Kalan kapılar: yeni gerçek-view iki görüntü/otomatik snapshot geometri probe'unun
+native ortamda çalışması ve kanıtlı aktif decode sırasında kapanış/temizlik.
+49 core ve 8 scoped GUI regresyonu Codex'te yeniden geçti; yeni pozitif görüntü
+probe'u Codex'te exit77/BLOCKED. Ayrıntılar README ve takip tablosundadır.
+PIV-09 DONE değildir; PIV-10 başlatılmadı. Faz 0 kapısı ayrı değerlendirilir.

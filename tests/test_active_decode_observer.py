@@ -290,6 +290,25 @@ class BaselineAndLifecycleGuards(unittest.TestCase):
         finally:
             os.close(fd)
 
+    def test_bwrap_helper_is_an_identity_without_unnecessary_frame_fd_access(self):
+        parent = os.getpid()
+        actual_stat, actual_link, actual_iterdir = probe.stat, os.readlink, Path.iterdir
+        accesses = []
+        def entries(path):
+            accesses.append(str(path))
+            if str(path) == '/proc/99/fd':
+                raise PermissionError('helper fd should never be inspected')
+            return actual_iterdir(path)
+        def link(path):
+            return '/usr/bin/bwrap' if str(path) == '/proc/99/exe' else actual_link(path)
+        with mock.patch('active_decode_close.descendants', return_value={99}), \
+             mock.patch('active_decode_close.stat', side_effect=lambda pid: ('S', 123) if pid == 99 else actual_stat(pid)), \
+             mock.patch('active_decode_close.os.readlink', side_effect=link), \
+             mock.patch('active_decode_close.Path.iterdir', side_effect=entries, autospec=True):
+            baseline = probe.snapshot_baseline(parent, probe.Diagnostics({}))
+        self.assertEqual(baseline.origin(99, 123), 'baseline')
+        self.assertNotIn('/proc/99/fd', accesses)
+
     def test_unreadable_baseline_does_not_allow_freshness_claim(self):
         with mock.patch('active_decode_close.descendants', return_value=set()), \
              mock.patch('active_decode_close.Path.iterdir', side_effect=PermissionError('denied')):

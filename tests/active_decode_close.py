@@ -94,6 +94,12 @@ def snapshot_baseline(parent, diagnostics):
         try:
             _, birth = stat(pid)
             baseline.processes[pid] = birth
+            # Helpers are inventory identities, not frame producers. Avoid
+            # unnecessary fd access to non-dumpable bwrap supervisors.
+            if pid != parent:
+                executable = os.readlink(f'/proc/{pid}/exe')
+                if Path(executable.removesuffix(' (deleted)')).name != 'glycin-image-rs':
+                    continue
             # Include the probe's retained old textures as well as loader buffers.
             for entry in Path(f'/proc/{pid}/fd').iterdir():
                 try:

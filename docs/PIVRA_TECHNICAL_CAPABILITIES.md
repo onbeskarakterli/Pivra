@@ -576,3 +576,37 @@ ve loader temizliği kontrolü. Pre-cancel unit testi, yalnız thread başlatıl
 hata-yolu veya yükleme sonrası kapanış bu testi karşılamaz. Yapay gecikme veya
 sandbox bypass eklenmedi. Gerçek decode/EXIF/manual Fit kullanıcı kanıtıyla PASS;
 bu kalan kontroller nedeniyle genel durum **PIV-09 TESTING**, PIV-10 başlamadı.
+
+
+## 15. PIV-09 son test aşaması — aktif decode kapanışı
+
+Kullanıcı `7d1acf4932b6b7dfa21e42c00777b965cee54bcc` üzerinde gerçek Arch/GNOME
+Wayland `image_gui_probe` **exit0** bildirdi: gerçek view snapshot Fit/center
+1600×1200 ve 32×64 görüntüler için 800×600 viewport'ta PASS; iki bağımsız yükleme,
+480×320 resize ve decode sonrası bağımsız kapanış PASS. **Kaynak kullanıcı
+bildirimidir, Codex bağımsız yürütmesi değildir.** Önceki geometri/iki başarılı
+view eksikleri bu kanıtla kapanır; decoder sürelerinin çakışması ölçülmüş değildir.
+
+Kalan aktif-decode-close kapısı için [ayrıntılı test tasarımı ve native komut](PIV09_ACTIVE_DECODE_TEST.md)
+eklendi. Gerçek secure image-rs loader'ın kısmen yazılmış 96 MB RGB frame'i,
+loader'ın halen aynı fd/inode ve writable shared mapping'e sahip olması, ayrı
+namespace/NoNewPrivs/seccomp/capability kontrolleri ve dönmemiş load işi birlikte
+şart koşulur. Kendi loader'ı pidfd ile kısa süre SIGSTOP altında tekrar gözlenir,
+gerçek pencere kapanır, ardından SIGCONT ile üretim cancellation temizliği ölçülür.
+Bu kontrollü pause altında in-flight decode iptalidir; kesintisiz doğal çalışma
+zamanlaması veya iki decoder interval çakışması testi değildir.
+
+Üretim view'ında yalnız dahili job-completion gözlem noktası eklendi: normal
+`build` no-op kullanır; gerçek GIO await sonrası mevcut cancellation/weak-ref
+korumaları aynen sürer. Yeni probe bu bildirimle worker join'ini doğrular,
+stale mutation/weak-ref bırakılması/diğer pencerenin gerçek texture byte'ları ve
+10 saniyelik cleanup sınırını kontrol eder. GIO pool thread'lerinin OS exit'i
+istenmez. Başarı yolunda dışarıdan zorla süreç öldürerek PASS üretilmez.
+
+Codex sonuçları: fmt/check/build/test/Clippy PASS, **49 Rust + 6 Python observer
+guard PASS**, fixture/CLI/katalog/doğal sıra/desktop korunur; 8 mevcut GUI/helper
+çağrısı kendi sınırlı kapsamlarında PASS. Yeni gerçek probe baseline secure decode
+kapısında **BLOCKED exit77**, pozitif active-close yolu NOT RUN. Salt okunur proc
+UID-map engeli değişmedi. Native pozitif test henüz bildirilmedi. Host güvenliği,
+Cargo bağımlılıkları ve Glycin Bwrap zorunluluğu değiştirilmedi.
+**PIV-09 TESTING; PIV-10 başlamadı.**

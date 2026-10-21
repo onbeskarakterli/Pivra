@@ -1,6 +1,6 @@
 # Pivra — Geliştirme Yol Haritası
 
-**Durum:** PIV-01–08 DONE (giriş, keşif ve doğal sıra); PIV-09 TESTING (Arch kullanıcı decode/EXIF/manual Fit PASS; otomatik geometri ve aktif yükleme kapanış kapıları açık); PIV-10–60 TODO. Faz 0 INCOMPLETE: temiz native kurulumun bağımsız yeniden üretimi NOT RUN; temiz Cargo target derlemesi ve headless regresyonlar geçti. [PIV-05 kanıtı ve ayrı faz kapısı](PIVRA_TECHNICAL_CAPABILITIES.md#102-piv-05-ve-faz-0-kapanışını-ayrı-değerlendirme).
+**Durum:** PIV-01–08 DONE (giriş, keşif ve doğal sıra); PIV-09 TESTING (Arch kullanıcı decode/EXIF ve otomatik geometri PASS; yalnız aktif decode kapanış/temizlik sonucu açık); PIV-10–60 TODO. Faz 0 INCOMPLETE: temiz native kurulumun bağımsız yeniden üretimi NOT RUN; temiz Cargo target derlemesi ve headless regresyonlar geçti. [PIV-05 kanıtı ve ayrı faz kapısı](PIVRA_TECHNICAL_CAPABILITIES.md#102-piv-05-ve-faz-0-kapanışını-ayrı-değerlendirme).
 **Başlangıç branch:** `dev` · **Kararlı sürümler:** `main`  
 **Kaynak şartname:** [PIVRA_FEATURE_SPEC_TR.md](PIVRA_FEATURE_SPEC_TR.md)  
 **Görev ve commit takibi:** [PIVRA_COMMIT_TRACKER.md](PIVRA_COMMIT_TRACKER.md)
@@ -172,3 +172,14 @@ native ortamda çalışması ve kanıtlı aktif decode sırasında kapanış/tem
 49 core ve 8 scoped GUI regresyonu Codex'te yeniden geçti; yeni pozitif görüntü
 probe'u Codex'te exit77/BLOCKED. Ayrıntılar README ve takip tablosundadır.
 PIV-09 DONE değildir; PIV-10 başlatılmadı. Faz 0 kapısı ayrı değerlendirilir.
+
+
+### PIV-09 son test aşaması
+
+Kullanıcı `7d1acf4` üzerinde yeni image_gui_probe exit0 (iki görüntü, gerçek-view
+snapshot Fit/center, resize ve decode sonrası bağımsız kapanış) bildirdi; bu
+Codex yürütmesi değildir. Yalnız aktif decode sırasında kapanış/temizlik sonucu
+beklenir. [Yeni kontrollü test ve native komut](PIV09_ACTIVE_DECODE_TEST.md) gerçek
+secure loader'ın kısmi çıktı yazımını kanıtlamadan pencere kapatma PASS'i vermez.
+Codex baseline sandbox kapısında exit77; güvenlik gevşetilmedi. 49 Rust + 6 guard
+regresyonu PASS. PIV-09 TESTING, DONE değil; PIV-10 başlamadı.

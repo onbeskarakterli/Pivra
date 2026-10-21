@@ -7,8 +7,9 @@ A fast, lightweight GNOME image viewer with seamless photo and video navigation,
 Wayland at `459fbea` passed secure JPEG/PNG decode, EXIF 1–8 pixels and manual
 Fit/resize/normal close. These were not independently run by Codex. Codex still
 cannot start the Bwrap loader because its `/proc` UID-map write returns EROFS.
-Pending: successful concurrent-load coverage, automatic rendered-image geometry,
-and close during proven active decode. PIV-10 has not started. Historical delivery
+The user additionally reports `image_gui_probe` exit0 at `7d1acf4`: two loaded
+views, automatic Fit/center snapshots, resize and independent post-decode close.
+Only close during proven active decode and its cleanup gate remain pending. PIV-10 has not started. Historical delivery
 records below retain their original scope; the latest validation section supersedes
 the earlier overall BLOCKED status.
 
@@ -638,3 +639,36 @@ Remaining PIV-09 acceptance gaps only:
 **PIV-09 TESTING**, not DONE. The Codex-specific sandbox restriction remains;
 the user-reported native successes resolve the earlier global absence of runtime
 evidence. PIV-10 remains untouched.
+
+
+### PIV-09 final test stage — active-decode close still TESTING
+
+**User-reported Arch Linux / GNOME Wayland evidence, not Codex execution:** at
+`7d1acf4932b6b7dfa21e42c00777b965cee54bcc`, `image_gui_probe` exited 0.
+The reported real-view snapshot checks passed for 1600×1200 and 32×64 images in
+800×600 windows, two independently loaded images, resize to 480×320 and independent
+normal close after successful decode. These supersede the earlier missing
+geometry/two-image gate, not the separate Codex sandbox restriction. Two decoder
+execution intervals were not measured to overlap.
+
+The remaining gate is implemented in `examples/active_decode_close_probe.rs` and
+`tests/active_decode_close.py`. It requires a real secure loader owning a partially
+written RGB output, uses pidfd SIGSTOP/recheck to remove the completion race, closes
+the actual view, resumes the decoder, and checks joined worker, released widgets,
+no stale UI mutations, unchanged survivor pixels and bounded child cleanup.
+A partially written real decode is paused for this controlled cancellation test;
+it is not an unpaused timing benchmark. Production retains mandatory Bwrap and
+its existing cancellation/result guards; the new internal completion observer is
+a no-op in normal builds.
+
+Exact native command, proof criteria, JSON interpretation and observation limits:
+[active decode test instructions](docs/PIV09_ACTIVE_DECODE_TEST.md). No sudo or
+sandbox policy changes are requested. Missing `/proc` observation rights, a
+missed partial-frame interval or a different loader memory layout yields NOT RUN,
+never PASS. The native positive path has not yet been run by the user or Codex.
+Codex's new probe exits77 at baseline secure decode; 49 Rust + 6 Python observer
+tests pass. Existing eight GUI/helper calls pass only their established window/
+catalog/error scopes; Weston normal close remains NOT RUN.
+
+**PIV-09 TESTING; only the active-decode close/cleanup result remains outstanding.
+PIV-10 has not started.**

@@ -1331,3 +1331,96 @@ PIV-09 TESTING, DONE değil; son native kanıttan sonra kapanış değerlendiril
 
 Bu takip kaydı ayrı commit'tir; kendi SHA'sı Git geçmişi ve push raporundadır.
 Normal push sonrasında origin/dev eşitliği ve main korunması doğrulanır.
+
+
+## PIV-09 V3 — baseline loader keşfi düzeltmesi, TESTING
+
+Başlangıç: `69a98d3f7b93015cb3fc75c49c1356eeffa45436`, temiz `dev`.
+`main` korunacak referans: `5d55ee599df4617bd51c09b1c7a008b8d0ece480`.
+PIV-10 başlamadı. PIV-09 DONE değildir; son native V3 sonucu beklenir.
+
+### Kullanıcı tarafından aktarılan native V2 kanıtı
+
+**Codex'in bağımsız çalıştırması değildir.** Arch/GNOME Wayland V2 testi
+NOT RUN/77, first_uncompleted_stage=loader_found ve 5.476 tarama bildirdi.
+Ayrı 5.445 taramalık yerel teşhiste ilk taramada iki bwrap (142105, 142122) ile
+`/usr/lib/glycin-loaders/2+/glycin-image-rs` (142123) zaten vardı ve loader tüm
+taramalarda görünmeye devam etti. Başlangıçtaki bu loader'ın hedef görüntü için
+gerçekte reuse edildiği bu kanıtla henüz gösterilmedi.
+
+V2 `descendants(process.pid) - baseline` kullandığından bu başlangıç PID'lerini
+keşiften tamamen çıkarıyordu. **Somut keşif hatası V3'te giderildi.**
+
+### Yaşam döngüsü ve doğru hedef ilişkisi
+
+Kilitli Rust Glycin **3.0.8** kaynakları incelendi: Loader::new varsayılan
+Pool::global kullanır; pool.rs bağlı uygun config hash'li süreci tekrar verebilir.
+Varsayılan retention **30 saniye**, paralel işlem sınırı varsayılanı sınırsızdır.
+Image drop/cancellation request'e ait done(path) yapar; her yeni görüntü için
+mutlaka yeni PID veya her cancellation'da anında process exit beklenemez.
+Native Glycin 2.2.3 loader paketiyle Rust client sürümü karıştırılmadı. Kaynakta
+reuse olanağı doğrulandı; Arch'ta gerçek reuse olmuş gibi PASS üretilmedi.
+
+V3 ARMED öncesi tüm child PID/starttime kimliklerini ve probe+image-rs loader
+frame dev/inode envanterini alır. Bwrap helper'ları kimlik olarak kaydedilir;
+frame üreticisi olmayan helper fd'lerine gereksiz erişim istenmez. Gerekli frame
+envanteri okunamazsa NOT RUN. Keşif baseline dahil tüm kendi loader'larını tarar;
+origin PID **ve** starttime ile baseline/new olarak ayrılır. Eski inode'un boyutu
+büyüse veya RGB koşulu aynı olsa da fresh kabul edilmez. Yalnız ARMED sonrasında
+tek kontrollü 32 MP hedef işine uyan yeni inode'daki 96 MB frame değerlendirilir.
+
+Tam 96-byte prefix/tail, pidfd, tüm thread STOP, yeniden kimlik, loader'ın aynı
+inode/fd sahipliği ve writable-shared mapping, namespace/NoNewPrivs/seccomp/CapEff
+ve Rust load-pending checkpoint'i korunur. Eski tamamlanmış veya eski kısmi
+matching frame, yeni fakat tamamlanmış frame ve yalnız PID'nin bulunması PASS
+olamaz. Üretim kaynakları, Cargo.lock/toml, fixture ve sandbox politikası değişmedi.
+
+Test-only TARGET_LOAD_ENTERED/RETURNED ok/error telemetrisi yeni PID oluşmadığında
+hedef işin başlamaması/erken hata/tamamlanmasını ayırır. Process inventory exe ve
+origin kaydeder; target_frame_fresh ve eski frame reddi ayrı aşamalardır.
+`candidate_loader_origin` yalnız adayı, `certified_loader_origin` ve
+`reuse_observed` ancak fresh-frame + Rust pending checkpoint'i geçmiş ilişkiyi
+anlatır. Codex baseline başarısızlığında not_observed/not_certified/null kalırlar.
+
+Temizlik: önce gerçek job join/weak-ref/stale-callback/survivor byte'ları ve hedef
+inode'un fd+mapping bırakılması gerekir. Bu aşamada pool'da canlı baseline süreç
+sırf var diye leak sayılmaz; origin ile raporlanır. Sonra survivor/app normal
+kapanmalı ve gözlenen baseline+new çocukların **tamamı** zombiesiz çıkmalıdır.
+Toplam süre hedef close isteğinden itibaren hâlâ <10 s; dışarıdan kill ile PASS yok.
+Son process-exit veya hedef kaynak temizliği koşulu kaldırılmadı.
+
+### Bu devamda Codex'te gerçekten çalıştırılanlar
+
+| Kontrol | Gerçek sonuç |
+|---|---|
+| `bash tests/check.sh` | PASS; iki fixture manifesti, fmt/check/build/test/all-targets Clippy -D warnings; stable/locked/offline -j2 |
+| Rust regresyonu | **49 PASS** (25 unit+24 integration), 0 failed/ignored; 0 doctest |
+| Python gözlemci regresyonu | **30 PASS**; eski 17 + 13 yeni baseline/telemetri/kaynak senaryosu |
+| Yeni pozitif guard | Mevcut baseline loader taranır ve taze hedef frame'i örneklenir; native PASS değildir |
+| Yeni negatif guard'lar | Eski matching partial/complete frame reddi, old inode büyümesi, unreadable inventory, PID reuse, tamamlanmış fresh frame, telemetri/protokol ayrımı, mapping-only referans, helper fd erişimi ve hedef/baseline kaynak ayrımı |
+| Rust example locked/offline build/check/Clippy | PASS |
+| Tek native wrapper `bash -n` | PASS; giriş komutu değiştirilmedi |
+| Python -O assertion-disable guard | PASS: exit2 ile çalıştırmayı reddeder |
+| Gerçek V3 probe / Xvfb | **NOT RUN/exit77**, baseline secure loader engeli; first_uncompleted_stage=baseline_decoded |
+| Native V3 fresh-frame/reuse/checkpoint/kapanış/cleanup | **NOT RUN**, kullanıcı henüz çalıştırmadı |
+| git diff --check ve üretim src/Cargo/data/fixture diff | PASS; üretim değişikliği yok |
+
+Codex kayıt: [PIV09_ACTIVE_DECODE_OBSERVER_V3_CODEX.json](probes/PIV09_ACTIVE_DECODE_OBSERVER_V3_CODEX.json).
+Unitlerdeki kontrol akışı simülasyonları gerçek decode PASS'i değildir. Önceki
+kullanıcı decode/EXIF/Fit/iki görüntü/geometri PASS'leri korunur. İki decoder'ın
+zamansal çakışması NOT MEASURED. Yeni GUI/piksel başarısı iddia edilmedi.
+
+Güncel dev checkout'unda yalnız native son test için tek komut:
+`bash tests/run_active_decode_close.sh`.
+JSON `/tmp/pivra-active-decode-close.json`; result=PASS ve exit0 birlikte gerekir.
+[Detaylı yöntem ve origin yorumlaması](PIV09_ACTIVE_DECODE_TEST.md).
+**PIV-09 TESTING; native sonuç sonrası kapanış değerlendirilecek. PIV-10 başlamadı.**
+
+| Gerçek commit SHA | İçerik |
+|---|---|
+| `775b5bce0f41a8a02ad8a9619e424013328a510f` | Baseline loader keşfi, taze hedef frame envanteri, target telemetri/origin ve pool-aware tam cleanup |
+| `97db18ba790154aa7b1fd1d51a814ad2b43b6315` | Helper kimliği korunurken ilgisiz helper buffer erişimini önleme ve 30. regresyon |
+| `7914d70b6d972830382a4418580b82ee52dba87a` | Pool yaşam döngüsü, kullanıcı V2 bulgusunun sınırları, güncel yöntem ve Codex V3 NOT RUN kanıtı |
+
+Bu takip kaydı commit'inin kendi SHA'sı Git geçmişi/push raporundadır; normal push
+sonrası origin/dev eşitliği ve main korunması ayrıca kontrol edilir.

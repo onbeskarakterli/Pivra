@@ -1005,3 +1005,8 @@ pozitif pixel/EXIF kapısı, gerçek app Fit/resize, bozuk image ve eşzamanlı/
 load close testleri tamamlanmalı. Bwrap bypass veya başka korumasız decoder
 alternatifi bu kaydın çözümü değildir. PIV-05 GStreamer SDK/sink/Libav riskleri ve
 Faz 0 temiz native kurulum kapısı açık. **PIV-09 BLOCKED; PIV-10 başlamadı.**
+
+Son Git bütünlük kontrolünde NUL içermeyen truncated PNG metin olarak algılandı;
+PNG imzasının zorunlu CR/LF byte'ları whitespace uyarısı üretti. Fixture içeriği
+oynanmadı: images/.gitattributes JPEG/PNG'yi binary olarak tanımlar. Hash kontrolleri
+tekrar geçti; final commit bu Git asset sınıflandırmasını da içerir.

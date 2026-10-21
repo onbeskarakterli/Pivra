@@ -3,6 +3,12 @@ A fast, lightweight GNOME image viewer with seamless photo and video navigation,
 
 ## Development status
 
+**PIV-09: BLOCKED (2026-10-21).** Glycin 3.0.8 integration compiles, but compatible
+2+ loaders are absent and this Codex session rejects bubblewrap UID-map setup.
+Real JPEG/PNG pixels, EXIF orientation and application Fit have **not** passed.
+PIV-01–08 remain DONE; PIV-10 has not started. Details below supersede the older
+placeholder-only delivery descriptions, which record their respective milestones.
+
 **PIV-01: DONE. PIV-02: GTK4/libadwaita shell implemented and validated on 2026-10-21, on `dev`.** No image/video functionality, media engine or CI is included. PIV-03 separates application, window, CLI and core data responsibilities without changing that behavior. PIV-04 adds deterministic fixtures and isolated Rust/X11/headless Wayland test infrastructure. PIV-05 records versioned GTK/Glycin/GStreamer capability probes and explicit runtime gaps; production dependencies are unchanged. PIV-06 adds local photo path/URI input and a decoder-free file placeholder. PIV-07 discovers unsorted neighboring image/video candidates on a worker and preserves the opened selection. PIV-08 naturally orders the unified catalog while preserving the opened selection. PIV-09 has not started.
 
 See [technical capabilities and open prerequisites](docs/PIVRA_TECHNICAL_CAPABILITIES.md) and [verified results and commit evidence](docs/PIVRA_COMMIT_TRACKER.md). PIV-05 is DONE; Phase 0 remains INCOMPLETE because a fresh native environment installation has not been independently reproduced. A clean Cargo target build and the existing headless regressions passed.
@@ -384,3 +390,99 @@ DESKTOP-06 remain NOT RUN. See the tracker for exact commands and commit SHAs.
 video defaults, production dependencies and existing environment are unchanged.
 No decoder, player, navigation, thumbnail, zoom, watcher, CI or license was added.
 PIV-05 media/sandbox risks and the separate Phase 0 clean-native-install gate remain open.
+
+
+### PIV-09 secure image integration — BLOCKED, 2026-10-21
+
+Source now attempts secure JPEG/PNG loading with exact **Glycin 3.0.8**, matching
+gtk/gdk 0.10.3, GLib/GIO 0.21.5 and adw 0.8.1. Cargo.lock records the new client
+chain (common 1.0.3/utils 4.0.4). Glycin's gdk feature requires **native GTK >=4.16**;
+the manifest explicitly raises the old 4.6 feature baseline. Existing GTK 4.18.6 /
+adw 1.7.6 satisfy it. Rust stays stable 1.99.1; declared MSRV 1.85 was not separately
+compiled. No GStreamer, extra production codec, editing or playback crate was added.
+
+`src/image_loader.rs` contains no widgets: GIO source -> forced Bwrap sandbox ->
+Glycin metadata/MIME -> oriented frame. It accepts actual detected JPEG/PNG MIME,
+not extension as decode proof. Glycin `apply_transformations(true)` applies EXIF
+once; the view never rotates again. No Auto/NotSandboxed/fallback decoder is used;
+base-directory exposure remains disabled. Errors return controlled text.
+`src/image_view.rs` runs the full async load/transform on GIO's blocking pool in a
+worker-owned GLib context. Only frame.texture and widget updates run on the GTK
+thread. Cancellable on close/destroy and weak widgets discard late results.
+Catalog discovery/order/selection remain independent and unchanged.
+
+The GTK view uses an expanding Picture/Overlay with **ScaleDown + can_shrink**.
+The intended Fit policy is aspect-preserving, centered containment with no
+upscaling above intrinsic size (one source pixel per logical layout unit); resize
+uses GTK's layout. Physical 100% pixels at HiDPI/fractional scale are NOT validated.
+Loading/errors have labels; a successful frame would replace them with its actual
+texture. This is compiled source/API configuration, **not observed image/Fit
+success**. No Fit/100% controls, zoom/pan or navigation were added.
+
+Limits: compressed regular file <=64 MiB, nonzero dimensions <=32768 per edge and
+<=32 MP, actual returned frame <=512 MiB. Tests reject oversized sparse input,
+invalid dimensions, missing files and pre-cancelled work without starting decode.
+These are admission/post-frame checks, not a hard total-RSS guarantee: loader
+metadata can allocate first, transformations/copies and multiple windows add
+memory, and Glycin's own sandbox memory limit remains upstream policy. TOCTOU,
+blocked filesystem I/O and cancellation timing require further validation.
+
+**Independent blockers:**
+
+- Configured official Debian 13 metadata still offers glycin-loaders 1.2.1+ds-2
+  (1+ protocol), not Glycin 3.x's 2+. No 2+ executable/config is installed.
+  Official GNOME tag 2.0.0 was inspected at commit
+  `724f18c5f3519885995428a7e2e6e5df9ca2ab27` (tarball 2.0.0 includes client 3.0.0 /
+  utils 4.0.0 / loaders 2.0.0). Source checkout is research, not a built/installed
+  JPEG/PNG loader. Broader upstream codec/editor bundles were not installed.
+- `bwrap --unshare-all --die-with-parent --new-session --ro-bind /usr /usr
+  --symlink usr/lib /lib --symlink usr/lib64 /lib64 -- /usr/bin/true` again failed
+  with `setting up uid map: Read-only file system`. This is the Codex namespace
+  restriction, not proof that native Debian/Glycin is incompatible. No mount,
+  seccomp, privilege or sandbox bypass was attempted.
+
+Only necessary LCMS/seccomp SDK packages were downloaded from official signed APT
+metadata and extracted to the existing user prefix: liblcms2-dev 2.16-2+deb13u2 /
+libseccomp-dev 2.6.0-2; pkg-config 2.16 / 2.6.0. Rust/GTK activation and system
+packages were not reset/upgraded. The additive environment helper is
+`/workspace/pivra-environment/piv09/prepare-image-sdk.sh`.
+
+**Verification:** fmt/check/build/test/Clippy pass; **49 Rust tests = 25 unit + 24
+integration**, 0 failed/ignored. These do not include successful image decode.
+18 original assets and repeatable encoding/TIFF-tag checks pass; see
+[image fixture provenance](tests/fixtures/images/README.md). The pixel/orientation
+gate was attempted with valid PNG and JPEG separately; each returned **77/BLOCKED**
+with `No image loaders are configured`. EXIF 1–8 pixels, actual GTK image/Fit,
+resize, successful parallel decoding and close during active decoding remain
+BLOCKED/NOT RUN. Broken-file decode errors and MIME mismatch success branches
+were prepared but cannot be certified from a missing-loader error.
+
+Empty-window X11/Sway/Weston regressions pass. File-window tests explicitly support
+`--expect-image-error` for this blocked environment: they require a real controlled
+loader error and print **BLOCKED image decode/pixels**, while independently testing
+window/catalog lifecycle. Without that explicit flag stderr remains strictly
+empty; image failures are never silently accepted. X11/Sway normal closure passed;
+Weston proved real mapped surface/configure/SHM-buffer commits only. Physical
+GNOME/Wayland, Nautilus DESKTOP-06 and Weston normal close remain NOT RUN.
+Desktop entry/GIO launch and discovery-warning/failure UI passed with the same
+explicit blocked-runtime distinction. The entry is not installed or made default;
+its JPEG/PNG Exec/MIME contract and video defaults remain unchanged.
+
+After activation/build, use these **blocked-runtime** checks:
+
+```sh
+GTK_A11Y=none GSK_RENDERER=cairo GDK_BACKEND=x11 \
+  xvfb-run -a dbus-run-session -- python3 tests/gui_smoke.py target/debug/pivra --files --expect-image-error
+dbus-run-session -- python3 tests/wayland_smoke.py target/debug/pivra --files --expect-image-error
+PIVRA_WESTON_PREFIX=/workspace/pivra-environment/weston/usr \
+  dbus-run-session -- python3 tests/weston_smoke.py target/debug/pivra --files --expect-image-error
+GTK_A11Y=none GSK_RENDERER=cairo GDK_BACKEND=x11 \
+  xvfb-run -a dbus-run-session -- cargo +stable run --locked --offline --example image_probe
+# Same command with: -- --jpeg-first
+```
+
+Resume PIV-09 in a namespace-capable native environment with a matching minimal
+2+ loader, then verify real JPEG/PNG, EXIF 1–8 pixels, app presentation/Fit/resize,
+errors and active-load lifecycle on X11/native Wayland. The current source is
+**not a DONE image viewer**. PIV-10 has not started. PIV-05 video risks, DESKTOP-06
+and the independent Phase 0 clean-native-install gate remain open.

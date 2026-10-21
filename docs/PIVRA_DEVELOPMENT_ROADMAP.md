@@ -1,6 +1,6 @@
 # Pivra — Geliştirme Yol Haritası
 
-**Durum:** PIV-01–08 DONE (giriş, keşif ve doğal sıra); PIV-09–60 TODO. Faz 0 INCOMPLETE: temiz native kurulumun bağımsız yeniden üretimi NOT RUN; temiz Cargo target derlemesi ve headless regresyonlar geçti. [PIV-05 kanıtı ve ayrı faz kapısı](PIVRA_TECHNICAL_CAPABILITIES.md#102-piv-05-ve-faz-0-kapanışını-ayrı-değerlendirme).
+**Durum:** PIV-01–08 DONE (giriş, keşif ve doğal sıra); PIV-09 BLOCKED (Glycin loader 2+ ve Codex namespace kapısı); PIV-10–60 TODO. Faz 0 INCOMPLETE: temiz native kurulumun bağımsız yeniden üretimi NOT RUN; temiz Cargo target derlemesi ve headless regresyonlar geçti. [PIV-05 kanıtı ve ayrı faz kapısı](PIVRA_TECHNICAL_CAPABILITIES.md#102-piv-05-ve-faz-0-kapanışını-ayrı-değerlendirme).
 **Başlangıç branch:** `dev` · **Kararlı sürümler:** `main`  
 **Kaynak şartname:** [PIVRA_FEATURE_SPEC_TR.md](PIVRA_FEATURE_SPEC_TR.md)  
 **Görev ve commit takibi:** [PIVRA_COMMIT_TRACKER.md](PIVRA_COMMIT_TRACKER.md)
@@ -140,3 +140,13 @@ ve non-ASCII case-fold yok. Raw Linux adları korunur. Ayrıntılı politika ve 
 kanıtı README/takip tablosundadır. PIV-08 DONE; PIV-09 başlamadı. Medya/sandbox,
 DESKTOP-06 ve Faz 0 temiz native kurulum kapıları açık kalır; fiziksel GNOME ve
 Weston normal kapanış NOT RUN. Decoder/player/gezinme eklenmedi.
+
+## PIV-09 güvenli görüntü yükleme — 21.10.2026
+
+Glycin 3.0.8/Bwrap zorunlu istemci, async worker, GTK Picture ScaleDown ve
+EXIF-tek-dönüşüm kaynakları derlendi. Native GTK minimumu 4.16 oldu. Gerçek valid
+JPEG/PNG probe'ları loader/config eksikliğiyle exit 77 verdi; ayrıca Codex UID-map
+sandbox probe read-only /proc nedeniyle başarısız. Bypass yok. PIV-09 **BLOCKED**;
+gerçek JPEG/PNG/EXIF/Fit/resize/lifecycle kapıları kapanmadı. Olumlu source branch
+compile olması PASS değildir. 49 Rust ve scoped window/catalog regresyon kanıtı
+README/teknik belge/takip tablosundadır. PIV-10 başlamadı; Faz 0 INCOMPLETE sürer.

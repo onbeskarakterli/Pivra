@@ -421,3 +421,54 @@ Regresyon komutları README/PIV-04 ile aynıdır: `bash tests/check.sh`, Xvfb
 Probe kaynakları `tests/probes/` altında; ortam snapshot'ı `docs/probes/` altında.
 Gerçek komut sonuçları, temiz target doğrulaması ve kapanış SHA'ları commit takip
 tablosunun PIV-05 bölümünde kaydedilir.
+
+
+## 12. PIV-09 entegrasyon güncellemesi — 21.10.2026 (BLOCKED)
+
+Önceki bölümler PIV-05 araştırma snapshot'ıdır. PIV-09'da production Glycin
+**=3.0.8** (gdk4) eklendi ve Cargo.lock ile derlendi; common 1.0.3/utils 4.0.4,
+gtk/gdk 0.10.3, glib/gio 0.21.5 hattı korundu. GTK Rust feature tabanı v4_16'ya
+yükseldi: etkili native minimum artık 4.16, adw 1.2; ortam 4.18.6/1.7.6.
+Yeni medya motoru GStreamer veya production encoder/codec eklenmedi.
+
+LCMS/seccomp geliştirme dosyaları resmi Debian paketlerinden kullanıcı prefix'ine
+çıkarıldı: liblcms2-dev 2.16-2+deb13u2 ve libseccomp-dev 2.6.0-2; .pc 2.16/2.6.0.
+Böylece istemci compile/link kapısı geçti. Mevcut Rust/GTK/native runtime ve sistem
+paketleri değiştirilmedi. İstemci derlenmesi loader/decode başarısı değildir.
+
+Official Debian loader adayı hâlâ 1.2.1+ds-2/ABI 1+; gereken ABI 2+ kurulu değil.
+GNOME 2.0.0 tag objesi 902fc5525180cd18d281afcfc977cefa40a684c1, dereferenced commit
+724f18c5f3519885995428a7e2e6e5df9ca2ab27 kaynakları incelendi. Oradaki loader 2.0.0
+uygun protokol ailesini gösterir; kaynak checkout'u bir kurulum/build değildir.
+Gereksiz diğer decoder/editor paketleri eklenmedi. Uyumlu minimum JPEG/PNG loader
+hazırlığı ve güvenli çalıştırılması **BLOCKED** olarak açık kalır.
+
+Bwrap 0.12.0 minimal true probe yine UID-map read-only hatası verdi. Codex /proc
+kısıtı dağıtımın paket/ABI farkından ayrıdır; normal native Linux testi NOT RUN.
+İstemci kodu SandboxSelector::Bwrap'i zorunlu seçer; Auto'nun development istisnasına
+veya NotSandboxed'a düşmez. Seccomp/namespace/mount/privilege değişikliği yapılmadı.
+
+Image loader modülü worker'da GIO -> Glycin load/MIME -> tek EXIF dönüşümlü Frame
+üretir; GTK widget içermez. View yalnız main-thread texture/widget işlemi yapar;
+close/destroy Cancellable ve weak UI referansları vardır. Metadata/dosya/frame
+limitleri: 64 MiB compressed, 32 MP/32768 edge, 512 MiB returned buffer. Bunlar
+loader'ın tüm peak RSS'ini sınırlamaz. Actual MIME JPEG/PNG olmalı; uzantı başarı
+kanıtı değildir. GTK Picture ScaleDown/can_shrink oranı koruyan merkezli Fit ve
+intrinsic logical-size cap için seçildi; fiziksel HiDPI/resize/piksel davranışı
+gerçek görüntüyle henüz doğrulanmadı. EXIF'i Glycin uygular; view tekrar döndürmez.
+
+Gerçek valid PNG ve JPEG ile `examples/image_probe` ayrı ayrı çalıştırıldı:
+**exit 77/BLOCKED: No image loaders are configured**. EXIF 1–8/texture piksel
+assertion'ları derlenir ama olumlu branch **NOT RUN**; actual app Fit/resize ve
+başarılı eşzamanlı decode/active-load close da NOT RUN. Fixture hashleri/yeniden
+üretim/TIFF tag incelemesi bunların yerine geçmez. Bozuk medya/MIME mismatch
+sonuçları eksik-loader hatasıyla test edilmiş sayılmadı.
+
+49 Rust testi (25 unit + 24 integration), fmt/check/build/Clippy ve fixture'lar
+PASS. İki yeni test yalnız boyut/boyut bütçesi ve decoder öncesi missing/oversize/
+pre-cancel kontrolleridir; gerçek decode sayılmaz. X11/Sway/Weston boş pencere ve
+katalog/hata lifecycle kontrolleri geçti. `--expect-image-error` harness modu
+kontrollü image error ister ve decode/pixels BLOCKED yazar; varsayılan strict
+stderr kontrolleri korunur. Weston normal close, fiziksel GNOME ve DESKTOP-06
+NOT RUN. PIV-09 **BLOCKED**, PIV-10 başlamadı; PIV-19 SDK/sink/Libav riskleri ve
+Faz 0 temiz native kurulum kapısı açık. Tam komut/SHA sonuçları takip tablosunda.

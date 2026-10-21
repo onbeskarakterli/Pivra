@@ -1,7 +1,7 @@
 //! In-memory ordered selection, independent of a directory scanner or UI.
 //!
 //! Callers supply the complete order. No sorting, filtering, filesystem access,
-//! next/previous commands, wrapping policy or file watching is implemented here.
+//! wrapping policy or file watching is implemented here.
 
 use crate::media::MediaItem;
 
@@ -29,6 +29,21 @@ impl MediaCollection {
 
     pub fn current(&self) -> Option<&MediaItem> {
         self.selected.and_then(|index| self.items.get(index))
+    }
+
+    /// Move one step without wrapping. False means selection did not change.
+    pub fn select_previous(&mut self) -> bool {
+        let Some(index) = self.selected.and_then(|index| index.checked_sub(1)) else {
+            return false;
+        };
+        self.select(index)
+    }
+
+    pub fn select_next(&mut self) -> bool {
+        let Some(index) = self.selected.and_then(|index| index.checked_add(1)) else {
+            return false;
+        };
+        self.select(index)
     }
 
     /// Select an existing item. Invalid indices return false and keep selection.
@@ -95,5 +110,64 @@ mod tests {
         assert!(!collection.select(1));
         assert_eq!(collection.selected_index(), Some(0));
         assert_eq!(collection.current(), Some(&only));
+    }
+}
+
+#[cfg(test)]
+mod navigation_tests {
+    use super::*;
+    use crate::{media::MediaKind, natural};
+
+    #[test]
+    fn empty_and_single_catalogs_do_not_move_or_wrap() {
+        for items in [vec![], vec![MediaItem::new("only.png", MediaKind::Image)]] {
+            let mut catalog = MediaCollection::new(items);
+            let original = catalog.current().cloned();
+            for _ in 0..10 {
+                assert!(!catalog.select_previous());
+                assert!(!catalog.select_next());
+                assert_eq!(catalog.current(), original.as_ref());
+            }
+        }
+    }
+
+    #[test]
+    fn mixed_natural_order_preserves_initial_selection_and_stops_at_bounds() {
+        let mut items = vec![
+            MediaItem::new("10.jpg", MediaKind::Image),
+            MediaItem::new("2.mp4", MediaKind::Video),
+            MediaItem::new("1.png", MediaKind::Image),
+        ];
+        items.sort_by(|a, b| natural::compare_paths(a.path(), b.path()));
+        let mut catalog = MediaCollection::new(items.clone());
+        assert!(catalog.select(2));
+        assert!(!catalog.select_next());
+        assert_eq!(catalog.current(), Some(&items[2]));
+        assert!(catalog.select_previous());
+        assert_eq!(catalog.current().unwrap().kind(), MediaKind::Video);
+        assert!(catalog.select_previous());
+        assert!(!catalog.select_previous());
+        assert_eq!(catalog.current(), Some(&items[0]));
+        assert!(catalog.select_next());
+        assert!(catalog.select_next());
+        assert!(!catalog.select_next());
+        assert_eq!(catalog.items(), items);
+    }
+
+    #[test]
+    fn rapid_alternation_and_two_catalogs_are_independent_without_filesystem_io() {
+        let items = vec![
+            MediaItem::new("deleted.png", MediaKind::Image),
+            MediaItem::new("broken.jpg", MediaKind::Image),
+        ];
+        let mut a = MediaCollection::new(items.clone());
+        let mut b = MediaCollection::new(items);
+        assert!(b.select(1));
+        for _ in 0..1000 {
+            assert!(a.select_next());
+            assert!(a.select_previous());
+            assert_eq!(b.selected_index(), Some(1));
+        }
+        assert_eq!(a.selected_index(), Some(0));
     }
 }

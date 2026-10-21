@@ -1,7 +1,7 @@
 # Pivra — Planlı Commit ve İlerleme Takibi
 
 **Kaynak:** [Özellik Şartnamesi](PIVRA_FEATURE_SPEC_TR.md) · [Yol Haritası](PIVRA_DEVELOPMENT_ROADMAP.md)  
-**Branch:** `dev` · **Durum:** PIV-01 **DONE (21.10.2026)**; PIV-02 **DONE (21.10.2026, Xvfb GTK pencere doğrulaması)**; PIV-03 **DONE (21.10.2026)**; PIV-04 **DONE (21.10.2026; grafik test kategorileri ayrı)**; PIV-05 **DONE (21.10.2026; belgeleme/probe kapsamı)**; PIV-06 **DONE (21.10.2026; dosya/URI ve desktop giriş altyapısı; gerçek Nautilus NOT RUN)**; PIV-07 **DONE (21.10.2026; sırasız komşu medya keşfi)**; PIV-08 **DONE (21.10.2026; deterministik doğal sıra)**; PIV-09 **DONE (21.10.2026; Arch gerçek JPEG/PNG/EXIF, otomatik geometri ve güvenli aktif-decode kapanış PASS)**; PIV-10–60 TODO, başlatılmadı. Faz 0 **INCOMPLETE** (temiz native kurulum yeniden üretimi NOT RUN). Güncel kapanış kanıtı son bölümde; 20.10.2026 kayıtları tarihçedir. Burada listelenen `PIV-xx` kimlikleri gerçek Git commit SHA'sı **değildir**.
+**Branch:** `dev` · **Durum:** PIV-01 **DONE (21.10.2026)**; PIV-02 **DONE (21.10.2026, Xvfb GTK pencere doğrulaması)**; PIV-03 **DONE (21.10.2026)**; PIV-04 **DONE (21.10.2026; grafik test kategorileri ayrı)**; PIV-05 **DONE (21.10.2026; belgeleme/probe kapsamı)**; PIV-06 **DONE (21.10.2026; dosya/URI ve desktop giriş altyapısı; gerçek Nautilus NOT RUN)**; PIV-07 **DONE (21.10.2026; sırasız komşu medya keşfi)**; PIV-08 **DONE (21.10.2026; deterministik doğal sıra)**; PIV-09 **DONE (21.10.2026; Arch gerçek JPEG/PNG/EXIF, otomatik geometri ve güvenli aktif-decode kapanış PASS)**; PIV-10 **TESTING (22.10.2026; sol/sağ gezinme kodlandı, yeni native piksel ve fiziksel focus kanıtı bekleniyor)**; PIV-11–60 TODO, başlatılmadı. Faz 0 **INCOMPLETE** (temiz native kurulum yeniden üretimi NOT RUN). Güncel kapanış kanıtı son bölümde; 20.10.2026 kayıtları tarihçedir. Burada listelenen `PIV-xx` kimlikleri gerçek Git commit SHA'sı **değildir**.
 
 ## Kullanım kuralları
 
@@ -30,7 +30,7 @@
 | PIV-07 | `feat: scan neighboring media in folder` | Tek dizinde sırasız fotoğraf/video adayları, açılan alias seçimi, arka plan keşfi ve açık hata durumları | **DONE — 21.10.2026** | `9255519e8c576f067184a2818e5917bfcb9ec724`, `91c81e895cd3859981805690af01a7cafddbf30a`, `9a998ba40c793ff49a6ee4fe7e617a6041f48cfe` |
 | PIV-08 | `feat: apply natural filename ordering` | Doğal karma medya sırası, alias seçimi ve deterministik byte politikası doğrulandı | **DONE — 21.10.2026** | `5a109ac26bd98201e8de9f5a3971189e5969a8ba`, `5cf8469070b4b574c6d2292a92e0d8167763d8a1` |
 | PIV-09 | `feat: render JPEG PNG with orientation` | Arch gerçek JPEG/PNG/EXIF, iki görüntü/otomatik geometri ve aktif secure-decode kapanış/temizlik PASS; iki decoder zaman çakışması NOT MEASURED | **DONE — 21.10.2026** | İlk uygulama: `1685139d47afdd55ac47699726f49a66aa270bfc`; yeni probe: `66af846ae4b153ad1415c7d8ff7f2612896817e7`; Arch kanıtı: `c42774da2b0448a4014500dc4545a4b399d58d28` |
-| PIV-10 | `feat: navigate previous and next media` | Sol/sağ; ilk/son sınırları; tek ve boş klasör | TODO | — |
+| PIV-10 | `feat: navigate previous and next media` | Sol/sağ, doğal karışık sıra, sınırlar ve iptal guard'ları geçti; gerçek yeni native piksel/focus kontrolü bekleniyor | **TESTING — 22.10.2026** | `028b747`, `b69ba2c`, `8403d12`, `80e501d`; tam SHA ve kanıt son bölümde |
 | PIV-11 | `feat: watch folder changes and external modifications` | Ekle/sil/ad değiştir listeyi yeniler; açık dosyada elle Yenile isteği | TODO | — |
 | PIV-12 | `test: harden media failures and window isolation` | Bozuk medya gezinmeyi bozmaz; pencereler bağımsız | TODO | — |
 
@@ -122,7 +122,7 @@
 | Faz | ID aralığı | Planlı commit | Tamamlanan |
 |---|---|---:|---:|
 | 0 — Temel | 01–05 | 5 | 5 |
-| 1 — Fotoğraf | 06–12 | 7 | 3 |
+| 1 — Fotoğraf | 06–12 | 7 | 4 |
 | 2 — Zoom/performans | 13–18 | 6 | 0 |
 | 3 — Video temel | 19–24 | 6 | 0 |
 | 4 — Video gelişmiş | 25–31 | 7 | 0 |
@@ -130,9 +130,9 @@
 | 6 — Uyumluluk/paket | 40–47 | 8 | 0 |
 | 7 — Edit (en son özellik geliştirmesi) | 48–57 | 10 | 0 |
 | 8 — Son doğrulama | 58–60 | 3 | 0 |
-| **TOPLAM** | **PIV-01–60** | **60** | **8** |
+| **TOPLAM** | **PIV-01–60** | **60** | **9** |
 
-> PIV-01–08 tamamlandı; PIV-09 BLOCKED, PIV-10–60 gelecekteki işlerdir. Görev sayacı 5/5 olsa da Faz 0 kapısı INCOMPLETE: temiz native kurulum yeniden üretimi NOT RUN. Görev kimlikleri commit SHA'sı değildir. İlk planlama ve önceki engel kayıtları aşağıda tarihçe olarak korunur.
+> PIV-01–09 tamamlandı; PIV-10 TESTING, PIV-11–60 gelecekteki işlerdir. Görev sayacı 5/5 olsa da Faz 0 kapısı INCOMPLETE: temiz native kurulum yeniden üretimi NOT RUN. Görev kimlikleri commit SHA'sı değildir. İlk planlama ve önceki engel kayıtları aşağıda tarihçe olarak korunur.
 
 ## PIV-01 ayrıntılı ilerleme — 20.10.2026
 
@@ -1437,3 +1437,99 @@ sonrası origin/dev eşitliği ve main korunması ayrıca kontrol edilir.
 - Önceki kullanıcı Arch testleri: gerçek JPEG/PNG piksel, EXIF orientation 1–8, Unicode/bozuk dosya kontrolleri, manuel GNOME Fit/resize/close ve `image_gui_probe` iki görüntü/snapshot/geometri/normal kapanış **PASS**. Codex'in son belgelenmiş kısa regresyonları: **49 Rust + 30 Python gözlemci** PASS, format/check/build/Clippy PASS (V3 aşaması). Bunlar kullanıcıdaki native testle karıştırılmamalıdır.
 
 **Karar: PIV-09 DONE.** İki decoder'ın eşzamanlı gerçek çalışma aralığı `NOT MEASURED`; test bunun yerine iki bağımsız yükleme ve aktif yüklemede iptali kanıtlar. Faz 0 temiz native kurulumun bağımsız tekrarı, DESKTOP-06 gerçek Nautilus testi ve diğer bağımsız kapılar **açık** kalır. PIV-10 **TODO / başlamadı**. Üretim/sandbox politikası değiştirilmedi, yalnız sonuçlar belgelendi. Bu kayıt commit'inin SHA'sı Git geçmişinden doğrulanır; burada önceden tahmin edilmez.
+
+
+## PIV-10 — önceki/sonraki medya — 22.10.2026 — TESTING
+
+Başlangıçta yerel `c3e0aaf` temiz dev idi. Origin fetch refspec'i yalnız main'i
+kapsadığından dev açık ref ile fetch edildi; `origin/dev`'e fast-forward yapıldı:
+**başlangıç SHA `c11c7b79bf0dce97516c3a1f8505c5f020e9193e`**. Kullanıcının
+PIV-09 DONE kayıtları `8991b78`/`c11c7b7` kaynakları ve yukarıdaki native kanıt
+aynen korundu. `main` korunacak SHA `5d55ee599df4617bd51c09b1c7a008b8d0ece480`.
+Yeni kurulum/reset yapılmadı; mevcut Rust/GTK/Glycin SDK/Xvfb/Sway/Weston kullanıldı.
+
+### Uygulanan davranış
+
+- MediaCollection::select_previous/select_next sınırlıdır; ilk/sonda false ve
+  seçim aynı kalır. Boş/tek öğe güvenli no-op; doğal sıralama ve başlangıçta açılan
+  alias seçimi korunur. Karışık video/fotoğraf listesi filtrelenmez/yeniden sıralanmaz.
+- Her pencerenin ayrı context/kataloğu, previous-media/next-media action'ları ve
+  capture-phase Left/Right handler'ı vardır. Ctrl/Alt/Super okları tüketilmez.
+  Başlık seçilen adla ve mevcut aday/uyarı suffix'iyle güncellenir. Yeni toolbar yok.
+- Tek ImageView yeniden kullanılır. Her yeni seçim önceki GIO Cancellable'ını iptal
+  eder, paintable'ı temizler ve ScaleDown Fit'i yeniler. Completion GTK context'inde
+  yalnız güncel ve iptal edilmemiş token'la kabul edilir; daha önce bitmiş ama GTK
+  kuyruğundaki eski sonuç da yeni seçim/video/hata durumunu ezemez. Close/destroy
+  handler'ları her tuşta yeniden bağlanmaz. PIV-09 probe build/observer girişleri korunur.
+- JPEG/PNG aynı zorunlu Bwrap image_loader yolundadır. Video atlanmaz; açık
+  playback-unavailable durumu gösterilir, sonraki fotoğrafa geçilir. Diğer format
+  adaylarında JPEG/PNG kapsamı açık mesajdır. Video motoru veya video default'u yok.
+- Silinmiş/bozuk görüntü hatası gezinmeyi kilitlemez. Katalog snapshot kalır;
+  silinmiş öğe kontrollü hata verir, file watcher/refresh eklenmez. Kaynak dosyalar
+  değişmez; testteki silme yalnız private temp kopyadadır. Sarma/zoom/Edit/CI yok.
+
+### Gerçek Codex kontrolleri
+
+| Kontrol | Gerçek sonuç ve sınır |
+|---|---|
+| cargo fmt --check | PASS |
+| cargo check --locked / cargo build --locked | PASS; stable/offline/-j2 helper |
+| cargo test --locked | **54 PASS = 30 unit + 24 integration**, 0 failed/ignored; 0 doctest |
+| cargo clippy --locked --all-targets -- -D warnings | PASS |
+| Eski Python observer regresyonları | **30 PASS**; native decode sayılmaz |
+| Yeni katalog unit (3) | Boş/tek, sınırlar, opened seçim, doğal 1/2/10 fotoğraf-video, 1000 hızlı alternatif, iki katalog bağımsızlığı PASS |
+| Yeni LoadSlot unit (2) | Pending veya bitmiş eski callback kimliği, replacement/video/close iptali, 1000 replacement ve iki pencere token bağımsızlığı PASS |
+| Fixture bütünlüğü / CLI / desktop / katalog / doğal sıra | PASS; core testler ve iki fixture manifesti |
+| Yeni gerçek X11 tuş smoke'u | PASS: Tab sonrası Left/Right, doğal karma sıra, sınırda durma, Ctrl filtreleme, hızlı alternatifler, iki launch bağımsızlığı ve normal WM close |
+| Yeni üretim-window navigation_probe Xvfb | Scoped PASS, gerçek mapped GDK yüzey ve GTK controller/key sinyalleri; explicit --expect-image-error, fotoğraf pikselleri BLOCKED |
+| Yeni navigation_probe Sway | Scoped PASS: native Wayland/DISPLAY yok/XWayland kapalı; controller sinyali, compositor fiziksel key enjeksiyonu değildir |
+| Yeni navigation_race_probe Xvfb | PASS yalnız kontrollü Err-worker GTK/GIO yarışları: ikinci sonuç önce, eski sonuç sonra; video geçişi, pending close/join/weak-ref ve diğer pencere durumu korunur |
+| Eski X11 boş/file/desktop/discovery | 4 scoped PASS; dosyalı modlarda gerçek loader hatası beklendi |
+| Eski Sway boş/file | 2 scoped PASS; mapped native surface ve normal close/exit0 |
+| Eski Weston boş/file | 2 scoped PASS; mapped xdg_toplevel/SHM/configure/attach/commit. Normal close NOT RUN |
+| Yeni navigation_probe strict, Xvfb | **BLOCKED exit77**: ilk gerçek JPEG loader başlamadı. Yeni başarılı piksel/Fit/late-success-frame yolu NOT RUN |
+| Rust examples build / Python AST / shell syntax / git diff --check | PASS |
+| Cargo/lock, üretim decoder, CLI/input, discovery/natural, data ve fixture diff | Başlangıçla aynı; kaynak medya ve desktop varsayılanları değiştirilmedi |
+
+**12 başarılı scoped GUI/helper çağrısı** = 8 eski + 4 yeni. Piksel PASS toplamı
+değildir; strict native gate bu sayıya dahil edilmez. Mock/hata worker yalnız
+ayrı test example'ındadır; üretimde decoder/fallback değildir, hiç frame/piksel
+üretmez. Gerçek Bwrap izolasyonu kapatılmadı. Bozuk fixture'da Codex'in gözlediği
+hata secure-loader başlangıcıdır; gerçek corrupt decode recovery PASS sayılmaz.
+Silinmiş private dosyanın gerçek metadata NotFound hatası ise ayrıca doğrulandı.
+İlk gerçek native baseline geçtikten sonraki geçerli resim hatası FAIL'dir;
+yeni probe bunu ortam skip'i/exit77 diye gizlemez.
+
+PIV-09'un **kullanıcı Arch** pixel/EXIF/Fit/active-close DONE kanıtı tarihiyle
+korunur; bu devamda Codex'te gerçek görüntü işlendiği anlamına gelmez. PIV-10
+native render ve fiziksel GNOME/focus sonuçları henüz yok.
+
+### Yalnız kalan PIV-10 kabul kanıtları
+
+Güncel dev checkout'unda tek otomatik native komut:
+`bash tests/run_navigation_probe.sh`.
+HEAD'i yazar, locked matching example'ı derler ve gerçek GDK_BACKEND=wayland
+çalıştırır. Native doğrulamada --expect-image-error kullanılmaz. Private iki
+pencerede gerçek JPEG/PNG boyut/RGB/alpha, actual-view snapshot Fit/center,
+rapid sonrası son frame, video/hata geçişleri ve bağımsız close doğrulanmalıdır.
+
+Ardından normal Pivra'da fiziksel Left/Right'ı fotoğraf alanı ve başlık düğmeleri
+arasında mouse/Tab ile odak değiştirerek doğrulamak gerekir; video mesajından
+fotoğrafa geçiş ve ikinci pencerenin bağımsızlığı görülmelidir. Bu fiziksel
+GNOME/Wayland kontrolü Codex'te yapılmış değildir. [Tam komut/matris](PIV10_VALIDATION.md).
+
+**PIV-10 TESTING**, DONE değil. PIV-11 ve sonrası başlamadı. Faz 0 temiz native
+kurulum INCOMPLETE, DESKTOP-06 gerçek Nautilus NOT RUN ve PIV-05 video bağımlılık
+riskleri kendi kapsamlarında açık kalır. Toplam DONE görev sayacı PIV-09 dahil 9'dur;
+PIV-10 bu sayaca eklenmedi.
+
+| Gerçek commit SHA | İçerik |
+|---|---|
+| `028b74720e5690d5f2509044895f18a8b6639b73` | GUI bağımsız bounded previous/next model ve 3 katalog regresyonu |
+| `b69ba2c0ff13da35d6f464460669073b4a600130` | Window-local actions/keys/başlık, reusable cancellable view ve 2 slot regresyonu |
+| `8403d125db65f1997c7f9872b6e68bb11fe3954c` | Gerçek X11 key, Sway/GTK gezinme, deterministik callback yarışları ve native pixel probe |
+| `80e501dbf2500f342863f309492770c814dcb986` | Gerçek baseline sonrası valid-image hatasını FAIL sınıflandıran strict native gate |
+| `9fd4b3d59df858a57a7fbbcd8df6c87f2fc0e965` | README/teknik/yol haritası ve ayrıntılı test matrisi; PIV-09 DONE/PIV-10 TESTING ayrımı |
+
+Bu takip commit'inin SHA'sı Git geçmişi ve push raporundadır. Normal origin/dev
+push sonrası remote eşitliği ve main korunması doğrulanır; force/rebase yoktur.

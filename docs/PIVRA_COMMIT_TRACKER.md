@@ -1,7 +1,7 @@
 # Pivra — Planlı Commit ve İlerleme Takibi
 
 **Kaynak:** [Özellik Şartnamesi](PIVRA_FEATURE_SPEC_TR.md) · [Yol Haritası](PIVRA_DEVELOPMENT_ROADMAP.md)  
-**Branch:** `dev` · **Durum:** PIV-01 **DONE (21.10.2026)**; PIV-02 **DONE (21.10.2026, Xvfb GTK pencere doğrulaması)**; PIV-03 **DONE (21.10.2026)**; PIV-04 **DONE (21.10.2026; grafik test kategorileri ayrı)**; PIV-05 **DONE (21.10.2026; belgeleme/probe kapsamı)**; PIV-06 **DONE (21.10.2026; dosya/URI ve desktop giriş altyapısı; gerçek Nautilus NOT RUN)**; PIV-07 **DONE (21.10.2026; sırasız komşu medya keşfi)**; PIV-08 **DONE (21.10.2026; deterministik doğal sıra)**; PIV-09 **BLOCKED (21.10.2026; loader 2+ discovery PASS, Codex UID-map engeli)**; PIV-10–60 TODO, başlatılmadı. Faz 0 **INCOMPLETE** (temiz native kurulum yeniden üretimi NOT RUN). Güncel kapanış kanıtı son bölümde; 20.10.2026 kayıtları tarihçedir. Burada listelenen `PIV-xx` kimlikleri gerçek Git commit SHA'sı **değildir**.
+**Branch:** `dev` · **Durum:** PIV-01 **DONE (21.10.2026)**; PIV-02 **DONE (21.10.2026, Xvfb GTK pencere doğrulaması)**; PIV-03 **DONE (21.10.2026)**; PIV-04 **DONE (21.10.2026; grafik test kategorileri ayrı)**; PIV-05 **DONE (21.10.2026; belgeleme/probe kapsamı)**; PIV-06 **DONE (21.10.2026; dosya/URI ve desktop giriş altyapısı; gerçek Nautilus NOT RUN)**; PIV-07 **DONE (21.10.2026; sırasız komşu medya keşfi)**; PIV-08 **DONE (21.10.2026; deterministik doğal sıra)**; PIV-09 **TESTING (21.10.2026; kullanıcı Arch decode/EXIF/manual Fit PASS; otomatik geometri ve aktif decode kapanışı açık)**; PIV-10–60 TODO, başlatılmadı. Faz 0 **INCOMPLETE** (temiz native kurulum yeniden üretimi NOT RUN). Güncel kapanış kanıtı son bölümde; 20.10.2026 kayıtları tarihçedir. Burada listelenen `PIV-xx` kimlikleri gerçek Git commit SHA'sı **değildir**.
 
 ## Kullanım kuralları
 
@@ -29,7 +29,7 @@
 | PIV-06 | `feat: accept image path from Nautilus` | Nihai hedef: fotoğrafa çift tıklama. Dosya/URI + GIO/desktop Exec doğrulandı; gerçek Nautilus DESKTOP-06 NOT RUN; video varsayılanı değiştirilmedi | **DONE — 21.10.2026 (giriş altyapısı)** | `ad0bcde080ee36c88dc74bd58844d73e7bff8986`, `cac751927b6e3a967cf0ca31b04d06971a5f9fbc`, `69feda8d5cc7342d941b71d5e8878081f2792211` |
 | PIV-07 | `feat: scan neighboring media in folder` | Tek dizinde sırasız fotoğraf/video adayları, açılan alias seçimi, arka plan keşfi ve açık hata durumları | **DONE — 21.10.2026** | `9255519e8c576f067184a2818e5917bfcb9ec724`, `91c81e895cd3859981805690af01a7cafddbf30a`, `9a998ba40c793ff49a6ee4fe7e617a6041f48cfe` |
 | PIV-08 | `feat: apply natural filename ordering` | Doğal karma medya sırası, alias seçimi ve deterministik byte politikası doğrulandı | **DONE — 21.10.2026** | `5a109ac26bd98201e8de9f5a3971189e5969a8ba`, `5cf8469070b4b574c6d2292a92e0d8167763d8a1` |
-| PIV-09 | `feat: render JPEG PNG with orientation` | Güvenli istemci/view ve resmi 2+ loader hazır; discovery PASS; gerçek decode/EXIF/Fit BLOCKED | **BLOCKED — 21.10.2026** | `1685139d47afdd55ac47699726f49a66aa270bfc`, `018d9d91648ff582b8f6b19981a4e7ed741334f0`, `bebf6f232625cfdf6a6d02f5cf71b38e441aed9e` |
+| PIV-09 | `feat: render JPEG PNG with orientation` | Kullanıcı Arch decode/EXIF/manual Fit PASS; yeni iki görüntü/geometri ve aktif decode kapanış kapıları açık | **TESTING — 21.10.2026** | İlk uygulama: `1685139d47afdd55ac47699726f49a66aa270bfc`; yeni probe: `66af846ae4b153ad1415c7d8ff7f2612896817e7`; Arch kanıtı: `c42774da2b0448a4014500dc4545a4b399d58d28` |
 | PIV-10 | `feat: navigate previous and next media` | Sol/sağ; ilk/son sınırları; tek ve boş klasör | TODO | — |
 | PIV-11 | `feat: watch folder changes and external modifications` | Ekle/sil/ad değiştir listeyi yeniler; açık dosyada elle Yenile isteği | TODO | — |
 | PIV-12 | `test: harden media failures and window isolation` | Bozuk medya gezinmeyi bozmaz; pencereler bağımsız | TODO | — |
@@ -1067,3 +1067,96 @@ native dağıtım uyumsuzluğu kanıtı değildir; IPC/pixel ABI çalışma zama
 onaylanmamıştır. PIV-05 GStreamer riskleri ve Faz 0 temiz native kurulum kapısı açık.
 **PIV-09 BLOCKED; PIV-10 başlatılmadı.** Bu kayıt commit'i kendi SHA'sını içermez;
 son SHA Git geçmişi/push raporundan doğrulanır.
+
+
+## PIV-09 Arch Linux kullanıcı sonuçları ve eksik test değerlendirmesi — 21.10.2026
+
+Başlangıç yerel HEAD: `459fbea40cc3048eabc14d8c996db1ab7023c726`, temiz `dev`.
+Fetch sonrası `origin/dev` `242ff09bcbd2d9cdaa87341b68a5b102bb41ee2b` idi;
+yerel HEAD'in atası olduğu doğrulandı. Fast-forward-only merge yerel değişiklik
+yapmadı; reset/rebase/force-push kullanılmadı. `main` referansı
+`5d55ee599df4617bd51c09b1c7a008b8d0ece480` olarak korundu.
+
+### Kanıt A — kullanıcının aktardığı gerçek Arch/GNOME Wayland testleri
+
+**Bu testleri Codex çalıştırmadı.** Kullanıcının belirttiği yerel test commit'i
+`459fbea` (tam SHA yukarıda); ham log veya tam paket envanteri sunulmadı.
+
+| Ortam / kontrol | Kullanıcının bildirdiği sonuç |
+|---|---|
+| Rust/Cargo | 1.99.1 |
+| GTK4 / libadwaita | 4.24.1 / 1.10.0 |
+| Glycin / Bwrap | Native Glycin 2.2.3, uyumlu 2+ loader'lar / Bwrap 0.13.1; Cargo istemcisi 3.0.8 olarak korunur |
+| User namespace ve Bwrap izolasyon testi | PASS |
+| PNG ve JPEG image_probe | PASS, exit 0 |
+| EXIF orientation 1–8 piksel doğrulaması | PASS |
+| Unicode dosya yolu / hatalı görüntülerde kontrollü hata | PASS |
+| Gerçek GNOME/Wayland Pivra fotoğrafı | Görünür, merkezde, oran korunarak Fit: manuel PASS |
+| Pencere resize / normal hatasız kapanış | Manuel PASS |
+| cargo fmt --check | PASS |
+| cargo check --locked / cargo build --locked | PASS |
+| cargo test --locked | PASS: 49 test, 0 başarısız |
+| cargo clippy --locked --all-targets -- -D warnings | PASS |
+| Git çalışma dizini | Temiz |
+
+Bu kanıt normal native ortamda güvenli decode ve manuel sunumun çalıştığını
+bildirir; Codex sandbox'ının düzeldiği veya tüm dağıtımların doğrulandığı anlamına
+gelmez. Arch native loader sürümü Cargo client sürümüyle karıştırılmadı.
+
+### Kanıt B — bu devamda Codex'in bağımsız çalıştırdığı kontroller
+
+Aktivasyon: `source /workspace/pivra-environment/piv09/image-activate.sh`.
+Üretim src/Cargo bağımlılıkları, mevcut test assertion'ları ve fixture'lar korundu.
+
+| Kontrol | Codex sonucu |
+|---|---|
+| `bash tests/check.sh` | PASS: iki fixture manifesti, fmt, check, build, test, all-targets Clippy -D warnings; stable/locked/offline/-j2 |
+| Rust test toplamı | **49 PASS = 25 unit + 24 integration**, 0 failed/ignored; 0 doctest; CLI/katalog/doğal sıra/desktop dahil |
+| Yeni example check / son fmt ve all-targets Clippy | PASS |
+| X11/Xvfb boş ve file/URI, desktop launch, discovery hata UI | **4 scoped PASS**; file modlarında gerçek loader hatası açıkça beklendi |
+| Sway headless boş ve file/URI | **2 scoped PASS**: gerçek native Wayland, normal close/exit0; file görüntü decode BLOCKED |
+| Weston headless boş ve file/URI | **2 scoped PASS**: gerçek xdg_toplevel/configure/SHM/attach/commit; normal close NOT RUN |
+| Yeni `image_gui_probe` Xvfb gerçek üretim-view yüklemesi | **BLOCKED exit77**; iki iş de secure loader başlangıcında hata verdi, pozitif görüntü/geometri assertion'ları çalışmadı |
+| `git diff --check` | PASS |
+
+GUI komutları önceki README kaydıyla aynıydı: X11 için GTK_A11Y=none,
+GSK_RENDERER=cairo, GDK_BACKEND=x11 ve xvfb-run/dbus-run-session; Sway için
+`dbus-run-session -- python3 tests/wayland_smoke.py`; Weston için özel prefix ve
+`tests/weston_smoke.py`. File varyantlarında `target/debug/pivra --files
+--expect-image-error`; desktop/discovery için binary ve expected-error seçeneği.
+Bu sekiz çağrı decoded fotoğraf PASS'i değildir. Codex UID-map EROFS kısıtı aynı;
+Bwrap zorunluluğu, host güvenliği ve loader izolasyonu değiştirilmedi.
+Fiziksel GNOME sonucu yalnız Kanıt A'dır; gerçek Nautilus ve Weston normal close
+hakkında yeni PASS iddiası yok. Faz 0 temiz native kurulum kapısı ayrı/açık kalır.
+
+### Eklenen regresyon ve yalnız kalan PIV-09 kapıları
+
+`examples/image_gui_probe.rs` doğrudan üretim image_view/image_loader'ını import
+eder. Büyük PNG ve EXIF-6 JPEG için iki yükleme işini main loop öncesi başlatır;
+iki gerçek texture'ı bekler. Gerçek Picture'ın WidgetPaintable/GSK snapshot'ında
+alpha sınırlarıyla Fit boyutu/oranı/merkez ölçülür; render frame beklendikten sonra
+resize'da tekrarlanır. İlk pencerenin normal kapanışından sonra ikincinin görünür
+ve görüntüsünün doğru geometrili kalması gerekir. Bu offscreen GTK snapshot'ıdır,
+compositor ekran fotoğrafı değildir; iki decoder'ın zaman aralıklarının çakıştığını
+ölçmez. Yeni probe kullanıcı tarafından test edilen `459fbea` içinde yoktu.
+
+1. **İki başarılı yükleme ve otomatik görüntü geometrisi/resize:** yeni probe
+   çalışan güvenli native ortamda henüz çalıştırılmadı. Komut:
+   `GDK_BACKEND=wayland cargo run --locked --example image_gui_probe`.
+2. **Kanıtlı aktif decode sırasında kapanış:** bir secure decoder'ın gerçekten
+   aktif olduğu gözlenmeli; pencere kapanınca stale callback/crash olmamalı,
+   worker/loader temizliği sınırlı sürede tamamlanmalı, ikinci yüklü pencere
+   etkilenmemeli. Önceden iptal edilmiş token unit testi, decoder başlamadan
+   kapanış veya başarılı yüklemeden sonra normal kapanış bunu kanıtlamaz.
+
+Bu iki eksik nedeniyle **PIV-09 TESTING**, DONE değil. Codex'e özel çalıştırma
+engeli ayrı olarak BLOCKED kalır. Gerçek JPEG/PNG, EXIF ve manuel Fit kanıtını
+tekrar eksik saymıyoruz; kaynak açıkça kullanıcı bildirimi. PIV-10 başlamadı.
+
+| Gerçek yeni commit SHA | İçerik |
+|---|---|
+| `66af846ae4b153ad1415c7d8ff7f2612896817e7` | Gerçek üretim view'ı kullanan iki yükleme/snapshot geometri/resize gate |
+| `c42774da2b0448a4014500dc4545a4b399d58d28` | README/teknik yetenek/yol haritasında kullanıcı Arch kanıtı ve TESTING durumu |
+
+Bu takip kaydı ayrı commit'tir; kendi SHA'sı Git geçmişi/push raporundan doğrulanır.
+Normal push sonrası origin/dev eşitliği ve main korunması ayrıca kontrol edilir.

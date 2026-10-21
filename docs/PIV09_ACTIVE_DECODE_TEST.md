@@ -37,7 +37,10 @@ aktif decode kabul edilmez. Test şu koşulların tamamını şart koşar:
    tüm pikseller (17,83,191), tüm scanline filtreleri 0. Compressed dosya 64 MiB
    sınırının altındadır; 96 MB çıktı mevcut üretim limitlerine uygundur. Dosya
    test sonunda silinir; fixture manifesti değişmez ve başka decoder kullanılmaz.
-3. Python yalnız kendi başlattığı probe'un yeni descendant süreçlerini izler.
+3. Python kendi başlattığı probe'un tüm descendant süreçlerini izler; baseline
+   loader'ları dışlamaz. ARMED öncesinde PID/starttime ve probe+image-rs loader
+   frame device/inode envanteri alınır. Yalnız bu envanterde olmayan hedef
+   çıktısı değerlendirilir; eski inode boyut değiştirse bile aday kabul edilmez.
    Aynı UID'li, gerçek executable adı `glycin-image-rs` olan loader aranır.
    PID starttime + pidfd ile kimlik örnekleme başlamadan sabitlenir; descendant
    üyeliği ve kimlik bu pin aşamasında tekrar kontrol edilir. Sinyal pidfd üzerinden
@@ -90,8 +93,11 @@ Başarı için kapanış isteğinden itibaren **10 saniye içinde**:
 - kapanıştan sonraki paintable/label-text/label-visible mutation sayısı sıfır olmalı;
   join sonrasında 300 ms daha main context işlenir;
 - diğer pencere görünür kalmalı; yüklenmiş texture byte'ları aynen korunmalı;
-- sabitlenen loader ve gözlenen yeni helper PID/starttime kimlikleri `/proc`'tan
-  kaybolmalı (zombie kabul edilmez); baseline dışı yeni descendant kalmamalı;
+- hedef 96 MB frame'in fd ve mapping referansları probe/loader/descendant'lardan
+  bırakılmalı; bu aşamada havuzdaki idle loader'ın varlığı tek başına sızıntı değildir;
+- survivor doğrulandıktan sonra normal FINISH/app kapanışı gerçekleşmeli; sonrasında
+  baseline dahil gözlenen loader/helper kimlikleri `/proc`'tan kaybolmalı (zombie
+  kabul edilmez). Toplam süre hâlâ ilk hedef close isteğinden itibaren 10 saniyedir;
 - probe normal exit0 vermeli ve stderr boş olmalıdır. Crash/panic/timeout FAIL'dir.
 
 Kalıcı GIO thread-pool thread'lerinin OS seviyesinde yok olması beklenmez;
@@ -112,11 +118,11 @@ izinli memfd/maps/namespace gözlemleri engelleniyorsa host güvenliği değişt
 root/ptrace yetkisi istenmez: test NOT RUN kalır. SIGSTOP/SIGCONT yalnız testin
 kendi loader'ına zamanlama kontrolüdür; sandbox yetkisi veya erişimi genişletmez.
 
-`tests/test_active_decode_observer.py` 17 negatif/pozitif gözlemci guard testi
+`tests/test_active_decode_observer.py` 30 negatif/pozitif gözlemci guard testi
 çalıştırır (gerçek decoder PASS'i değildir); core `tests/check.sh` içine eklenmiştir.
 Üretim Cargo.toml/Cargo.lock ve mevcut fixture/pixel assertion'ları korunmuştur.
 Önceki sürücü Codex JSON kaydı (tarihçe): [PIV09_ACTIVE_DECODE_CODEX.json](probes/PIV09_ACTIVE_DECODE_CODEX.json).
-Codex'te 49 Rust + 17 Python guard PASS; fmt/check/build/Clippy PASS. Gerçek yeni
+Codex'te güncel 49 Rust + 30 Python guard PASS; fmt/check/build/Clippy PASS. Gerçek yeni
 probe yalnız baseline decode kapısına kadar çalışabildi ve exit77 verdi.
 **PIV-09 TESTING; aktif decode kapanışının native sonucu henüz yok. PIV-10 başlamadı.**
 
@@ -186,3 +192,82 @@ Güncel Codex kanıtı: [observer v2 JSON](probes/PIV09_ACTIVE_DECODE_OBSERVER_V
 Baseline secure loader başlamadığı için `first_uncompleted_stage=baseline_decoded`,
 exit77/NOT RUN. Native v2 checkpoint/close yolu henüz çalıştırılmadı. İki decoder'ın
 zamansal çakışması NOT MEASURED kalır. **PIV-09 TESTING; PIV-10 başlamadı.**
+
+
+## 21.10.2026 — V3: başlangıçtaki loader ve hedef frame ayrımı
+
+**Kullanıcı tarafından aktarılan V2 native bulgusu:** Arch/GNOME Wayland'da
+exit77, `first_uncompleted_stage=loader_found`, 5.476 tarama. Ayrı yerel teşhis
+5.445 tarama yaptı: ilk taramada PID 142105 ve 142122 bwrap, PID 142123
+`/usr/lib/glycin-loaders/2+/glycin-image-rs` zaten vardı; loader tüm taramalarda
+görünüyordu. Bu Codex'in bağımsız gözlemi değildir ve ikinci görüntünün aynı
+loader'ı kullandığını tek başına kanıtlamaz.
+
+V2'nin `descendants(process.pid) - baseline` filtresi baseline'daki bu PID'leri
+keşiften tamamen çıkartıyordu. **Bu somut test hatası V3'te kaldırıldı.**
+
+Kilitli **Rust Glycin 3.0.8 istemci** kaynağındaki yaşam döngüsü incelemesi:
+
+- `src/api_loader.rs`: `Loader::new` varsayılan olarak `Pool::global()` kullanır.
+- `src/pool.rs`: havuz uygun config hash/sandbox/base-dir için bağlı mevcut
+  process'i yeniden döndürebilir. Varsayılan idle retention 30 saniyedir;
+  max_parallel_operations varsayılanı sınırsızdır. Yeni görüntü yeni PID gerektirmez.
+- `Image::drop` ve cancellation görüntüye ait frame-request için `done(path)`
+  gönderir. Bu, havuz process'inin anında OS exit yapmasıyla aynı şey değildir.
+
+Bunlar kaynakta doğrulanan istemci davranışlarıdır; native loader paketi Glycin
+2.2.3 ile Rust istemcisi 3.0.8 karıştırılmadı. Arch'ta fiilen reuse ancak aşağıdaki
+hedef kanıtıyla doğrulanabilir. Üretim görüntü yükleme kodunda hata kanıtlanmadı;
+V3 hiçbir `src/`, Cargo bağımlılığı veya sandbox politikasını değiştirmez.
+
+V3, TARGET_STARTING/ARMED bariyeri sırasında, target başlamadan hemen önce mevcut
+PID/starttime'ları ve probe'un eski texture'ları ile image-rs loader'larındaki
+   görünen glycin-frame
+(device,inode,size) kimliklerini envantere alır. Envanter okunamazsa NOT RUN.
+Keşif hem baseline hem yeni loader'ları tarar; origin karşılaştırması PID **ve**
+starttime kullanır. Mevcut süreçteki **yeni inode** 96 MB frame kabul edilebilir;
+eski tamamlanmış veya eski kısmi frame, aynı RGB'ye sahip olsa bile reddedilir.
+Önceden küçük olup sonra büyüyen aynı inode da konservatif olarak reddedilir;
+in-place buffer reuse'u bu test doğrudan sertifikalandırmaz.
+
+Hedef bağı, kapalı test protokolüne dayanır: survivor yalnız 64×32 wide.png'dir;
+ARMED sonrası tek yeni decode işi üretilen 8000×4000 RGB fixture'dır. Yeni frame
+kimliği + tam 96 MB boyut + tam 96-byte RGB prefix + sıfır tail + STOP sonrası
+sahiplik/mapping/kimlik/sandbox + Rust target load pending koşulları birlikte
+zorunludur. Baseline PID'sinin bulunması veya yalnız `TARGET_LOAD_ENTERED` bu
+koşulların yerine geçmez. Bwrap ve tüm eski güvenlik/checkpoint guard'ları korunur.
+
+Test-only Rust wrapper `TARGET_LOAD_ENTERED` ve `TARGET_LOAD_RETURNED ok/error`
+telemetrisi verir; üretim secure loader'ını aynen çağırır. Target sonuç döndürdüyse
+checkpoint kabul edilmez. Bu, yeni PID oluşmadığında target'ın başlamaması,
+erken hata veya çok hızlı tamamlanmasını loader keşfinden ayırır. Process inventory
+bwrap dahil exe/starttime/origin gösterir; eski frame reddi ve fresh-frame aşaması
+ayrı sayaçlardır. Gerçek loader reuse'u yoksa yeni process/fresh frame gözlemi
+raporda görünür; pool kaynak bilgisiyle hayali reuse PASS'i üretilmez.
+
+Rapor alanları:
+
+- `observer_version=3`, `baseline_processes`, `baseline_frames` ve snapshot zamanı;
+- `process_inventory`, `loader_discoveries[].origin`: baseline veya new;
+- `candidate_loader_origin`: aday seçimi; tek başına sertifika değildir;
+- `certified_loader_origin`, `reuse_observed`: yalnız taze kısmi frame ve Rust
+  pending checkpoint'i doğrulandıktan sonra atanır. Aksi halde not_certified/null;
+- `target_events`, `target_load_return`, `target_frame_identity` ve eski tanı alanları.
+
+Temizlik iki aşamalıdır: hedef iş join'i/weak-ref/stale-mutation/survivor byte'ları
+ve hedef inode'un fd+mapping bırakılması önce kanıtlanır. Bu sırada canlı baseline
+pool process'i sırf canlı diye leak sayılmaz; origin ile raporlanır. Sonra survivor
+normal kapanır, probe exit0 verir ve baseline dahil gözlenen çocukların tamamı
+aynı **close-to-cleanup <10 s** bütçesinde zombiesiz çıkmalıdır. Dışarıdan zorla
+öldürmek başarı değildir. Böylece hem pool retention doğru yorumlanır hem son
+process cleanup koşulu korunur. Kısmi cleanup veya sadece başarılı job join'i PASS
+olamaz; mapping-only target referansı da cleanup'ı engeller.
+
+Codex: **49 Rust + 30 Python observer unit PASS**, fmt/check/build/Clippy PASS.
+Yeni testler mevcut loader'da fresh frame kabulü, eski kısmi/tamamlanmış frame
+reddi, PID reuse, snapshot okunamaması, eski inode'un büyümesi, telemetri ayrımı,
+mapping referansı ve baseline process/target kaynak ayrımını kapsar. Unitler
+native decoder PASS'i değildir. Gerçek V3 probe baseline sandbox kapısında
+NOT RUN/77: [güncel JSON](probes/PIV09_ACTIVE_DECODE_OBSERVER_V3_CODEX.json).
+Native V3 reuse/checkpoint/kapanış henüz çalıştırılmadı. Komut değişmedi:
+`bash tests/run_active_decode_close.sh`. **PIV-09 TESTING; PIV-10 başlamadı.**

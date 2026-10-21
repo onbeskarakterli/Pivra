@@ -641,3 +641,39 @@ fmt/check/build/Clippy PASS. Gerçek probe baseline secure load kapısında exit
 [güncel Codex JSON](probes/PIV09_ACTIVE_DECODE_OBSERVER_V2_CODEX.json).
 Native checkpoint/kapanış/temizlik pozitif yolu hâlâ NOT RUN. Decoder zaman
 aralıkları çakışması NOT MEASURED. PIV-09 TESTING; PIV-10 başlamadı.
+
+
+## 17. PIV-09 V3 — baseline loader keşfi ve yaşam döngüsü
+
+Kullanıcı V2 native testinde exit77/loader_found ve 5.476 tarama bildirdi. Ayrı
+5.445 taramalık yerel teşhiste başlangıçtan itibaren iki bwrap (142105/142122) ve
+image-rs (142123) görüldü. Bu **kullanıcı kanıtı**, Codex gözlemi değildir.
+V2'nin baseline PID çıkarımı bu süreci keşiften saklıyordu; V3 somut kör noktayı
+kaldırdı. Başlangıçtaki süreçte gerçekten ikinci decode yapıldığı henüz kanıtlanmadı.
+
+Kilitli Rust Glycin 3.0.8 `api_loader.rs`/`pool.rs` kaynaklarında varsayılan
+Pool::global, config hash'e göre reuse ve 30 s retention görüldü. Image drop/cancel
+request-scoped done(path) yapar; her görüntü için yeni process/ani process exit
+beklentisi geçerli değildir. Native Glycin 2.2.3 loader sürümü istemci sürümüyle
+karıştırılmadı; source pool davranışı native reuse kanıtı sayılmadı.
+
+ARMED öncesi PID/starttime ve eski frame dev/inode envanteri alınır; eski/yeni tüm
+kendi loader'ları taranır. Yalnız yeni inode'da hedef 96 MB RGB çıktısı sıkı önceki
+checkpoint guard'larıyla değerlendirilir. Eski matching kısmi/tamamlanmış buffer
+ve boyutu büyüyen eski inode reddedilir. Hedefe ait test-only entered/returned
+telemetri, process inventory ve origin/fresh-frame sayaçları neden yeni PID veya
+frame bulunmadığını ayrıştırır. Asıl pending kontrolü Rust bayrağıyla aynen sürer.
+Üretim kaynak/Cargo/fixture ve Bwrap güvenliği değiştirilmedi.
+
+Pool retention temizlikte leak diye etiketlenmez: hedef fd/mapping kaynakları
+önce bırakılmalı, worker join/weak-ref/stale/survivor koşulları geçmeli; sonra normal
+app exit ve bütün gözlenen çocukların zombiesiz kapanışı aynı 10 s toplam bütçede
+zorunludur. Son process-exit veya kaynak temizliği kriteri kaldırılmadı.
+`certified_loader_origin`/`reuse_observed` yalnız gerçek fresh-frame ve Rust pending
+checkpoint'inden sonra atanır; Codex baseline başarısızlığında not_certified/null.
+
+49 Rust + 30 Python guard PASS; fmt/check/build/Clippy ve shell syntax PASS.
+Gerçek V3 probe **NOT RUN/77**, baseline secure decode engeli sürer.
+[Codex V3 JSON](probes/PIV09_ACTIVE_DECODE_OBSERVER_V3_CODEX.json) ·
+[Kesin native komut ve detay](PIV09_ACTIVE_DECODE_TEST.md).
+PIV-09 TESTING; native V3 kapanış sonucu bekleniyor. PIV-10 başlamadı.

@@ -194,3 +194,15 @@ ve STOP/kimlik/mapping/sandbox kriterleri korunarak aşama tanıları eklenir.
 Native ortamda tek komut: `bash tests/run_active_decode_close.sh`.
 Codex: 49 Rust + 17 Python unit PASS; gerçek secure baseline exit77/NOT RUN.
 Yeni native sonuç bekleniyor; PIV-09 TESTING, PIV-10 başlamadı.
+
+
+### PIV-09 V3 — mevcut loader keşfi
+
+Kullanıcının V2 native loader_found engeli baseline PID çıkarımının somut kör
+noktasını gösterdi. V3 tüm kendi loader'larını tarar; eski frame inode'larını
+reddederek yalnız taze hedef 96 MB çıktısını önceki sıkı checkpoint'le kabul eder.
+Glycin 3.0.8 istemci havuzunun 30 s retention davranışı kaynakta doğrulandı;
+Arch'ta gerçek reuse native sonuç olmadan iddia edilmez. Origin ve target yaşam
+döngüsü raporlanır; cleanup hedef kaynak bırakma + normal app/çocuk exit olarak
+aynı 10 s bütçede korunur. 49 Rust + 30 Python PASS; native test Codex'te NOT RUN.
+Komut `bash tests/run_active_decode_close.sh`; PIV-09 TESTING, PIV-10 başlamadı.

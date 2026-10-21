@@ -704,3 +704,33 @@ Codex: **49 Rust + 17 Python observer tests PASS**, fmt/check/build/Clippy PASS;
 real probe **NOT RUN/77 at baseline sandbox**. Native v2 active close is untested;
 two-decoder time overlap remains NOT MEASURED. **PIV-09 TESTING**, never DONE here;
 PIV-10 has not started.
+
+
+### PIV-09 V3 — discover existing pooled loaders
+
+The user reports V2 native exit77 at `loader_found` after 5,476 scans. A separate
+5,445-scan diagnosis saw bwrap PIDs 142105/142122 and loader PID 142123 from the
+first scan onward. **User-reported Arch observations, not Codex execution.** V2's
+baseline PID subtraction hid that loader; V3 removes this concrete discovery bug.
+
+The locked Rust Glycin 3.0.8 client uses a global process pool with default 30-second
+idle retention. Source supports reuse; actual Arch reuse is not yet proven. V3
+inventories pre-target process identities and frame inodes, scans both old/new
+loaders, and requires a **fresh target frame** with every original pixel/STOP/
+ownership/mapping/sandbox/pending-load guard. Old matching partial or completed
+frames are rejected. Loader origin and target entered/returned telemetry are saved.
+
+Target memory release is verified before normal survivor/app close. An idle pooled
+baseline process is not itself a leak; all observed child identities must still
+exit after normal app shutdown within the original 10-second total cleanup budget.
+Production sources/dependencies and mandatory Bwrap remain unchanged.
+
+Codex: **49 Rust + 30 Python observer tests PASS**, mandatory Cargo checks PASS;
+real V3 probe **NOT RUN/77 at baseline sandbox**. Actual native reuse/active close
+remains unverified; **PIV-09 TESTING**, PIV-10 untouched. Update `dev`, then run:
+
+```sh
+bash tests/run_active_decode_close.sh
+```
+
+[Current design, origin fields and cleanup interpretation](docs/PIV09_ACTIVE_DECODE_TEST.md).

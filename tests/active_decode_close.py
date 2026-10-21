@@ -6,6 +6,7 @@ memfd, briefly SIGSTOPs/rechecks it, then closes the real production view and re
 Exit 77 = BLOCKED/NOT RUN, including missing observation rights or missed timing.
 """
 import argparse
+from dataclasses import dataclass, field
 import hashlib
 import json
 import os
@@ -71,6 +72,96 @@ def descendants(pid):
                     result.add(child)
                     pending.append(child)
     return result
+
+
+@dataclass
+class Baseline:
+    processes: dict = field(default_factory=dict)  # PID -> starttime, never PID alone
+    frame_ids: set = field(default_factory=set)  # (device, inode), all pre-target sizes
+    frames: list = field(default_factory=list)
+
+    def origin(self, pid, birth):
+        return 'baseline' if self.processes.get(pid) == birth else 'new'
+
+    def fresh(self, fd):
+        info = os.fstat(fd)
+        return info.st_size == SIZE and (info.st_dev, info.st_ino) not in self.frame_ids
+
+
+def snapshot_baseline(parent, diagnostics):
+    baseline = Baseline()
+    for pid in sorted(descendants(parent) | {parent}):
+        try:
+            _, birth = stat(pid)
+            baseline.processes[pid] = birth
+            # Include the probe's retained old textures as well as loader buffers.
+            for entry in Path(f'/proc/{pid}/fd').iterdir():
+                try:
+                    if os.readlink(entry) != '/memfd:glycin-frame (deleted)':
+                        continue
+                    info = os.stat(entry)
+                    baseline.frame_ids.add((info.st_dev, info.st_ino))
+                    baseline.frames.append({'pid': pid, 'starttime': birth, 'fd': entry.name,
+                                            'device': info.st_dev, 'inode': info.st_ino, 'size': info.st_size})
+                except FileNotFoundError:
+                    diagnostics.mark('baseline_fd_disappeared', pid=pid, fd=entry.name)
+        except FileNotFoundError:
+            diagnostics.mark('baseline_process_disappeared', pid=pid)
+        except PermissionError as error:
+            # Without a complete readable inventory we cannot certify freshness.
+            raise NotRun('cannot inventory pre-target processes/frames: ' + str(error)) from error
+    diagnostics.mark('baseline_snapshot', processes=len(baseline.processes), frames=len(baseline.frame_ids))
+    return baseline
+
+
+def drain_target_events(events, evidence, diagnostics):
+    if events is None:
+        return
+    while True:
+        try:
+            event = events.get_nowait()
+        except queue.Empty:
+            break
+        evidence.setdefault('target_events', []).append(event)
+        if event['message'] == 'TARGET_LOAD_ENTERED':
+            diagnostics.mark('target_load_entered')
+        elif event['message'].startswith('TARGET_LOAD_RETURNED'):
+            diagnostics.mark('target_load_returned', message=event['message'])
+            evidence['target_load_return'] = event['message']
+
+
+def target_references(pid, identity):
+    # A cached observer fd is closed before this check. Check both FDs and maps:
+    # an mmap can keep a frame alive even after its descriptor has been closed.
+    device, inode = identity
+    references = []
+    try:
+        for entry in Path(f'/proc/{pid}/fd').iterdir():
+            try:
+                info = os.stat(entry)
+                if (info.st_dev, info.st_ino) == identity:
+                    references.append({'pid': pid, 'fd': entry.name})
+            except FileNotFoundError:
+                continue
+        for line in Path(f'/proc/{pid}/maps').read_text().splitlines():
+            fields = line.split(maxsplit=5)
+            major, minor = (int(value, 16) for value in fields[3].split(':'))
+            if int(fields[4]) == inode and (major, minor) == (os.major(device), os.minor(device)):
+                references.append({'pid': pid, 'mapping': line})
+    except FileNotFoundError:
+        pass  # process gone, including its mappings
+    return references
+
+
+def surviving_identities(identities):
+    remaining = {}
+    for pid, birth in identities.items():
+        try:
+            if stat(pid)[1] == birth:
+                remaining[pid] = birth  # includes unreaped zombies
+        except FileNotFoundError:
+            pass
+    return remaining
 
 
 def frame_sample(fd):
@@ -142,10 +233,11 @@ class Diagnostics:
 
     def missing(self):
         # Independent per-sample successes never certify a combined checkpoint.
-        for stage in ('baseline_decoded', 'target_starting', 'observer_armed', 'loader_found', 'pidfd_pinned', 'memfd_found', 'size_correct',
+        for stage in ('baseline_decoded', 'target_starting', 'observer_armed', 'target_load_entered', 'loader_found', 'pidfd_pinned', 'memfd_found', 'target_frame_fresh', 'size_correct',
                       'prefix_correct', 'tail_zero', 'partial_candidate', 'stop_complete',
                       'fd_owned', 'mapping_verified', 'sandbox_verified', 'checkpoint_certified',
-                      'window_closed_worker_pending_verified', 'job_joined_widgets_released', 'children_cleaned'):
+                      'window_closed_worker_pending_verified', 'job_joined_widgets_released',
+                      'target_resources_released', 'children_cleaned'):
             if not self.data['counts'].get(stage):
                 return stage
         return 'none'
@@ -241,10 +333,11 @@ def stop_and_certify(pid, birth, pidfd, entry, frame, process, evidence, diagnos
     diagnostics.mark('checkpoint_certified', pid=pid)
 
 
-def observe(process, baseline, evidence, diagnostics, arm, timeout=15):
+def observe(process, baseline, evidence, diagnostics, arm, timeout=15, telemetry=None):
     # Cache each loader pidfd and frame descriptor. Only the known output FD is
     # sampled in the hot path; discovery has its own cadence and stable PID order.
     loaders, frames, observed = {}, {}, {}
+    inventoried = set()
     held = None
     frame = None
     transferred = False
@@ -257,18 +350,28 @@ def observe(process, baseline, evidence, diagnostics, arm, timeout=15):
             now = time.monotonic()
             if now >= next_discovery:
                 diagnostics.mark('process_scan')
-                for pid in sorted(descendants(process.pid) - baseline):
+                for pid in sorted(descendants(process.pid)):
                     try:
-                        _, birth = stat(pid)
+                        state, birth = stat(pid)
                         observed[pid] = birth
                         if pid in loaders:
                             continue
                         executable = os.readlink(f'/proc/{pid}/exe')
+                        if (pid, birth) not in inventoried:
+                            inventoried.add((pid, birth))
+                            evidence.setdefault('process_inventory', []).append({
+                                'pid': pid, 'starttime': birth, 'state': state, 'executable': executable,
+                                'origin': baseline.origin(pid, birth)})
                         if Path(executable.removesuffix(' (deleted)')).name != 'glycin-image-rs':
                             continue
                         if Path(f'/proc/{pid}').stat().st_uid != os.getuid():
+                            diagnostics.mark('loader_uid_rejected', pid=pid, executable=executable)
                             continue
-                        diagnostics.mark('loader_found', pid=pid, starttime=birth, executable=executable)
+                        origin = baseline.origin(pid, birth)
+                        diagnostics.mark('loader_found', pid=pid, starttime=birth, executable=executable, origin=origin)
+                        diagnostics.mark('loader_found_' + origin, pid=pid, starttime=birth)
+                        evidence.setdefault('loader_discoveries', []).append({
+                            'pid': pid, 'starttime': birth, 'origin': origin, 'executable': executable})
                         pin = os.pidfd_open(pid)
                         try:
                             # Repeat identity/descendant verification ONCE when pinning.
@@ -303,9 +406,13 @@ def observe(process, baseline, evidence, diagnostics, arm, timeout=15):
                             fd = os.open(entry, os.O_RDONLY | os.O_CLOEXEC)
                             diagnostics.mark('memfd_found', pid=pid, fd=str(entry))
                             try:
-                                if os.fstat(fd).st_size != SIZE:
-                                    diagnostics.sample(pid, entry, fd)
+                                if not baseline.fresh(fd):
+                                    info = os.fstat(fd)
+                                    diagnostics.mark('pretarget_or_wrong_size_frame_rejected', pid=pid,
+                                                     device=info.st_dev, inode=info.st_ino, size=info.st_size)
                                     continue
+                                diagnostics.mark('target_frame_fresh', pid=pid,
+                                                 origin=baseline.origin(pid, loaders[pid][0]))
                                 frames[(pid, entry)] = fd
                                 fd = None
                                 break
@@ -318,6 +425,9 @@ def observe(process, baseline, evidence, diagnostics, arm, timeout=15):
                             diagnostics.error('frame descriptor', error)
                 # The single target frame is now the only hot-path candidate.
                 next_discovery = time.monotonic() + 0.002 if not frames else float('inf')
+            drain_target_events(telemetry, evidence, diagnostics)
+            if evidence.get('target_load_return'):
+                raise NotRun('target load returned before active checkpoint: ' + evidence['target_load_return'])
             for (pid, entry), cached in list(frames.items()):
                 birth, pin, executable = loaders[pid]
                 if select.select([pin], [], [], 0)[0]:
@@ -330,9 +440,16 @@ def observe(process, baseline, evidence, diagnostics, arm, timeout=15):
                 held = (pid, birth, os.dup(pin))
                 frame = os.dup(cached)
                 evidence['executable'] = executable
+                evidence['candidate_loader_origin'] = baseline.origin(pid, birth)
+                info = os.fstat(cached)
+                evidence['target_frame_identity'] = {'device': info.st_dev, 'inode': info.st_ino}
+                assert baseline.fresh(cached), 'pre-target frame cannot certify target decode'
                 stop_and_certify(pid, birth, held[2], entry, frame, process, evidence, diagnostics, sample)
                 transferred = True
                 return held, frame, observed
+            drain_target_events(telemetry, evidence, diagnostics)
+            if evidence.get('target_load_return'):
+                raise NotRun('target load returned before active checkpoint: ' + evidence['target_load_return'])
             # Keep stdout (including a potentially blocked pipe/terminal) out
             # of the entire live sampling interval. run() flushes on completion.
             if process.poll() is not None:
@@ -366,11 +483,15 @@ def send(process, command):
     process.stdin.flush()
 
 
-def read_events(stream, events):
+def read_events(stream, events, telemetry):
     for line in stream:
         print(line.rstrip(), flush=True)
         if line.startswith('PIV09 '):
-            events.put(line.strip()[6:])
+            message = line.strip()[6:]
+            if message.startswith('TARGET_LOAD_'):
+                telemetry.put({'monotonic': time.monotonic(), 'message': message})
+            else:
+                events.put(message)
     events.put('EOF')
 
 
@@ -392,13 +513,16 @@ def expect(events, prefix, timeout=15):
 def run(binary, report):
     evidence = {'result': 'NOT RUN', 'decoder_time_overlap': 'NOT MEASURED',
                 'method': 'owned descendant pidfd; partial RGB memfd; SIGSTOP/recheck/close/SIGCONT',
-                'width': WIDTH, 'height': HEIGHT, 'output_bytes': SIZE}
+                'width': WIDTH, 'height': HEIGHT, 'output_bytes': SIZE,
+                'candidate_loader_origin': 'not_observed', 'certified_loader_origin': 'not_certified',
+                'reuse_observed': None, 'observer_version': 3}
     started = time.monotonic()
     diagnostics = Diagnostics(evidence)
     process = None
     held = None
     frame = None
     readers = []
+    telemetry = queue.Queue()
     try:
         evidence['driver_sha256'] = hashlib.sha256(Path(__file__).read_bytes()).hexdigest()
         evidence['binary_sha256'] = hashlib.sha256(binary.read_bytes()).hexdigest()
@@ -416,23 +540,28 @@ def run(binary, report):
                 for line in process.stderr:
                     errors.append(line)
                     print(line.rstrip(), flush=True)
-            readers = [threading.Thread(target=read_events, args=(process.stdout, events), daemon=True),
+            readers = [threading.Thread(target=read_events, args=(process.stdout, events, telemetry), daemon=True),
                        threading.Thread(target=stderr, daemon=True)]
             for reader in readers:
                 reader.start()
             expect(events, 'READY survivor_loaded')
             diagnostics.mark('baseline_decoded')
-            baseline = descendants(process.pid)
             send(process, 'START')
             expect(events, 'TARGET_STARTING')
             diagnostics.mark('target_starting')
+            baseline = snapshot_baseline(process.pid, diagnostics)
+            evidence['baseline_processes'] = baseline.processes
+            evidence['baseline_frames'] = baseline.frames
+            evidence['baseline_snapshot_monotonic'] = time.monotonic()
             held, frame, observed = observe(process, baseline, evidence, diagnostics,
-                                             arm=lambda: send(process, 'ARMED'))
+                                             arm=lambda: send(process, 'ARMED'), telemetry=telemetry)
             pause = time.monotonic()
             evidence['close_requested_monotonic'] = pause
             send(process, 'CLOSE')
             expect(events, 'WINDOW_CLOSED entered=true returned_at_checkpoint=false', timeout=5)
             diagnostics.mark('window_closed_worker_pending_verified')
+            evidence['certified_loader_origin'] = evidence['candidate_loader_origin']
+            evidence['reuse_observed'] = evidence['certified_loader_origin'] == 'baseline'
             # Remove the observer's read-only reference before cleanup checks.
             os.close(frame)
             frame = None
@@ -448,18 +577,36 @@ def run(binary, report):
             evidence['worker_settled_monotonic'] = time.monotonic()
             deadline = pause + 10
             assert time.monotonic() < deadline, 'worker settlement exceeded 10 seconds from close'
+            identity = evidence['target_frame_identity']
+            frame_identity = (identity['device'], identity['inode'])
+            # Pooled baseline loaders may remain alive. First prove the target
+            # frame is released, then close the survivor/app normally. Final child
+            # exit remains mandatory within the original 10s-from-close budget.
             while True:
-                remaining = []
-                for pid, birth in observed.items():
+                current = descendants(process.pid)
+                for pid in current:
                     try:
-                        if stat(pid)[1] == birth:
-                            remaining.append(pid)  # includes unreaped zombies
+                        observed[pid] = stat(pid)[1]
                     except FileNotFoundError:
                         pass
-                new_children = descendants(process.pid) - baseline
-                if not remaining and not new_children:
+                refs = []
+                pinned_live = set(surviving_identities({held[0]: held[1]}))
+                for pid in current | {process.pid} | pinned_live:
+                    refs.extend(target_references(pid, frame_identity))
+                if not refs:
                     break
-                assert time.monotonic() < deadline, ('loader/helper cleanup timed out', remaining, new_children)
+                assert time.monotonic() < deadline, ('target frame cleanup timed out', refs)
+                time.sleep(0.01)
+            diagnostics.mark('target_resources_released')
+            live = surviving_identities(observed)
+            evidence['pooled_processes_alive_before_normal_app_close'] = [
+                {'pid': pid, 'starttime': birth, 'origin': baseline.origin(pid, birth)}
+                for pid, birth in live.items()]
+            send(process, 'FINISH')
+            expect(events, 'PASS active_decode_close')
+            assert process.wait(timeout=max(0.001, deadline - time.monotonic())) == 0
+            while surviving_identities(observed):
+                assert time.monotonic() < deadline, ('children remained after normal app exit', surviving_identities(observed))
                 time.sleep(0.01)
             assert select.select([held[2]], [], [], 0)[0], 'pinned loader has not exited'
             evidence['cleanup_seconds'] = time.monotonic() - cleanup_started
@@ -467,9 +614,6 @@ def run(binary, report):
             assert evidence['close_to_cleanup_seconds'] < 10
             evidence['observed_child_identities'] = observed
             diagnostics.mark('children_cleaned')
-            send(process, 'FINISH')
-            expect(events, 'PASS active_decode_close')
-            assert process.wait(timeout=5) == 0
             for reader in readers:
                 reader.join(timeout=1)
             assert not errors, 'unexpected stderr: ' + ''.join(errors)
@@ -500,6 +644,9 @@ def run(binary, report):
             except subprocess.TimeoutExpired:
                 process.kill()
                 process.wait(timeout=5)
+        drain_target_events(telemetry, evidence, diagnostics)
+        if evidence['result'] != 'PASS':
+            evidence['first_uncompleted_stage'] = diagnostics.missing()
         evidence['elapsed_seconds'] = time.monotonic() - started
         diagnostics.flush()
         print('DIAG summary', json.dumps(diagnostics.data['counts'], sort_keys=True), flush=True)

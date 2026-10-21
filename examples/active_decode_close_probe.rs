@@ -33,10 +33,18 @@ mod image_loader {
         let target = TARGET.get().is_some_and(|p| p == path);
         if target {
             ENTERED.store(true, Ordering::SeqCst);
+            event("TARGET_LOAD_ENTERED");
         }
         let result = secure_loader::load(path, cancel).await;
         if target {
             RETURNED.store(true, Ordering::SeqCst);
+            match &result {
+                Ok(_) => event("TARGET_LOAD_RETURNED ok"),
+                Err(error) => event(&format!(
+                    "TARGET_LOAD_RETURNED error={}",
+                    error.lines().next().unwrap_or("unknown")
+                )),
+            }
         }
         result
     }

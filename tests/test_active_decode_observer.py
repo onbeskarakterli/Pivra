@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 """Observer guard tests only; these never certify a real decoder or GUI PASS."""
 import os
+import io
+import queue
 import mmap
 from pathlib import Path
 import struct
@@ -133,8 +135,8 @@ class DiagnosisAndRaceGuards(unittest.TestCase):
         frame = self.output()
         evidence = {}
         diagnostics = probe.Diagnostics(evidence)
-        for stage in ('baseline_decoded', 'target_starting', 'observer_armed', 'loader_found',
-                      'pidfd_pinned', 'memfd_found'):
+        for stage in ('baseline_decoded', 'target_starting', 'observer_armed', 'target_load_entered', 'loader_found',
+                      'pidfd_pinned', 'memfd_found', 'target_frame_fresh'):
             diagnostics.mark(stage)
         os.pwrite(frame, probe.COLOR * 32, probe.SIZE - 96)
         self.assertFalse(diagnostics.sample(1, Path('fd'), frame))
@@ -187,9 +189,20 @@ class DiagnosisAndRaceGuards(unittest.TestCase):
             with self.assertRaisesRegex(probe.NotRun, 'every loader thread'):
                 self.checkpoint(self.output(), {'stopped': lambda _: False})
 
-    def test_disappearing_early_fd_does_not_hide_later_frame(self):
+    def discovery_case(self, baseline=None, old_frame=False, returned=False):
         frame = self.output()
-        os.pwrite(frame, bytes(96), 0)
+        baseline = baseline or probe.Baseline()
+        if old_frame:
+            info = os.fstat(frame)
+            baseline.frame_ids.add((info.st_dev, info.st_ino))
+        telemetry = queue.Queue()
+        if returned:
+            telemetry.put({'message': 'TARGET_LOAD_ENTERED', 'monotonic': 1.})
+            telemetry.put({'message': 'TARGET_LOAD_RETURNED ok', 'monotonic': 2.})
+        if old_frame:
+            self.assertTrue(probe.partial(frame), 'old frame fixture must really match partial RGB')
+        else:
+            os.pwrite(frame, bytes(96), 0)
         reads = []
         real_sample = probe.frame_sample
         def progress(fd):
@@ -224,15 +237,121 @@ class DiagnosisAndRaceGuards(unittest.TestCase):
              mock.patch('active_decode_close.frame_sample', side_effect=progress), \
              mock.patch.object(probe.Diagnostics, 'flush') as flush, \
              mock.patch('active_decode_close.stop_and_certify', side_effect=probe.NotRun('candidate reached')):
-            with self.assertRaisesRegex(probe.NotRun, 'candidate reached'):
-                probe.observe(process, set(), evidence, diagnostics, arm=lambda: armed.append(True))
+            reason = 'target load returned' if returned else 'candidate reached'
+            with self.assertRaisesRegex(probe.NotRun, reason):
+                probe.observe(process, baseline, evidence, diagnostics, arm=lambda: armed.append(True), telemetry=telemetry)
         flush.assert_not_called()
-        self.assertEqual(len(reads), 4)
+        self.assertEqual(len(reads), 0 if returned else 4)
         self.assertEqual(discover.call_count, 2, 'cached polling must not repeat tree scans')
         self.assertEqual(diagnostics.data['counts']['fd_discovery_race'], 1)
         self.assertEqual(diagnostics.data['counts']['memfd_found'], 1)
         self.assertEqual(diagnostics.data['counts']['pidfd_pinned'], 1)
         self.assertNotIn('checkpoint_certified', diagnostics.data['counts'])
+        self.assertEqual(evidence['loader_discoveries'][0]['origin'], baseline.origin(99, 123))
+        return evidence
+
+    def test_disappearing_early_fd_does_not_hide_later_frame(self):
+        self.discovery_case()
+
+    def test_existing_loader_is_discovered_and_its_fresh_target_frame_is_examined(self):
+        evidence = self.discovery_case(probe.Baseline(processes={99: 123}))
+        self.assertEqual(evidence['candidate_loader_origin'], 'baseline')
+        self.assertIsNone(evidence.get('reuse_observed'), 'discovery is not yet a certified reuse')
+
+    def test_existing_loader_old_matching_partial_frame_is_rejected(self):
+        evidence = self.discovery_case(probe.Baseline(processes={99: 123}), old_frame=True, returned=True)
+        self.assertNotIn('candidate_loader_origin', evidence)
+        self.assertNotIn('target_frame_fresh', evidence['diagnostics']['counts'])
+
+    def test_new_loader_old_frame_is_also_rejected(self):
+        evidence = self.discovery_case(old_frame=True, returned=True)
+        self.assertNotIn('target_frame_fresh', evidence['diagnostics']['counts'])
+
+
+class BaselineAndLifecycleGuards(unittest.TestCase):
+    def test_origin_requires_pid_and_starttime(self):
+        baseline = probe.Baseline(processes={12: 100})
+        self.assertEqual(baseline.origin(12, 100), 'baseline')
+        self.assertEqual(baseline.origin(12, 101), 'new')
+        self.assertEqual(baseline.origin(13, 100), 'new')
+
+    def test_snapshot_rejects_old_frame_even_if_it_later_grows_to_target_size(self):
+        fd = os.memfd_create('glycin-frame', os.MFD_CLOEXEC)
+        try:
+            os.ftruncate(fd, 12)
+            with mock.patch('active_decode_close.descendants', return_value=set()):
+                baseline = probe.snapshot_baseline(os.getpid(), probe.Diagnostics({}))
+            info = os.fstat(fd)
+            self.assertIn((info.st_dev, info.st_ino), baseline.frame_ids)
+            os.ftruncate(fd, probe.SIZE)
+            os.pwrite(fd, probe.COLOR * 32, 0)
+            self.assertTrue(probe.partial(fd))
+            self.assertFalse(baseline.fresh(fd), 'old inode cannot become a fresh target by resizing')
+        finally:
+            os.close(fd)
+
+    def test_unreadable_baseline_does_not_allow_freshness_claim(self):
+        with mock.patch('active_decode_close.descendants', return_value=set()), \
+             mock.patch('active_decode_close.Path.iterdir', side_effect=PermissionError('denied')):
+            with self.assertRaisesRegex(probe.NotRun, 'inventory'):
+                probe.snapshot_baseline(os.getpid(), probe.Diagnostics({}))
+
+    def test_fresh_complete_frame_is_still_not_active(self):
+        with tempfile.TemporaryFile() as output:
+            output.truncate(probe.SIZE)
+            os.pwrite(output.fileno(), probe.COLOR * 32, 0)
+            os.pwrite(output.fileno(), probe.COLOR * 32, probe.SIZE - 96)
+            self.assertTrue(probe.Baseline().fresh(output.fileno()))
+            self.assertFalse(probe.partial(output.fileno()))
+
+    def test_old_completed_frame_does_not_become_target_activity(self):
+        with tempfile.TemporaryFile() as output:
+            output.truncate(probe.SIZE)
+            os.pwrite(output.fileno(), probe.COLOR * 32, 0)
+            os.pwrite(output.fileno(), probe.COLOR * 32, probe.SIZE - 96)
+            info = os.fstat(output.fileno())
+            baseline = probe.Baseline(frame_ids={(info.st_dev, info.st_ino)})
+            self.assertFalse(baseline.fresh(output.fileno()))
+            self.assertFalse(probe.partial(output.fileno()))
+
+    def test_target_telemetry_is_not_mistaken_for_close_protocol(self):
+        events, telemetry = queue.Queue(), queue.Queue()
+        stream = io.StringIO('PIV09 TARGET_LOAD_ENTERED\nPIV09 TARGET_LOAD_RETURNED error=decode failed\nPIV09 WINDOW_CLOSED entered=true returned_at_checkpoint=false\n')
+        with mock.patch('builtins.print'):
+            probe.read_events(stream, events, telemetry)
+        self.assertTrue(events.get_nowait().startswith('WINDOW_CLOSED'))
+        self.assertEqual(events.get_nowait(), 'EOF')
+        evidence = {}
+        diagnostics = probe.Diagnostics(evidence)
+        probe.drain_target_events(telemetry, evidence, diagnostics)
+        self.assertEqual(diagnostics.data['counts']['target_load_entered'], 1)
+        self.assertIn('error=decode failed', evidence['target_load_return'])
+
+    def test_retained_baseline_process_is_not_itself_a_target_memory_leak(self):
+        with tempfile.TemporaryFile() as output:
+            output.truncate(64)
+            identity = (os.fstat(output.fileno()).st_dev, os.fstat(output.fileno()).st_ino)
+            self.assertTrue(probe.target_references(os.getpid(), identity))
+            unrelated = (identity[0], identity[1] + 10**9)
+            self.assertFalse(probe.target_references(os.getpid(), unrelated))
+
+    def test_mapping_remains_a_reference_after_its_fd_closes(self):
+        fd = os.memfd_create('glycin-frame', os.MFD_CLOEXEC)
+        os.ftruncate(fd, 4096)
+        identity = (os.fstat(fd).st_dev, os.fstat(fd).st_ino)
+        memory = mmap.mmap(fd, 4096)
+        os.close(fd)
+        try:
+            refs = probe.target_references(os.getpid(), identity)
+            self.assertTrue(any('mapping' in item for item in refs))
+        finally:
+            memory.close()
+        self.assertFalse(probe.target_references(os.getpid(), identity))
+
+    def test_pid_reuse_does_not_keep_the_original_child_alive(self):
+        with mock.patch('active_decode_close.stat', return_value=('R', 101)):
+            self.assertFalse(probe.surviving_identities({12: 100}))
+            self.assertEqual(probe.surviving_identities({12: 101}), {12: 101})
 
 
 if __name__ == '__main__':

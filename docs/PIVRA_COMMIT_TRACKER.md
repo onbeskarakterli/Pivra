@@ -1,7 +1,7 @@
 # Pivra — Planlı Commit ve İlerleme Takibi
 
 **Kaynak:** [Özellik Şartnamesi](PIVRA_FEATURE_SPEC_TR.md) · [Yol Haritası](PIVRA_DEVELOPMENT_ROADMAP.md)  
-**Branch:** `dev` · **Durum:** PIV-01 **DONE (21.10.2026)**; PIV-02 **DONE (21.10.2026, Xvfb GTK pencere doğrulaması)**; PIV-03 **DONE (21.10.2026)**; PIV-04 **DONE (21.10.2026; grafik test kategorileri ayrı)**; PIV-05 **DONE (21.10.2026; belgeleme/probe kapsamı)**; PIV-06 **DONE (21.10.2026; dosya/URI ve desktop giriş altyapısı; gerçek Nautilus NOT RUN)**; PIV-07 **DONE (21.10.2026; sırasız komşu medya keşfi)**; PIV-08 **DONE (21.10.2026; deterministik doğal sıra)**; PIV-09 **TESTING (21.10.2026; kullanıcı Arch decode/EXIF/otomatik geometri PASS; yalnız aktif decode kapanış sonucu açık)**; PIV-10–60 TODO, başlatılmadı. Faz 0 **INCOMPLETE** (temiz native kurulum yeniden üretimi NOT RUN). Güncel kapanış kanıtı son bölümde; 20.10.2026 kayıtları tarihçedir. Burada listelenen `PIV-xx` kimlikleri gerçek Git commit SHA'sı **değildir**.
+**Branch:** `dev` · **Durum:** PIV-01 **DONE (21.10.2026)**; PIV-02 **DONE (21.10.2026, Xvfb GTK pencere doğrulaması)**; PIV-03 **DONE (21.10.2026)**; PIV-04 **DONE (21.10.2026; grafik test kategorileri ayrı)**; PIV-05 **DONE (21.10.2026; belgeleme/probe kapsamı)**; PIV-06 **DONE (21.10.2026; dosya/URI ve desktop giriş altyapısı; gerçek Nautilus NOT RUN)**; PIV-07 **DONE (21.10.2026; sırasız komşu medya keşfi)**; PIV-08 **DONE (21.10.2026; deterministik doğal sıra)**; PIV-09 **DONE (21.10.2026; Arch gerçek JPEG/PNG/EXIF, otomatik geometri ve güvenli aktif-decode kapanış PASS)**; PIV-10–60 TODO, başlatılmadı. Faz 0 **INCOMPLETE** (temiz native kurulum yeniden üretimi NOT RUN). Güncel kapanış kanıtı son bölümde; 20.10.2026 kayıtları tarihçedir. Burada listelenen `PIV-xx` kimlikleri gerçek Git commit SHA'sı **değildir**.
 
 ## Kullanım kuralları
 
@@ -29,7 +29,7 @@
 | PIV-06 | `feat: accept image path from Nautilus` | Nihai hedef: fotoğrafa çift tıklama. Dosya/URI + GIO/desktop Exec doğrulandı; gerçek Nautilus DESKTOP-06 NOT RUN; video varsayılanı değiştirilmedi | **DONE — 21.10.2026 (giriş altyapısı)** | `ad0bcde080ee36c88dc74bd58844d73e7bff8986`, `cac751927b6e3a967cf0ca31b04d06971a5f9fbc`, `69feda8d5cc7342d941b71d5e8878081f2792211` |
 | PIV-07 | `feat: scan neighboring media in folder` | Tek dizinde sırasız fotoğraf/video adayları, açılan alias seçimi, arka plan keşfi ve açık hata durumları | **DONE — 21.10.2026** | `9255519e8c576f067184a2818e5917bfcb9ec724`, `91c81e895cd3859981805690af01a7cafddbf30a`, `9a998ba40c793ff49a6ee4fe7e617a6041f48cfe` |
 | PIV-08 | `feat: apply natural filename ordering` | Doğal karma medya sırası, alias seçimi ve deterministik byte politikası doğrulandı | **DONE — 21.10.2026** | `5a109ac26bd98201e8de9f5a3971189e5969a8ba`, `5cf8469070b4b574c6d2292a92e0d8167763d8a1` |
-| PIV-09 | `feat: render JPEG PNG with orientation` | Kullanıcı Arch decode/EXIF/iki görüntü/otomatik geometri PASS; yalnız aktif decode kapanış/temizlik sonucu açık | **TESTING — 21.10.2026** | İlk uygulama: `1685139d47afdd55ac47699726f49a66aa270bfc`; yeni probe: `66af846ae4b153ad1415c7d8ff7f2612896817e7`; Arch kanıtı: `c42774da2b0448a4014500dc4545a4b399d58d28` |
+| PIV-09 | `feat: render JPEG PNG with orientation` | Arch gerçek JPEG/PNG/EXIF, iki görüntü/otomatik geometri ve aktif secure-decode kapanış/temizlik PASS; iki decoder zaman çakışması NOT MEASURED | **DONE — 21.10.2026** | İlk uygulama: `1685139d47afdd55ac47699726f49a66aa270bfc`; yeni probe: `66af846ae4b153ad1415c7d8ff7f2612896817e7`; Arch kanıtı: `c42774da2b0448a4014500dc4545a4b399d58d28` |
 | PIV-10 | `feat: navigate previous and next media` | Sol/sağ; ilk/son sınırları; tek ve boş klasör | TODO | — |
 | PIV-11 | `feat: watch folder changes and external modifications` | Ekle/sil/ad değiştir listeyi yeniler; açık dosyada elle Yenile isteği | TODO | — |
 | PIV-12 | `test: harden media failures and window isolation` | Bozuk medya gezinmeyi bozmaz; pencereler bağımsız | TODO | — |
@@ -1424,3 +1424,16 @@ JSON `/tmp/pivra-active-decode-close.json`; result=PASS ve exit0 birlikte gereki
 
 Bu takip kaydı commit'inin kendi SHA'sı Git geçmişi/push raporundadır; normal push
 sonrası origin/dev eşitliği ve main korunması ayrıca kontrol edilir.
+
+
+## PIV-09 native V3 kapanışı — 21.10.2026 — DONE
+
+**Kanıt kaynağı:** Kullanıcının kendi Arch Linux / GNOME Wayland bilgisayarından paylaştığı terminal çıktısı ve `/tmp/pivra-active-decode-close.json`; Codex tarafından çalıştırılan test **değildir**. Test edilen `dev` commit'i: `c3e0aaf9e1d19ee73f35d1167b7363ce48c70d86`. Komut: `bash tests/run_active_decode_close.sh`. **Çıkış 0**, JSON `result=PASS`, `observer_version=3`.
+
+- `READY survivor_loaded` ve `TARGET_LOAD_ENTERED` doğrulandı. Önceden mevcut Glycin image-rs loader'ının hedef için gerçekten tekrar kullanıldığı **`reuse_observed=true`**, `certified_loader_origin=baseline` ile kanıtlandı; V2'nin baseline PID'lerini dışlaması bu nedenle geçersizdi.
+- Yeni hedef frame'i: 8000×4000 RGB, **96.000.000 byte**, doğru 96-byte RGB prefix ve sıfır tail; yeni inode; pidfd/SIGSTOP ile tüm thread stop; loader'ın aynı fd/inode ve writable-shared mapping sahipliği kontrol edildi. `checkpoint_certified`, `mapping_verified`, `sandbox_verified` PASS. NoNewPrivs=1, Seccomp=2, CapEff=0; user/mount/PID/network namespace ayrılığı gözlendi.
+- Gerçek yükleme sürerken pencere kapatıldı; hedef decoder `Operation was explicitly canceled` döndürdü. `job_joined=true`, `widgets_released=true`, `stale_mutations=0`, `survivor_pixels_unchanged=true`; `target_resources_released` ve `children_cleaned` PASS.
+- `close_to_cleanup_seconds=0.31790098699275404` (10 s kabul sınırının altında), toplam çalışma `elapsed_seconds=0.7865941640047822`. Son temizlikte `Cleanup SIGCONT unavailable: [Errno 3] No such process` mesajı, ilgili loader'ın önceden çıkmış olmasından kaynaklandı; testin çıkışı 0 ve kaynak temizliği başarılı.
+- Önceki kullanıcı Arch testleri: gerçek JPEG/PNG piksel, EXIF orientation 1–8, Unicode/bozuk dosya kontrolleri, manuel GNOME Fit/resize/close ve `image_gui_probe` iki görüntü/snapshot/geometri/normal kapanış **PASS**. Codex'in son belgelenmiş kısa regresyonları: **49 Rust + 30 Python gözlemci** PASS, format/check/build/Clippy PASS (V3 aşaması). Bunlar kullanıcıdaki native testle karıştırılmamalıdır.
+
+**Karar: PIV-09 DONE.** İki decoder'ın eşzamanlı gerçek çalışma aralığı `NOT MEASURED`; test bunun yerine iki bağımsız yükleme ve aktif yüklemede iptali kanıtlar. Faz 0 temiz native kurulumun bağımsız tekrarı, DESKTOP-06 gerçek Nautilus testi ve diğer bağımsız kapılar **açık** kalır. PIV-10 **TODO / başlamadı**. Üretim/sandbox politikası değiştirilmedi, yalnız sonuçlar belgelendi. Bu kayıt commit'inin SHA'sı Git geçmişinden doğrulanır; burada önceden tahmin edilmez.

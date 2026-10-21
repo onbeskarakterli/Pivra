@@ -5,6 +5,17 @@ use gtk::{gio, glib};
 use std::path::PathBuf;
 
 pub(super) fn build(window: &adw::ApplicationWindow, path: PathBuf) -> gtk::Overlay {
+    build_with_completion(window, path, || {})
+}
+
+// Internal lifecycle observation: called on the GTK context after the real GIO
+// worker has joined, including cancellation. Production uses the no-op above.
+// This does not intercept decoding or change the cancellation/result guards.
+pub(super) fn build_with_completion(
+    window: &adw::ApplicationWindow,
+    path: PathBuf,
+    on_completion: impl FnOnce() + 'static,
+) -> gtk::Overlay {
     let picture = gtk::Picture::builder()
         .content_fit(gtk::ContentFit::ScaleDown)
         .can_shrink(true)
@@ -39,6 +50,7 @@ pub(super) fn build(window: &adw::ApplicationWindow, path: PathBuf) -> gtk::Over
         let result = job
             .await
             .unwrap_or_else(|_| Err("Image worker failed".into()));
+        on_completion();
         if cancellable.is_cancelled() {
             return;
         }

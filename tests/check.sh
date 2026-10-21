@@ -7,6 +7,7 @@ fi
 cd "$(dirname "${BASH_SOURCE[0]}")/.."
 python3 tests/fixtures/generate.py --check
 python3 tests/fixtures/images/generate.py --check
+python3 -B tests/test_active_decode_observer.py
 cargo +stable fmt --check
 cargo +stable check --locked --offline -j 2
 cargo +stable build --locked --offline -j 2

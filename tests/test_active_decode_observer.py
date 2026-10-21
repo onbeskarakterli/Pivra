@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Observer guard tests only; these never certify a real decoder or GUI PASS."""
 import os
+import mmap
 from pathlib import Path
 import struct
 import tempfile
@@ -56,6 +57,26 @@ class ObserverGuards(unittest.TestCase):
         self.assertEqual(chunks[0], b'IHDR')
         self.assertEqual(chunks[-1], b'IEND')
         self.assertEqual(zlib.decompress(compressed), (b'\0' + probe.COLOR * 8) * 3)
+
+    def test_retained_observer_fd_is_not_enough_after_decoder_unmaps_or_closes(self):
+        fd = os.memfd_create('glycin-frame', os.MFD_CLOEXEC)
+        retained = os.dup(fd)
+        entry = Path(f'/proc/{os.getpid()}/fd/{fd}')
+        try:
+            os.ftruncate(fd, probe.SIZE)
+            os.pwrite(fd, probe.COLOR * 32, 0)
+            with mmap.mmap(fd, probe.SIZE) as mapping:
+                self.assertEqual(mapping[:3], probe.COLOR)
+                self.assertTrue(probe.owned_partial(os.getpid(), entry, retained))
+            self.assertTrue(probe.partial(retained))
+            self.assertFalse(probe.owned_partial(os.getpid(), entry, retained), 'unmapped output is not active')
+        finally:
+            os.close(fd)
+        try:
+            self.assertTrue(probe.partial(retained))
+            self.assertFalse(probe.owned_partial(os.getpid(), entry, retained), 'closed output is not active')
+        finally:
+            os.close(retained)
 
     def test_linux_process_identity_is_not_just_pid(self):
         state, birth = probe.stat(os.getpid())

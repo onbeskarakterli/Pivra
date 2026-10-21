@@ -82,6 +82,28 @@ def partial(fd):
             and os.pread(fd, 96, SIZE - 96) == bytes(96))
 
 
+def owned_partial(pid, entry, frame):
+    # Our read-only FD can outlive the decoder's buffer. Recheck ownership AND
+    # its writable shared mapping after SIGSTOP, not just our retained copy.
+    try:
+        owner = os.stat(entry)
+        observed = os.fstat(frame)
+        if (owner.st_dev, owner.st_ino) != (observed.st_dev, observed.st_ino):
+            return False
+        if os.readlink(entry) != '/memfd:glycin-frame (deleted)' or not partial(frame):
+            return False
+        for line in Path(f'/proc/{pid}/maps').read_text().splitlines():
+            fields = line.split(maxsplit=5)
+            if len(fields) < 6 or fields[1] != 'rw-s' or int(fields[4]) != owner.st_ino:
+                continue
+            start, end = (int(value, 16) for value in fields[0].split('-'))
+            if end - start >= SIZE and fields[5] == '/memfd:glycin-frame (deleted)':
+                return True
+    except FileNotFoundError:
+        return False
+    return False
+
+
 def stopped(pid):
     tasks = list(Path(f'/proc/{pid}/task').iterdir())
     return bool(tasks) and all(stat(int(t.name))[0] == 'T' for t in tasks)
@@ -202,13 +224,14 @@ def run(binary, report):
                                 stop_deadline = time.monotonic() + 2
                                 while not stopped(pid) and time.monotonic() < stop_deadline:
                                     time.sleep(0.001)
-                                if not stopped(pid) or not partial(frame):
+                                if not stopped(pid) or not owned_partial(pid, entry, frame):
                                     raise NotRun('partial-frame race missed; cannot certify active read_image at close')
                                 evidence['stop_confirmed_monotonic'] = time.monotonic()
                                 evidence.update(loader_pid=pid, loader_starttime=birth,
+                                                loader_output_fd=entry.name, output_inode=os.fstat(frame).st_ino,
                                                 executable=executable, output_prefix_hex=os.pread(frame, 96, 0).hex(),
                                                 output_tail_hex=os.pread(frame, 96, SIZE-96).hex(),
-                                                active_checkpoint='all threads stopped; prefix exact RGB; tail zero; worker not yet returned')
+                                                active_checkpoint='all threads stopped; loader owns writable shared frame; prefix exact RGB; tail zero; worker not yet returned')
                                 print('EVIDENCE real loader mid-frame, incomplete output pinned:', pid, flush=True)
                                 break
                     except (FileNotFoundError, ProcessLookupError):

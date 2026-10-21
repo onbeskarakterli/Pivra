@@ -1245,3 +1245,89 @@ Faz 0 ve önceki bağımsız test kategorilerinin durumları kendiliğinden değ
 | `8359d7fa974e32d790a0e4a7110764711629a574` | Kullanıcı geometri PASS kaynağı, kesin native komut, yöntem/sınırlar ve Codex NOT RUN JSON'u |
 
 Bu takip kaydı commit'inin kendi SHA'sı Git geçmişi ve son push raporundadır.
+
+
+## PIV-09 aktif decode gözlemci teşhisi / v2 — 21.10.2026
+
+Başlangıç temiz `dev`: `f363425732817ad562e7bda423f471f079f29e4a`.
+PIV-09 **TESTING** kalır. `main` korunacak SHA:
+`5d55ee599df4617bd51c09b1c7a008b8d0ece480`; PIV-10 başlamadı.
+
+### Kullanıcı native teşhis kanıtı — bağımsız Codex çalıştırması değildir
+
+Arch Glycin 2.2.3 / Bubblewrap 0.13.1; proc erişimi ve Python pidfd mevcut.
+Kullanıcı gerçek glycin-image-rs sürecinin 8.285 kez örneklendiğini, beklenen
+memfd'nin 30 kez görüldüğünü, mapping ve tam 96.000.000 byte boyut bulunduğunu,
+Python/proc erişim hatası olmadığını aktardı. Tek ilk örnekten ilk 12 byte
+`1153bf1153bf1153bf1153bf`, son 12 byte sıfır. Son native active-close sonucu
+**NOT RUN/exit77**. Test edilen teşhis binary/driver tam SHA'sı bu yeni kullanıcı
+bildiriminde ayrıca verilmedi; yeni v2 commit'lerine atfedilmedi.
+
+Bu kanıt beklenen RGB/memfd biçimini destekler; 96-byte prefix/tail koşullarının
+aynı STOP sonrası checkpoint'te geçmesi, loader sahipliği/mapping ve load pending
+kanıtı değildir. Önceki kullanıcı JPEG/PNG/EXIF/geometri PASS'leri korunur; yalnız
+aktif-decode kapanış/temizlik kapısı açık kalır. Decoder sürelerinin zamansal
+çakışması NOT MEASURED kalır.
+
+### İnceleme bulgusu ve değişiklik
+
+Eski kod gözlemi target `view/present` döndükten sonra başlatıyordu. Her tur set
+sıralı tam process/executable/fd keşfi yapıyordu; tek fd kaybolması kalan fd'leri
+atlatabiliyordu. Kısmi adaydan sonra pidfd açımı, yeniden ağaç üyeliği ve
+namespace/status okumaları SIGSTOP'u geciktiriyordu. Hangi boolean'ın başarısız
+olduğu raporlanmıyordu. Bunlar kaynakta doğrulanan kör aralık/maliyetlerdir;
+**native exit77'nin kesin tek nedeni eldeki kanıtla belirlenmedi.** Proc engeli
+veya ABI uyumsuzluğu şeklinde yeni teşhis uydurulmadı.
+
+V2, TARGET_STARTING/ARMED bariyeriyle gözlemci hazır olmadan target oluşturmaz.
+PID'ler sıralı keşfedilir, kimlik/UID/executable/descendant ve starttime tekrar
+kontrol edilerek pidfd örnekleme öncesi pin edilir. Doğru boyutlu çıktı fd'si
+cache edilir; sonraki poll'lar ağaç taraması yapmaz, yaklaşık 0,2 ms hedef aralığı
+kullanır. Bu gerçek frekans garantisi değildir: örnek başlangıç/bitişi ve en büyük
+örnek aralığı JSON'a yazılır. Yanlış boyutlu memfd ve tekil kaybolan fd sonraki
+adayları gizlemez. Kısmi adayda hemen pidfd SIGSTOP; pahalı namespace/status ve
+aynı sıkı ownership/mapping/security koşulları STOP sonrasında yapılır.
+
+Tüm canlı örnekleme aralığında stdout bufferlanır; sonuçta ilk aşama geçişleri ve
+sayaçlar basılır. Baseline, loader, pin, memfd, boyut, tam 96-byte prefix, sıfır tail,
+aynı örnekte partial, stop, sahiplik, mapping, sandbox, Rust pending checkpoint,
+join ve cleanup ayrı raporlanır. İlk/son ve son kısmi örnekler faz/zaman/fd/inode
+ile saklanır. Farklı örneklerdeki prefix ve tail başarıları birleştirilemez.
+Tamamlanmış frame, kaybolmuş mapping, yanlış PID, izin reddi ve stop timeout hiçbir
+zaman aktif checkpoint PASS'i olmaz. Üretim decoder/sandbox yavaşlatılmadı veya
+gevşetilmedi; src/Cargo/data/fixture içerikleri bu devamda değişmedi.
+
+### Bu devamda gerçekten çalıştırılan kısa kontroller
+
+| Kontrol | Gerçek Codex sonucu |
+|---|---|
+| `bash tests/check.sh` | PASS: iki fixture manifesti; fmt, check, build, test, all-targets Clippy -D warnings; stable/locked/offline -j2 |
+| Rust testleri | **49 PASS** (25 unit + 24 integration), 0 failed/ignored |
+| Python gözlemci unit | **17 PASS**; önceki 6 guard ve 11 yeni tanı/race senaryosu |
+| Yeni negatif senaryolar | 12/96-byte farkı, farklı örneklerin birleştirilmemesi, STOP öncesi tamamlanma, PID reuse, mapping/security reddi, izin reddi, tüm thread stop timeout; native decoder PASS'i değildir |
+| Gözlem akışı unit | Arm-before-discovery, kaybolan erken fd sonrasındaki frame, dört cache okumasında yalnız pin/ilk-keşif ağaç kontrolleri; sıcak döngüde stdout flush yok |
+| Rust example build/check ve shell wrapper `bash -n` | PASS |
+| Python -O assertion guard | PASS: exit2 ile çalışmayı reddeder |
+| Yeni gerçek probe Xvfb + zorunlu secure loader | **NOT RUN / exit77**: baseline secure decode başlamadı; first_uncompleted_stage=baseline_decoded |
+| Yeni native v2 aktif checkpoint/kapanış/temizlik | **NOT RUN**, kullanıcı henüz çalıştırmadı |
+| git diff --check; src/Cargo/data/fixture diff | PASS; production kaynakları/bağımlılıkları ve mevcut fixture/pixel assertion'ları korunur |
+
+Yeni Codex kanıtı: [PIV09_ACTIVE_DECODE_OBSERVER_V2_CODEX.json](probes/PIV09_ACTIVE_DECODE_OBSERVER_V2_CODEX.json).
+Önceki 8 scoped GUI regresyonu tarihçedir; bu yalnız gözlemci/test değişikliğinde
+yeni görüntü/GUI PASS'i iddia edilmedi. Codex UID-map sandbox kısıtı aşılmadı.
+
+**Yalnız native son test kullanıcıya kalır:** güncel dev checkout'unda
+`bash tests/run_active_decode_close.sh`. Betik eşleşen Rust probe'u locked build
+eder ve native Wayland sürücüsünü çalıştırır. Sonuç JSON'u
+`/tmp/pivra-active-decode-close.json`; exit0 ve result=PASS birlikte gerekir.
+[Ayrıntılı yöntem/yorumlama](PIV09_ACTIVE_DECODE_TEST.md).
+PIV-09 TESTING, DONE değil; son native kanıttan sonra kapanış değerlendirilecek.
+
+| Gerçek commit SHA | İçerik |
+|---|---|
+| `26c2846f940e1d867e8acf02090dc7ad35c8f48b` | Başlatma bariyeri, cached pidfd/frame gözlemi, ayrıntılı tanı, 17 guard ve tek native giriş betiği |
+| `083bff60f3b4cd33a92b55e77a9dfadc6fb45239` | stdout backpressure'ını tüm canlı örnekleme döngüsünden çıkarma ve ilgili unit kontrolü |
+| `cfe01b288b8e1daf9f7cce2dbd8f39eb4481a7b4` | Kullanıcı teşhis kanıtının sınırları, README/teknik/yol haritası/test komutu ve güncel Codex NOT RUN kaydı |
+
+Bu takip kaydı ayrı commit'tir; kendi SHA'sı Git geçmişi ve push raporundadır.
+Normal push sonrasında origin/dev eşitliği ve main korunması doğrulanır.

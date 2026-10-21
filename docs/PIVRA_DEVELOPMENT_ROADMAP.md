@@ -1,6 +1,6 @@
 # Pivra — Geliştirme Yol Haritası
 
-**Durum:** PIV-01–07 DONE (PIV-06 giriş altyapısı, PIV-07 sırasız klasör adayları); PIV-08–60 TODO. Faz 0 INCOMPLETE: temiz native kurulumun bağımsız yeniden üretimi NOT RUN; temiz Cargo target derlemesi ve headless regresyonlar geçti. [PIV-05 kanıtı ve ayrı faz kapısı](PIVRA_TECHNICAL_CAPABILITIES.md#102-piv-05-ve-faz-0-kapanışını-ayrı-değerlendirme).
+**Durum:** PIV-01–08 DONE (giriş, keşif ve doğal sıra); PIV-09–60 TODO. Faz 0 INCOMPLETE: temiz native kurulumun bağımsız yeniden üretimi NOT RUN; temiz Cargo target derlemesi ve headless regresyonlar geçti. [PIV-05 kanıtı ve ayrı faz kapısı](PIVRA_TECHNICAL_CAPABILITIES.md#102-piv-05-ve-faz-0-kapanışını-ayrı-değerlendirme).
 **Başlangıç branch:** `dev` · **Kararlı sürümler:** `main`  
 **Kaynak şartname:** [PIVRA_FEATURE_SPEC_TR.md](PIVRA_FEATURE_SPEC_TR.md)  
 **Görev ve commit takibi:** [PIVRA_COMMIT_TRACKER.md](PIVRA_COMMIT_TRACKER.md)
@@ -129,3 +129,14 @@ sözleşmesi genişletilmedi. Ayrıntılı politika/testler README ve takip tabl
 
 PIV-05 medya/sandbox riskleri, DESKTOP-06 gerçek Nautilus ve Faz 0 temiz native
 kurulum kapıları açık kalır. Fiziksel GNOME ve Weston normal kapanış NOT RUN.
+
+## PIV-08 doğal sıra — 21.10.2026
+
+PIV-07 read_dir sırası artık katalog kurulmadan önce worker'da ortak doğal sıraya
+çevrilir; açılan exact alias/yol sıralamadan sonra seçilir. ASCII katlama,
+overflow'suz sayı blokları, primary eşitliğinde kısa sayı bloğu ve ham filename/
+full-path byte tie-break kullanılır. Türkçe locale collation, Unicode normalization
+ve non-ASCII case-fold yok. Raw Linux adları korunur. Ayrıntılı politika ve 47 test
+kanıtı README/takip tablosundadır. PIV-08 DONE; PIV-09 başlamadı. Medya/sandbox,
+DESKTOP-06 ve Faz 0 temiz native kurulum kapıları açık kalır; fiziksel GNOME ve
+Weston normal kapanış NOT RUN. Decoder/player/gezinme eklenmedi.

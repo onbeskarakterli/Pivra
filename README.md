@@ -3,7 +3,7 @@ A fast, lightweight GNOME image viewer with seamless photo and video navigation,
 
 ## Development status
 
-**PIV-01: DONE. PIV-02: GTK4/libadwaita shell implemented and validated on 2026-10-21, on `dev`.** No image/video functionality, media engine or CI is included. PIV-03 separates application, window, CLI and core data responsibilities without changing that behavior. PIV-04 adds deterministic fixtures and isolated Rust/X11/headless Wayland test infrastructure. PIV-05 records versioned GTK/Glycin/GStreamer capability probes and explicit runtime gaps; production dependencies are unchanged. PIV-06 adds local photo path/URI input and a decoder-free file placeholder. PIV-07 discovers unsorted neighboring image/video candidates on a worker and preserves the opened selection. PIV-08 has not started.
+**PIV-01: DONE. PIV-02: GTK4/libadwaita shell implemented and validated on 2026-10-21, on `dev`.** No image/video functionality, media engine or CI is included. PIV-03 separates application, window, CLI and core data responsibilities without changing that behavior. PIV-04 adds deterministic fixtures and isolated Rust/X11/headless Wayland test infrastructure. PIV-05 records versioned GTK/Glycin/GStreamer capability probes and explicit runtime gaps; production dependencies are unchanged. PIV-06 adds local photo path/URI input and a decoder-free file placeholder. PIV-07 discovers unsorted neighboring image/video candidates on a worker and preserves the opened selection. PIV-08 naturally orders the unified catalog while preserving the opened selection. PIV-09 has not started.
 
 See [technical capabilities and open prerequisites](docs/PIVRA_TECHNICAL_CAPABILITIES.md) and [verified results and commit evidence](docs/PIVRA_COMMIT_TRACKER.md). PIV-05 is DONE; Phase 0 remains INCOMPLETE because a fresh native environment installation has not been independently reproduced. A clean Cargo target build and the existing headless regressions passed.
 
@@ -19,12 +19,13 @@ Launching without arguments opens a blank `Pivra` window with a native libadwait
 | `src/app.rs` | GTK initialization, NON_UNIQUE + HANDLES_OPEN, activate/open lifecycle; input boundary, windows and settings |
 | `src/window.rs` | Native header/viewport, window-owned file/catalog context, worker completion/cancellation and decoder-free status; settings dimensions |
 | `src/lib.rs` | Expose GUI-independent models, std-only folder discovery and shared application name |
-| `src/discovery.rs` | Nonrecursive candidate classification, read-only inspection, unsorted catalog/selection and explicit scan issues; no GTK/GIO |
+| `src/discovery.rs` | Nonrecursive candidate classification, read-only inspection, naturally ordered catalog/selection and explicit scan issues; no GTK/GIO |
+| `src/natural.rs` | Pure byte-preserving natural filename/path comparison, no I/O or GTK |
 | `src/media.rs` | `MediaItem`: supplied path and explicit `MediaKind`; no existence checks, extension guessing or decoding |
 | `src/catalog.rs` | `MediaCollection`: caller-ordered items and a bounded selection; depends only on media |
 | `src/settings.rs` | In-memory window defaults (960×640); no globals, persistence or GSettings |
 
-The core library has no GTK/GIO imports and no dependency back into app/CLI/window. The binary depends on it, not the reverse. Core edges are `catalog -> media` and `discovery -> catalog/media`; there are no module dependency cycles. PIV-03 left native Cargo dependencies and Cargo.lock unchanged; PIV-04 adds only the test-only `tempfile` dependency.
+The core library has no GTK/GIO imports and no dependency back into app/CLI/window. The binary depends on it, not the reverse. Core edges are `catalog -> media` and `discovery -> catalog/media/natural`; there are no module dependency cycles. PIV-03 left native Cargo dependencies and Cargo.lock unchanged; PIV-04 adds only the test-only `tempfile` dependency.
 
 A collection starts with its first item selected, or no selection if empty. Selecting an out-of-range index returns false and leaves the current item unchanged; callers receive an immutable item slice. Input order is preserved exactly. Directory discovery, natural sorting, next/previous actions, looping, file watching and UI/catalog wiring are deliberately outside PIV-03. The media kind is caller-provided metadata, not proof that a file is supported or readable. Settings currently carry only the dimensions actually used by the window; system theme behavior remains inherited.
 
@@ -268,8 +269,7 @@ Unsupported extensions are ignored without decoding or content sniffing.
 Linux non-UTF-8 filename bytes are retained in paths; only display text is lossy.
 
 Selection uses the **opened alias/path**, not the first enumerated entry or
-canonical target. The folder's enumeration order is unspecified and preserved;
-there is no lexical/natural order promise before PIV-08. If the opened entry has
+canonical target. At PIV-07 the enumeration order was unspecified; PIV-08 now sorts the completed candidate list naturally (policy below). If the opened entry has
 disappeared or is no longer an accessible candidate, neighbor discovery fails.
 A standalone empty/no-candidate directory yields an empty collection with no
 selection; the app never substitutes an arbitrary neighbor for its opened file.
@@ -324,5 +324,63 @@ GTK_A11Y=none GSK_RENDERER=cairo GDK_BACKEND=x11 \
   xvfb-run -a dbus-run-session -- python3 tests/discovery_smoke.py
 ```
 
-**PIV-07 DONE; PIV-08 not started.** PIV-05 media/sandbox risks, PIV-06
+**PIV-07 DONE; PIV-08 completion is recorded below.** PIV-05 media/sandbox risks, PIV-06
 DESKTOP-06, and the separate Phase 0 clean-native-install gate remain open.
+
+
+### PIV-08 natural filename order — 2026-10-21
+
+The completed candidate list is now naturally sorted in the existing worker,
+before catalog construction and opened-path selection. Images/videos share one
+order. Paths/kinds are unchanged; the opened alias remains selected even when
+`foto10.jpg` sorts after `foto1.jpg`. Other MediaCollection callers still retain
+caller order; no generic reordering/navigation API was added.
+
+The pure std-only `natural::compare_paths` compares the **whole filename including
+extension**, using Linux OS bytes without lossy UTF-8 conversion:
+
+1. Primary comparison folds only ASCII A–Z. Maximal ASCII 0–9 runs compare by
+   significant digit count then digit bytes, ignoring leading zeros. No integer
+   parsing occurs; number length cannot overflow an integer conversion.
+2. Only when the entire primary comparison ties, the first different numeric-run
+   width decides: fewer leading zeros first (`foto2 < foto02 < foto002`). Later
+   primary tokens take precedence over padding (`a02b3 < a2b10`).
+3. Remaining ties use exact filename bytes (uppercase before lowercase when all
+   primary tokens/widths tie), then exact full-path bytes for identical filenames
+   in different parents. Identical byte paths compare equal; no canonicalization.
+
+Examples: `foto1.jpg, foto2.mp4, foto10.jpg`; same roots use extension text:
+`same.jpg, same.mp4, same.png`. Signs, decimals and punctuation are ordinary bytes;
+non-ASCII digits are not number tokens. This is **not Turkish locale collation**,
+Unicode case folding or normalization. ASCII I/i fold; dotted İ and dotless ı
+remain distinct byte sequences. Tested example: `I2, i2, ç2, İ2, ı2, ş2, 🦀2`.
+Invalid UTF-8 Linux filenames are compared and preserved as raw bytes.
+
+In-place sorting has no comparator I/O or allocations/new crate. Cost is
+O(N log N × L) byte-comparison work (L: compared filename/path length), not a
+benchmark claim. Cancellation checks surround sorting and remain in enumeration;
+the standard sort itself is not preemptible. Existing close/weak-reference guards
+remain unchanged. Blocked syscall/network mounts, extreme directory scale and
+TOCTOU/RAM risks remain; no latency guarantee is claimed.
+
+Validation: **47 Rust tests passed (23 unit + 24 integration), 0 failed/ignored**;
+fmt/check/build/Clippy and fixtures passed. Five new comparator tests cover natural
+numbers, padding, extensions, multiple blocks, ASCII case, Unicode/raw bytes,
+10,000-digit values and an 18-name corpus checked for antisymmetry, equality,
+transitivity and rotated/reversed input independence. This is finite test evidence,
+not an exhaustive proof. Two new real-filesystem catalog tests assert mixed-media
+order under opposite creation orders and alias/raw-byte selection. The existing
+1,200-candidate test now checks the entire `0.png … 1199.png` sequence and selected
+index 917. Empty/single, discovery errors and cancellation regressions passed.
+
+X11/Sway empty and file/URI GUI tests passed with independent normal close/exit 0.
+Weston passed native mapped-surface/title/SHM-buffer/configure/commit checks in both
+modes; normal close remains NOT RUN. GIO desktop launch, desktop-file validation
+and X11 scan warning/failure UI checks passed. Actual order is asserted in real
+catalog tests; no list/navigation UI was added. Physical GNOME/Wayland and Nautilus
+DESKTOP-06 remain NOT RUN. See the tracker for exact commands and commit SHAs.
+
+**PIV-08 DONE; PIV-09 not started.** Direct CLI/GIO admission, JPEG/PNG MIME entry,
+video defaults, production dependencies and existing environment are unchanged.
+No decoder, player, navigation, thumbnail, zoom, watcher, CI or license was added.
+PIV-05 media/sandbox risks and the separate Phase 0 clean-native-install gate remain open.

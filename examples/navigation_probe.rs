@@ -13,8 +13,11 @@ use adw::prelude::*;
 use gtk::{gdk, glib};
 use std::{
     path::Path,
+    sync::atomic::{AtomicBool, Ordering},
     time::{Duration, Instant},
 };
+
+static REAL_BASELINE_PASSED: AtomicBool = AtomicBool::new(false);
 
 fn wait(mut ready: impl FnMut() -> bool) {
     let deadline = Instant::now() + Duration::from_secs(20);
@@ -130,6 +133,13 @@ fn image(window: &adw::ApplicationWindow, blocked: bool, size: (i32, i32)) {
         println!("SCOPED PASS current controlled image error; pixels BLOCKED");
     } else {
         if picture.paintable().is_none() {
+            // Once a valid real frame passed, later valid-image failures are
+            // regressions, not a passing skip or an environment-only blocker.
+            assert!(
+                !REAL_BASELINE_PASSED.load(Ordering::SeqCst),
+                "valid selected image failed after real baseline: {}",
+                label.text()
+            );
             eprintln!("BLOCKED real navigation pixels: {}", label.text());
             std::process::exit(77);
         }
@@ -164,6 +174,7 @@ fn image(window: &adw::ApplicationWindow, blocked: bool, size: (i32, i32)) {
         }
         assert_eq!(picture.content_fit(), gtk::ContentFit::ScaleDown);
         geometry(window, &picture);
+        REAL_BASELINE_PASSED.store(true, Ordering::SeqCst);
     }
 }
 

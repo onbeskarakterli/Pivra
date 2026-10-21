@@ -12,15 +12,13 @@ gevşetmesi, Codex aktivasyon betiği veya loader config değişikliği gerekmez
 Aşağıdaki komutlar deponun kökünde, gerçek GNOME Wayland oturumunda çalışır:
 
 ```sh
-set -e
-test "$(git branch --show-current)" = dev
-git pull --ff-only origin dev
-git rev-parse HEAD
-cargo build --locked --example active_decode_close_probe --target-dir target
-GDK_BACKEND=wayland python3 -B tests/active_decode_close.py \
-  --binary target/debug/examples/active_decode_close_probe \
-  --report /tmp/pivra-active-decode-close.json
+bash tests/run_active_decode_close.sh
 ```
+
+Önce `dev` checkout'unu normal fast-forward pull ile güncelleyin. Bu tek betik dev
+branch kontrolü yapar, gerçek HEAD'i yazar, `cargo build --locked` ile eşleşen
+Rust example'ı `target` altında derler ve GDK_BACKEND=wayland ile Python sürücüsünü
+başlatır. Böylece eski binary/yeni driver protokol karışıklığı önlenir.
 
 Sonuç JSON'u: `/tmp/pivra-active-decode-close.json`. **Exit0 ve result=PASS birlikte**
 başarılı kapıdır. Exit77 / NOT RUN gözlem veya decode kapısı sağlanamadı demektir;
@@ -41,8 +39,9 @@ aktif decode kabul edilmez. Test şu koşulların tamamını şart koşar:
    test sonunda silinir; fixture manifesti değişmez ve başka decoder kullanılmaz.
 3. Python yalnız kendi başlattığı probe'un yeni descendant süreçlerini izler.
    Aynı UID'li, gerçek executable adı `glycin-image-rs` olan loader aranır.
-   PID starttime + pidfd ile kimlik sabitlenir; sinyal öncesi descendant üyeliği ve
-   kimlik tekrar kontrol edilir. Başka oturum/process'lere sinyal gönderilmez.
+   PID starttime + pidfd ile kimlik örnekleme başlamadan sabitlenir; descendant
+   üyeliği ve kimlik bu pin aşamasında tekrar kontrol edilir. Sinyal pidfd üzerinden
+   yalnız o süreç kimliğine gider; STOP sonrasında starttime yeniden doğrulanır. Başka oturum/process'lere sinyal gönderilmez.
 4. Loader'ın `NoNewPrivs=1`, `Seccomp=2`, `CapEff=0` ve probe'dan ayrı user,
    mount, PID ve network namespace'leri doğrulanır. Üretim loader yolu yine
    `SandboxSelector::Bwrap` kullanır; hiçbir config/protokol/loader patch'i yoktur.
@@ -113,10 +112,77 @@ izinli memfd/maps/namespace gözlemleri engelleniyorsa host güvenliği değişt
 root/ptrace yetkisi istenmez: test NOT RUN kalır. SIGSTOP/SIGCONT yalnız testin
 kendi loader'ına zamanlama kontrolüdür; sandbox yetkisi veya erişimi genişletmez.
 
-`tests/test_active_decode_observer.py` altı negatif/pozitif gözlemci guard testi
+`tests/test_active_decode_observer.py` 17 negatif/pozitif gözlemci guard testi
 çalıştırır (gerçek decoder PASS'i değildir); core `tests/check.sh` içine eklenmiştir.
 Üretim Cargo.toml/Cargo.lock ve mevcut fixture/pixel assertion'ları korunmuştur.
-Codex JSON kaydı: [PIV09_ACTIVE_DECODE_CODEX.json](probes/PIV09_ACTIVE_DECODE_CODEX.json).
-Codex'te 49 Rust + 6 Python guard PASS; fmt/check/build/Clippy PASS. Gerçek yeni
+Önceki sürücü Codex JSON kaydı (tarihçe): [PIV09_ACTIVE_DECODE_CODEX.json](probes/PIV09_ACTIVE_DECODE_CODEX.json).
+Codex'te 49 Rust + 17 Python guard PASS; fmt/check/build/Clippy PASS. Gerçek yeni
 probe yalnız baseline decode kapısına kadar çalışabildi ve exit77 verdi.
 **PIV-09 TESTING; aktif decode kapanışının native sonucu henüz yok. PIV-10 başlamadı.**
+
+
+## 21.10.2026 — native NOT RUN teşhisi ve gözlemci v2
+
+**Kullanıcı tarafından aktarılan Arch kanıtı; Codex tarafından bağımsız üretilmedi:**
+Glycin 2.2.3 / Bwrap 0.13.1 ortamında gerçek image-rs loader 8.285 kez örneklendi,
+memfd 30 kez görüldü; `/proc` veya Python erişim hatası olmadı ve pidfd mevcuttu.
+96.000.000 byte buffer ve mapping görüldü. Tek ilk örneğin ilk 12 byte'ı
+`1153bf1153bf1153bf1153bf`, son 12 byte'ı sıfırdı. Bu biçim beklentisini destekler;
+tam 96-byte prefix/tail ve STOP sonrası sahiplik/mapping/worker koşulları aynı
+checkpoint'te doğrulanmadığından yeni aktif-decode PASS'i değildir.
+
+Önceki sürücüde kesin görülen maliyet/kör aralıklar:
+
+- TARGET_STARTED, worker'ın başlatıldığı `view()` ve `present()` dönüşünden sonra
+  yazılıyordu. Gözlemci bu bildirimi beklediğinden decode daha önce başlayabiliyordu.
+- Her poll tam descendant/executable/fd keşfi yapıyor, sıra set sırasına bağlı
+  kalıyordu. Tek kaybolan descriptor hatası kalan fd'lerin taranmasını atlatabiliyordu.
+- Kısmi adaydan sonra pidfd açımı, yeniden tam ağaç taraması ve namespace/status
+  okumaları yapılıyor, SIGSTOP daha sonra gönderiliyordu.
+- Boolean retler hangi koşulun eksik kaldığını saklıyordu. İlk 12 byte ile sürücünün
+  istediği tam 96 byte koşulları birbirinden ayrıştırılamıyordu.
+
+Bunlar kod incelemesi bulgularıdır; kullanıcının exit77 sonucunun kesin tek nedeni
+eldeki verilerle belirlenmedi. Sürüm/ABI uyumsuzluğu veya proc yasağı ilan edilmedi.
+
+Yeni protokol: survivor gerçek baseline decode yaptıktan sonra START gönderilir;
+Rust **TARGET_STARTING** yazar ve **ARMED** bekler. Gözlemci hazır olmadan target
+view/loader oluşturulamaz. Bu yalnız test başlatma bariyeridir; üretim decoder'ı
+yavaşlatılmaz veya değiştirilmez.
+
+PID'ler deterministik sırayla keşfedilir, pidfd bir kez pin edilir. Geçici fd
+kaybolmaları tek fd düzeyinde ele alınır. Yanlış boyutlu memfd açık tutulup doğru
+frame'i gizlemez. Tam boyuttaki çıktı fd'si read-only cache edilir; ardından yalnız
+bu fd yaklaşık 0,2 ms poll aralığıyla örneklenir, süreç ağacı tekrar taranmaz. Bu
+sleep hedefidir; gerçek scheduler/okuma süreleri için JSON örnek zamanları ve
+`max_sample_gap_seconds` incelenmelidir; sabit gerçek örnekleme frekansı iddiası yoktur.
+
+Kısmi adayda SIGSTOP hemen gönderilir. Namespace/status/ownership/mapping kontrolleri
+**durduktan sonra**, aynı sıkı koşullarla yapılır. Tanı stdout yazımları tüm canlı
+örnekleme aralığı boyunca bufferlanır ve sonuçta basılır; aday→STOP yolunda stdout
+yazımı yoktur. PID kimliği, tüm thread'lerin T durumu, tam 96-byte
+prefix ve tail, fd/inode/writable-shared mapping, namespace/NoNewPrivs/seccomp/CapEff,
+Rust load pending ve sonraki tüm kapanış/temizlik ölçütleri aynen zorunludur.
+
+JSON ve ilk-geçiş DIAG satırları: baseline_decoded, target_starting, observer_armed,
+loader_found, pidfd_pinned, memfd_found, size_correct, prefix_correct, tail_zero,
+partial_candidate, stop_requested/stop_complete, fd_owned, mapping_verified,
+sandbox_verified, checkpoint_certified ve kapanış/join/cleanup aşamalarını ayırır.
+Sayaçlar her gözlemi sayar, stdout yalnız ilk geçişleri basar. İlk/son örnek ve son
+kısmi aday 96-byte hex, fd/PID/inode ve örnek başlangıç/bitiş zamanlarını içerir.
+`phase=candidate_before_stop` durdurulmuş atomik kanıt değildir; yalnız `phase=stopped`
+ile yeniden kontrol ve tüm sonraki kapılar nihai PASS'e götürebilir. Ayrı örneklerde
+prefix ve tail başarıları birleştirilemez. `first_uncompleted_stage`, `failed_stage`
+(varsa) ve son örnek, geçişin nerede durduğunu gösterir. Ham bağımsız koşul sayaçları
+tek başlarına başarı sertifikası değildir.
+
+17 unit test içinde STOP sırası, tamamlanma yarışı, PID reuse, mapping/sandbox
+reddi, izin reddi, stop timeout, 12/96-byte farkı, farklı örneklerin birleştirilmemesi,
+kaybolan erken fd'nin sonraki frame'i gizlememesi ve cache poll sırasında ağaç
+keşfinin tekrarlanmaması vardır. Bu unit senaryoları gerçek decode taklidiyle native
+PASS üretmez; yalnız gözlemci kontrol akışını sınar.
+
+Güncel Codex kanıtı: [observer v2 JSON](probes/PIV09_ACTIVE_DECODE_OBSERVER_V2_CODEX.json).
+Baseline secure loader başlamadığı için `first_uncompleted_stage=baseline_decoded`,
+exit77/NOT RUN. Native v2 checkpoint/close yolu henüz çalıştırılmadı. İki decoder'ın
+zamansal çakışması NOT MEASURED kalır. **PIV-09 TESTING; PIV-10 başlamadı.**

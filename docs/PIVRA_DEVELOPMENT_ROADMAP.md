@@ -183,3 +183,14 @@ beklenir. [Yeni kontrollü test ve native komut](PIV09_ACTIVE_DECODE_TEST.md) ge
 secure loader'ın kısmi çıktı yazımını kanıtlamadan pencere kapatma PASS'i vermez.
 Codex baseline sandbox kapısında exit77; güvenlik gevşetilmedi. 49 Rust + 6 guard
 regresyonu PASS. PIV-09 TESTING, DONE değil; PIV-10 başlamadı.
+
+
+### PIV-09 gözlemci v2 — teşhis ve son native kapı
+
+Kullanıcı beklenen memfd boyutu/ilk-son 12 byte'ı ve erişim hatası olmadığını
+bildirdi; bu aktif checkpoint PASS'i değildir. Gözlem test başlatılmadan önce
+ARMED bariyeriyle hazırlanır, doğru boyutlu frame fd'si cache edilir; tam 96-byte
+ve STOP/kimlik/mapping/sandbox kriterleri korunarak aşama tanıları eklenir.
+Native ortamda tek komut: `bash tests/run_active_decode_close.sh`.
+Codex: 49 Rust + 17 Python unit PASS; gerçek secure baseline exit77/NOT RUN.
+Yeni native sonuç bekleniyor; PIV-09 TESTING, PIV-10 başlamadı.

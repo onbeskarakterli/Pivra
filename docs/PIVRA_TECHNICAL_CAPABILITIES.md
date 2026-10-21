@@ -610,3 +610,34 @@ kapısında **BLOCKED exit77**, pozitif active-close yolu NOT RUN. Salt okunur p
 UID-map engeli değişmedi. Native pozitif test henüz bildirilmedi. Host güvenliği,
 Cargo bağımlılıkları ve Glycin Bwrap zorunluluğu değiştirilmedi.
 **PIV-09 TESTING; PIV-10 başlamadı.**
+
+
+## 16. PIV-09 gözlemci v2 teşhisi
+
+Kullanıcı Arch Glycin 2.2.3 / Bwrap 0.13.1 ortamında pidfd ve proc erişiminin
+çalıştığını bildirdi: image-rs 8.285 kez örneklendi; beklenen frame memfd/mapping
+ve 96.000.000 byte boyut görüldü, buffer 30 kez gözlendi. İlk tek örneğin ilk
+12 byte'ı `1153bf1153bf1153bf1153bf`, son 12 byte'ı sıfır. Python erişim hatası yok.
+Bu **kullanıcı kanıtı**, Codex ölçümü değildir. Tam 96-byte koşullarının ve STOP
+sonrası sahiplik/mapping/Rust pending koşullarının birlikte geçtiği kanıtlanmadı;
+aktif-decode native testi NOT RUN kalır. Veri formatıyla uyumluluk desteklenir,
+sürüm/ABI sorunu veya proc yasağı bu sonuçtan çıkarılmaz.
+
+Kod incelemesi; gözlemin `view/present` sonrasında başlaması, her poll'da ağaç/fd
+keşfi ve kısmi adaydan sonra pahalı pre-STOP kontrolleri gibi kör aralıklar gösterdi.
+Tek fd kaybolmasının kalan taramayı atlatması da düzeltildi. Bunlar doğrulanmış kod
+bulguları, native başarısızlığın kesin tek nedeni değildir. Yeni TARGET_STARTING /
+ARMED bariyeriyle target loader gözlem hazır olmadan başlamaz; pidfd ve doğru boyutlu
+memfd cache edilerek 0,2 ms hedef poll kullanılır. Gerçek zamanlar JSON'dadır.
+Status/namespace kontrolleri STOP sonrasına taşındı; kabul koşulları korunur.
+
+Tanı çıktıları ayrı koşul sayaçları, ilk/son ve son kısmi 96-byte örnek, örnek
+zamanları, faz (running/candidate_before_stop/stopped), failed_stage ve
+first_uncompleted_stage içerir. Ayrı örneklerin başarıları birleştirilmez.
+[Kesin tek native komut ve tüm yorumlama](PIV09_ACTIVE_DECODE_TEST.md).
+Yeni wrapper yalnız test binary'sini derler; paket/production kaynak/Cargo bağımlılığı
+ve Bwrap zorunluluğu değişmedi. Codex core **49 Rust + 17 observer unit PASS**,
+fmt/check/build/Clippy PASS. Gerçek probe baseline secure load kapısında exit77:
+[güncel Codex JSON](probes/PIV09_ACTIVE_DECODE_OBSERVER_V2_CODEX.json).
+Native checkpoint/kapanış/temizlik pozitif yolu hâlâ NOT RUN. Decoder zaman
+aralıkları çakışması NOT MEASURED. PIV-09 TESTING; PIV-10 başlamadı.

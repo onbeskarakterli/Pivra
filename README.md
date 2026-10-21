@@ -672,3 +672,35 @@ catalog/error scopes; Weston normal close remains NOT RUN.
 
 **PIV-09 TESTING; only the active-decode close/cleanup result remains outstanding.
 PIV-10 has not started.**
+
+
+### PIV-09 active-decode observer diagnosis — 2026-10-21
+
+The user reports the old native test still exited77/NOT RUN despite detecting the
+real image-rs loader (8,285 process samples), the expected memfd/mapping (30 buffer
+observations), size 96,000,000 bytes, first 12 bytes `1153bf1153bf1153bf1153bf` and
+last 12 bytes zero, without proc access errors. These are **user-reported**, not
+Codex observations. One initial 12-byte sample supports the format but does not
+certify the full 96-byte conditions at an active stopped checkpoint.
+
+The driver previously started observing after window presentation and performed
+extra process/security discovery before STOP. These are verified timing risks,
+not a proven sole explanation for the native failure. The updated test arms its
+observer before target launch, pins PID/fd once, polls the cached output, handles
+transient fd races independently and checks security only after STOP. All original
+acceptance conditions remain; no production decoder or sandbox policy changed.
+Per-stage DIAG counters, exact samples/timestamps and first uncompleted stage now
+separate discovery, prefix/tail, stop, mapping/security and cleanup failures.
+
+After updating the `dev` checkout, the **single native GNOME Wayland command** is:
+
+```sh
+bash tests/run_active_decode_close.sh
+```
+
+It builds the matching Rust probe and writes `/tmp/pivra-active-decode-close.json`.
+[Full diagnostic interpretation](docs/PIV09_ACTIVE_DECODE_TEST.md).
+Codex: **49 Rust + 17 Python observer tests PASS**, fmt/check/build/Clippy PASS;
+real probe **NOT RUN/77 at baseline sandbox**. Native v2 active close is untested;
+two-decoder time overlap remains NOT MEASURED. **PIV-09 TESTING**, never DONE here;
+PIV-10 has not started.

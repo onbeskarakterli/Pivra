@@ -6,6 +6,10 @@ from pathlib import Path
 import struct
 import tempfile
 import unittest
+from unittest import mock
+from types import SimpleNamespace
+from contextlib import ExitStack
+import itertools
 import zlib
 
 import active_decode_close as probe
@@ -83,6 +87,151 @@ class ObserverGuards(unittest.TestCase):
         self.assertIn(state, 'RSDIT')
         self.assertGreater(birth, 0)
         self.assertNotIn(os.getpid(), probe.descendants(os.getpid()))
+
+
+class DiagnosisAndRaceGuards(unittest.TestCase):
+    def output(self):
+        output = tempfile.TemporaryFile()
+        self.addCleanup(output.close)
+        output.truncate(probe.SIZE)
+        os.pwrite(output.fileno(), probe.COLOR * 32, 0)
+        return output.fileno()
+
+    def checkpoint(self, frame, overrides=None):
+        order = []
+        defaults = {
+            'signal.pidfd_send_signal': lambda *_: order.append('STOP'),
+            'stopped': lambda _: True,
+            'stat': lambda _: ('T', 123),
+            'select.select': lambda *_: ([], [], []),
+            'owned_partial': lambda *_: order.append('mapping') or True,
+            'sandbox_evidence': lambda *_: order.append('sandbox') or {},
+        }
+        defaults.update(overrides or {})
+        evidence = {}
+        diagnostics = probe.Diagnostics(evidence)
+        with ExitStack() as patches:
+            for name, value in defaults.items():
+                patches.enter_context(mock.patch('active_decode_close.' + name, side_effect=value))
+            probe.stop_and_certify(99, 123, 88, Path('/proc/99/fd/7'), frame,
+                                  SimpleNamespace(pid=os.getpid()), evidence, diagnostics,
+                                  probe.frame_sample(frame))
+        return order, evidence
+
+    def test_twelve_good_prefix_bytes_are_insufficient(self):
+        frame = self.output()
+        os.pwrite(frame, bytes(96), 0)
+        os.pwrite(frame, probe.COLOR * 4, 0)
+        self.assertFalse(probe.partial(frame))
+
+    def test_twelve_zero_tail_bytes_are_insufficient(self):
+        frame = self.output()
+        os.pwrite(frame, bytes([1]) * 84 + bytes(12), probe.SIZE - 96)
+        self.assertFalse(probe.partial(frame))
+
+    def test_conditions_from_different_samples_do_not_certify_partial(self):
+        frame = self.output()
+        evidence = {}
+        diagnostics = probe.Diagnostics(evidence)
+        for stage in ('baseline_decoded', 'target_starting', 'observer_armed', 'loader_found',
+                      'pidfd_pinned', 'memfd_found'):
+            diagnostics.mark(stage)
+        os.pwrite(frame, probe.COLOR * 32, probe.SIZE - 96)
+        self.assertFalse(diagnostics.sample(1, Path('fd'), frame))
+        os.pwrite(frame, bytes(96), 0)
+        os.pwrite(frame, bytes(96), probe.SIZE - 96)
+        self.assertFalse(diagnostics.sample(1, Path('fd'), frame))
+        self.assertEqual(diagnostics.missing(), 'partial_candidate')
+        self.assertIn('prefix_correct', diagnostics.data['counts'])
+        self.assertIn('tail_zero', diagnostics.data['counts'])
+        self.assertIsNone(diagnostics.data['last_partial_sample'])
+
+    def test_expensive_security_and_mapping_checks_are_after_stop(self):
+        order, evidence = self.checkpoint(self.output())
+        self.assertEqual(order, ['STOP', 'mapping', 'sandbox'])
+        self.assertEqual(evidence['diagnostics']['last_sample']['phase'], 'stopped')
+        self.assertIn('checkpoint_certified', evidence['diagnostics']['counts'])
+        self.assertNotIn('result', evidence, 'unit checkpoint simulation is not a native gate PASS')
+
+    def test_completion_between_candidate_and_stop_is_not_run(self):
+        frame = self.output()
+        def complete(*_):
+            os.pwrite(frame, probe.COLOR * 32, probe.SIZE - 96)
+        with self.assertRaisesRegex(probe.NotRun, 'STOP race'):
+            self.checkpoint(frame, {'signal.pidfd_send_signal': complete})
+
+    def test_reused_pid_is_not_run_even_with_partial_output(self):
+        with self.assertRaisesRegex(probe.NotRun, 'identity changed'):
+            self.checkpoint(self.output(), {'stat': lambda _: ('T', 999)})
+
+    def test_missing_mapping_is_not_run(self):
+        with self.assertRaisesRegex(probe.NotRun, 'owned/mapped'):
+            self.checkpoint(self.output(), {'owned_partial': lambda *_: False})
+
+    def test_missing_sandbox_still_fails_after_stop(self):
+        def unsafe(*_):
+            raise AssertionError('missing isolation')
+        with self.assertRaisesRegex(AssertionError, 'missing isolation'):
+            self.checkpoint(self.output(), {'sandbox_evidence': unsafe})
+
+    def test_stop_permission_denial_is_not_a_certificate(self):
+        def denied(*_):
+            raise PermissionError('signal denied')
+        with self.assertRaises(PermissionError):
+            self.checkpoint(self.output(), {'signal.pidfd_send_signal': denied})
+
+    def test_stop_timeout_does_not_accept_a_running_loader(self):
+        clock = itertools.count()
+        with mock.patch('active_decode_close.time.monotonic', side_effect=lambda: next(clock)), \
+             mock.patch('active_decode_close.time.sleep'):
+            with self.assertRaisesRegex(probe.NotRun, 'every loader thread'):
+                self.checkpoint(self.output(), {'stopped': lambda _: False})
+
+    def test_disappearing_early_fd_does_not_hide_later_frame(self):
+        frame = self.output()
+        os.pwrite(frame, bytes(96), 0)
+        reads = []
+        real_sample = probe.frame_sample
+        def progress(fd):
+            reads.append(fd)
+            if len(reads) == 4:
+                os.pwrite(frame, probe.COLOR * 32, 0)
+            return real_sample(fd)
+        process = SimpleNamespace(pid=90000, poll=lambda: None)
+        first, good = Path('/proc/99/fd/1'), Path('/proc/99/fd/7')
+        armed = []
+        evidence = {}
+        diagnostics = probe.Diagnostics(evidence)
+        def children(_):
+            self.assertTrue(armed, 'observe must arm before process discovery')
+            return {99}
+        def link(path):
+            if str(path) == '/proc/99/exe':
+                return '/usr/lib/glycin-image-rs'
+            if path == first:
+                raise FileNotFoundError('transient descriptor')
+            self.assertEqual(path, good)
+            return '/memfd:glycin-frame (deleted)'
+        with mock.patch('active_decode_close.descendants', side_effect=children) as discover, \
+             mock.patch('active_decode_close.stat', return_value=('R', 123)), \
+             mock.patch('active_decode_close.os.readlink', side_effect=link), \
+             mock.patch('active_decode_close.Path.stat', return_value=SimpleNamespace(st_uid=os.getuid())), \
+             mock.patch('active_decode_close.Path.iterdir', return_value=[first, good]), \
+             mock.patch('active_decode_close.os.pidfd_open', side_effect=lambda _: os.dup(frame)), \
+             mock.patch('active_decode_close.select.select', return_value=([], [], [])), \
+             mock.patch('active_decode_close.os.open', side_effect=lambda *_: os.dup(frame)), \
+             mock.patch('active_decode_close.signal.pidfd_send_signal'), \
+             mock.patch('active_decode_close.frame_sample', side_effect=progress), \
+             mock.patch('builtins.print'), \
+             mock.patch('active_decode_close.stop_and_certify', side_effect=probe.NotRun('candidate reached')):
+            with self.assertRaisesRegex(probe.NotRun, 'candidate reached'):
+                probe.observe(process, set(), evidence, diagnostics, arm=lambda: armed.append(True))
+        self.assertEqual(len(reads), 4)
+        self.assertEqual(discover.call_count, 2, 'cached polling must not repeat tree scans')
+        self.assertEqual(diagnostics.data['counts']['fd_discovery_race'], 1)
+        self.assertEqual(diagnostics.data['counts']['memfd_found'], 1)
+        self.assertEqual(diagnostics.data['counts']['pidfd_pinned'], 1)
+        self.assertNotIn('checkpoint_certified', diagnostics.data['counts'])
 
 
 if __name__ == '__main__':

@@ -161,6 +161,9 @@ fn main() {
     let original = pixels(&survivor.picture);
     event("READY survivor_loaded");
     command(&commands, "START");
+    event("TARGET_STARTING");
+    // Observation must be armed before the real view can spawn its loader.
+    command(&commands, "ARMED");
     let target = view(&app, path);
     let closed = Rc::new(Cell::new(false));
     let mutations = Rc::new(Cell::new(0_u32));
@@ -177,7 +180,6 @@ fn main() {
             }
         });
     }
-    event("TARGET_STARTED");
     command(&commands, "CLOSE");
     // Parent has stopped a verified incomplete frame. These guards independently
     // reject a queued job or an already returned result at the close checkpoint.

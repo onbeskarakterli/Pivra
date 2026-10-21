@@ -6,7 +6,6 @@ memfd, briefly SIGSTOPs/rechecks it, then closes the real production view and re
 Exit 77 = BLOCKED/NOT RUN, including missing observation rights or missed timing.
 """
 import argparse
-import contextlib
 import hashlib
 import json
 import os
@@ -74,17 +73,86 @@ def descendants(pid):
     return result
 
 
+def frame_sample(fd):
+    began = time.monotonic()
+    before = os.fstat(fd)
+    prefix = os.pread(fd, 96, 0)
+    tail = os.pread(fd, 96, SIZE - 96) if before.st_size == SIZE else b''
+    after = os.fstat(fd)
+    return {'sample_begin_monotonic': began, 'sample_end_monotonic': time.monotonic(),
+            'size': before.st_size, 'inode': before.st_ino, 'device': before.st_dev,
+            'size_correct': before.st_size == after.st_size == SIZE,
+            'prefix_correct': prefix == COLOR * 32,
+            'tail_zero': tail == bytes(96),
+            'prefix_hex': prefix.hex(), 'tail_hex': tail.hex()}
+
+
 def partial(fd):
-    # All source RGB channels are nonzero. Prefix written + untouched zero tail
-    # proves read_image output is incomplete, not a merely allocated idle frame.
-    return (os.fstat(fd).st_size == SIZE
-            and os.pread(fd, 96, 0) == COLOR * 32
-            and os.pread(fd, 96, SIZE - 96) == bytes(96))
+    sample = frame_sample(fd)
+    return all(sample[name] for name in ('size_correct', 'prefix_correct', 'tail_zero'))
 
 
-def owned_partial(pid, entry, frame):
-    # Our read-only FD can outlive the decoder's buffer. Recheck ownership AND
-    # its writable shared mapping after SIGSTOP, not just our retained copy.
+class Diagnostics:
+    def __init__(self, evidence):
+        self.emitted = set()
+        self.data = evidence.setdefault('diagnostics', {
+            'counts': {}, 'first_events': {}, 'first_sample': None,
+            'last_sample': None, 'last_partial_sample': None, 'errors': []})
+
+    def mark(self, stage, **details):
+        counts = self.data['counts']
+        counts[stage] = counts.get(stage, 0) + 1
+        if stage not in self.data['first_events']:
+            event = {'monotonic': time.monotonic(), **details}
+            self.data['first_events'][stage] = event
+            # Flush outside the candidate-to-SIGSTOP path; stdout can block.
+
+    def flush(self):
+        for stage, event in self.data['first_events'].items():
+            if stage not in self.emitted:
+                print('DIAG', stage, json.dumps(event, sort_keys=True), flush=True)
+                self.emitted.add(stage)
+
+    def error(self, operation, error):
+        self.mark('proc_error', operation=operation, error=str(error))
+        if len(self.data['errors']) < 16:
+            self.data['errors'].append({'operation': operation, 'error': str(error)})
+
+    def sample(self, pid, entry, fd, phase="running"):
+        return self.record_sample(pid, entry, frame_sample(fd), phase)
+
+    def record_sample(self, pid, entry, raw, phase='running'):
+        sample = {'pid': pid, 'fd': str(entry), 'phase': phase, **raw}
+        previous = self.data['last_sample']
+        if previous is not None:
+            gap = max(0., raw['sample_begin_monotonic'] - previous['sample_end_monotonic'])
+            self.data['max_sample_gap_seconds'] = max(self.data.get('max_sample_gap_seconds', 0.), gap)
+        self.mark('frame_sampled')
+        if self.data['first_sample'] is None:
+            self.data['first_sample'] = sample
+        self.data['last_sample'] = sample
+        for key in ('size_correct', 'prefix_correct', 'tail_zero'):
+            if sample[key]:
+                self.mark(key, pid=pid, fd=str(entry))
+        if all(sample[key] for key in ('size_correct', 'prefix_correct', 'tail_zero')):
+            self.data['last_partial_sample'] = sample
+            self.mark('partial_candidate', pid=pid, fd=str(entry))
+            return True
+        return False
+
+    def missing(self):
+        # Independent per-sample successes never certify a combined checkpoint.
+        for stage in ('baseline_decoded', 'target_starting', 'observer_armed', 'loader_found', 'pidfd_pinned', 'memfd_found', 'size_correct',
+                      'prefix_correct', 'tail_zero', 'partial_candidate', 'stop_complete',
+                      'fd_owned', 'mapping_verified', 'sandbox_verified', 'checkpoint_certified',
+                      'window_closed_worker_pending_verified', 'job_joined_widgets_released', 'children_cleaned'):
+            if not self.data['counts'].get(stage):
+                return stage
+        return 'none'
+
+
+def owned_partial(pid, entry, frame, diagnostics=None):
+    # A retained observer FD is not evidence of a live decoder mapping.
     try:
         owner = os.stat(entry)
         observed = os.fstat(frame)
@@ -92,12 +160,16 @@ def owned_partial(pid, entry, frame):
             return False
         if os.readlink(entry) != '/memfd:glycin-frame (deleted)' or not partial(frame):
             return False
+        if diagnostics:
+            diagnostics.mark('fd_owned', pid=pid, inode=owner.st_ino)
         for line in Path(f'/proc/{pid}/maps').read_text().splitlines():
             fields = line.split(maxsplit=5)
             if len(fields) < 6 or fields[1] != 'rw-s' or int(fields[4]) != owner.st_ino:
                 continue
             start, end = (int(value, 16) for value in fields[0].split('-'))
             if end - start >= SIZE and fields[5] == '/memfd:glycin-frame (deleted)':
+                if diagnostics:
+                    diagnostics.mark('mapping_verified', pid=pid, mapping=line)
                 return True
     except FileNotFoundError:
         return False
@@ -125,6 +197,167 @@ def sandbox_evidence(pid, parent):
         namespaces[name] = {'loader': child, 'probe': host}
     return {'NoNewPrivs': values['NoNewPrivs'], 'Seccomp': values['Seccomp'],
             'CapEff': values['CapEff'], 'namespaces': namespaces}
+
+
+def stop_and_certify(pid, birth, pidfd, entry, frame, process, evidence, diagnostics, candidate_sample):
+    # PID was pinned while a verified same-UID descendant, BEFORE frame sampling.
+    # No recursive process scan or namespace reads on the critical pre-STOP path.
+    evidence['stop_requested_monotonic'] = time.monotonic()
+    try:
+        signal.pidfd_send_signal(pidfd, signal.SIGSTOP)
+    except OSError as error:
+        evidence['failed_stage'] = 'sigstop'
+        diagnostics.error('SIGSTOP', error)
+        raise
+    finally:
+        diagnostics.record_sample(pid, entry, candidate_sample, phase="candidate_before_stop")
+    diagnostics.mark('stop_requested', pid=pid)
+    deadline = time.monotonic() + 2
+    while not stopped(pid) and time.monotonic() < deadline:
+        time.sleep(0.0002)
+    if not stopped(pid):
+        raise NotRun('SIGSTOP did not stop every loader thread within 2 seconds')
+    evidence['stop_confirmed_monotonic'] = time.monotonic()
+    diagnostics.mark('stop_complete', pid=pid)
+    if stat(pid)[1] != birth or select.select([pidfd], [], [], 0)[0]:
+        raise NotRun('pinned identity changed or exited at stopped checkpoint')
+    if not diagnostics.sample(pid, entry, frame, phase="stopped"):
+        failed = [name for name in ('size_correct', 'prefix_correct', 'tail_zero')
+                  if not diagnostics.data['last_sample'][name]]
+        evidence['failed_stage'] = 'stopped_' + failed[0]
+        raise NotRun('STOP race: stopped sample failed ' + ', '.join(failed))
+    if not owned_partial(pid, entry, frame, diagnostics):
+        evidence['failed_stage'] = 'stopped_ownership_or_mapping'
+        raise NotRun('stopped partial frame no longer owned/mapped writable-shared by loader')
+    # Security conditions are unchanged; checking AFTER STOP removes this I/O
+    # from the candidate-to-signal race without weakening any acceptance gate.
+    evidence['sandbox'] = sandbox_evidence(pid, process.pid)
+    diagnostics.mark('sandbox_verified', pid=pid)
+    evidence.update(loader_pid=pid, loader_starttime=birth,
+                    loader_output_fd=entry.name, output_inode=os.fstat(frame).st_ino,
+                    output_prefix_hex=os.pread(frame, 96, 0).hex(),
+                    output_tail_hex=os.pread(frame, 96, SIZE - 96).hex(),
+                    active_checkpoint='all threads stopped; owned writable shared partial RGB frame; Rust worker checkpoint still required')
+    diagnostics.mark('checkpoint_certified', pid=pid)
+
+
+def observe(process, baseline, evidence, diagnostics, arm, timeout=15):
+    # Cache each loader pidfd and frame descriptor. Only the known output FD is
+    # sampled in the hot path; discovery has its own cadence and stable PID order.
+    loaders, frames, observed = {}, {}, {}
+    held = None
+    frame = None
+    transferred = False
+    deadline = time.monotonic() + timeout
+    next_discovery = 0.
+    try:
+        diagnostics.mark('observer_armed')
+        arm()  # TARGET cannot spawn until this barrier is released.
+        while time.monotonic() < deadline:
+            now = time.monotonic()
+            if now >= next_discovery:
+                diagnostics.mark('process_scan')
+                for pid in sorted(descendants(process.pid) - baseline):
+                    try:
+                        _, birth = stat(pid)
+                        observed[pid] = birth
+                        if pid in loaders:
+                            continue
+                        executable = os.readlink(f'/proc/{pid}/exe')
+                        if Path(executable.removesuffix(' (deleted)')).name != 'glycin-image-rs':
+                            continue
+                        if Path(f'/proc/{pid}').stat().st_uid != os.getuid():
+                            continue
+                        diagnostics.mark('loader_found', pid=pid, starttime=birth, executable=executable)
+                        pin = os.pidfd_open(pid)
+                        try:
+                            # Repeat identity/descendant verification ONCE when pinning.
+                            if stat(pid)[1] != birth or pid not in descendants(process.pid):
+                                continue
+                            loaders[pid] = (birth, pin, executable)
+                            pin = None
+                            diagnostics.mark('pidfd_pinned', pid=pid, starttime=birth)
+                        finally:
+                            if pin is not None:
+                                os.close(pin)
+                    except (FileNotFoundError, ProcessLookupError):
+                        diagnostics.mark('discovery_race', pid=pid)
+                    except PermissionError as error:
+                        diagnostics.error('loader discovery', error)
+                # Scan FDs until a frame is found; handle disappearing FDs
+                # individually so an unrelated transient FD cannot hide later ones.
+                for pid, (_, pin, _) in sorted(loaders.items()):
+                    if select.select([pin], [], [], 0)[0] or any(key[0] == pid for key in frames):
+                        continue
+                    try:
+                        entries = sorted(Path(f'/proc/{pid}/fd').iterdir(), key=lambda p: int(p.name))
+                    except FileNotFoundError:
+                        continue
+                    except PermissionError as error:
+                        diagnostics.error('fd directory', error)
+                        continue
+                    for entry in entries:
+                        try:
+                            if os.readlink(entry) != '/memfd:glycin-frame (deleted)':
+                                continue
+                            fd = os.open(entry, os.O_RDONLY | os.O_CLOEXEC)
+                            diagnostics.mark('memfd_found', pid=pid, fd=str(entry))
+                            try:
+                                if os.fstat(fd).st_size != SIZE:
+                                    diagnostics.sample(pid, entry, fd)
+                                    continue
+                                frames[(pid, entry)] = fd
+                                fd = None
+                                break
+                            finally:
+                                if fd is not None:
+                                    os.close(fd)
+                        except (FileNotFoundError, ProcessLookupError):
+                            diagnostics.mark('fd_discovery_race', pid=pid, fd=str(entry))
+                        except PermissionError as error:
+                            diagnostics.error('frame descriptor', error)
+                # The single target frame is now the only hot-path candidate.
+                next_discovery = time.monotonic() + 0.002 if not frames else float('inf')
+            for (pid, entry), cached in list(frames.items()):
+                birth, pin, executable = loaders[pid]
+                if select.select([pin], [], [], 0)[0]:
+                    diagnostics.mark('loader_exited', pid=pid)
+                    continue
+                sample = frame_sample(cached)
+                if not all(sample[key] for key in ('size_correct', 'prefix_correct', 'tail_zero')):
+                    diagnostics.record_sample(pid, entry, sample)
+                    continue
+                held = (pid, birth, os.dup(pin))
+                frame = os.dup(cached)
+                evidence['executable'] = executable
+                stop_and_certify(pid, birth, held[2], entry, frame, process, evidence, diagnostics, sample)
+                transferred = True
+                return held, frame, observed
+            diagnostics.flush()
+            if process.poll() is not None:
+                raise AssertionError('probe exited while observing loader')
+            if loaders and all(select.select([pin], [], [], 0)[0] for _, pin, _ in loaders.values()):
+                raise NotRun('all pinned loaders exited before checkpoint; first uncompleted stage: ' + diagnostics.missing())
+            time.sleep(0.0002)
+        raise NotRun('observation deadline; first uncompleted stage: ' + diagnostics.missing())
+    except (FileNotFoundError, ProcessLookupError, PermissionError) as error:
+        diagnostics.error('observe/checkpoint', error)
+        raise NotRun('loader observation interrupted at ' + diagnostics.missing() + ': ' + str(error)) from error
+    finally:
+        for fd in frames.values():
+            os.close(fd)
+        for _, pin, _ in loaders.values():
+            os.close(pin)
+        if not transferred:
+            if held:
+                try:
+                    signal.pidfd_send_signal(held[2], signal.SIGCONT)
+                except ProcessLookupError:
+                    pass
+                finally:
+                    os.close(held[2])
+            if frame is not None:
+                os.close(frame)
 
 
 def send(process, command):
@@ -160,6 +393,7 @@ def run(binary, report):
                 'method': 'owned descendant pidfd; partial RGB memfd; SIGSTOP/recheck/close/SIGCONT',
                 'width': WIDTH, 'height': HEIGHT, 'output_bytes': SIZE}
     started = time.monotonic()
+    diagnostics = Diagnostics(evidence)
     process = None
     held = None
     frame = None
@@ -186,74 +420,18 @@ def run(binary, report):
             for reader in readers:
                 reader.start()
             expect(events, 'READY survivor_loaded')
+            diagnostics.mark('baseline_decoded')
             baseline = descendants(process.pid)
-            observed = {}
             send(process, 'START')
-            expect(events, 'TARGET_STARTED')
-            deadline = time.monotonic() + 15
-            permission_errors = set()
-            while time.monotonic() < deadline and held is None:
-                for pid in descendants(process.pid) - baseline:
-                    try:
-                        state, birth = stat(pid)
-                        observed[pid] = birth
-                        executable = os.readlink(f'/proc/{pid}/exe')
-                        if Path(executable.removesuffix(' (deleted)')).name != 'glycin-image-rs':
-                            continue
-                        if Path(f'/proc/{pid}').stat().st_uid != os.getuid():
-                            continue
-                        for entry in Path(f'/proc/{pid}/fd').iterdir():
-                            if os.readlink(entry) != '/memfd:glycin-frame (deleted)':
-                                continue
-                            with contextlib.ExitStack() as handles:
-                                candidate = os.open(entry, os.O_RDONLY | os.O_CLOEXEC)
-                                handles.callback(os.close, candidate)
-                                if not partial(candidate):
-                                    continue
-                                pidfd = os.pidfd_open(pid)
-                                handles.callback(os.close, pidfd)
-                                # Recheck identity and membership before any signal.
-                                if stat(pid)[1] != birth or pid not in descendants(process.pid):
-                                    continue
-                                held = (pid, birth, pidfd)
-                                frame = candidate
-                                handles.pop_all()  # resources now owned by the outer finally
-                                evidence['sandbox'] = sandbox_evidence(pid, process.pid)
-                                evidence['stop_requested_monotonic'] = time.monotonic()
-                                signal.pidfd_send_signal(pidfd, signal.SIGSTOP)
-                                stop_deadline = time.monotonic() + 2
-                                while not stopped(pid) and time.monotonic() < stop_deadline:
-                                    time.sleep(0.001)
-                                if not stopped(pid) or not owned_partial(pid, entry, frame):
-                                    raise NotRun('partial-frame race missed; cannot certify active read_image at close')
-                                evidence['stop_confirmed_monotonic'] = time.monotonic()
-                                evidence.update(loader_pid=pid, loader_starttime=birth,
-                                                loader_output_fd=entry.name, output_inode=os.fstat(frame).st_ino,
-                                                executable=executable, output_prefix_hex=os.pread(frame, 96, 0).hex(),
-                                                output_tail_hex=os.pread(frame, 96, SIZE-96).hex(),
-                                                active_checkpoint='all threads stopped; loader owns writable shared frame; prefix exact RGB; tail zero; worker not yet returned')
-                                print('EVIDENCE real loader mid-frame, incomplete output pinned:', pid, flush=True)
-                                break
-                    except (FileNotFoundError, ProcessLookupError):
-                        continue
-                    except PermissionError as error:
-                        if held:
-                            raise NotRun('cannot stop/inspect owned loader: ' + str(error)) from error
-                        permission_errors.add(str(error))
-                    if held:
-                        break
-                if held is None:
-                    if process.poll() is not None:
-                        raise AssertionError('probe exited while awaiting active loader')
-                    time.sleep(0.001)
-            if held is None or 'active_checkpoint' not in evidence:
-                raise NotRun('no certifiable partial glycin-image-rs RGB frame; loader too fast, '
-                             'different implementation/layout, or proc observation denied: '
-                             + '; '.join(sorted(permission_errors)))
+            expect(events, 'TARGET_STARTING')
+            diagnostics.mark('target_starting')
+            held, frame, observed = observe(process, baseline, evidence, diagnostics,
+                                             arm=lambda: send(process, 'ARMED'))
             pause = time.monotonic()
             evidence['close_requested_monotonic'] = pause
             send(process, 'CLOSE')
             expect(events, 'WINDOW_CLOSED entered=true returned_at_checkpoint=false', timeout=5)
+            diagnostics.mark('window_closed_worker_pending_verified')
             # Remove the observer's read-only reference before cleanup checks.
             os.close(frame)
             frame = None
@@ -265,6 +443,7 @@ def run(binary, report):
             evidence['resumed_monotonic'] = time.monotonic()
             cleanup_started = time.monotonic()
             expect(events, 'SETTLED load_returned=true job_joined=true widgets_released=true stale_mutations=0 survivor_pixels_unchanged=true')
+            diagnostics.mark('job_joined_widgets_released')
             evidence['worker_settled_monotonic'] = time.monotonic()
             deadline = pause + 10
             assert time.monotonic() < deadline, 'worker settlement exceeded 10 seconds from close'
@@ -286,6 +465,7 @@ def run(binary, report):
             evidence['close_to_cleanup_seconds'] = time.monotonic() - pause
             assert evidence['close_to_cleanup_seconds'] < 10
             evidence['observed_child_identities'] = observed
+            diagnostics.mark('children_cleaned')
             send(process, 'FINISH')
             expect(events, 'PASS active_decode_close')
             assert process.wait(timeout=5) == 0
@@ -296,10 +476,11 @@ def run(binary, report):
             return 0
     except (NotRun, PermissionError) as error:
         evidence['reason'] = str(error)
+        evidence['first_uncompleted_stage'] = diagnostics.missing()
         print('BLOCKED/NOT RUN:', error, flush=True)
         return 77
     except Exception as error:
-        evidence.update(result='FAIL', reason=str(error))
+        evidence.update(result='FAIL', reason=str(error), first_uncompleted_stage=diagnostics.missing())
         print('FAIL:', error, flush=True)
         return 1
     finally:
@@ -319,6 +500,8 @@ def run(binary, report):
                 process.kill()
                 process.wait(timeout=5)
         evidence['elapsed_seconds'] = time.monotonic() - started
+        diagnostics.flush()
+        print('DIAG summary', json.dumps(diagnostics.data['counts'], sort_keys=True), flush=True)
         report.write_text(json.dumps(evidence, indent=2) + '\n')
         print('Report:', report, flush=True)
 

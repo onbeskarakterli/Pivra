@@ -246,3 +246,14 @@ bütünlüğü ve 14 scoped GUI çağrısı PASS. Gerçek native pixel/refresh g
 exit77/NOT RUN; PIV-11 DONE değil. Tek native komut:
 `bash tests/run_folder_watch_probe.sh`. [Ayrıntılı kanıt](PIV11_VALIDATION.md).
 PIV-01–10 DONE korunur; PIV-12 başlamadı. Faz 0 ve DESKTOP-06 açık kalır.
+
+
+### Planlanan dil standardizasyonu — PIV-39 GNOME entegrasyonları
+
+Kullanıcının 22.10.2026 gözlemi: GNOME arayüzü İngilizce, bölge Türkiye iken PIV-11'in `Dosya değiştirildi — Yenile` bileşeni Türkçe; `Loading image securely` ve video uyarıları İngilizce. Metinler kodda sabit; bölge ayarı dil seçimi olarak yorumlanmamalı. **PIV-39 kapsamında** uygulamaya gettext/GNOME uyumlu merkezi i18n altyapısı, en az `tr` ve `en` katalogları, tüm kullanıcıya görünen mesajların çeviriye taşınması ve `LANGUAGE/LC_MESSAGES/LANG` dil seçimi testleri eklenmesi planlandı. İngilizce GNOME + Türkiye bölgesi → İngilizce Pivra; Türkçe arayüz dili → Türkçe Pivra. İleride kapsamlı localization işi PIV-39'da açılacak; **henüz kodlanmadı**, PIV-11'in kaynak kapsamı genişletilmeyecek.
+
+### PIV-11 kullanıcı native bulgusu — açık pencere yenileme regresyonu
+
+Kullanıcı Arch/GNOME'da `f96a0db029fa0e5157318d4bdfd4ef494d3baf33` commit'inde `bash tests/run_folder_watch_probe.sh` **exit0/PASS** bildirdi: gerçek GIO olayları ve secure Glycin reload; beklenen silinme/klasör kaybı hata logları test kapsamı. Normal uygulamada seçili fotoğrafın haricen değiştirilmesi üzerine altta **Yenile** seçeneği görüntülendi. Ancak kullanıcı **Yenile'ye basınca mevcut pencerenin kapandığını ve yeni pencerenin açıldığını** bildirdi. Bu beklenen in-place refresh değildir; window identity ve signal/action yaşam döngüsü incelenmeli. Yeni pencere nedeninin kodda doğrulandığı iddia edilmez.
+
+**Karar:** PIV-11 `TESTING` kalır. Başarılı otomatik probe, fiziksel buton tıklamasındaki regresyonu kapsamıyor olabilir. Düzeltme kabulü: gerçek GTK button click ile **aynı GtkWindow nesnesinin korunması**, mevcut ImageView'da taze frame, popup/ek pencere oluşmaması, eski image'ın kullanıcı onayına kadar korunması, banner'ın doğru temizlenmesi, worker guard/monitor güvenliği ve bağımsız pencere testleri; native GNOME manuel tekrar kontrolü. Faz 0 / DESKTOP-06 ayrı açık; PIV-12 başlatılmaz.

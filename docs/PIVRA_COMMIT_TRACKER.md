@@ -1,7 +1,7 @@
 # Pivra — Planlı Commit ve İlerleme Takibi
 
 **Kaynak:** [Özellik Şartnamesi](PIVRA_FEATURE_SPEC_TR.md) · [Yol Haritası](PIVRA_DEVELOPMENT_ROADMAP.md)  
-**Branch:** `dev` · **Durum:** PIV-01 **DONE (21.10.2026)**; PIV-02 **DONE (21.10.2026, Xvfb GTK pencere doğrulaması)**; PIV-03 **DONE (21.10.2026)**; PIV-04 **DONE (21.10.2026; grafik test kategorileri ayrı)**; PIV-05 **DONE (21.10.2026; belgeleme/probe kapsamı)**; PIV-06 **DONE (21.10.2026; dosya/URI ve desktop giriş altyapısı; gerçek Nautilus NOT RUN)**; PIV-07 **DONE (21.10.2026; sırasız komşu medya keşfi)**; PIV-08 **DONE (21.10.2026; deterministik doğal sıra)**; PIV-09 **DONE (21.10.2026; Arch gerçek JPEG/PNG/EXIF, otomatik geometri ve güvenli aktif-decode kapanış PASS)**; PIV-10 **TESTING (22.10.2026; sol/sağ gezinme kodlandı, yeni native piksel ve fiziksel focus kanıtı bekleniyor)**; PIV-11–60 TODO, başlatılmadı. Faz 0 **INCOMPLETE** (temiz native kurulum yeniden üretimi NOT RUN). Güncel kapanış kanıtı son bölümde; 20.10.2026 kayıtları tarihçedir. Burada listelenen `PIV-xx` kimlikleri gerçek Git commit SHA'sı **değildir**.
+**Branch:** `dev` · **Durum:** PIV-01 **DONE (21.10.2026)**; PIV-02 **DONE (21.10.2026, Xvfb GTK pencere doğrulaması)**; PIV-03 **DONE (21.10.2026)**; PIV-04 **DONE (21.10.2026; grafik test kategorileri ayrı)**; PIV-05 **DONE (21.10.2026; belgeleme/probe kapsamı)**; PIV-06 **DONE (21.10.2026; dosya/URI ve desktop giriş altyapısı; gerçek Nautilus NOT RUN)**; PIV-07 **DONE (21.10.2026; sırasız komşu medya keşfi)**; PIV-08 **DONE (21.10.2026; deterministik doğal sıra)**; PIV-09 **DONE (21.10.2026; Arch gerçek JPEG/PNG/EXIF, otomatik geometri ve güvenli aktif-decode kapanış PASS)**; PIV-10 **DONE (22.10.2026; native piksel/Fit/gezinti PASS ve kullanıcı fiziksel sol/sağ doğrulaması)**; PIV-11–60 TODO, başlatılmadı. Faz 0 **INCOMPLETE** (temiz native kurulum yeniden üretimi NOT RUN). Güncel kapanış kanıtı son bölümde; 20.10.2026 kayıtları tarihçedir. Burada listelenen `PIV-xx` kimlikleri gerçek Git commit SHA'sı **değildir**.
 
 ## Kullanım kuralları
 
@@ -30,7 +30,7 @@
 | PIV-07 | `feat: scan neighboring media in folder` | Tek dizinde sırasız fotoğraf/video adayları, açılan alias seçimi, arka plan keşfi ve açık hata durumları | **DONE — 21.10.2026** | `9255519e8c576f067184a2818e5917bfcb9ec724`, `91c81e895cd3859981805690af01a7cafddbf30a`, `9a998ba40c793ff49a6ee4fe7e617a6041f48cfe` |
 | PIV-08 | `feat: apply natural filename ordering` | Doğal karma medya sırası, alias seçimi ve deterministik byte politikası doğrulandı | **DONE — 21.10.2026** | `5a109ac26bd98201e8de9f5a3971189e5969a8ba`, `5cf8469070b4b574c6d2292a92e0d8167763d8a1` |
 | PIV-09 | `feat: render JPEG PNG with orientation` | Arch gerçek JPEG/PNG/EXIF, iki görüntü/otomatik geometri ve aktif secure-decode kapanış/temizlik PASS; iki decoder zaman çakışması NOT MEASURED | **DONE — 21.10.2026** | İlk uygulama: `1685139d47afdd55ac47699726f49a66aa270bfc`; yeni probe: `66af846ae4b153ad1415c7d8ff7f2612896817e7`; Arch kanıtı: `c42774da2b0448a4014500dc4545a4b399d58d28` |
-| PIV-10 | `feat: navigate previous and next media` | Sol/sağ, doğal karışık sıra, sınırlar ve iptal guard'ları geçti; gerçek yeni native piksel/focus kontrolü bekleniyor | **TESTING — 22.10.2026** | `028b747`, `b69ba2c`, `8403d12`, `80e501d`; tam SHA ve kanıt son bölümde |
+| PIV-10 | `feat: navigate previous and next media` | 54 Rust + 30 Python, otomatik native pixel/Fit/rapid/error/independent window PASS (exit0); gerçek GNOME fiziksel sol/sağ PASS, Loading image securely mesajı yükleme sonrasında kayboluyor; Tab için odaklanacak düğme yok | **DONE — 22.10.2026** | `028b747`, `b69ba2c`, `8403d12`, `80e501d`; tam SHA ve kanıt son bölümde |
 | PIV-11 | `feat: watch folder changes and external modifications` | Ekle/sil/ad değiştir listeyi yeniler; açık dosyada elle Yenile isteği | TODO | — |
 | PIV-12 | `test: harden media failures and window isolation` | Bozuk medya gezinmeyi bozmaz; pencereler bağımsız | TODO | — |
 
@@ -1533,3 +1533,12 @@ PIV-10 bu sayaca eklenmedi.
 
 Bu takip commit'inin SHA'sı Git geçmişi ve push raporundadır. Normal origin/dev
 push sonrası remote eşitliği ve main korunması doğrulanır; force/rebase yoktur.
+
+
+## PIV-10 Arch native kabul ve kapanış — 22.10.2026 — DONE
+
+**Kaynak:** Kullanıcının Arch Linux / GNOME Wayland terminal çıktısı ve manuel gözlemi; Codex testi değildir. **Test commit'i**: `c53d4071368b2b45ceb8ecba06f949f4c5188b52`. Komut: `bash tests/run_navigation_probe.sh`; **exit0** ve gerçek secure-navigation pixel/Fit/center PASS. Otomatik native probe: natural mixed order, sınırlar, hızlı ardışık oklar, hata sonrası devam, bağımsız pencereler, normal close ve kaynak dosya değişmezliği PASS. Bozuk PNG ve silinmiş dosyanın konsoldaki beklenen hataları kontrollü kurtarma kapsamındaydı.
+
+Kullanıcı gerçek fotoğraflarla normal Pivra'da **fiziksel sol/sağ oklarla fotoğraflar arasında geçişin çalıştığını** doğruladı. Her medya değişiminde görünen `Loading image securely` yükleme tamamlandığında kayboluyor; bu beklenen geçici durum. Arayüzde gezinme düğmeleri bulunmuyor; PIV-10 bunları kapsamamıştı. Odaklanabilir başlık düğmesi olmadığından Tab ile odak aktarımı fiilen uygulanamadı; **Tab sonrası focus PASS iddiası yoktur**. Video üzerinden fiziksel gezinme ayrıca kullanıcı tarafından raporlanmadı; otomatik native probe video mesajı/karışık sıralamayı doğruladı. Bu ayrımlar saklanır.
+
+Codex kaynaklı önceki kısa testler **54 Rust + 30 Python observer PASS**, 12 scoped GUI/helper PASS. **PIV-10 DONE**: mevcut kabul kapsamındaki klavye gezinmesi, gerçek secure render ve kontrollü durum akışı doğrulandı. Faz 0 bağımsız temiz kurulum **INCOMPLETE**, DESKTOP-06 Nautilus **NOT RUN**, PIV-11 **TODO**. Yeni production değişikliği yapılmadı; belge güncellemesinin commit SHA'sı Git geçmişindedir.

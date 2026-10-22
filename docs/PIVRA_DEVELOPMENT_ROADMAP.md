@@ -1,6 +1,6 @@
 # Pivra — Geliştirme Yol Haritası
 
-**Durum:** PIV-01–08 DONE (giriş, keşif ve doğal sıra); PIV-09 DONE (Arch gerçek JPEG/PNG/EXIF, geometri ve aktif-decode kapanış/temizlik PASS); PIV-10 DONE (native gerçek secure piksel/Fit ve fiziksel sol/sağ gezinme PASS); PIV-11 TESTING; PIV-12–60 TODO. Faz 0 INCOMPLETE: temiz native kurulumun bağımsız yeniden üretimi NOT RUN; temiz Cargo target derlemesi ve headless regresyonlar geçti. [PIV-05 kanıtı ve ayrı faz kapısı](PIVRA_TECHNICAL_CAPABILITIES.md#102-piv-05-ve-faz-0-kapanışını-ayrı-değerlendirme).
+**Durum:** PIV-01–08 DONE (giriş, keşif ve doğal sıra); PIV-09 DONE (Arch gerçek JPEG/PNG/EXIF, geometri ve aktif-decode kapanış/temizlik PASS); PIV-10 DONE (native gerçek secure piksel/Fit ve fiziksel sol/sağ gezinme PASS); PIV-11 DONE (Arch native ve GNOME Yenile PASS); PIV-12–60 TODO. Faz 0 INCOMPLETE: temiz native kurulumun bağımsız yeniden üretimi NOT RUN; temiz Cargo target derlemesi ve headless regresyonlar geçti. [PIV-05 kanıtı ve ayrı faz kapısı](PIVRA_TECHNICAL_CAPABILITIES.md#102-piv-05-ve-faz-0-kapanışını-ayrı-değerlendirme).
 **Başlangıç branch:** `dev` · **Kararlı sürümler:** `main`  
 **Kaynak şartname:** [PIVRA_FEATURE_SPEC_TR.md](PIVRA_FEATURE_SPEC_TR.md)  
 **Görev ve commit takibi:** [PIVRA_COMMIT_TRACKER.md](PIVRA_COMMIT_TRACKER.md)
@@ -257,3 +257,8 @@ Kullanıcının 22.10.2026 gözlemi: GNOME arayüzü İngilizce, bölge Türkiye
 Kullanıcı Arch/GNOME'da `f96a0db029fa0e5157318d4bdfd4ef494d3baf33` commit'inde `bash tests/run_folder_watch_probe.sh` **exit0/PASS** bildirdi: gerçek GIO olayları ve secure Glycin reload; beklenen silinme/klasör kaybı hata logları test kapsamı. Normal uygulamada seçili fotoğrafın haricen değiştirilmesi üzerine altta **Yenile** seçeneği görüntülendi. Ancak kullanıcı **Yenile'ye basınca mevcut pencerenin kapandığını ve yeni pencerenin açıldığını** bildirdi. Bu beklenen in-place refresh değildir; window identity ve signal/action yaşam döngüsü incelenmeli. Yeni pencere nedeninin kodda doğrulandığı iddia edilmez.
 
 **Karar:** PIV-11 `TESTING` kalır. Başarılı otomatik probe, fiziksel buton tıklamasındaki regresyonu kapsamıyor olabilir. Düzeltme kabulü: gerçek GTK button click ile **aynı GtkWindow nesnesinin korunması**, mevcut ImageView'da taze frame, popup/ek pencere oluşmaması, eski image'ın kullanıcı onayına kadar korunması, banner'ın doğru temizlenmesi, worker guard/monitor güvenliği ve bağımsız pencere testleri; native GNOME manuel tekrar kontrolü. Faz 0 / DESKTOP-06 ayrı açık; PIV-12 başlatılmaz.
+
+
+## PIV-11 final native acceptance — DONE (2026-10-22)
+
+At `f96a0db029fa0e5157318d4bdfd4ef494d3baf33`, user ran `bash tests/run_folder_watch_probe.sh`: exit0/PASS, real filesystem events and secure Glycin refresh, previous frame retained until explicit user refresh action. In normal GNOME/Wayland application, user observed the refresh banner and confirmed clicking Yenile displays the modified image after a loading animation. Previous new-window impression was not confirmed by terminal logs (two separate cargo run commands); actual GtkWindow object identity not manually instrumented. Native acceptance met; PIV-11 DONE, PIV-12 TODO. The mixed Turkish/English UI strings are scheduled for PIV-39 i18n; Phase 0 clean install INCOMPLETE and DESKTOP-06 Nautilus NOT RUN remain independent.

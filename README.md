@@ -3,7 +3,7 @@ A fast, lightweight GNOME image viewer with seamless photo and video navigation,
 
 ## Development status
 
-**PIV-01–10: DONE. PIV-11: TESTING (2026-10-22), on `dev`.**
+**PIV-01–11: DONE (PIV-11 Arch/GNOME 2026-10-22), on `dev`.**
 Pivra accepts one local JPEG/PNG path or file URI and discovers a naturally ordered
 photo/video catalog. Left/Right now navigate that window's catalog without
 wrapping; video entries show an explicit unavailable-playback message. Every new
@@ -777,3 +777,8 @@ Fit/center snapshots across navigation, error recovery and independent windows.
 Also confirm physical Left/Right after changing focus between the picture/header
 controls in normal Pivra. [Commands, actual results and exact remaining gates](docs/PIV10_VALIDATION.md).
 PIV-10 remains TESTING pending those native results; PIV-11 has not started.
+
+
+## PIV-11 final native acceptance — DONE (2026-10-22)
+
+At `f96a0db029fa0e5157318d4bdfd4ef494d3baf33`, user ran `bash tests/run_folder_watch_probe.sh`: exit0/PASS, real filesystem events and secure Glycin refresh, previous frame retained until explicit user refresh action. In normal GNOME/Wayland application, user observed the refresh banner and confirmed clicking Yenile displays the modified image after a loading animation. Previous new-window impression was not confirmed by terminal logs (two separate cargo run commands); actual GtkWindow object identity not manually instrumented. Native acceptance met; PIV-11 DONE, PIV-12 TODO. The mixed Turkish/English UI strings are scheduled for PIV-39 i18n; Phase 0 clean install INCOMPLETE and DESKTOP-06 Nautilus NOT RUN remain independent.

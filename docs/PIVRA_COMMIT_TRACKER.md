@@ -1653,3 +1653,14 @@ NOT RUN korunur. Sayaç PIV-11'in mevcut DONE kaydına göre 6/11'e düzeltildi;
 PIV-12 eklenmedi. Cargo.toml/lock, kaynak fixture'lar, decoder güvenliği,
 kurulum, CI ve lisans değişmedi. Main beklenen SHA
 `5d55ee599df4617bd51c09b1c7a008b8d0ece480`; normal push sonunda ayrıca doğrulanır.
+
+### PIV-12 belge ve push kanıtı
+
+Belge/matris commit'i `2b7e5751a041ea3f3a628aed1e8defcba524ff53`.
+Normal push `1ceaa04..2b7e575 dev -> dev` başarılı; açık dev refspec'iyle fetch
+sonrasında HEAD/origin/dev aynı SHA ve çalışma dizini temiz doğrulandı.
+`ls-remote` main'i değişmemiş
+`5d55ee599df4617bd51c09b1c7a008b8d0ece480` olarak gösterdi. Başlangıca karşı
+Cargo.toml, Cargo.lock, image_loader.rs, image_view.rs ve fixture farkı yok.
+Bu son kayıt kendi SHA'sını içermez; ayrı belge commit'i Git geçmişindedir.
+PIV-12 TESTING, native kabul bekleniyor.

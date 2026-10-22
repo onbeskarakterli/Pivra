@@ -1590,3 +1590,13 @@ INCOMPLETE ve DESKTOP-06 gerçek Nautilus NOT RUN bağımsız kalır. Sayaçta P
 PIV-11 sayaca eklenmedi. Main beklenen SHA:
 `5d55ee599df4617bd51c09b1c7a008b8d0ece480`. Normal push ve uzak SHA kontrolü teslim
 sonunda ayrıca doğrulanır; bu belge kendi commit SHA'sını önceden tahmin etmez.
+
+### PIV-11 belge ve uzak dal doğrulaması
+
+Belge/test matrisi commit'i:
+`4340c448bf1e4d5583248c3a476dc285930d0675`.
+Normal push başarılı: `b83aa93..4340c44 dev -> dev`. Açık refspec ile fetch sonrası
+`HEAD = origin/dev = 4340c448bf1e4d5583248c3a476dc285930d0675` ve çalışma dizini
+temiz doğrulandı. `ls-remote` main'in
+`5d55ee599df4617bd51c09b1c7a008b8d0ece480` kaldığını doğruladı. Bu son kanıt kaydı
+ayrı belge commit'idir; kendi SHA'sı Git geçmişinde bulunur. PIV-11 TESTING kalır.

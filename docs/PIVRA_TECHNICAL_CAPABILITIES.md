@@ -1,6 +1,6 @@
 # Pivra — Teknik Yetenekler ve Faz 0 Kararları
 
-**Tarih:** 21.10.2026 · **Dal:** dev · **Güncel durum:** PIV-09 DONE, PIV-10 TESTING; aşağıdaki ilk kayıt yalnız PIV-05 tarihçesidir.
+**Tarih:** 21.10.2026 · **Dal:** dev · **Güncel durum:** PIV-01–10 DONE, PIV-11 TESTING; aşağıdaki ilk kayıt yalnız PIV-05 tarihçesidir.
 Başlangıç commit'i: `8b3947215c54dfd2515df61a50dd05c080eccf31`.
 PIV-06 uygulanmadı. Production kaynakları, Cargo.toml ve Cargo.lock değiştirilmedi;
 görüntü decoder'ı veya video oynatıcı yazılmadı. Proje lisansı seçilmedi.
@@ -696,3 +696,14 @@ Codex'te secure loader başlamadığı için exit77; başarılı frame/Fit/bozuk
 recovery ve fiziksel GNOME keyboard/focus NOT RUN. [Tam matris ve native komut](PIV10_VALIDATION.md).
 PIV-10 TESTING, PIV-11 başlamadı; Phase 0 clean install, DESKTOP-06 ve PIV-05 video
 SDK/sink/Libav riskleri kendi durumlarını korur.
+
+
+## PIV-11 — canlı katalog ve açık native kapı
+
+GIO FileMonitor, 120 ms olay birleştirme, tek katalog worker'ı, lexical seçim ve
+symlink hedef izleme eklendi. İçerik değişikliği otomatik decode başlatmaz;
+Yenile mevcut zorunlu Bwrap yolundadır. 57 Rust/30 Python ve 14 scoped GUI çağrısı
+PASS; gerçek yeni pixel/refresh kabulü Codex'te NOT RUN/exit77. Kullanıcının
+PIV-09/10 native DONE kanıtı korunur, PIV-11'e genellenmez.
+[Ayrıntılar ve tek komut](PIV11_VALIDATION.md). Faz 0 temiz kurulum,
+DESKTOP-06 ve önceki GStreamer/loader dağıtım riskleri kendi kapsamlarında açık.

@@ -3,12 +3,21 @@ A fast, lightweight GNOME image viewer with seamless photo and video navigation,
 
 ## Development status
 
-**PIV-01–09: DONE. PIV-10: TESTING (2026-10-22), on `dev`.**
+**PIV-01–10: DONE. PIV-11: TESTING (2026-10-22), on `dev`.**
 Pivra accepts one local JPEG/PNG path or file URI and discovers a naturally ordered
 photo/video catalog. Left/Right now navigate that window's catalog without
 wrapping; video entries show an explicit unavailable-playback message. Every new
 photo uses the existing secure Glycin path and starts in centered Fit.
-PIV-10's real GNOME/Wayland pixel and physical-key validation is pending.
+PIV-10's real GNOME/Wayland pixel and physical-key validation was reported by
+the user and recorded in the tracker. PIV-11 now watches each window's folder:
+additions, removals and renames update the naturally ordered catalog while
+preserving selection. External changes show **Dosya değiştirildi — Yenile**;
+only the explicit **Yenile** action reloads the image. Native PIV-11 acceptance
+remains pending; see [results and native command](docs/PIV11_VALIDATION.md).
+
+```bash
+bash tests/run_folder_watch_probe.sh
+```
 
 PIV-09 DONE is backed by **user-reported Arch/GNOME Wayland tests**, including
 active secure-decode cancellation; see the tracker closure at `8991b78`/`c11c7b7`.

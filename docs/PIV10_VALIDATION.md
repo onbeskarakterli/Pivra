@@ -116,3 +116,12 @@ Yalnız native kullanıcıya kalanlar:
 
 Her iki native kanıt gelmeden **PIV-10 TESTING** kalır. PIV-09 DONE kaydı,
 Faz 0 INCOMPLETE ve DESKTOP-06 NOT RUN bağımsız durumları korunur.
+
+
+## Sonraki geçerli durum
+
+PIV-10, kullanıcı kaynaklı native probe ve fiziksel ok tuşu kanıtıyla DONE oldu;
+[22.10.2026 kapanış kaydı](PIVRA_COMMIT_TRACKER.md#piv-10-arch-native-kabul-ve-kapanış--22102026--done)
+önceki TESTING ifadelerini tarihsel olarak tamamlar. PIV-11 regresyonunda
+`navigation_probe` silinen komşunun canlı listeden çıkmasını bekler (6 → 5 aday);
+PIV-10 doğal sıra, sınırlar, gerçek tuşlar ve iptal/stale-result testleri korunur.

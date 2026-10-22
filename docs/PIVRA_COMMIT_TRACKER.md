@@ -1,7 +1,7 @@
 # Pivra — Planlı Commit ve İlerleme Takibi
 
 **Kaynak:** [Özellik Şartnamesi](PIVRA_FEATURE_SPEC_TR.md) · [Yol Haritası](PIVRA_DEVELOPMENT_ROADMAP.md)  
-**Branch:** `dev` · **Durum:** PIV-01 **DONE (21.10.2026)**; PIV-02 **DONE (21.10.2026, Xvfb GTK pencere doğrulaması)**; PIV-03 **DONE (21.10.2026)**; PIV-04 **DONE (21.10.2026; grafik test kategorileri ayrı)**; PIV-05 **DONE (21.10.2026; belgeleme/probe kapsamı)**; PIV-06 **DONE (21.10.2026; dosya/URI ve desktop giriş altyapısı; gerçek Nautilus NOT RUN)**; PIV-07 **DONE (21.10.2026; sırasız komşu medya keşfi)**; PIV-08 **DONE (21.10.2026; deterministik doğal sıra)**; PIV-09 **DONE (21.10.2026; Arch gerçek JPEG/PNG/EXIF, otomatik geometri ve güvenli aktif-decode kapanış PASS)**; PIV-10 **DONE (22.10.2026; native piksel/Fit/gezinti PASS ve kullanıcı fiziksel sol/sağ doğrulaması)**; PIV-11 **TESTING** (canlı katalog/Yenile uygulandı; native kabul bekleniyor); PIV-12–60 TODO, başlatılmadı. Faz 0 **INCOMPLETE** (temiz native kurulum yeniden üretimi NOT RUN). Güncel kapanış kanıtı son bölümde; 20.10.2026 kayıtları tarihçedir. Burada listelenen `PIV-xx` kimlikleri gerçek Git commit SHA'sı **değildir**.
+**Branch:** `dev` · **Durum:** PIV-01 **DONE (21.10.2026)**; PIV-02 **DONE (21.10.2026, Xvfb GTK pencere doğrulaması)**; PIV-03 **DONE (21.10.2026)**; PIV-04 **DONE (21.10.2026; grafik test kategorileri ayrı)**; PIV-05 **DONE (21.10.2026; belgeleme/probe kapsamı)**; PIV-06 **DONE (21.10.2026; dosya/URI ve desktop giriş altyapısı; gerçek Nautilus NOT RUN)**; PIV-07 **DONE (21.10.2026; sırasız komşu medya keşfi)**; PIV-08 **DONE (21.10.2026; deterministik doğal sıra)**; PIV-09 **DONE (21.10.2026; Arch gerçek JPEG/PNG/EXIF, otomatik geometri ve güvenli aktif-decode kapanış PASS)**; PIV-10 **DONE (22.10.2026; native piksel/Fit/gezinti PASS ve kullanıcı fiziksel sol/sağ doğrulaması)**; PIV-11 **DONE (22.10.2026; Arch native probe exit0 ve gerçek GNOME Yenile PASS)**; PIV-12–60 TODO, başlatılmadı. Faz 0 **INCOMPLETE** (temiz native kurulum yeniden üretimi NOT RUN). Güncel kapanış kanıtı son bölümde; 20.10.2026 kayıtları tarihçedir. Burada listelenen `PIV-xx` kimlikleri gerçek Git commit SHA'sı **değildir**.
 
 ## Kullanım kuralları
 
@@ -31,7 +31,7 @@
 | PIV-08 | `feat: apply natural filename ordering` | Doğal karma medya sırası, alias seçimi ve deterministik byte politikası doğrulandı | **DONE — 21.10.2026** | `5a109ac26bd98201e8de9f5a3971189e5969a8ba`, `5cf8469070b4b574c6d2292a92e0d8167763d8a1` |
 | PIV-09 | `feat: render JPEG PNG with orientation` | Arch gerçek JPEG/PNG/EXIF, iki görüntü/otomatik geometri ve aktif secure-decode kapanış/temizlik PASS; iki decoder zaman çakışması NOT MEASURED | **DONE — 21.10.2026** | İlk uygulama: `1685139d47afdd55ac47699726f49a66aa270bfc`; yeni probe: `66af846ae4b153ad1415c7d8ff7f2612896817e7`; Arch kanıtı: `c42774da2b0448a4014500dc4545a4b399d58d28` |
 | PIV-10 | `feat: navigate previous and next media` | 54 Rust + 30 Python, otomatik native pixel/Fit/rapid/error/independent window PASS (exit0); gerçek GNOME fiziksel sol/sağ PASS, Loading image securely mesajı yükleme sonrasında kayboluyor; Tab için odaklanacak düğme yok | **DONE — 22.10.2026** | `028b747`, `b69ba2c`, `8403d12`, `80e501d`; tam SHA ve kanıt son bölümde |
-| PIV-11 | `feat: watch folder changes and external modifications` | Gerçek GIO add/delete/rename/atomic/symlink/bağımsız pencere PASS; native secure Yenile kabulü NOT RUN | **TESTING** | `078d028`, `5dd8f14`; tam SHA aşağıda |
+| PIV-11 | `feat: watch folder changes and external modifications` | Arch gerçek GIO ve Glycin Yenile probe exit0; GNOME Yenile yeni görüntü PASS | **DONE — 22.10.2026** | `078d028`, `5dd8f14`; tam SHA aşağıda |
 | PIV-12 | `test: harden media failures and window isolation` | Bozuk medya gezinmeyi bozmaz; pencereler bağımsız | TODO | — |
 
 ## Faz 2 — Zoom, pan, ağır medya ve kaynak yönetimi
@@ -1600,3 +1600,8 @@ Normal push başarılı: `b83aa93..4340c44 dev -> dev`. Açık refspec ile fetch
 temiz doğrulandı. `ls-remote` main'in
 `5d55ee599df4617bd51c09b1c7a008b8d0ece480` kaldığını doğruladı. Bu son kanıt kaydı
 ayrı belge commit'idir; kendi SHA'sı Git geçmişinde bulunur. PIV-11 TESTING kalır.
+
+
+## PIV-11 final native acceptance — DONE (2026-10-22)
+
+At `f96a0db029fa0e5157318d4bdfd4ef494d3baf33`, user ran `bash tests/run_folder_watch_probe.sh`: exit0/PASS, real filesystem events and secure Glycin refresh, previous frame retained until explicit user refresh action. In normal GNOME/Wayland application, user observed the refresh banner and confirmed clicking Yenile displays the modified image after a loading animation. Previous new-window impression was not confirmed by terminal logs (two separate cargo run commands); actual GtkWindow object identity not manually instrumented. Native acceptance met; PIV-11 DONE, PIV-12 TODO. The mixed Turkish/English UI strings are scheduled for PIV-39 i18n; Phase 0 clean install INCOMPLETE and DESKTOP-06 Nautilus NOT RUN remain independent.

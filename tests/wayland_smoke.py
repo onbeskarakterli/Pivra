@@ -111,6 +111,8 @@ def main():
                       "GDK_BACKEND=wayland, XWayland disabled, DISPLAY absent")
                 if "--navigation-probe" in sys.argv[2:]:
                     args = [binary] + (["--expect-image-error"] if blocked else [])
+                    if "--media-failures" in sys.argv[2:]:
+                        args.append("--media-failures")
                     result = subprocess.run(args, env={**env, "G_DEBUG": "fatal-criticals"},
                                             capture_output=True, text=True, timeout=60)
                     print(result.stdout, end="")

@@ -13,9 +13,10 @@ use std::{
     time::{Duration, Instant},
 };
 
+static RESULTS: AtomicUsize = AtomicUsize::new(0);
 static STARTED: AtomicUsize = AtomicUsize::new(0);
-static RELEASE: [AtomicBool; 4] = [const { AtomicBool::new(false) }; 4];
-static CANCELLED: [AtomicBool; 4] = [const { AtomicBool::new(false) }; 4];
+static RELEASE: [AtomicBool; 8] = [const { AtomicBool::new(false) }; 8];
+static CANCELLED: [AtomicBool; 8] = [const { AtomicBool::new(false) }; 8];
 
 // Test-only controlled error boundary. The application still uses image_loader.rs
 // and mandatory Bwrap; this module provides no decoder or production fallback.
@@ -62,9 +63,14 @@ fn text(view: &image_view::ImageView) -> String {
 
 fn load(view: &image_view::ImageView, index: usize, joined: &Rc<Cell<usize>>) {
     let joined = joined.clone();
-    view.load_with_completion(index.to_string().into(), move || {
-        joined.set(joined.get() + 1)
-    });
+    view.load_observed(
+        index.to_string().into(),
+        move || joined.set(joined.get() + 1),
+        move |success| {
+            assert!(!success, "controlled boundary never returns pixels");
+            RESULTS.fetch_or(1 << index, Ordering::SeqCst);
+        },
+    );
     wait(|| STARTED.load(Ordering::SeqCst) == index + 1);
 }
 
@@ -91,37 +97,56 @@ fn main() {
     let joined = Rc::new(Cell::new(0));
     load(&view, 0, &joined);
     load(&view, 1, &joined);
-    RELEASE[1].store(true, Ordering::SeqCst);
-    wait(|| joined.get() == 1);
-    assert!(text(&view).contains("controlled error 1"));
-    RELEASE[0].store(true, Ordering::SeqCst);
-    wait(|| joined.get() == 2);
-    assert!(CANCELLED[0].load(Ordering::SeqCst));
-    assert!(
-        text(&view).contains("controlled error 1"),
-        "late old callback replaced latest state"
-    );
     load(&view, 2, &joined);
-    view.show_message("Video playback is not available yet.");
     RELEASE[2].store(true, Ordering::SeqCst);
-    wait(|| joined.get() == 3);
-    assert!(CANCELLED[2].load(Ordering::SeqCst));
-    assert_eq!(text(&view), "Video playback is not available yet.");
+    wait(|| joined.get() == 1);
+    assert!(text(&view).contains("controlled error 2"));
+    for index in [1, 0] {
+        RELEASE[index].store(true, Ordering::SeqCst);
+        wait(|| joined.get() == 3 - index);
+        assert!(CANCELLED[index].load(Ordering::SeqCst));
+        assert!(text(&view).contains("controlled error 2"));
+    }
     load(&view, 3, &joined);
+    view.show_message("Video playback is not available yet.");
+    RELEASE[3].store(true, Ordering::SeqCst);
+    wait(|| joined.get() == 4);
+    assert!(CANCELLED[3].load(Ordering::SeqCst));
+    assert_eq!(text(&view), "Video playback is not available yet.");
+    load(&view, 4, &joined);
+    load(&other, 5, &joined); // survivor has a genuinely pending controlled worker
     let weak = first.downgrade();
     let widget = view.widget().downgrade();
     first.close();
     drop(view);
     drop(first);
-    RELEASE[3].store(true, Ordering::SeqCst);
-    wait(|| joined.get() == 4 && weak.upgrade().is_none() && widget.upgrade().is_none());
-    assert!(CANCELLED[3].load(Ordering::SeqCst));
+    RELEASE[4].store(true, Ordering::SeqCst);
+    wait(|| joined.get() == 5 && weak.upgrade().is_none() && widget.upgrade().is_none());
+    assert!(CANCELLED[4].load(Ordering::SeqCst));
     assert!(second.is_visible());
-    assert_eq!(text(&other), "Second window unchanged");
+    assert_eq!(text(&other), "Loading image securely…");
+    RELEASE[5].store(true, Ordering::SeqCst);
+    wait(|| joined.get() == 6);
+    assert!(!CANCELLED[5].load(Ordering::SeqCst));
+    assert!(text(&other).contains("controlled error 5"));
+    // Repeated load/refresh invalidates the earlier result notification too.
+    load(&other, 6, &joined);
+    load(&other, 7, &joined);
+    RELEASE[6].store(true, Ordering::SeqCst);
+    wait(|| joined.get() == 7);
+    assert!(CANCELLED[6].load(Ordering::SeqCst));
+    assert_eq!(text(&other), "Loading image securely…");
+    RELEASE[7].store(true, Ordering::SeqCst);
+    wait(|| joined.get() == 8);
+    assert!(text(&other).contains("controlled error 7"));
+    assert_eq!(
+        RESULTS.load(Ordering::SeqCst),
+        (1 << 2) | (1 << 5) | (1 << 7)
+    );
     second.close();
     wait(|| !second.is_visible());
     println!(
-        "PASS controlled-error GTK/GIO race gate: reversed completion, video replacement, pending close, cancelled tokens, joined jobs, released widgets, independent window"
+        "PASS controlled-error GTK/GIO race gate: A/B/C reversed completion, video replacement, pending close with active survivor worker, repeated loads, stale result notifications, cancelled tokens, joined jobs, released widgets"
     );
     println!(
         "NOT TESTED Glycin decode, image pixels or real decoder cancellation; controlled workers only"

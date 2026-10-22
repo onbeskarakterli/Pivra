@@ -5,7 +5,8 @@
 
 use crate::media::MediaItem;
 
-/// Selection is either absent for an empty list or a valid index into `items`.
+/// Selection is absent or a valid index into `items`. A removed file leaves
+/// no selection until the user navigates, even if neighbors remain.
 /// Immutable item access prevents callers from invalidating that invariant.
 #[derive(Debug)]
 pub struct MediaCollection {
@@ -17,6 +18,25 @@ impl MediaCollection {
     pub fn new(items: Vec<MediaItem>) -> Self {
         let selected = if items.is_empty() { None } else { Some(0) };
         Self { items, selected }
+    }
+
+    /// Reconcile a filesystem snapshot without selecting a different file.
+    pub fn replace_preserving(&mut self, items: Vec<MediaItem>) -> bool {
+        let path = self.current().map(|item| item.path().to_owned());
+        self.items = items;
+        self.selected = path
+            .as_ref()
+            .and_then(|path| self.items.iter().position(|item| item.path() == path));
+        path.is_some() && self.selected.is_none()
+    }
+
+    pub fn rename_selected(&mut self, old: &std::path::Path, new: &std::path::Path) {
+        if let Some(index) = self
+            .selected
+            .filter(|_| self.current().is_some_and(|item| item.path() == old))
+        {
+            self.items[index] = MediaItem::new(new, self.items[index].kind());
+        }
     }
 
     pub fn items(&self) -> &[MediaItem] {
@@ -33,6 +53,9 @@ impl MediaCollection {
 
     /// Move one step without wrapping. False means selection did not change.
     pub fn select_previous(&mut self) -> bool {
+        if self.selected.is_none() {
+            return self.select(self.items.len().saturating_sub(1));
+        }
         let Some(index) = self.selected.and_then(|index| index.checked_sub(1)) else {
             return false;
         };
@@ -40,6 +63,9 @@ impl MediaCollection {
     }
 
     pub fn select_next(&mut self) -> bool {
+        if self.selected.is_none() {
+            return self.select(0);
+        }
         let Some(index) = self.selected.and_then(|index| index.checked_add(1)) else {
             return false;
         };
@@ -169,5 +195,51 @@ mod navigation_tests {
             assert_eq!(b.selected_index(), Some(1));
         }
         assert_eq!(a.selected_index(), Some(0));
+    }
+}
+
+#[cfg(test)]
+mod reconciliation_tests {
+    use super::*;
+    use crate::media::MediaKind;
+    fn items(names: &[&str]) -> Vec<MediaItem> {
+        names
+            .iter()
+            .map(|name| MediaItem::new(name, MediaKind::Image))
+            .collect()
+    }
+    #[test]
+    fn insertion_and_unselected_deletion_preserve_selected_path() {
+        let mut c = MediaCollection::new(items(&["2.png", "10.png"]));
+        c.select(1);
+        assert!(!c.replace_preserving(items(&["1.png", "2.png", "10.png"])));
+        assert_eq!(c.selected_index(), Some(2));
+        assert!(!c.replace_preserving(items(&["10.png"])));
+        assert_eq!(c.selected_index(), Some(0));
+    }
+    #[test]
+    fn selected_removal_does_not_jump_and_navigation_can_resume() {
+        let mut c = MediaCollection::new(items(&["1.png", "2.png"]));
+        assert!(c.replace_preserving(items(&["2.png"])));
+        assert!(c.current().is_none());
+        assert!(c.select_next());
+        assert_eq!(c.selected_index(), Some(0));
+        c.replace_preserving(vec![]);
+        assert!(!c.select_previous());
+        assert!(!c.select_next());
+        c.replace_preserving(items(&["10.png"]));
+        assert!(c.current().is_none());
+        assert!(c.select_previous());
+    }
+    #[test]
+    fn rename_and_snapshot_use_latest_selection_not_scan_start_selection() {
+        let mut c = MediaCollection::new(items(&["1.png", "2.png"]));
+        c.rename_selected("1.png".as_ref(), "10.png".as_ref());
+        assert!(!c.replace_preserving(items(&["2.png", "10.png"])));
+        assert_eq!(c.selected_index(), Some(1));
+        c.select_previous();
+        c.rename_selected("10.png".as_ref(), "20.png".as_ref());
+        assert!(!c.replace_preserving(items(&["2.png", "20.png"])));
+        assert_eq!(c.selected_index(), Some(0));
     }
 }

@@ -91,6 +91,15 @@ impl ImageView {
         path: PathBuf,
         on_completion: impl FnOnce() + 'static,
     ) {
+        self.load_observed(path, on_completion, |_| {});
+    }
+
+    pub(super) fn load_observed(
+        &self,
+        path: PathBuf,
+        on_completion: impl FnOnce() + 'static,
+        on_result: impl FnOnce(bool) + 'static,
+    ) {
         self.show_message("Loading image securely…");
         let cancellable = self.slot.begin();
         let loading = cancellable.clone();
@@ -119,6 +128,7 @@ impl ImageView {
             if !window.is_visible() {
                 return;
             }
+            on_result(result.is_ok());
             match result {
                 Ok(frame) => {
                     picture.set_paintable(Some(&frame.texture()));

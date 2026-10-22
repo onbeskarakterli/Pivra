@@ -291,7 +291,6 @@ fn main() {
     assert_eq!(picture(&second).paintable(), survivor);
     assert_eq!(status(&second).text(), survivor_status);
     // Scanner snapshot intentionally retains this now-deleted private file.
-    std::fs::remove_file(root.join("12.png")).unwrap();
     key(&first, false);
     title(&first, "2.mp4", 6);
     video(&first);
@@ -318,15 +317,15 @@ fn main() {
     key(&first, true);
     title(&first, "11.png", 6);
     invalid(&first, false);
+    // PIV-11 removes deleted neighbors live; they are no longer navigable.
+    std::fs::remove_file(root.join("12.png")).unwrap();
+    wait(|| first.title().is_some_and(|s| s.ends_with("(5 candidates)")));
     key(&first, true);
-    title(&first, "12.png", 6);
-    invalid(&first, true);
-    key(&first, true);
-    title(&first, "20.png", 6);
+    title(&first, "20.png", 5);
     image(&first, blocked, (32, 64));
     let before = picture(&first).paintable();
     key(&first, true);
-    title(&first, "20.png", 6);
+    title(&first, "20.png", 5);
     assert_eq!(picture(&first).paintable(), before);
     // Drive old work to completion after the final selection; latest stays current.
     let grace = Instant::now() + Duration::from_millis(300);
@@ -339,7 +338,7 @@ fn main() {
         }
         std::thread::sleep(Duration::from_millis(2));
     }
-    title(&first, "20.png", 6);
+    title(&first, "20.png", 5);
     image(&first, blocked, (32, 64));
     assert_eq!(picture(&second).paintable(), survivor);
     assert!(second.is_visible());

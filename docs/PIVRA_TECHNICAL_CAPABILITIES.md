@@ -1,6 +1,6 @@
 # Pivra — Teknik Yetenekler ve Faz 0 Kararları
 
-**Tarih:** 21.10.2026 · **Dal:** dev · **Güncel durum:** PIV-01–10 DONE, PIV-11 TESTING; aşağıdaki ilk kayıt yalnız PIV-05 tarihçesidir.
+**Tarih:** 21.10.2026 · **Dal:** dev · **Güncel durum:** PIV-01–11 DONE, PIV-12 TESTING; aşağıdaki ilk kayıt yalnız PIV-05 tarihçesidir.
 Başlangıç commit'i: `8b3947215c54dfd2515df61a50dd05c080eccf31`.
 PIV-06 uygulanmadı. Production kaynakları, Cargo.toml ve Cargo.lock değiştirilmedi;
 görüntü decoder'ı veya video oynatıcı yazılmadı. Proje lisansı seçilmedi.
@@ -707,3 +707,13 @@ PASS; gerçek yeni pixel/refresh kabulü Codex'te NOT RUN/exit77. Kullanıcını
 PIV-09/10 native DONE kanıtı korunur, PIV-11'e genellenmez.
 [Ayrıntılar ve tek komut](PIV11_VALIDATION.md). Faz 0 temiz kurulum,
 DESKTOP-06 ve önceki GStreamer/loader dağıtım riskleri kendi kapsamlarında açık.
+
+
+## PIV-12 — hata dayanıklılığı ve kanıt ayrımı
+
+[Doğrulama matrisi](PIV12_VALIDATION.md): 57 Rust + 30 Python ve 18 scoped GTK/GIO
+çağrısı PASS. Gerçek secure decoder kapıları Codex'te 7 exit77/NOT RUN; önceki
+kullanıcı PIV-09–11 native kanıtları korunur. Kontrollü worker testleri gerçek
+Glycin/piksel başarısı değildir; secure decode etkinliği/overlap ölçülmedi.
+Yalnız unsupported/video Yenile yolu düzeltildi; Bwrap zorunluluğu, bağımlılıklar
+ve önceki açık dağıtım/temiz kurulum/Nautilus işleri değişmedi. PIV-12 TESTING.

@@ -1,6 +1,6 @@
 # Pivra — Geliştirme Yol Haritası
 
-**Durum:** PIV-01–08 DONE (giriş, keşif ve doğal sıra); PIV-09 DONE (Arch gerçek JPEG/PNG/EXIF, geometri ve aktif-decode kapanış/temizlik PASS); PIV-10 DONE (native gerçek secure piksel/Fit ve fiziksel sol/sağ gezinme PASS); PIV-11 DONE (Arch native ve GNOME Yenile PASS); PIV-12–60 TODO. Faz 0 INCOMPLETE: temiz native kurulumun bağımsız yeniden üretimi NOT RUN; temiz Cargo target derlemesi ve headless regresyonlar geçti. [PIV-05 kanıtı ve ayrı faz kapısı](PIVRA_TECHNICAL_CAPABILITIES.md#102-piv-05-ve-faz-0-kapanışını-ayrı-değerlendirme).
+**Durum:** PIV-01–08 DONE (giriş, keşif ve doğal sıra); PIV-09 DONE (Arch gerçek JPEG/PNG/EXIF, geometri ve aktif-decode kapanış/temizlik PASS); PIV-10 DONE (native gerçek secure piksel/Fit ve fiziksel sol/sağ gezinme PASS); PIV-11 DONE (Arch native ve GNOME Yenile PASS); PIV-12 TESTING; PIV-13–60 TODO. Faz 0 INCOMPLETE: temiz native kurulumun bağımsız yeniden üretimi NOT RUN; temiz Cargo target derlemesi ve headless regresyonlar geçti. [PIV-05 kanıtı ve ayrı faz kapısı](PIVRA_TECHNICAL_CAPABILITIES.md#102-piv-05-ve-faz-0-kapanışını-ayrı-değerlendirme).
 **Başlangıç branch:** `dev` · **Kararlı sürümler:** `main`  
 **Kaynak şartname:** [PIVRA_FEATURE_SPEC_TR.md](PIVRA_FEATURE_SPEC_TR.md)  
 **Görev ve commit takibi:** [PIVRA_COMMIT_TRACKER.md](PIVRA_COMMIT_TRACKER.md)
@@ -262,3 +262,17 @@ Kullanıcı Arch/GNOME'da `f96a0db029fa0e5157318d4bdfd4ef494d3baf33` commit'inde
 ## PIV-11 final native acceptance — DONE (2026-10-22)
 
 At `f96a0db029fa0e5157318d4bdfd4ef494d3baf33`, user ran `bash tests/run_folder_watch_probe.sh`: exit0/PASS, real filesystem events and secure Glycin refresh, previous frame retained until explicit user refresh action. In normal GNOME/Wayland application, user observed the refresh banner and confirmed clicking Yenile displays the modified image after a loading animation. Previous new-window impression was not confirmed by terminal logs (two separate cargo run commands); actual GtkWindow object identity not manually instrumented. Native acceptance met; PIV-11 DONE, PIV-12 TODO. The mixed Turkish/English UI strings are scheduled for PIV-39 i18n; Phase 0 clean install INCOMPLETE and DESKTOP-06 Nautilus NOT RUN remain independent.
+
+
+## PIV-12 — 22.10.2026 — TESTING
+
+Medya hataları ve gerçek GTK/GIO pencere/monitor izolasyonu güçlendirildi.
+Yenile'nin video/unsupported öğeyi decoder'a göndermesi küçük bir düzeltmeyle
+engellendi. Mevcut 57 Rust + 30 Python PASS; 18 scoped GUI/helper çağrısı PASS.
+A/B/C, tekrarlanan Yenile, seçili silinme ve diğer pencerede bekleyen yükleme
+sırasında kapanış deterministik kontrollü hata worker'larıyla doğrulandı;
+gerçek Glycin başarısı değildir. 7 native decoder kapısı Codex'te exit77/NOT RUN.
+Tek yeni native komut: `bash tests/run_media_failure_probe.sh`.
+[Ayrıntılı kanıt/kalan kabul](PIV12_VALIDATION.md). PIV-01–11 DONE korunur,
+PIV-12 DONE değil; PIV-13 başlamadı. PIV-39 tr/en i18n kararı, Faz 0 temiz
+kurulum ve DESKTOP-06 ayrı açık işler olarak kalır.

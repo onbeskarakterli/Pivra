@@ -1,6 +1,6 @@
 # PIV-11 — canlı katalog ve kullanıcı eylemiyle yenileme
 
-22.10.2026 · `dev` · **TESTING**, native kabul bekleniyor.
+22.10.2026 · `dev` · **DONE**, Arch native ve GNOME manuel kabul sağlandı.
 Başlangıç: `b83aa93e7b6d754c4cc2f55e7f6ff584046e49b6`.
 PIV-01–10 DONE kayıtları korunur. PIV-10'un native/gerçek klavye kanıtları
 kullanıcı kaynaklıdır; bu çalışmada Codex tarafından tekrar üretilmiş sayılmaz.
@@ -106,3 +106,8 @@ PIV-12 başlatılmadı. Ağ dosya sistemi/özel monitor backend'leri ve monitor
 kurulum hatası enjeksiyonu ayrıca test edilmedi; yerel Linux GIO kapsamı dışına
 PASS genellenmez. Scan/decode sayılarının performans ölçümü yapılmadı; eşzamanlı
 scan/token sınırları kod invariants ve mevcut yarış testleriyle sınırlıdır.
+
+
+## PIV-11 final native acceptance — DONE (2026-10-22)
+
+At `f96a0db029fa0e5157318d4bdfd4ef494d3baf33`, user ran `bash tests/run_folder_watch_probe.sh`: exit0/PASS, real filesystem events and secure Glycin refresh, previous frame retained until explicit user refresh action. In normal GNOME/Wayland application, user observed the refresh banner and confirmed clicking Yenile displays the modified image after a loading animation. Previous new-window impression was not confirmed by terminal logs (two separate cargo run commands); actual GtkWindow object identity not manually instrumented. Native acceptance met; PIV-11 DONE, PIV-12 TODO. The mixed Turkish/English UI strings are scheduled for PIV-39 i18n; Phase 0 clean install INCOMPLETE and DESKTOP-06 Nautilus NOT RUN remain independent.

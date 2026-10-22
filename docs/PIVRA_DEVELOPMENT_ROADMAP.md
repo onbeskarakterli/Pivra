@@ -1,6 +1,6 @@
 # Pivra — Geliştirme Yol Haritası
 
-**Durum:** PIV-01–08 DONE (giriş, keşif ve doğal sıra); PIV-09 DONE (Arch gerçek JPEG/PNG/EXIF, geometri ve aktif-decode kapanış/temizlik PASS); PIV-10 TESTING (sol/sağ gezinme kodlandı; yeni native piksel/focus doğrulaması bekleniyor); PIV-11–60 TODO. Faz 0 INCOMPLETE: temiz native kurulumun bağımsız yeniden üretimi NOT RUN; temiz Cargo target derlemesi ve headless regresyonlar geçti. [PIV-05 kanıtı ve ayrı faz kapısı](PIVRA_TECHNICAL_CAPABILITIES.md#102-piv-05-ve-faz-0-kapanışını-ayrı-değerlendirme).
+**Durum:** PIV-01–08 DONE (giriş, keşif ve doğal sıra); PIV-09 DONE (Arch gerçek JPEG/PNG/EXIF, geometri ve aktif-decode kapanış/temizlik PASS); PIV-10 DONE (native gerçek secure piksel/Fit ve fiziksel sol/sağ gezinme PASS); PIV-11–60 TODO. Faz 0 INCOMPLETE: temiz native kurulumun bağımsız yeniden üretimi NOT RUN; temiz Cargo target derlemesi ve headless regresyonlar geçti. [PIV-05 kanıtı ve ayrı faz kapısı](PIVRA_TECHNICAL_CAPABILITIES.md#102-piv-05-ve-faz-0-kapanışını-ayrı-değerlendirme).
 **Başlangıç branch:** `dev` · **Kararlı sürümler:** `main`  
 **Kaynak şartname:** [PIVRA_FEATURE_SPEC_TR.md](PIVRA_FEATURE_SPEC_TR.md)  
 **Görev ve commit takibi:** [PIVRA_COMMIT_TRACKER.md](PIVRA_COMMIT_TRACKER.md)
@@ -229,3 +229,10 @@ testi Codex sandbox kapısında exit77/BLOCKED. [Detay ve native tek komut](PIV1
 Yeni native render/rapid sonuç ve fiziksel GNOME tuş/focus kanıtı olmadan DONE yok.
 PIV-09 kullanıcı native kanıtıyla DONE kalır. PIV-11, Faz 0 temiz native kurulum
 ve DESKTOP-06 kapsamında yeni başarı iddiası yok; bu görevler ilerletilmedi.
+
+
+### PIV-10 native Arch kapanış — DONE (22.10.2026)
+
+Kullanıcı `c53d4071368b2b45ceb8ecba06f949f4c5188b52` üzerinde `bash tests/run_navigation_probe.sh` çalıştırdı: **exit0/PASS**. Gerçek secure JPEG/PNG pikselleri, Fit/center, doğal karışık katalog, rapid navigation, bozuk/silinmiş dosyadan devam ve bağımsız pencereler PASS. Normal Pivra'da fiziksel sol/sağ tuşlarıyla gerçek fotoğraf geçişi kullanıcı tarafından ayrıca doğrulandı; `Loading image securely` mesajı yükleme bitince kayboluyor. PIV-10 arayüzünde odaklanabilir gezinme/başlık düğmesi olmadığından Tab sonrası focus kontrolü **NOT APPLICABLE**; bu ayrıca test edilmiş gibi gösterilmez. Video mesajının native otomatik doğrulaması PASS; fiziksel video geçişi kullanıcıca ayrıca raporlanmadı.
+
+**PIV-10 DONE**, PIV-11 TODO. Faz 0 bağımsız temiz native kurulum **INCOMPLETE** ve DESKTOP-06 gerçek Nautilus **NOT RUN** kalır. Ayrıntılar [PIV-10 kapanış kanıtı](PIVRA_COMMIT_TRACKER.md#piv-10-arch-native-kabul-ve-kapanış--22102026--done).

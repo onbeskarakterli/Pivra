@@ -5,6 +5,8 @@ mod image_loader;
 mod image_view;
 #[path = "../src/input.rs"]
 mod input;
+#[path = "support/media_failure_cases.rs"]
+mod media_failure_cases;
 #[path = "../src/window.rs"]
 mod window;
 use adw::prelude::*;
@@ -115,6 +117,10 @@ fn main() {
         .flags(gio::ApplicationFlags::NON_UNIQUE)
         .build();
     app.register(None::<&gio::Cancellable>).unwrap();
+    if std::env::args().any(|s| s == "--media-failures") {
+        media_failure_cases::run(&app, native);
+        return;
+    }
     let dir = tempfile::tempdir().unwrap();
     let other = tempfile::tempdir().unwrap();
     let fixtures = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/images");

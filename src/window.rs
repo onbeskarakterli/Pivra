@@ -175,6 +175,21 @@ pub(super) fn build(app: &adw::Application, settings: &Settings, file: Option<Op
             let Some(item) = context.collection.current() else {
                 return;
             };
+            if item.kind() == MediaKind::Video
+                || !item
+                    .path()
+                    .extension()
+                    .and_then(|s| s.to_str())
+                    .is_some_and(|ext| {
+                        ["jpg", "jpeg", "png"]
+                            .iter()
+                            .any(|s| ext.eq_ignore_ascii_case(s))
+                    })
+            {
+                refresh_banner.set_reveal_child(false);
+                display_selected(&refresh_view, &context);
+                return;
+            }
             let path = item.path().to_owned();
             let revision = context.revision;
             drop(context);

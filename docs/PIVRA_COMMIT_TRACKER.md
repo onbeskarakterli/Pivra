@@ -1859,3 +1859,13 @@ native kurulum INCOMPLETE, DESKTOP-06 Nautilus NOT RUN ve PIV-39 tr/en planı
 korunur. Cargo.toml/lock, decoder/sandbox, eski medya fixture'ları, kurulum,
 CI ve lisans değişmedi; manifest yalnız yeni özgün checker satırıyla genişledi.
 Main beklenen SHA `5d55ee599df4617bd51c09b1c7a008b8d0ece480`; push sonunda kontrol edilir.
+
+### PIV-15 belge ve uzak dal kanıtı
+
+Belge/matris commit'i `470efbf4eb3e1ee3b29f45dade3cd4008aa161d5`.
+Normal push `28505e4..470efbf dev -> dev` başarılı; açık dev refspec'iyle fetch
+sonrasında HEAD/origin/dev aynı SHA doğrulandı. `ls-remote` main'i değişmemiş
+`5d55ee599df4617bd51c09b1c7a008b8d0ece480` gösterdi. Başlangıca karşı Cargo.toml,
+Cargo.lock, image_loader.rs, eski pixels-2x2/model-video ve images fixture'larında
+fark yok; manifest yeni checker girdisiyle genişledi. Bu son kayıt ayrı belge
+commit'idir; kendi SHA'sı Git geçmişindedir. PIV-15 TESTING.

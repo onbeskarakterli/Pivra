@@ -1,11 +1,16 @@
 //! Native logical-pixel presentation without changing Picture's minimum size.
 use gtk::{gdk, glib, prelude::*, subclass::prelude::*};
-use std::cell::OnceCell;
+use std::{
+    cell::{OnceCell, RefCell},
+    rc::Rc,
+};
 mod imp {
     use super::*;
     #[derive(Default)]
     pub struct ActualPaintable {
         pub texture: OnceCell<gdk::Texture>,
+        pub transform: OnceCell<Rc<RefCell<pivra::viewing::Transform>>>,
+        pub mode: std::cell::Cell<pivra::viewing::ViewMode>,
     }
     #[glib::object_subclass]
     impl ObjectSubclass for ActualPaintable {
@@ -25,10 +30,15 @@ mod imp {
             let Some(texture) = self.texture.get() else {
                 return;
             };
-            let Some(g) = pivra::viewing::ViewMode::Actual.geometry(
-                (texture.width() as f64, texture.height() as f64),
-                (width, height),
-            ) else {
+            let image = (texture.width() as f64, texture.height() as f64);
+            let geometry = if let Some(transform) = self.transform.get() {
+                transform
+                    .borrow_mut()
+                    .geometry(image, (width, height), self.mode.get())
+            } else {
+                pivra::viewing::ViewMode::Actual.geometry(image, (width, height))
+            };
+            let Some(g) = geometry else {
                 return;
             };
             let snapshot = snapshot
@@ -50,6 +60,26 @@ mod imp {
 }
 glib::wrapper! { pub struct ActualPaintable(ObjectSubclass<imp::ActualPaintable>) @implements gdk::Paintable; }
 impl ActualPaintable {
+    pub fn has_transform(&self, transform: &Rc<RefCell<pivra::viewing::Transform>>) -> bool {
+        self.imp()
+            .transform
+            .get()
+            .is_some_and(|current| Rc::ptr_eq(current, transform))
+    }
+    pub fn transformed(
+        texture: &gdk::Texture,
+        transform: Rc<RefCell<pivra::viewing::Transform>>,
+        mode: pivra::viewing::ViewMode,
+    ) -> Self {
+        let object = Self::new(texture);
+        object
+            .imp()
+            .transform
+            .set(transform)
+            .expect("new transform");
+        object.imp().mode.set(mode);
+        object
+    }
     pub fn new(texture: &gdk::Texture) -> Self {
         let object: Self = glib::Object::new();
         object

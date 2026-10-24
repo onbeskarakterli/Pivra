@@ -4,8 +4,12 @@
 mod actual_paintable;
 use adw::prelude::*;
 use gtk::{gio, glib};
-use pivra::viewing::ViewMode;
-use std::{cell::RefCell, path::PathBuf, rc::Rc};
+use pivra::viewing::{Transform, ViewMode};
+use std::{
+    cell::{Cell, RefCell},
+    path::PathBuf,
+    rc::Rc,
+};
 
 #[derive(Default)]
 struct LoadSlot(RefCell<Option<gio::Cancellable>>);
@@ -39,6 +43,7 @@ pub(super) struct ImageView {
     window: glib::WeakRef<adw::ApplicationWindow>,
     mode_action: gio::SimpleAction,
     texture: Rc<RefCell<Option<gtk::gdk::Texture>>>,
+    transform: Rc<RefCell<Transform>>,
 }
 
 impl ImageView {
@@ -73,12 +78,16 @@ impl ImageView {
         );
         mode_action.set_enabled(false);
         let texture: Rc<RefCell<Option<gtk::gdk::Texture>>> = Rc::default();
+        let transform = Rc::new(RefCell::new(Transform::default()));
+        install_interaction(&picture, texture.clone(), transform.clone(), &mode_action);
+        let mode_transform = transform.clone();
         let weak_picture = picture.downgrade();
         let current_texture = texture.clone();
         mode_action.connect_activate(move |action, parameter| {
             let Some(mode) = parameter.and_then(|v| v.str()).and_then(ViewMode::from_id) else {
                 return;
             };
+            mode_transform.borrow_mut().reset();
             action.set_state(&mode.id().to_variant());
             if let Some(picture) = weak_picture.upgrade() {
                 present(&picture, current_texture.borrow().as_ref(), mode);
@@ -87,6 +96,7 @@ impl ImageView {
         window.add_action(&mode_action);
         Self {
             mode_action,
+            transform,
             texture,
             overlay,
             picture,
@@ -102,6 +112,7 @@ impl ImageView {
 
     pub(super) fn show_message(&self, message: &str) {
         self.slot.cancel();
+        self.transform.borrow_mut().reset();
         self.mode_action.set_enabled(false);
         self.texture.borrow_mut().take();
         self.mode_action.set_state(&"fit".to_variant());
@@ -180,6 +191,138 @@ impl ImageView {
             }
         });
     }
+}
+
+/// Attached only to the photo widget: header/menu/banner events never enter here.
+pub(super) fn install_interaction(
+    picture: &gtk::Picture,
+    texture: Rc<RefCell<Option<gtk::gdk::Texture>>>,
+    transform: Rc<RefCell<Transform>>,
+    action: &gio::SimpleAction,
+) {
+    let pointer = Rc::new(Cell::new((0., 0.)));
+    let motion = gtk::EventControllerMotion::new();
+    let entered = pointer.clone();
+    motion.connect_enter(move |_, x, y| entered.set((x, y)));
+    let position = pointer.clone();
+    motion.connect_motion(move |_, x, y| position.set((x, y)));
+    picture.add_controller(motion);
+    let scroll = gtk::EventControllerScroll::new(gtk::EventControllerScrollFlags::VERTICAL);
+    let weak = picture.downgrade();
+    let source = texture.clone();
+    let state = transform.clone();
+    let mode_action = action.clone();
+    scroll.connect_scroll(move |_, _, dy| {
+        let Some(picture) = weak.upgrade() else {
+            return glib::Propagation::Proceed;
+        };
+        if !picture.is_mapped() {
+            return glib::Propagation::Proceed;
+        }
+        let source = source.borrow();
+        let Some(texture) = source.as_ref() else {
+            return glib::Propagation::Proceed;
+        };
+        let mode = mode_action
+            .state()
+            .and_then(|v| v.str().and_then(ViewMode::from_id))
+            .unwrap_or(ViewMode::Actual);
+        let changed = state.borrow_mut().zoom(
+            (texture.width() as f64, texture.height() as f64),
+            (picture.width() as f64, picture.height() as f64),
+            mode,
+            pointer.get(),
+            dy,
+        );
+        if changed {
+            manual(&picture, texture, state.clone(), mode, &mode_action);
+        }
+        glib::Propagation::Stop
+    });
+    picture.add_controller(scroll);
+    let drag = gtk::GestureDrag::new();
+    drag.set_button(1);
+    let last = Rc::new(Cell::new(None::<(f64, f64)>));
+    let start = last.clone();
+    let source = texture.clone();
+    let drag_generation = Rc::new(Cell::new(0));
+    let began_generation = drag_generation.clone();
+    let began_transform = transform.clone();
+    drag.connect_drag_begin(move |gesture, _, _| {
+        if source.borrow().is_some() && gesture.widget().is_some_and(|w| w.is_mapped()) {
+            began_generation.set(began_transform.borrow().generation());
+            start.set(Some((0., 0.)));
+            gesture.set_state(gtk::EventSequenceState::Claimed);
+        }
+    });
+    let weak = picture.downgrade();
+    let offsets = last.clone();
+    let state = transform;
+    let mode_action = action.clone();
+    drag.connect_drag_update(move |_, x, y| {
+        if drag_generation.get() != state.borrow().generation() {
+            offsets.set(None);
+            return;
+        }
+        let Some(previous) = offsets.get() else {
+            return;
+        };
+        let Some(picture) = weak.upgrade() else {
+            return;
+        };
+        if !picture.is_mapped() {
+            offsets.set(None);
+            return;
+        }
+        let source = texture.borrow();
+        let Some(texture) = source.as_ref() else {
+            offsets.set(None);
+            return;
+        };
+        if !x.is_finite() || !y.is_finite() {
+            return;
+        }
+        offsets.set(Some((x, y)));
+        let mode = mode_action
+            .state()
+            .and_then(|v| v.str().and_then(ViewMode::from_id))
+            .unwrap_or(ViewMode::Actual);
+        let changed = state.borrow_mut().pan(
+            (texture.width() as f64, texture.height() as f64),
+            (picture.width() as f64, picture.height() as f64),
+            mode,
+            (x - previous.0, y - previous.1),
+        );
+        if changed {
+            manual(&picture, texture, state.clone(), mode, &mode_action);
+        }
+    });
+    let end = last.clone();
+    drag.connect_drag_end(move |_, _, _| end.set(None));
+    drag.connect_cancel(move |_, _| last.set(None));
+    picture.add_controller(drag);
+}
+fn manual(
+    picture: &gtk::Picture,
+    texture: &gtk::gdk::Texture,
+    transform: Rc<RefCell<Transform>>,
+    mode: ViewMode,
+    action: &gio::SimpleAction,
+) {
+    picture.set_overflow(gtk::Overflow::Hidden);
+    picture.set_content_fit(gtk::ContentFit::Fill);
+    if let Some(current) = picture
+        .paintable()
+        .and_then(|p| p.downcast::<actual_paintable::ActualPaintable>().ok())
+        .filter(|p| p.has_transform(&transform))
+    {
+        current.invalidate_contents();
+    } else {
+        picture.set_paintable(Some(&actual_paintable::ActualPaintable::transformed(
+            texture, transform, mode,
+        )));
+    }
+    action.set_state(&"manual".to_variant());
 }
 
 pub(super) fn present(picture: &gtk::Picture, texture: Option<&gtk::gdk::Texture>, mode: ViewMode) {

@@ -132,11 +132,15 @@ pub(super) fn build(app: &adw::Application, settings: &Settings, file: Option<Op
             .expect("view mode action");
         action.connect_notify_local(Some("state"), move |action, _| {
             if let Some(button) = weak_button.upgrade() {
-                let mode = action
-                    .state()
-                    .and_then(|v| v.str().and_then(pivra::viewing::ViewMode::from_id))
-                    .unwrap_or_default();
-                button.set_label(mode.label());
+                let state = action.state();
+                let id = state.as_ref().and_then(|v| v.str()).unwrap_or("fit");
+                button.set_label(if id == "manual" {
+                    pivra::viewing::ViewMode::MANUAL_LABEL
+                } else {
+                    pivra::viewing::ViewMode::from_id(id)
+                        .unwrap_or_default()
+                        .label()
+                });
             }
         });
         viewport.prepend(view.widget());

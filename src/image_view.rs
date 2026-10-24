@@ -17,6 +17,7 @@ mod image_requests;
 mod preload;
 use image_requests::LoadSlot;
 use pivra::image_cache::texture_cost;
+use pivra::image_pipeline::Phase;
 #[derive(Clone)]
 pub(super) struct ImageView {
     overlay: gtk::Overlay,
@@ -30,6 +31,7 @@ pub(super) struct ImageView {
     filter: Rc<Cell<Resampling>>,
     requested: Rc<RefCell<Option<PathBuf>>>,
     prefetch: Rc<RefCell<preload::State>>,
+    phase: Rc<Cell<Phase>>,
 }
 
 impl ImageView {
@@ -49,6 +51,14 @@ impl ImageView {
         overlay.set_vexpand(true);
         overlay.set_child(Some(&picture));
         overlay.add_overlay(&status);
+        let phase = Rc::new(Cell::new(Phase::Requested));
+        let closing_phase = phase.clone();
+        window.connect_close_request(move |_| {
+            closing_phase.set(Phase::Cancelled);
+            glib::Propagation::Proceed
+        });
+        let destroyed_phase = phase.clone();
+        window.connect_destroy(move |_| destroyed_phase.set(Phase::Cancelled));
         let prefetch = preload::State::new();
         let closing_prefetch = prefetch.clone();
         window.connect_close_request(move |_| {
@@ -146,6 +156,7 @@ impl ImageView {
         Self {
             mode_action,
             prefetch,
+            phase,
             requested: Rc::default(),
             filter,
             transform,
@@ -175,6 +186,7 @@ impl ImageView {
     fn prepare(&self, message: &str, cancel: bool) {
         if cancel {
             self.slot.cancel();
+            self.phase.set(Phase::Cancelled);
         }
         {
             let mut state = self.prefetch.borrow_mut();
@@ -280,6 +292,11 @@ impl ImageView {
         }
     }
 
+    #[allow(dead_code)] // Probe diagnostics, not a user-visible debug indicator.
+    pub(super) fn phase(&self) -> Phase {
+        self.phase.get()
+    }
+
     pub(super) fn load(&self, path: PathBuf) {
         if self.requested.borrow().as_ref() == Some(&path) && self.slot.current_in_flight() {
             return;
@@ -331,6 +348,7 @@ impl ImageView {
             self.slot.begin()
         };
         self.prepare("Loading image securely…", false);
+        self.phase.set(Phase::FullLoading);
         {
             let mut state = self.prefetch.borrow_mut();
             state.current_path = Some(path.clone());
@@ -349,6 +367,7 @@ impl ImageView {
         let transform = self.transform.clone();
         let prefetch = self.prefetch.clone();
         let epoch = prefetch.borrow().epoch.clone();
+        let phase = self.phase.clone();
         type Completion = preload::Completion;
         let completion: Rc<RefCell<Option<Completion>>> = Rc::new(RefCell::new(Some(Box::new({
             let slot = slot.clone();
@@ -380,6 +399,7 @@ impl ImageView {
                     other => other,
                 };
                 let success = result.is_ok();
+                phase.set(phase.get().full(success, false));
                 match result {
                     Ok(output) => {
                         let (decoded, key) = match output {

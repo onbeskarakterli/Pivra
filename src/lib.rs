@@ -9,3 +9,5 @@ pub mod settings;
 pub mod viewing;
 
 pub const APP_NAME: &str = "Pivra";
+
+pub mod image_pipeline;

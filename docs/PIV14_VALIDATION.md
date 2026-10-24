@@ -1,6 +1,6 @@
 # PIV-14 — imleç merkezli zoom ve pan
 
-24.10.2026 · `dev` · **TESTING**, gerçek Arch/GNOME kabulü bekleniyor.
+24.10.2026 · `dev` · **DONE**, Arch/GNOME native ve manuel kabul tamamlandı.
 Başlangıç: `8b31944dacef310ef3df3b617a241c6f27d005ba`.
 Güncel origin/dev fast-forward ile alındı. PIV-01–13 DONE kayıtları ve önceki
 kullanıcı kaynaklı native sonuçlar korunur; yeni görev için genellenmez.
@@ -159,3 +159,8 @@ kurulum INCOMPLETE, DESKTOP-06 Nautilus NOT RUN ve PIV-39 tr/en planı açık ka
 |---|---|
 | `0bacddbd8cd4fd2e266ed63c1886e33f35468408` | Ankrajlı manuel zoom, bounded pan/resize, nesilli gesture reset; mevcut paintable/texture ve header indicator entegrasyonu |
 | `e1d977124e939897b129e759293df866682a0de3` | Sentetik render/controller/izolasyon ve pending-input regresyonları; native zoom-pan girişi, Sway argümanı |
+
+
+## PIV-14 Arch native ve gerçek fare kabulü — 24.10.2026 — DONE
+
+Kullanıcı `6c55eab27d4c5bcf980246c2c69fb08671d2d2be` üzerinde `bash tests/run_zoom_pan_probe.sh` çalıştırdı: **exit 0**. Gerçek Glycin JPEG/PNG/EXIF baseline ve üretim render/mod/geometri, iki pencere izolasyonu testleri PASS; betiğin `view_modes_probe --zoom-pan` yolunu çağırdığı doğrulandı. Bozuk PNG testindeki decoder hata satırı beklenendi. Kullanıcı ayrıca fiziksel GNOME/Wayland fare testi için **olumlu sonuç** bildirdi: %100 görüntü üzerinde sürükleme, imleç ankrajlı yakınlaştırma, Fit sıfırlama ve resize akışı için bir problem bildirilmedi. Ayrı ölçülmeyen HiDPI fiziksel piksel eşlemesi, gerçek decoder süreç zaman çakışması ve FPS/gecikme ölçümleri PASS sayılmaz. **PIV-14 DONE; PIV-15 TODO.** Faz 0 temiz native kurulum INCOMPLETE, DESKTOP-06 Nautilus NOT RUN ve PIV-39 i18n kararı açık kalır.

@@ -41,13 +41,22 @@ fn update_title(window: &adw::ApplicationWindow, title: &adw::WindowTitle, conte
         .unwrap_or_default();
     window.set_title(Some(&format!("{name} — {APP_NAME}{suffix}")));
     title.set_title(&name);
-    title.set_subtitle(if context.warning {
-        "Folder scan incomplete."
-    } else if selected.kind() == MediaKind::Video {
-        "Video playback is not available yet."
+    if selected.kind() == MediaKind::Image {
+        let selected_index = context.collection.selected_index().unwrap_or(0);
+        let mut photo_number = 0;
+        let mut photo_total = 0;
+        for (index, item) in context.collection.items().iter().enumerate() {
+            if item.kind() == MediaKind::Image {
+                photo_total += 1;
+                if index <= selected_index {
+                    photo_number += 1;
+                }
+            }
+        }
+        title.set_subtitle(&format!("{photo_number} / {photo_total}"));
     } else {
-        "Local photo"
-    });
+        title.set_subtitle("Video playback is not available yet.");
+    }
 }
 
 fn display_selected(view: &ImageView, context: &FileContext) {

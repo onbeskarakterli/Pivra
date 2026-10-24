@@ -1,6 +1,6 @@
 # PIV-16 — cancellable async image loading
 
-24.10.2026 · `dev` · **TESTING**, gerçek Arch/GNOME kabulü bekleniyor.
+24.10.2026 · `dev` · **DONE**, gerçek Arch native ve kullanıcı manuel kabulü tamamlandı.
 Başlangıç: `d9a127f482041a7f0a6994d9427de45f94c4784b`, origin/dev fast-forward.
 PIV-01–15 DONE ve kullanıcı kaynaklı native kanıtları korunur; yeni görev için
 Codex'te tekrar üretilmiş veya yeni native PASS olarak kullanılmaz.
@@ -208,3 +208,8 @@ DESKTOP-06 Nautilus NOT RUN ve PIV-39 tr/en i18n planı ayrı açık işlerdir.
 |---|---|
 | `636498cb123cf92cc723f432251704c3b7566793` | 3+1 admission/deadline, unique cancellable identity/stats, duplicate-load coalescing, close cache release, observer reentrancy ve pending rename düzeltmesi; eski probe compatibility/barrier uyarlaması |
 | `d9c93ebc104bdda9ea6b7ee3171ef7707e3b0062` | Controlled success/error/pixel ve timeout probe'ları, secure async native yolu, PIV-09 checkpoint'i içeren tek native giriş, Sway argümanları |
+
+
+## PIV-16 native ve manuel kapanış — 24.10.2026 — DONE
+
+Kullanıcı gerçek Arch/GNOME ortamında `0822e4b2028d414304ef3b2078bc5bc6d6da8852` üzerinde `bash tests/run_async_cancel_probe.sh` çalıştırdı: **exit 0**. Gerçek JPEG/PNG/EXIF baseline PASS; secure async latest-pixel, A→B→A, hata toparlanma, iki pencere ve kaynak bütünlüğü PASS. `LoadStats`: running=0, pending=0, started=11, completed=11, max_running=3, dropped_pending=97, suppressed=6, timed_out=0. Ek PIV-09 aktif secure decode close checkpoint'inde partial memfd/frame, pidfd/mapping/sandbox, worker join, stale mutation=0, survivor pixels ve child cleanup PASS. `Cleanup SIGCONT unavailable: No such process` süreç zaten çıktığı için fatal değildi; toplam test exit0. Burst içinde decoder active interval/overlap **NOT MEASURED**. Kullanıcı gerçek uygulamada hızlı Sol/Sağ, A→B→A ve yükleme sırasında görüntüleme tercihlerini denedikten sonra olumlu manuel yanıt verdi; ayrıntılı ayrı ölçüm iddiası yok. **PIV-16 DONE; PIV-17 TODO.** Faz 0 temiz native kurulum INCOMPLETE, DESKTOP-06 Nautilus NOT RUN ve PIV-39 i18n planı açık.

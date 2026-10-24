@@ -2096,3 +2096,32 @@ silmeler ve üç belge; kalan prototip link/komut referansı yok; üretim src/Ca
 examples ve PIV-18B betiği değişmedi. Mevcut 30 Python observer +3 native rapor
 sürücüsü testi PASS; git diff --check PASS. Üretim kodu değişmediğinden Rust/GUI
 paketleri tekrar çalıştırılmadı; bu bir native decode PASS iddiası değildir.
+
+## PIV-18 / TH-01 — GNOME thumbnail sağlayıcısı — 25.10.2026 — TESTING
+
+Yalnız TH-01; TH-02–TH-06 kullanıcı kabulü bekler, kodlanmadı.
+Başlangıç `1624264aa72a9b27825853b812fb17f69e2e2451`, temiz/güncel dev.
+
+| Gerçek SHA | Değişiklik |
+|---|---|
+| `c8eb5bdf011cae2e86e3c4448df62ed173590038` | İzole GIO thumbnail cache provider, FileKey, metadata/container validation, bounded worker, dört capability/controlled outcome |
+| `88f3e94f484ced10df9fb32d9ec36425571ce722` | Gerçek GIO cache testleri, GNOME factory can_thumbnail metadata helper ve tek native giriş |
+
+PASS:5 yeni Rust unit;11 GIO entegrasyon testi. Tek core80 Rust(56 unit+24
+integration),30 Python observer;3 mevcut native rapor testi: toplam44 Python.
+Fmt/locked check/build/test/all-targets Clippy -D warnings, fixture hash'leri,
+probe build, shell/whitespace PASS. İzole GNOME token/cache fixture'ı gerçek
+GNOME session değildir; factory mock sonucu gerçek factory PASS sayılmaz.
+Codex gerçek ortamda GNOME library yok, capability Unavailable; gerçek factory
+C derleme/çalışması ve CacheAndGenerate native kabulü NOT RUN. Thumbnail piksel
+decode/generation yok; Bwrap engeli tekrar denenmedi.
+
+GIO gerçek Thumb::URI/MTime/Size doğrulamasına ek PNG bound/CRC ve source/cache
+FileKey kontrolleri var; Hit bir **untrusted-pixel Candidate**, decode PASS değil.
+Source/cache yazılmaz/silinmez. GNOME factory capability güvenliği Glycin Bwrap
+ile eşdeğer sayılmaz; TH-05 generation güvenlik/öncelik işi bu görevde yok.
+[TH-01 API/kanıt/sınırlar/native komut](TH01_THUMBNAIL_VALIDATION.md).
+Native: `bash tests/run_thumbnail_provider_probe.sh /tam/yol/fotograf.jpg`.
+Normal app'e bağlantı/UI/şerit/T/kalıcı ayar eklenmedi; üretim ImageView/loader/
+cache/preload/cancellation/settings ve Cargo bağımlılıkları korundu.
+**TH-01 TESTING; PIV-18 TESTING; PIV-19 başlamadı.**

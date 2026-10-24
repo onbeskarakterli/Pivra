@@ -8,7 +8,8 @@ Yalnız TH-02 uygulanmıştır. TH-03–TH-06 ve PIV-19 başlamadı.
 ## Değişiklik
 
 `src/thumbnail_overlay.rs` mevcut ImageView GtkOverlay'ine ölçüme katılmayan,
-viewport içinde clip edilen alt dock ekler. Panel ScrolledWindow ile yatay
+viewport içinde clip edilen bağımsız alt panel ve düğme ekler; ortak dock yoktur.
+Panel ScrolledWindow ile yatay
 kaydırılır. Hücre dış sınırı96×80 GTK mantıksal piksel; içerik ayrı non-measuring
 Overlay içinde clip edilir. Görünür hücre çerçevesi/arka planı yoktur; selected class yalnız altta1px
 accent vurgu çizgisi çizer (inset shadow, layout alanı ayırmaz). CSS arka planında
@@ -17,10 +18,11 @@ Tema renkleri ve GTK logical ölçüleri kullanılır. Stylesheet GTK thread'ind
 bir kez kaydedilir; pencere başına provider biriktirilmez.
 
 Alt orta ToggleButton kapalıyken pan-up, açıkken pan-down gösterir; yerel transient
-state taşır. Kapalıyken panel görünmez, dock yalnız küçük düğme genişliğindedir;
-yatay görünmez bir input engeli kalmaz. Açıkken dock fill olur, şerit kenarlardan
-8px içeride kalır; scrollbar gerekirse görünür. Button callback yalnız görünürlük,
-align, icon ve tooltip değiştirir. Fotoğraf transform/texture/load çağrısı yoktur.
+state taşır. Kapalıyken panel görünmez; düğme her zaman yalnız kendi dar
+allocation alanını kaplar. Açıkken de düğme yanında geniş input katmanı yoktur.
+Şerit kenarlardan8px içeride kalır; scrollbar gerekirse görünür. Panelin alt
+boşluğu düğmenin GTK doğal yükseklik isteğinden hesaplanır. Button callback
+yalnız panel görünürlüğü, icon ve tooltip değiştirir. Fotoğraf transform/texture/load çağrısı yoktur.
 Callback weak widget referansları kullanır; sahiplik Overlay'dedir.
 
 `src/image_view.rs` yalnız component kurulumu ekler. TH-01 discovery capability
@@ -139,3 +141,36 @@ Tek native komut aynı: `bash tests/run_thumbnail_overlay_probe.sh`.
 İki TEST penceresinde standart başlık/close kontrollerini, daha saydam paneli,
 çerçevesiz opak test görsellerini ve yalnız alttaki seçili vurgu çizgisini incele.
 Fareyle otomatik göster/gizle bu kabulde beklenmez; TH-03 işidir.
+
+
+## Alt bant düzeltmesi — 25.10.2026 — TESTING
+
+Kod/test SHA: `eba1a07fefc925c44527b0a9f3b775e19e65869a`.
+Kullanıcı gerçek GNOME Wayland'da şerit altında istenmeyen koyu bant bildirdi.
+İncelemede şerit ile düğmenin ortak `thumbnail-controls` dikey kutusunda olduğu,
+açılınca bu kutunun Fill ile tam genişliğe yayıldığı görüldü. Kutuda uygulamaya
+ait açık bir background CSS kuralı yoktu; native temanın tam çizim katkısı Codex'te
+bağımsız yeniden üretilmedi. Sorunlu ortak geniş allocation kaldırıldı:
+
+- Şerit ve düğme artık GtkOverlay'in iki bağımsız, non-measuring/clip edilen
+  çocuğudur. Ayrı dock/status-bar widget'ı yoktur. Düğme her zaman alt ortada dar
+  kalır, panel düğmenin üzerinde yüzer. Fotoğraf allocation'ı değiştirilmez.
+- %25 panel/düğme arka planı, opak test görselleri, çerçevesiz hücreler ve1px
+  seçili çizgisi aynen korunur. Provider/Glycin/preload/cache kaynakları değişmedi.
+- Yeni gerçek GSK bileşik snapshot regresyonu: açık panelin altındaki tüm
+  düğme-dışı pikseller Picture snapshot'ıyla birebir aynı olmalı. Ortak dock'un
+  yokluğu ve doğrudan overlay ebeveynliği de sınanır. Açık ve kapalı durumda
+  düğmenin sağ/sol alt kenarında gerçek GTK pick sonucu Picture olmalıdır.
+
+PASS: hedefli X11; X11 koyu tema+GDK_SCALE=2; headless Wayland/Sway —3 GTK
+çağrısı. Mevcut Fit/Fill/Actual/zoom/pan byte sürekliliği, resize, scroll,
+alpha/hücre/underline, iki pencere izolasyonu ve ek load olmaması kontrolleri
+korunup geçti. PASS: tek `tests/check.sh` çalıştırmasıyla fmt/check/build/test/
+all-target Clippy -D warnings,80 Rust testi,30 Python gözlemci testi ve fixture
+bütünlüğü. Whitespace kontrolü PASS.
+
+NOT RUN: fiziksel Arch GNOME görsel kabulü; kullanıcı aynı
+`bash tests/run_thumbnail_overlay_probe.sh` komutuyla şeridin altında yatay koyu
+bant olmadığını, düğmenin bağımsız yüzdüğünü ve iki pencereyi kontrol edecek.
+Synthetic UI testi gerçek secure decoder testi değildir. Bilinen Bwrap engeli
+yeniden denenmedi. TH-02 TESTING; TH-03 başlamadı.

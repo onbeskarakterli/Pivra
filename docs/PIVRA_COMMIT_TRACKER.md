@@ -2199,3 +2199,17 @@ PASS:80 Rust/30 Python, zorunlu Rust/fixture kontrolleri, örnek build'leri;
 X11 light, X11 dark+scale2, Sway ve3 eski controlled regresyon (toplam6 GUI çağrısı).
 Gerçek GNOME görsel kabulü NOT RUN. [Ayrıntı/aynı native komut](TH02_THUMBNAIL_OVERLAY_VALIDATION.md).
 TH-02 TESTING; auto-hide/T/kalıcı ayarlar yok, TH-03'e geçilmedi.
+
+
+### TH-02 alt bant düzeltmesi — 25.10.2026 — TESTING
+
+`eba1a07fefc925c44527b0a9f3b775e19e65869a`: açılınca tam genişliğe yayılan ortak
+thumbnail-controls kutusu kaldırıldı; strip ve dar alt orta düğme bağımsız
+non-measuring GtkOverlay çocukları oldu. %25 CSS/çerçevesiz hücre/ince çizgi
+korundu. GSK bileşik snapshot'ta panel altındaki düğme-dışı piksellerin fotoğrafla
+aynılığı, açık/kapalı GTK pick-through ve ortak dock bulunmaması regresyonu eklendi.
+PASS: X11, X11 dark+scale2, Sway Wayland;80 Rust/30 Python; fmt/check/build/test/
+all-target Clippy -D warnings ve fixture/whitespace. Gerçek Arch GNOME görsel
+kabulü NOT RUN; native komut `bash tests/run_thumbnail_overlay_probe.sh`.
+[Ayrıntı](TH02_THUMBNAIL_OVERLAY_VALIDATION.md). Secure decoder tekrar denenmedi;
+Glycin/provider/preload/cache değişmedi. TH-02 TESTING; TH-03 başlamadı.

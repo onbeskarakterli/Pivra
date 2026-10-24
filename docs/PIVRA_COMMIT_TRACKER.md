@@ -2161,9 +2161,13 @@ Missing tek başına hata değildir. [Kanıt/komut](TH01_THUMBNAIL_VALIDATION.md
 
 | Aşama | Güncel durum | Kanıt |
 |---|---|---|
-| TH-01 provider | NATIVE ACCEPTED | Kullanıcı TH-02 talimatında native kabul başarılı bildirdi; yeni ayrıntılı log/SHA verilmedi, Codex testi sayılmaz |
+| TH-01 provider | DONE — NATIVE ACCEPTED | Kullanıcı TH-02 talimatında native kabul başarılı bildirdi; yeni ayrıntılı log/SHA verilmedi, Codex testi sayılmaz |
 | TH-02 overlay | TESTING | Kod ve otomatik kontroller tamamlandı; GNOME manuel görsel kabulü bekleniyor |
-| TH-03–TH-06 | TODO | Bu görevde kodlanmadı; ayrı kullanıcı yetkisi gerekli |
+| TH-03 | TODO | Otomatik gizlenme, `T`, kalıcı ayar |
+| TH-04 | TODO | Thumbnail gezinme senkronizasyonu |
+| TH-05 | TODO | Sistem thumbnail üretimi |
+| TH-06 | TODO | Thumbnail genel kabul ve optimizasyon |
+| TH-07 | TODO | Tam ekran fotoğraf görüntüleme; PIV-18 alt görevi, yalnız planlandı |
 
 TH-02 başlangıç `e503e8fec645ddf79b2b73b4b34b9c03573f8eec`, temiz/güncel dev.
 
@@ -2213,3 +2217,18 @@ all-target Clippy -D warnings ve fixture/whitespace. Gerçek Arch GNOME görsel
 kabulü NOT RUN; native komut `bash tests/run_thumbnail_overlay_probe.sh`.
 [Ayrıntı](TH02_THUMBNAIL_OVERLAY_VALIDATION.md). Secure decoder tekrar denenmedi;
 Glycin/provider/preload/cache değişmedi. TH-02 TESTING; TH-03 başlamadı.
+
+
+### TH-07 fullscreen planlama kararı — 25.10.2026
+
+Kullanıcı talimatıyla TH-06 sonrasına **TH-07 — Tam Ekran Fotoğraf Görüntüleme**
+eklendi. Yeni PIV numarası yok; mevcut PIV-18 kapsamına bağlıdır.
+[Tam plan ve15 gereksinim](PIV18_THUMBNAIL_PLAN.md),
+[yol haritası](PIVRA_DEVELOPMENT_ROADMAP.md).
+Çift tıklama/`F`/`Esc`, gizli chrome, TH-03 görünürlüğü/`T`, Sol/Sağ ve overlay
+etkileşim ayrımı, decode yapmadan aynı pencerede fullscreen, normal boyut/tercih
+koruması ve pencere bağımsızlığı planlandı. Native Arch GNOME Wayland ve klavye/fare
+regresyonları zorunlu kabul kapısıdır; bu testler henüz çalıştırılmadı.
+Yalnız belgeler değişti; TH-03 ve TH-07 kodlaması başlamadı. TH-01 DONE;
+TH-02 TESTING ve alt bant native kabulü ayrı devam eder. PIV-18 TESTING;
+PIV-19 başlamadı. Mevcut tarihsel test/commit kayıtları korunur.

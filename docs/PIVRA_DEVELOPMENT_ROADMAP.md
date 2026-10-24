@@ -389,3 +389,32 @@ Kullanıcı `07f47b5fb21200d8337933893128b700e5b8329d` üzerinde `bash tests/run
 Görünüm hafif ve yarı saydamdır; fare kenara geldiğinde belirginleşen ince ok/hover tepkisi önerilen varsayılandır. Sürekli opak panel ve büyük açıklama metni gösterilmez. Kenar bölgesinin tamamı tıklanabilir; ilk/son öğede döngü kapalıysa ilgili bölge pasif olur. Klavye Sol/Sağ ile **aynı navigasyon eylemi** kullanılır, yeni ayrı gezinme mantığı yazılmaz. Büyütülmüş fotoğrafı pan etmeyle çakışan pointer/touch olaylarında yanlışlıkla medya atlanmasını engelleyen jest/olay önceliği ve erişilebilirlik testleri zorunludur. Tam ekran davranışı ve düşük hareket tercihleri ayrıca doğrulanır.
 
 **Planlama:** PIV-18 performans/preview işine dahil edilmez; ilgili gelecekteki GUI aşamasında ayrı kabul maddesi veya küçük bağımsız görev olarak uygulanır. Mevcut PIV-01–17 DONE kayıtları değişmez, yeni PIV numarası verilmez.
+
+
+## PIV-18 alt görevleri — TH-01–TH-07 — 25.10.2026
+
+Thumbnail geliştirme sırası aşağıdadır. **TH-07 yeni bir PIV aşaması değildir**;
+mevcut PIV-18'e bağlı alt görevdir. PIV-01–60 numaraları korunur.
+
+| Alt görev | Kapsam | Durum |
+|---|---|---|
+| TH-01 | GNOME thumbnail altyapısı | DONE — kullanıcı native kabulü |
+| TH-02 | Thumbnail overlay | TESTING — alt bant düzeltmesinin native kabulü ayrı bekleniyor |
+| TH-03 | Otomatik gizlenme, `T`, kalıcı ayar | TODO |
+| TH-04 | Thumbnail gezinme senkronizasyonu | TODO |
+| TH-05 | Sistem thumbnail üretimi | TODO |
+| TH-06 | Thumbnail genel kabul ve optimizasyon | TODO |
+| TH-07 | Tam ekran fotoğraf görüntüleme | TODO — yalnız planlama |
+
+TH-07: ana fotoğrafta çift tıklama veya `F` ile fullscreen aç/kapa, `Esc` ile çıkış;
+başlık/menü/pencere kontrolleri gizli, oran korunarak tüm ekran kullanılır.
+Mevcut yüzen thumbnail overlay ve TH-03 görünürlük kuralları korunur; `T` ve
+Sol/Sağ çalışır, gezinme gizli şeridi açmaz. Thumbnail/düğme çift tıklaması
+fullscreen tetiklemez. Yerleşik GTK/libadwaita mekanizması aynı pencereyi kullanır;
+ek decode veya motor yeniden başlatma yoktur. Dönüşte pencere boyutu ve görüntüleme
+tercihleri korunur; fullscreen durumu pencere başına bağımsızdır.
+Native Arch GNOME Wayland ve klavye/fare regresyonları kabul koşuludur.
+[Tam gereksinimler ve kabul kapısı](PIV18_THUMBNAIL_PLAN.md).
+
+Bu güncelleme yalnız belgedir: TH-03/TH-07 geliştirmesi başlamadı; TH-02 TESTING
+ve alt bant native kabul süreci ayrı devam eder. PIV-18 TESTING; PIV-19 başlamadı.

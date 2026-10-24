@@ -2,6 +2,8 @@
 
 #[path = "actual_paintable.rs"]
 mod actual_paintable;
+#[path = "thumbnail_overlay.rs"]
+pub(crate) mod thumbnail_overlay;
 use adw::prelude::*;
 use gtk::{gio, glib};
 use pivra::viewing::{Resampling, Transform, ViewMode};
@@ -51,6 +53,11 @@ impl ImageView {
         overlay.set_vexpand(true);
         overlay.set_child(Some(&picture));
         overlay.add_overlay(&status);
+        let thumbnails = pivra::thumbnail::Provider::discover(None);
+        thumbnail_overlay::install(
+            &overlay,
+            thumbnails.capability() != pivra::thumbnail::Capability::Unavailable,
+        );
         let phase = Rc::new(Cell::new(Phase::Requested));
         let closing_phase = phase.clone();
         window.connect_close_request(move |_| {

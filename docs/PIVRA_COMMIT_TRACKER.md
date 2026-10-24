@@ -2050,3 +2050,18 @@ normal binary X11 error-mode input smoke. NOT RUN: gerçek app giriş probe'u bi
 kez exit77, Codex wide.png içeriğini image/png olarak algıladı; Arch text/plain
 tekrar üretilemedi. [Kanıt ve manuel komut](PIV18_VALIDATION.md). PIV-18 TESTING;
 kullanıcının normal GNOME yeniden testi gereklidir. PIV-19 başlamadı.
+
+
+### PIV-18B — erken önizleme araştırması — TESTING
+
+Başlangıç `b8924b85778e0386f81714dea6b99487ccbaa44a`.
+`b0caa4f99e30031271b870d381b7fafee1d53fd0`: bağımsız secure Glycin3.0.8
+specific_frame(scale) → same Image next_frame → fresh full kıyas probe'u.
+Üretim açılışı/decoder/cancel/cache değişmedi. Kaynakta image-rs scale isteğini
+yok sayıyor, full buffer okuyor ve still frame'i tüketiyor. Bu loader yolunda
+gerçek erken preview önerilmez; native farklı loader davranışı ayrıca ölçülmeli.
+PASS: probe build/1 unit/fmt/hedefli Clippy/shell/whitespace. Tek Codex secure
+deneme77: NOT RUN, gerçek frame/zaman ölçümü yok; tekrar edilmedi.
+[Format/method matrisi ve alternatif planı](PIV18_PREVIEW_FEASIBILITY.md).
+Native: `bash tests/run_preview_feasibility_probe.sh`; exit0 preview PASS değildir.
+PIV-18 TESTING, PIV-19 başlamadı; mevcut full-only native kabul korunur.

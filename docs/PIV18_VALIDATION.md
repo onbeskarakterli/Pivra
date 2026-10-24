@@ -240,3 +240,9 @@ Kullanıcı güncel `dev` üzerinde `bash tests/run_preview_pipeline_probe.sh` �
 İlk manuel denemelerde fixture klasörü gezinmesindeki bilerek geçersiz `text-content.jpg`, `broken.jpg` ve `broken.png` hata kayıtları görüldü; yeni hata teşhisi `text-content.jpg` için content-only MIME `text/plain` ve geçersiz imzayı gösterdi. Bu, ilk geçerli PNG'nin decoder tarafından hatalı çözüldüğü anlamına gelmez. Kullanıcı temiz klasörde geçerli fotoğrafların açıldığını ve Sol/Sağ gezinme, zoom, Fit/Fill kontrollerinin çalıştığını doğruladı. GDK frame-timing warning gözlendi; bu tek başına decoder hatası veya crash kanıtı değildir.
 
 **Kabul:** Native full-only fallback ve belirtilen manuel görüntüleme davranışları PASS. **Kapsam açığı:** gerçek erken preview sağlayıcısı, preview→full viewport sürekliliği ve preview sırasında full-loading UX henüz uygulanmadı; PIV-18 **TESTING**, DONE değil. PIV-19 başlatılmaz.
+
+
+## PIV-18B — ayrı erken-preview araştırması
+
+[API/loader kanıtı, standalone probe ve sınırlamalar](PIV18_PREVIEW_FEASIBILITY.md).
+Mevcut full-only açılış değişmedi. Erken preview kanıtlanmadı; PIV-18 TESTING.

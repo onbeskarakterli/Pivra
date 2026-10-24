@@ -57,6 +57,7 @@ fn pump() {
     }
     std::thread::sleep(Duration::from_millis(1));
 }
+#[track_caller]
 fn wait(mut predicate: impl FnMut() -> bool) {
     let end = Instant::now() + Duration::from_secs(20);
     while !predicate() {
@@ -98,6 +99,14 @@ fn open(app: &adw::Application) -> (adw::ApplicationWindow, image_view::ImageVie
         .default_height(600)
         .build();
     let view = image_view::ImageView::new(&w);
+    if !std::env::args().any(|s| s == "--manual") {
+        let motion = controller::<gtk::EventControllerMotion>(view.widget());
+        assert_eq!(motion.propagation_phase(), gtk::PropagationPhase::Capture);
+        // Automated tests inject explicit real controller signals. Prevent the
+        // compositor's physical pointer from adding unrelated resize crossings.
+        // Manual mode keeps production event delivery unchanged.
+        motion.set_propagation_phase(gtk::PropagationPhase::None);
+    }
     let header = adw::HeaderBar::new();
     header.set_widget_name("th02-test-header");
     header.set_title_widget(Some(&adw::WindowTitle::new(
@@ -189,13 +198,56 @@ fn widget_pixels(
     texture.download(&mut bytes, width * 4);
     (width, height, bytes)
 }
-fn controller<T: IsA<glib::Object> + glib::types::StaticType>(p: &gtk::Picture) -> T {
+fn controller<T: IsA<glib::Object> + glib::types::StaticType>(p: &impl IsA<gtk::Widget>) -> T {
     let list = p.observe_controllers();
     (0..list.n_items())
         .find_map(|i| list.item(i).unwrap().downcast().ok())
         .expect("controller")
 }
+fn point(v: &image_view::ImageView, bottom: bool) {
+    controller::<gtk::EventControllerMotion>(v.widget()).emit_by_name::<()>(
+        "motion",
+        &[
+            &20f64,
+            &(if bottom {
+                v.widget().height() as f64 - 4.
+            } else {
+                20.
+            }),
+        ],
+    );
+}
+fn set_enabled(v: &image_view::ImageView, enabled: bool) {
+    pivra::settings::thumbnail_preference().set_enabled(enabled);
+    point(v, true);
+}
+fn pause(milliseconds: u64) {
+    let until = Instant::now() + Duration::from_millis(milliseconds);
+    while Instant::now() < until {
+        pump();
+    }
+}
+fn key(w: &adw::ApplicationWindow, modifiers: gdk::ModifierType) -> bool {
+    controller::<gtk::EventControllerKey>(w)
+        .emit_by_name::<bool>("key-pressed", &[&gdk::Key::t, &0u32, &modifiers])
+}
 fn main() {
+    // Separate-process persistence checks, without GTK initialization or a display.
+    for arg in std::env::args() {
+        if let Some(value) = arg.strip_prefix("--persist-enabled=") {
+            pivra::settings::thumbnail_preference().set_enabled(value == "true");
+            return;
+        }
+        if let Some(value) = arg.strip_prefix("--expect-enabled=") {
+            assert_eq!(
+                pivra::settings::thumbnail_preference().enabled(),
+                value == "true"
+            );
+            println!("PASS restarted preference={value}");
+            return;
+        }
+    }
+
     adw::init().unwrap();
     if std::env::args().any(|arg| arg == "--dark") {
         adw::StyleManager::default().set_color_scheme(adw::ColorScheme::ForceDark);
@@ -205,17 +257,130 @@ fn main() {
         .flags(gio::ApplicationFlags::NON_UNIQUE)
         .build();
     app.register(None::<&gio::Cancellable>).unwrap();
+    if std::env::args().any(|s| s == "--manual") {
+        let (first, _first_view, _first_picture) = open(&app);
+        let (second, _second_view, _second_picture) = open(&app);
+        println!(
+            "MANUAL TH-03: TEST images/placeholders only; saved Enabled={}. Move to bottom; click or T to toggle. Re-run to check persistence. No real thumbnails/decoder/generation/selection binding.",
+            pivra::settings::thumbnail_preference().enabled()
+        );
+        let loop_ = glib::MainLoop::new(None, false);
+        let remaining = std::rc::Rc::new(std::cell::Cell::new(2usize));
+        for window in [&first, &second] {
+            let quit = loop_.clone();
+            let count = remaining.clone();
+            window.connect_close_request(move |_| {
+                count.set(count.get().saturating_sub(1));
+                if count.get() == 0 {
+                    quit.quit();
+                }
+                glib::Propagation::Proceed
+            });
+        }
+        loop_.run();
+        return;
+    }
+    pivra::settings::thumbnail_preference().set_enabled(false);
     let (w, v, p) = open(&app);
     let (other, ov, op) = open(&app);
     let button: gtk::ToggleButton = find(v.widget().upcast_ref(), "thumbnail-toggle");
     let strip: gtk::ScrolledWindow = find(v.widget().upcast_ref(), "thumbnail-strip");
     let other_button: gtk::ToggleButton = find(ov.widget().upcast_ref(), "thumbnail-toggle");
     assert!(
-        button.is_visible(),
-        "run in GNOME or explicit XDG_CURRENT_DESKTOP=GNOME test environment"
+        !button.is_visible() && !strip.is_visible(),
+        "initial visibility is not Enabled"
     );
+    point(&v, true);
+    assert!(button.is_visible(), "run with XDG_CURRENT_DESKTOP=GNOME");
     assert!(!strip.is_visible());
     assert_eq!(button.icon_name().as_deref(), Some("pan-up-symbolic"));
+    // TH-03: real controllers and GLib timers; no decoder success is implied.
+    button.emit_clicked();
+    assert!(strip.is_visible() && other_button.is_active());
+    point(&v, false);
+    pause(200);
+    assert!(strip.is_visible(), "hide delay prevents flicker");
+    point(&v, true);
+    pause(400);
+    assert!(strip.is_visible(), "re-entry cancels old timeout");
+    point(&v, false);
+    wait(|| !strip.is_visible() && !button.is_visible());
+    // A Wayland compositor may withhold frame callbacks from an occluded
+    // window. Present the window whose real frame/layout we are observing.
+    image_bytes(&w, &p);
+    // Layout-driven re-evaluation, without a new motion signal/polling timer.
+    controller::<gtk::EventControllerMotion>(v.widget())
+        .emit_by_name::<()>("motion", &[&20f64, &100f64]);
+    wait(|| !strip.is_visible());
+    w.set_default_size(800, 240);
+    wait(|| v.widget().height() < 250 && strip.is_visible());
+    // Complete the small frame and compositor roundtrip before issuing the
+    // opposite resize; a late Wayland configure can overwrite default-size.
+    image_bytes(&w, &p);
+    p.display().sync();
+    image_bytes(&w, &p);
+    w.set_default_size(800, 600);
+    image_bytes(&w, &p);
+    wait(|| v.widget().height() > 400 && !strip.is_visible());
+    for _ in 0..8 {
+        point(&v, true);
+        point(&v, false);
+    }
+    point(&v, true);
+    pause(550);
+    assert!(strip.is_visible());
+    let bounds = strip.compute_bounds(v.widget()).unwrap();
+    controller::<gtk::EventControllerMotion>(v.widget())
+        .emit_by_name::<()>("motion", &[&20f64, &(bounds.y() as f64 + 20.)]);
+    pause(550);
+    assert!(strip.is_visible(), "panel interaction keeps it open");
+    point(&v, false);
+    wait(|| !strip.is_visible());
+    assert!(key(&w, gdk::ModifierType::empty())); // disable
+    assert!(!pivra::settings::thumbnail_preference().enabled());
+    for modifier in [
+        gdk::ModifierType::CONTROL_MASK,
+        gdk::ModifierType::ALT_MASK,
+        gdk::ModifierType::SUPER_MASK,
+    ] {
+        assert!(!key(&w, modifier));
+        assert!(!pivra::settings::thumbnail_preference().enabled());
+    }
+    let entry = gtk::Entry::new();
+    v.widget().add_overlay(&entry);
+    entry.grab_focus();
+    assert!(
+        !key(&w, gdk::ModifierType::empty()),
+        "typing t is not intercepted"
+    );
+    v.widget().remove_overlay(&entry);
+    p.set_focusable(true);
+    p.grab_focus();
+    assert!(key(&w, gdk::ModifierType::empty()));
+    assert!(strip.is_visible(), "T flashes enabled strip");
+    wait(|| !strip.is_visible() && !button.is_visible());
+    assert!(pivra::settings::thumbnail_preference().enabled());
+    // Other windows can be visible independently; global preference changes sync.
+    point(&ov, true);
+    assert!(other_button.is_visible() && !button.is_visible());
+    point(&ov, false);
+    wait(|| !other_button.is_visible());
+    let unavailable_window = adw::ApplicationWindow::builder().application(&app).build();
+    let unavailable = gtk::Overlay::new();
+    unavailable.set_child(Some(&gtk::Label::new(Some("TEST unavailable"))));
+    image_view::thumbnail_overlay::install(&unavailable_window, &unavailable, false);
+    unavailable_window.set_content(Some(&unavailable));
+    unavailable_window.present();
+    wait(|| unavailable_window.is_mapped());
+    let unavailable_button: gtk::ToggleButton = find(unavailable.upcast_ref(), "thumbnail-toggle");
+    assert!(!unavailable_button.is_visible());
+    assert!(!key(&unavailable_window, gdk::ModifierType::empty()));
+    assert!(
+        pivra::settings::thumbnail_preference().enabled(),
+        "availability does not erase preference"
+    );
+    unavailable_window.close();
+    set_enabled(&v, false);
     let loads = LOADS.load(Ordering::SeqCst);
     for (width, height) in [(800, 600), (320, 300)] {
         w.set_default_size(width, height);
@@ -228,7 +393,7 @@ fn main() {
             let before = image_bytes(&w, &p);
             let allocated = (p.width(), p.height());
             let paintable = p.paintable();
-            button.set_active(true);
+            set_enabled(&v, true);
             let after = image_bytes(&w, &p);
             assert_eq!(allocated, (p.width(), p.height()));
             assert_eq!(before, after);
@@ -294,8 +459,13 @@ fn main() {
             assert!(strip.hadjustment().upper() > strip.hadjustment().page_size());
             strip.hadjustment().set_value(120.);
             assert!(strip.hadjustment().value() > 0.);
-            assert!(!other_button.is_active());
-            button.set_active(false);
+            point(&ov, false);
+            wait(|| !other_button.is_visible());
+            assert!(other_button.is_active(), "Enabled is shared");
+            let other_strip: gtk::ScrolledWindow =
+                find(ov.widget().upcast_ref(), "thumbnail-strip");
+            assert!(!other_strip.is_visible(), "Visible is per-window");
+            set_enabled(&v, false);
             assert_eq!(before, image_bytes(&w, &p));
             assert!(!strip.is_mapped());
             assert!(button.width() < 80, "toggle target too wide");
@@ -313,15 +483,15 @@ fn main() {
     drag.emit_by_name::<()>("drag-update", &[&30f64, &-20f64]);
     drag.emit_by_name::<()>("drag-end", &[&30f64, &-20f64]);
     let zoomed = image_bytes(&w, &p);
-    button.set_active(true);
+    set_enabled(&v, true);
     assert_eq!(zoomed, image_bytes(&w, &p));
-    button.set_active(false);
+    set_enabled(&v, false);
     let row: gtk::Box = find(v.widget().upcast_ref(), "thumbnail-items");
     let cell = row.first_child().unwrap();
     assert!(cell.has_css_class("selected"));
     assert_eq!(cell.opacity(), 1.);
     assert_eq!(strip.opacity(), 1.);
-    button.set_active(true);
+    set_enabled(&v, true);
     let selected = widget_pixels(&w, &p, &cell);
     assert_eq!(
         selected.2[(selected.0 * 24 + selected.0 / 2) * 4 + 3],
@@ -353,39 +523,28 @@ fn main() {
         (60..=68).contains(&alpha),
         "panel alpha expected about25%, got {alpha}"
     );
-    button.set_active(false);
+    set_enabled(&v, false);
     assert_eq!(LOADS.load(Ordering::SeqCst), loads);
     assert_eq!(v.load_stats().started, 1);
     assert_eq!(ov.load_stats().started, 1);
+    point(&v, false);
+    wait(|| !button.is_visible());
+    v.load(std::path::PathBuf::from("TH03-NAVIGATION-SYNTHETIC"));
+    wait(|| v.load_stats().completed == 2);
+    assert!(
+        !button.is_visible() && !strip.is_visible(),
+        "new media does not reveal controls"
+    );
+    point(&v, true);
+    point(&v, false); // close with a pending hide; callback must not affect survivor
     let stable = image_bytes(&other, &op);
     w.close();
     assert!(other.is_visible());
+    pause(550);
     assert_eq!(stable, image_bytes(&other, &op));
     println!(
-        "PASS TH-02 synthetic UI: overlay allocation/unchanged Fit-Fill-Actual pixels, zoom/pan preservation, horizontal scroll, icons, 25% panel alpha/opaque cells/borderless underline/header controls, narrow resize, no bottom-band pixels/open-and-closed pick-through, two-window close/isolation, zero additional decoder jobs. scale_factor={}",
+        "PASS TH-02 synthetic UI: overlay allocation/unchanged Fit-Fill-Actual pixels, zoom/pan preservation, horizontal scroll, icons, 25% panel alpha/opaque cells/borderless underline/header controls, TH-03 motion/T/shared preference/timer cancellation/unavailable/text focus, narrow resize, no bottom-band pixels/open-and-closed pick-through, two-window close/isolation, zero toggle-induced decoder jobs. scale_factor={}",
         op.scale_factor()
     );
-    if std::env::args().any(|s| s == "--manual") {
-        other_button.set_active(true);
-        println!(
-            "MANUAL: TEST MAIN IMAGE + TEST PLACEHOLDERS only. Inspect background alpha, opaque cells, selected underline, bottom-center toggle and scroll. No provider/generation/selection binding/T/persistence."
-        );
-        let (manual, _manual_view, _manual_picture) = open(&app);
-        let loop_ = glib::MainLoop::new(None, false);
-        let remaining = std::rc::Rc::new(std::cell::Cell::new(2usize));
-        for window in [&other, &manual] {
-            let quit = loop_.clone();
-            let count = remaining.clone();
-            window.connect_close_request(move |_| {
-                count.set(count.get().saturating_sub(1));
-                if count.get() == 0 {
-                    quit.quit();
-                }
-                glib::Propagation::Proceed
-            });
-        }
-        loop_.run();
-    } else {
-        other.close();
-    }
+    other.close();
 }

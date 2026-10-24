@@ -1,6 +1,11 @@
-//! TH-02 layout only. No provider queries, catalog selection, decoder or settings.
+//! Floating thumbnail controls; shared Enabled preference, per-window visibility.
 use gtk::prelude::*;
-use std::cell::Cell;
+use gtk::{gdk, glib};
+use std::{
+    cell::{Cell, RefCell},
+    rc::Rc,
+    time::Duration,
+};
 thread_local! { static CSS_INSTALLED: Cell<bool> = const { Cell::new(false) }; }
 pub(crate) const CELL_WIDTH: i32 = 96;
 pub(crate) const CELL_HEIGHT: i32 = 80;
@@ -34,7 +39,7 @@ pub(crate) fn cell(child: &impl IsA<gtk::Widget>, selected: bool) -> gtk::Frame 
     frame.set_child(Some(&content));
     frame
 }
-pub(crate) fn install(overlay: &gtk::Overlay, available: bool) {
+pub(crate) fn install(window: &impl IsA<gtk::Window>, overlay: &gtk::Overlay, available: bool) {
     install_css(&overlay.display());
     let items = gtk::Box::new(gtk::Orientation::Horizontal, 8);
     items.set_widget_name("thumbnail-items");
@@ -71,23 +76,228 @@ pub(crate) fn install(overlay: &gtk::Overlay, available: bool) {
         overlay.set_measure_overlay(widget, false);
         overlay.set_clip_overlay(widget, true);
     }
-    let panel = strip.downgrade();
-    button.connect_toggled(move |button| {
-        let Some(panel) = panel.upgrade() else {
+    let preference = pivra::settings::thumbnail_preference();
+    let state = Rc::new(Visibility {
+        available,
+        preference: preference.clone(),
+        strip: strip.downgrade(),
+        button: button.downgrade(),
+        overlay: overlay.downgrade(),
+        near: Cell::new(false),
+        pointer_y: Cell::new(None),
+        allocated_height: Cell::new(-1),
+        closed: Cell::new(false),
+        layout: RefCell::new(None),
+        shown: Cell::new(false),
+        timeout: RefCell::new(None),
+        listener: RefCell::new(None),
+    });
+    let weak = Rc::downgrade(&state);
+    let listener: Rc<dyn Fn(bool)> = Rc::new(move |_| {
+        if let Some(state) = weak.upgrade() {
+            state.cancel();
+            state.render(state.near.get());
+            // Enabled also changes the height of the interaction region.
+            if let Some(y) = state.pointer_y.get() {
+                state.motion(y);
+            }
+        }
+    });
+    preference.subscribe(&listener);
+    state.listener.replace(Some(listener));
+    state.render(false);
+    let click = state.clone();
+    button.connect_clicked(move |_| {
+        if click.available {
+            click.preference.set_enabled(!click.preference.enabled());
+        }
+    });
+    let motion = gtk::EventControllerMotion::new();
+    motion.set_propagation_phase(gtk::PropagationPhase::Capture);
+    let enter = state.clone();
+    motion.connect_enter(move |_, _, y| enter.motion(y));
+    let moving = state.clone();
+    motion.connect_motion(move |_, _, y| moving.motion(y));
+    let leave = state.clone();
+    motion.connect_leave(move |_| {
+        leave.pointer_y.set(None);
+        leave.away();
+    });
+    overlay.add_controller(motion);
+    let keys = gtk::EventControllerKey::new();
+    keys.set_propagation_phase(gtk::PropagationPhase::Capture);
+    let key_state = state.clone();
+    let weak_window = window.downgrade();
+    keys.connect_key_pressed(move |_, key, _, modifiers| {
+        if !key_state.available
+            || !matches!(key, gdk::Key::t | gdk::Key::T)
+            || modifiers.intersects(
+                gdk::ModifierType::CONTROL_MASK
+                    | gdk::ModifierType::ALT_MASK
+                    | gdk::ModifierType::SUPER_MASK
+                    | gdk::ModifierType::META_MASK,
+            )
+        {
+            return glib::Propagation::Proceed;
+        }
+        if let Some(window) = weak_window.upgrade() {
+            let mut focus = gtk::prelude::GtkWindowExt::focus(&window);
+            while let Some(widget) = focus {
+                if widget.is::<gtk::Editable>() || widget.is::<gtk::TextView>() {
+                    return glib::Propagation::Proceed;
+                }
+                focus = widget.parent();
+            }
+        }
+        key_state
+            .preference
+            .set_enabled(!key_state.preference.enabled());
+        if key_state.preference.enabled() {
+            key_state.render(true);
+            if !key_state.near.get() {
+                key_state.schedule(1000);
+            }
+        }
+        glib::Propagation::Stop
+    });
+    window.as_ref().add_controller(keys);
+    let mapped = state.clone();
+    overlay.connect_map(move |overlay| {
+        if let Some(clock) = overlay.frame_clock() {
+            let weak = Rc::downgrade(&mapped);
+            let handler = clock.connect_after_paint(move |_| {
+                if let Some(state) = weak.upgrade() {
+                    if let Some(overlay) = state.overlay.upgrade() {
+                        let height = overlay.height();
+                        if state.allocated_height.replace(height) != height {
+                            if let Some(y) = state.pointer_y.get() {
+                                state.motion(y);
+                            }
+                        }
+                    }
+                }
+            });
+            mapped.layout.replace(Some((clock, handler)));
+        }
+    });
+    let closing = state.clone();
+    window.connect_close_request(move |_| {
+        closing.closed.set(true);
+        closing.disconnect_layout();
+        closing.cancel();
+        closing.render(false);
+        glib::Propagation::Proceed
+    });
+    let unmap = state;
+    overlay.connect_unmap(move |_| {
+        unmap.pointer_y.set(None);
+        unmap.disconnect_layout();
+        unmap.near.set(false);
+        unmap.cancel();
+        unmap.render(false);
+    });
+}
+type PreferenceListener = Rc<dyn Fn(bool)>;
+struct Visibility {
+    available: bool,
+    preference: Rc<pivra::settings::ThumbnailPreference>,
+    strip: glib::WeakRef<gtk::ScrolledWindow>,
+    button: glib::WeakRef<gtk::ToggleButton>,
+    overlay: glib::WeakRef<gtk::Overlay>,
+    near: Cell<bool>,
+    pointer_y: Cell<Option<f64>>,
+    allocated_height: Cell<i32>,
+    closed: Cell<bool>,
+    layout: RefCell<Option<(gdk::FrameClock, glib::SignalHandlerId)>>,
+    shown: Cell<bool>,
+    timeout: RefCell<Option<glib::SourceId>>,
+    listener: RefCell<Option<PreferenceListener>>,
+}
+impl Visibility {
+    fn disconnect_layout(&self) {
+        if let Some((clock, handler)) = self.layout.borrow_mut().take() {
+            clock.disconnect(handler);
+        }
+    }
+    fn cancel(&self) {
+        if let Some(id) = self.timeout.borrow_mut().take() {
+            id.remove();
+        }
+    }
+    fn render(&self, show: bool) {
+        let show = show && self.available && !self.closed.get();
+        self.shown.set(show);
+        if let Some(strip) = self.strip.upgrade() {
+            strip.set_visible(show && self.preference.enabled());
+        }
+        if let Some(button) = self.button.upgrade() {
+            let enabled = self.preference.enabled();
+            button.set_active(enabled);
+            let icon = if enabled {
+                "pan-down-symbolic"
+            } else {
+                "pan-up-symbolic"
+            };
+            if button.icon_name().as_deref() != Some(icon) {
+                button.set_icon_name(icon);
+            }
+            button.set_tooltip_text(Some(if enabled {
+                "Disable thumbnail strip"
+            } else {
+                "Enable thumbnail strip"
+            }));
+            button.set_visible(show);
+        }
+    }
+    fn motion(self: &Rc<Self>, y: f64) {
+        self.pointer_y.set(Some(y));
+        let Some(overlay) = self.overlay.upgrade() else {
             return;
         };
-        let open = button.is_active();
-        panel.set_visible(open);
-        button.set_icon_name(if open {
-            "pan-down-symbolic"
+        let button_height = self
+            .button
+            .upgrade()
+            .map_or(32, |b| b.measure(gtk::Orientation::Vertical, -1).1.max(32));
+        let panel_height = self
+            .strip
+            .upgrade()
+            .map_or(128, |s| s.height().max(s.height_request() + 16));
+        let region = if self.preference.enabled() {
+            panel_height + button_height + 16
         } else {
-            "pan-up-symbolic"
+            button_height + 16
+        };
+        if y >= f64::from((overlay.height() - region).max(0)) && y <= f64::from(overlay.height()) {
+            self.near.set(true);
+            self.cancel();
+            self.render(true);
+        } else {
+            self.away();
+        }
+    }
+    fn away(self: &Rc<Self>) {
+        self.near.set(false);
+        if self.shown.get() && self.timeout.borrow().is_none() {
+            self.schedule(500);
+        }
+    }
+    fn schedule(self: &Rc<Self>, milliseconds: u64) {
+        self.cancel();
+        let weak = Rc::downgrade(self);
+        let id = glib::timeout_add_local_once(Duration::from_millis(milliseconds), move || {
+            if let Some(state) = weak.upgrade() {
+                state.timeout.borrow_mut().take();
+                if !state.near.get() {
+                    state.render(false);
+                }
+            }
         });
-        button.set_tooltip_text(Some(if open {
-            "Hide thumbnail strip"
-        } else {
-            "Show thumbnail strip"
-        }));
-    });
-    // Widget ownership remains with Overlay; signal captures only weak references.
+        self.timeout.replace(Some(id));
+    }
+}
+impl Drop for Visibility {
+    fn drop(&mut self) {
+        self.disconnect_layout();
+        self.cancel();
+    }
 }

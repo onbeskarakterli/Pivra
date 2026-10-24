@@ -55,6 +55,7 @@ impl ImageView {
         overlay.add_overlay(&status);
         let thumbnails = pivra::thumbnail::Provider::discover(None);
         thumbnail_overlay::install(
+            window,
             &overlay,
             thumbnails.capability() != pivra::thumbnail::Capability::Unavailable,
         );

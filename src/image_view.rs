@@ -210,7 +210,7 @@ impl ImageView {
         self.picture.set_paintable(None::<&gtk::gdk::Paintable>);
         self.picture.set_content_fit(gtk::ContentFit::ScaleDown);
         self.status.set_text(message);
-        self.status.set_visible(true);
+        self.status.set_visible(!message.is_empty());
     }
 
     #[allow(dead_code)] // Standalone view probes do not own a catalog.
@@ -360,7 +360,7 @@ impl ImageView {
         let selected_mode = self.mode_action.state().and_then(|state| {
             state.str().and_then(ViewMode::from_id)
         });
-        self.prepare("Loading image securely…", false);
+        self.prepare("", false);
         if let Some(mode) = selected_mode {
             self.mode_action.set_state(&mode.id().to_variant());
         }

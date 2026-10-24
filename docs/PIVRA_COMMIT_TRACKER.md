@@ -2065,3 +2065,15 @@ deneme77: NOT RUN, gerçek frame/zaman ölçümü yok; tekrar edilmedi.
 [Format/method matrisi ve alternatif planı](PIV18_PREVIEW_FEASIBILITY.md).
 Native: `bash tests/run_preview_feasibility_probe.sh`; exit0 preview PASS değildir.
 PIV-18 TESTING, PIV-19 başlamadı; mevcut full-only native kabul korunur.
+
+
+### PIV-18C — JPEG embedded/reduced prototipleri — TESTING
+
+`f69b0edef8f1e5f33f404e234c20d49a08bae170`: bounded EXIF IFD1 çıkarımı,
+ayrı Bwrap libjpeg-turbo helper baseline 1/8 IDCT; üretim modülleri değişmedi.
+PASS: C Werror compile, 6 metadata/driver test, shell/whitespace. Tek Bwrap77
+(uid map read-only proc): frame/zaman/RSS/gerçek iptal NOT RUN. Glycin scale
+deneyi tekrar edilmedi. Gerçek erken preview NOT PROVEN; no-thumbnail ve
+progressive/arithmetic JPEG sınırlamaları açık.
+[Kanıt, güvenlik farkları, native komut](PIV18_JPEG_PREVIEW_PROTOTYPE.md).
+PIV-18 TESTING, PIV-19 başlamadı; yeni decoder üretime bağlanmadı.

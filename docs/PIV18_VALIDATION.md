@@ -246,3 +246,10 @@ Kullanıcı güncel `dev` üzerinde `bash tests/run_preview_pipeline_probe.sh` �
 
 [API/loader kanıtı, standalone probe ve sınırlamalar](PIV18_PREVIEW_FEASIBILITY.md).
 Mevcut full-only açılış değişmedi. Erken preview kanıtlanmadı; PIV-18 TESTING.
+
+
+## PIV-18C — bağımsız JPEG prototipleri
+
+[Embedded EXIF thumbnail ve baseline 1/8 IDCT prototipleri](PIV18_JPEG_PREVIEW_PROTOTYPE.md).
+Üretim yolu değişmedi; tek Codex Bwrap denemesi77, gerçek erken frame NOT PROVEN.
+PIV-18 TESTING kalır.

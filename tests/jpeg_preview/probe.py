@@ -149,10 +149,14 @@ def main():
     parser.add_argument('--decoder',type=Path,required=True)
     parser.add_argument('jpeg',type=Path)
     args = parser.parse_args()
+    read_start = time.monotonic_ns()
     with args.jpeg.open('rb') as source:
         data = source.read(LIMIT+1)
     digest = hashlib.sha256(data).hexdigest()
+    extraction_start = time.monotonic_ns()
     embedded = thumbnail(data)
+    extraction_ms = (time.monotonic_ns()-extraction_start)/1e6
+    print(f'read_hash_extract_ms={(time.monotonic_ns()-read_start)/1e6:.3f} EXIF_extract_ms={extraction_ms:.3f}')
     print(f'SOURCE {args.jpeg} sha256={digest}; pixel decode only in Bwrap')
     with tempfile.TemporaryDirectory(prefix='pivra-jpeg-preview-') as folder:
         # These are bounded generated RGB artifacts, not decoded on the host.
@@ -167,7 +171,8 @@ def main():
             artifact = Path(folder)/f'{method}.ppm'
             artifact.write_bytes(output)
             print(method, 'FRAME READY', size, 'rgb_bytes=',size[0]*size[1]*3,
-                  'before full baseline starts; onscreen presentation NOT MEASURED')
+                  'before full baseline starts; first_usable_total_ms=',(time.monotonic_ns()-read_start)/1e6,
+                  'onscreen presentation NOT MEASURED')
             measurements.append((method,size,elapsed))
         # A single separate full baseline, only after both preview attempts.
         if measurements:

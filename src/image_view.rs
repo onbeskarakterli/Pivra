@@ -23,6 +23,7 @@ use pivra::image_pipeline::Phase;
 #[derive(Clone)]
 pub(super) struct ImageView {
     overlay: gtk::Overlay,
+    thumbnail_strip: thumbnail_overlay::ThumbnailStrip,
     picture: gtk::Picture,
     status: gtk::Label,
     slot: Rc<LoadSlot>,
@@ -54,7 +55,7 @@ impl ImageView {
         overlay.set_child(Some(&picture));
         overlay.add_overlay(&status);
         let thumbnails = pivra::thumbnail::Provider::discover(None);
-        thumbnail_overlay::install(
+        let thumbnail_strip = thumbnail_overlay::install(
             window,
             &overlay,
             thumbnails.capability() != pivra::thumbnail::Capability::Unavailable,
@@ -163,6 +164,7 @@ impl ImageView {
         });
         window.add_action(&quality_action);
         Self {
+            thumbnail_strip,
             mode_action,
             prefetch,
             phase,
@@ -184,6 +186,16 @@ impl ImageView {
         self.slot.stats()
     }
 
+    pub(super) fn set_thumbnail_catalog(
+        &self,
+        photos: &[(usize, PathBuf)],
+        selected: Option<usize>,
+    ) {
+        self.thumbnail_strip.set_catalog(photos, selected);
+    }
+    pub(super) fn on_thumbnail_select(&self, callback: impl Fn(usize) + 'static) {
+        self.thumbnail_strip.on_select(callback);
+    }
     pub(super) fn widget(&self) -> &gtk::Overlay {
         &self.overlay
     }

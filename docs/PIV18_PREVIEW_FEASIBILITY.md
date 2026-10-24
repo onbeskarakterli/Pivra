@@ -134,3 +134,12 @@ protokol JPEG/PNG config. Rust/GTK kurulumu değiştirilmedi.
    regresyonları ve native iki pencere kabulü olmadan etkinleştirme.
 
 Kod/test commit'i: `b0caa4f99e30031271b870d381b7fafee1d53fd0`.
+
+## Arch GNOME Wayland native feasibility — 24.10.2026
+
+Kullanıcı `807b67a402d19f81e6b2814fa6d3d644830e2786` sürümünde `bash tests/run_preview_feasibility_probe.sh` çalıştırdı: **exit 0 (observation complete, early preview NOT PROVEN)**. Zorunlu Bwrap etkin, Glycin3.0.8.
+
+- `large.png`: source 1600×1200; request 16×12; returned 1600×1200 (**REDUCED_FRAME=false**), frame_ready 13051µs, fresh full baseline 6366µs; same-image `next_frame` NoMoreFrames.
+- `no-exif.jpg`: source 64×32; request 16×8; returned 64×32 (**REDUCED_FRAME=false**), frame_ready 658µs, fresh full baseline 541µs; same-image `next_frame` NoMoreFrames.
+
+**Karar:** Bu runtime JPEG/PNG scale isteğini küçültülmüş çözümleme olarak uygulamıyor. Aynı Image üzerinden ikinci still frame elde edilemiyor. Ölçümler küçük fixture ve seri warm-pool etkileriyle genel performans kıyası değildir. Tam decode→resize üretim erken preview seçeneği olarak reddedilir. Sonraki ayrı kontrollü görev: güvenli, boyut/iş bütçesi sınırlı JPEG embedded thumbnail veya reduced-IDCT adapter fizibilite prototipi; ürün entegrasyonu yalnız gerçek erken frame ve kaynak maliyeti kanıtından sonra. PIV-18 TESTING.

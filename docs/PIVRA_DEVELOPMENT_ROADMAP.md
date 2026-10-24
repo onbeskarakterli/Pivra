@@ -399,8 +399,8 @@ mevcut PIV-18'e bağlı alt görevdir. PIV-01–60 numaraları korunur.
 | Alt görev | Kapsam | Durum |
 |---|---|---|
 | TH-01 | GNOME thumbnail altyapısı | DONE — kullanıcı native kabulü |
-| TH-02 | Thumbnail overlay | TESTING — alt bant düzeltmesinin native kabulü ayrı bekleniyor |
-| TH-03 | Otomatik gizlenme, `T`, kalıcı ayar | TODO |
+| TH-02 | Thumbnail overlay | DONE — kullanıcı TH-03 talimatında kabulü bildirdi |
+| TH-03 | Otomatik gizlenme, `T`, kalıcı ayar | TESTING — native kabul bekleniyor |
 | TH-04 | Thumbnail gezinme senkronizasyonu | TODO |
 | TH-05 | Sistem thumbnail üretimi | TODO |
 | TH-06 | Thumbnail genel kabul ve optimizasyon | TODO |
@@ -418,3 +418,13 @@ Native Arch GNOME Wayland ve klavye/fare regresyonları kabul koşuludur.
 
 Bu güncelleme yalnız belgedir: TH-03/TH-07 geliştirmesi başlamadı; TH-02 TESTING
 ve alt bant native kabul süreci ayrı devam eder. PIV-18 TESTING; PIV-19 başlamadı.
+
+
+## TH-03 — 25.10.2026 — TESTING
+
+Kullanıcının TH-03 talimatındaki native kabul beyanıyla TH-02 DONE.
+Shared Enabled tercihi, pencereye özel Available/Visible, fare alt bölgesi ve
+iptal edilebilir gizleme, `T` ve kalıcı kullanıcı tercihi eklendi.
+[Ayrı test kanıtı ve native komut](TH03_THUMBNAIL_VISIBILITY_VALIDATION.md).
+TH-04/TH-05/TH-07 kodlanmadı; PIV-18 TESTING, PIV-19 başlamadı.
+Önceki TH-07 yalnız planlama kaydı tarihsel olarak korunur.

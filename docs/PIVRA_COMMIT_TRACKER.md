@@ -2162,8 +2162,8 @@ Missing tek başına hata değildir. [Kanıt/komut](TH01_THUMBNAIL_VALIDATION.md
 | Aşama | Güncel durum | Kanıt |
 |---|---|---|
 | TH-01 provider | DONE — NATIVE ACCEPTED | Kullanıcı TH-02 talimatında native kabul başarılı bildirdi; yeni ayrıntılı log/SHA verilmedi, Codex testi sayılmaz |
-| TH-02 overlay | TESTING | Kod ve otomatik kontroller tamamlandı; GNOME manuel görsel kabulü bekleniyor |
-| TH-03 | TODO | Otomatik gizlenme, `T`, kalıcı ayar |
+| TH-02 overlay | DONE | Kullanıcı TH-03 talimatında native kabulü bildirdi; yeni ayrıntılı log/SHA verilmedi |
+| TH-03 | TESTING | Otomatik gizlenme, `T`, kalıcı ayar; ayrı native kabul bekleniyor |
 | TH-04 | TODO | Thumbnail gezinme senkronizasyonu |
 | TH-05 | TODO | Sistem thumbnail üretimi |
 | TH-06 | TODO | Thumbnail genel kabul ve optimizasyon |
@@ -2232,3 +2232,32 @@ regresyonları zorunlu kabul kapısıdır; bu testler henüz çalıştırılmad�
 Yalnız belgeler değişti; TH-03 ve TH-07 kodlaması başlamadı. TH-01 DONE;
 TH-02 TESTING ve alt bant native kabulü ayrı devam eder. PIV-18 TESTING;
 PIV-19 başlamadı. Mevcut tarihsel test/commit kayıtları korunur.
+
+
+## PIV-18 / TH-03 — 25.10.2026 — TESTING
+
+Başlangıç `0090131f05cddf9b076dc6a61d1807d4ba833834`, temiz ve origin/dev ile eşit.
+Kullanıcı bu görevin talimatında TH-02 native kabulünü bildirdi: **TH-02 DONE**.
+Ayrı yeni native log/test SHA verilmedi; Codex GNOME kabulü olarak sunulmaz.
+
+| Gerçek SHA | Değişiklik |
+|---|---|
+| `f8bfd580708f103945aa6b310e9ae80166eeefbb` | Pencereye özel motion/hide/T; ortak kalıcı Enabled, atomik küçük config dosyası; GTK/persistence testleri ve tek native giriş |
+| `e5f6681bfcd3e63c857fbff60963815c2ec28a2f` | Otomatik motion sinyallerini fiziksel pointer reset olaylarından ayırma, gerçek frame/roundtrip/allocation ile resize doğrulaması |
+
+PASS:82 Rust (58 unit+24 integration),30 Python observer, fixture bütünlüğü;
+fmt/check/build/test, son all-target Clippy -D warnings ve örnek build'leri.
+Settings missing/bozuk/yazılamayan config, abonelik ve ayrı süreç persistence
+kontrolleri PASS. GTK: X11 light, X11 dark+scale2, Sway Wayland; eski controlled
+PIV-16 cancellation ve PIV-17 preload/cache PASS. İlk type-complexity lint ve
+resize test sürücüsü deadline FAIL'leri düzeltildi; ayrıntılı geçmiş
+[TH-03 doğrulama kaydında](TH03_THUMBNAIL_VISIBILITY_VALIDATION.md).
+Test ana görselleri/hücreleri sentetik; fiziksel GNOME klavye/fare/görsel kabulü
+ve yeni gerçek secure decode paketi NOT RUN. Bwrap engeli tekrar denenmedi;
+Glycin/provider/cache/preload kodu değişmedi.
+
+Native tek komut: `bash tests/run_thumbnail_visibility_probe.sh`.
+İki TEST penceresinde hover/T/resize/Enabled paylaşımı ve Visible izolasyonu;
+yeniden çalıştırarak persistence, normal uygulamada gizli şeridi açmayan Sol/Sağ
+ayrıca kullanıcı tarafından kontrol edilecek. **TH-03 TESTING; TH-04/TH-05/TH-07
+kodlanmadı; PIV-18 TESTING, PIV-19 başlamadı.**

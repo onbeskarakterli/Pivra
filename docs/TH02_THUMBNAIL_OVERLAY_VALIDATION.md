@@ -1,4 +1,9 @@
-# PIV-18 / TH-02 — Thumbnail overlay — TESTING
+# PIV-18 / TH-02 — Thumbnail overlay — DONE
+
+**Güncel durum — 25.10.2026:** Kullanıcı TH-03 talimatında TH-02 native kabulünü
+başarılı bildirdi. TH-02 DONE; aşağıdaki önceki TESTING/NOT RUN kayıtları tarihsel
+Codex kanıtlarıdır ve geriye dönük native PASS sayılmaz. Yeni ayrıntılı native log
+veya ayrı test commit SHA’sı verilmedi. TH-03 kabulü ayrıdır.
 
 25.10.2026 · dev. Başlangıç `e503e8fec645ddf79b2b73b4b34b9c03573f8eec`,
 temiz çalışma ağacı, origin/dev ile eşit. Kullanıcı TH-01 native kabulünün

@@ -2156,3 +2156,33 @@ bu native GNOME başarı iddiası değildir. Gerçek GNOME compile/init/can_thum
 NOT RUN; kullanıcı Arch testi beklenir. Gerçek true/false/Failed korunur,
 Missing tek başına hata değildir. [Kanıt/komut](TH01_THUMBNAIL_VALIDATION.md).
 Üretim görüntüleyici/Glycin/preload/UI değişmedi. TH-01 TESTING; TH-02 yok.
+
+## PIV-18 thumbnail aşamaları — 25.10.2026
+
+| Aşama | Güncel durum | Kanıt |
+|---|---|---|
+| TH-01 provider | NATIVE ACCEPTED | Kullanıcı TH-02 talimatında native kabul başarılı bildirdi; yeni ayrıntılı log/SHA verilmedi, Codex testi sayılmaz |
+| TH-02 overlay | TESTING | Kod ve otomatik kontroller tamamlandı; GNOME manuel görsel kabulü bekleniyor |
+| TH-03–TH-06 | TODO | Bu görevde kodlanmadı; ayrı kullanıcı yetkisi gerekli |
+
+TH-02 başlangıç `e503e8fec645ddf79b2b73b4b34b9c03573f8eec`, temiz/güncel dev.
+
+| Gerçek SHA | Değişiklik |
+|---|---|
+| `604b5761904c195a2f0bdf55f08f4a5d377ed59c` | Yeni bağımsız thumbnail overlay component; mevcut ImageView'e non-measuring kurulum, pencereye özel toggle |
+| `b1bb6f41573fd41148a066d7de878e867b8b3b52` | Açık TEST placeholder UI probe ve native manuel giriş; GSK/geometry/counter/isolation testleri |
+
+PASS:80 Rust/30 Python observer, fmt/check/build/test/fixture, örneklerin locked
+build'i. Clippy ilk probe ok-expect uyarısı sonrası düzeltildi; all-targets
+Clippy -D warnings ve fmt tekrar PASS.6 scoped grafik çağrısı PASS: TH-02 X11,
+X11 scale2, Sway; eski async/preload/window-failure controlled probeları.
+Bunlar synthetic frame/GTK olay testleridir, secure/native pixel PASS değildir.
+Şerit açık/kapalı allocation ve Fit/Fill/Actual/zoom/pan pikselleri, aynı texture,
+sabit96×80 cell, scroll, kapalı input pick-through, ikon, pencere izolasyonu
+ve ek decode-job olmaması doğrulandı. Native GNOME alpha/tema/çerçeve/fiziksel
+input kabulü NOT RUN. Bilinen Bwrap engeli tekrarlanmadı.
+[TH-02 ayrıntılı kanıt ve manuel komut](TH02_THUMBNAIL_OVERLAY_VALIDATION.md):
+`bash tests/run_thumbnail_overlay_probe.sh` — açıkça TEST iki pencere, gerçek
+thumbnail değil. Normal app boş strip gösterir. Factory/generation/selection/T/
+kalıcı ayar/auto-hide yok. Üretim Glycin/preload/request/cache/settings ve
+Cargo bağımlılıkları korundu. **TH-02 TESTING; PIV-18 TESTING; PIV-19 yok.**

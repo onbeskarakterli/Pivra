@@ -1,4 +1,9 @@
-# PIV-18 / TH-01 — GNOME thumbnail sağlayıcısı — TESTING
+# PIV-18 / TH-01 — GNOME thumbnail sağlayıcısı — NATIVE ACCEPTED
+
+Güncel durum: Kullanıcı 25.10.2026 TH-02 talimatında TH-01 native kabulünün
+başarılı olduğunu bildirdi. Bu kullanıcı kaynaklı kabul, Codex tarafından
+bağımsız GNOME testi değildir; ayrıntılı yeni çıktı veya test SHA’sı verilmedi.
+Aşağıdaki TESTING/NOT RUN kayıtları önceki çalışmaların tarihçesidir.
 
 25.10.2026 · dev. Başlangıç `1624264aa72a9b27825853b812fb17f69e2e2451`,
 çalışma ağacı temiz, origin/dev ile eşit. Yalnız TH-01 uygulandı.
@@ -290,3 +295,10 @@ Tek Arch komutu değişmedi:
 Beklenen: tek uyumlu module ve gerçek factory=Eligible veya Ineligible.
 Gerçek hatada Failed korunur; Missing cache boşluğudur, tek başına hata değildir.
 **TH-01 TESTING; kullanıcı native kabulü beklenir. TH-02 başlamadı.**
+
+
+## TH-01 native kabul kapanışı — 25.10.2026
+
+Kullanıcı TH-02 görevinde “TH-01 native kabul başarılı” bilgisini verdi.
+TH-01 native kabul edilmiş olarak kaydedildi; eski Codex NOT RUN sonuçları
+geriye dönük PASS sayılmadı. PIV-18 TESTING kalır. TH-02 ayrı aşamadır.

@@ -1,6 +1,6 @@
 # Pivra — Teknik Yetenekler ve Faz 0 Kararları
 
-**Tarih:** 21.10.2026 · **Dal:** dev · **Güncel durum:** PIV-01–13 DONE, PIV-14 TESTING; aşağıdaki ilk kayıt yalnız PIV-05 tarihçesidir.
+**Tarih:** 21.10.2026 · **Dal:** dev · **Güncel durum:** PIV-01–14 DONE, PIV-15 TESTING; aşağıdaki ilk kayıt yalnız PIV-05 tarihçesidir.
 Başlangıç commit'i: `8b3947215c54dfd2515df61a50dd05c080eccf31`.
 PIV-06 uygulanmadı. Production kaynakları, Cargo.toml ve Cargo.lock değiştirilmedi;
 görüntü decoder'ı veya video oynatıcı yazılmadı. Proje lisansı seçilmedi.
@@ -740,3 +740,16 @@ veya cache sistemi yoktur. 63 Rust + 30 Python, 24 scoped GUI/helper ve toplam
 360 sentetik snapshot PASS. Dokuz gerçek secure kapı exit77/NOT RUN; fiziksel
 GNOME mouse/akıcılık kabulü bekleniyor. Eski kullanıcı native kabulü korunur.
 Bwrap, bağımlılıklar, kurulum ve bağımsız açık Faz 0/DESKTOP-06/i18n işleri değişmedi.
+
+
+## PIV-15 — native GSK resampling
+
+Mevcut GTK minimumu4.16, 4.10'dan beri bulunan append_scaled_texture ve
+ScalingFilter Linear/Nearest API'sini kapsar; yeni görüntü işleme bağımlılığı
+ve CPU bitmap resizer yoktur. Default Smooth preset yolu korunur, Nearest ve
+manuel adapter explicit filtre kullanır. GSK gerçek uygulamayı backend'e bırakır;
+Cairo encoded-channel bilinear referansı hardware GPU doğrulaması değildir.
+[Matris](PIV15_VALIDATION.md): 64 Rust/30 Python, 27 scoped GUI ve 462 sentetik
+snapshot PASS; 10 secure kapı NOT RUN/exit77. Native GPU/GNOME kabulü bekleniyor.
+Tercih pencereye özel/yeni medyada korunur, restart persistence yoktur. Önceki
+native kabul ve açık Faz 0/DESKTOP-06/i18n kapıları, Bwrap ve kurulum korunur.

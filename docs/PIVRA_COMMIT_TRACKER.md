@@ -1,7 +1,7 @@
 # Pivra — Planlı Commit ve İlerleme Takibi
 
 **Kaynak:** [Özellik Şartnamesi](PIVRA_FEATURE_SPEC_TR.md) · [Yol Haritası](PIVRA_DEVELOPMENT_ROADMAP.md)  
-**Branch:** `dev` · **Durum:** PIV-01 **DONE (21.10.2026)**; PIV-02 **DONE (21.10.2026, Xvfb GTK pencere doğrulaması)**; PIV-03 **DONE (21.10.2026)**; PIV-04 **DONE (21.10.2026; grafik test kategorileri ayrı)**; PIV-05 **DONE (21.10.2026; belgeleme/probe kapsamı)**; PIV-06 **DONE (21.10.2026; dosya/URI ve desktop giriş altyapısı; gerçek Nautilus NOT RUN)**; PIV-07 **DONE (21.10.2026; sırasız komşu medya keşfi)**; PIV-08 **DONE (21.10.2026; deterministik doğal sıra)**; PIV-09 **DONE (21.10.2026; Arch gerçek JPEG/PNG/EXIF, otomatik geometri ve güvenli aktif-decode kapanış PASS)**; PIV-10 **DONE (22.10.2026; native piksel/Fit/gezinti PASS ve kullanıcı fiziksel sol/sağ doğrulaması)**; PIV-11 **DONE (22.10.2026; Arch native probe exit0 ve gerçek GNOME Yenile PASS)**; PIV-12 **DONE (24.10.2026; Arch secure medya hata testi ve manuel iki pencere izolasyonu PASS)**; PIV-13 **DONE (24.10.2026; Arch gerçek secure Fit/Fill/%100 probe exit0 ve GNOME manuel kontrol PASS)**; PIV-14 **DONE (24.10.2026; Arch secure zoom/pan probe exit0 ve GNOME gerçek fare kabulü PASS)** (zoom/pan kod ve Codex kontrolleri; native mouse kabulü bekleniyor); PIV-15–60 TODO, başlatılmadı. Faz 0 **INCOMPLETE** (temiz native kurulum yeniden üretimi NOT RUN). Güncel kapanış kanıtı son bölümde; 20.10.2026 kayıtları tarihçedir. Burada listelenen `PIV-xx` kimlikleri gerçek Git commit SHA'sı **değildir**.
+**Branch:** `dev` · **Durum:** PIV-01 **DONE (21.10.2026)**; PIV-02 **DONE (21.10.2026, Xvfb GTK pencere doğrulaması)**; PIV-03 **DONE (21.10.2026)**; PIV-04 **DONE (21.10.2026; grafik test kategorileri ayrı)**; PIV-05 **DONE (21.10.2026; belgeleme/probe kapsamı)**; PIV-06 **DONE (21.10.2026; dosya/URI ve desktop giriş altyapısı; gerçek Nautilus NOT RUN)**; PIV-07 **DONE (21.10.2026; sırasız komşu medya keşfi)**; PIV-08 **DONE (21.10.2026; deterministik doğal sıra)**; PIV-09 **DONE (21.10.2026; Arch gerçek JPEG/PNG/EXIF, otomatik geometri ve güvenli aktif-decode kapanış PASS)**; PIV-10 **DONE (22.10.2026; native piksel/Fit/gezinti PASS ve kullanıcı fiziksel sol/sağ doğrulaması)**; PIV-11 **DONE (22.10.2026; Arch native probe exit0 ve gerçek GNOME Yenile PASS)**; PIV-12 **DONE (24.10.2026; Arch secure medya hata testi ve manuel iki pencere izolasyonu PASS)**; PIV-13 **DONE (24.10.2026; Arch gerçek secure Fit/Fill/%100 probe exit0 ve GNOME manuel kontrol PASS)**; PIV-14 **DONE (24.10.2026; Arch secure zoom/pan probe exit0 ve GNOME gerçek fare kabulü PASS)** (zoom/pan kod ve Codex kontrolleri; native mouse kabulü bekleniyor); PIV-15 **TESTING** (Smooth/Nearest kod ve Codex render kontrolleri; native kabul bekleniyor); PIV-16–60 TODO, başlatılmadı. Faz 0 **INCOMPLETE** (temiz native kurulum yeniden üretimi NOT RUN). Güncel kapanış kanıtı son bölümde; 20.10.2026 kayıtları tarihçedir. Burada listelenen `PIV-xx` kimlikleri gerçek Git commit SHA'sı **değildir**.
 
 ## Kullanım kuralları
 
@@ -40,7 +40,7 @@
 |---|---|---|---|---|
 | PIV-13 | `feat: implement fit fill and actual size` | 59 Rust + 30 Python, 21 scoped GUI/helper ve 144 sentetik snapshot PASS; secure native mod kabulü NOT RUN | **TESTING** | `b576c35`, `5ad7b98`; tam SHA aşağıda |
 | PIV-14 | `feat: implement cursor anchored zoom and pan` | 63 Rust + 30 Python, 24 scoped GTK/GIO ve 360 sentetik snapshot PASS; native zoom/pan kabulü NOT RUN | **TESTING** | `0bacddb`, `e1d9771`; tam SHA aşağıda |
-| PIV-15 | `feat: add image resampling choices` | Yumuşak/piksel keskinliği, büyütme-küçültme regresyonu | TODO | — |
+| PIV-15 | `feat: add image resampling choices` | 64 Rust + 30 Python, 27 scoped GTK/GIO ve 462 sentetik snapshot PASS; native secure resampling NOT RUN | **TESTING** | `5fec698`, `fd36f56`; tam SHA aşağıda |
 | PIV-16 | `feat: add cancellable async image loading` | Hızlı gezinmede eski decode sonucu yeni görselin üzerine yazılmaz | TODO | — |
 | PIV-17 | `perf: preload neighbors with bounded memory` | Öncelik mevcut medya; RAM baskısında önbellek azalır | TODO | — |
 | PIV-18 | `perf: preview and full resolution image pipeline` | RAW/TIFF önizleme, yükleme göstergesi ve viewport sürekliliği | TODO | — |
@@ -123,16 +123,16 @@
 |---|---|---:|---:|
 | 0 — Temel | 01–05 | 5 | 5 |
 | 1 — Fotoğraf | 06–12 | 7 | 7 |
-| 2 — Zoom/performans | 13–18 | 6 | 1 |
+| 2 — Zoom/performans | 13–18 | 6 | 2 |
 | 3 — Video temel | 19–24 | 6 | 0 |
 | 4 — Video gelişmiş | 25–31 | 7 | 0 |
 | 5 — Arayüz | 32–39 | 8 | 0 |
 | 6 — Uyumluluk/paket | 40–47 | 8 | 0 |
 | 7 — Edit (en son özellik geliştirmesi) | 48–57 | 10 | 0 |
 | 8 — Son doğrulama | 58–60 | 3 | 0 |
-| **TOPLAM** | **PIV-01–60** | **60** | **13** |
+| **TOPLAM** | **PIV-01–60** | **60** | **14** |
 
-> PIV-01–13 tamamlandı; PIV-14 TESTING, PIV-15–60 gelecekteki işlerdir. Görev sayacı 5/5 olsa da Faz 0 kapısı INCOMPLETE: temiz native kurulum yeniden üretimi NOT RUN. Görev kimlikleri commit SHA'sı değildir. İlk planlama ve önceki engel kayıtları aşağıda tarihçe olarak korunur.
+> PIV-01–14 tamamlandı; PIV-15 TESTING, PIV-16–60 gelecekteki işlerdir. Görev sayacı 5/5 olsa da Faz 0 kapısı INCOMPLETE: temiz native kurulum yeniden üretimi NOT RUN. Görev kimlikleri commit SHA'sı değildir. İlk planlama ve önceki engel kayıtları aşağıda tarihçe olarak korunur.
 
 ## PIV-01 ayrıntılı ilerleme — 20.10.2026
 
@@ -1798,3 +1798,64 @@ ayrı belge commit'idir; kendi SHA'sı Git geçmişindedir. PIV-14 TESTING.
 ## PIV-14 Arch native ve gerçek fare kabulü — 24.10.2026 — DONE
 
 Kullanıcı `6c55eab27d4c5bcf980246c2c69fb08671d2d2be` üzerinde `bash tests/run_zoom_pan_probe.sh` çalıştırdı: **exit 0**. Gerçek Glycin JPEG/PNG/EXIF baseline ve üretim render/mod/geometri, iki pencere izolasyonu testleri PASS; betiğin `view_modes_probe --zoom-pan` yolunu çağırdığı doğrulandı. Bozuk PNG testindeki decoder hata satırı beklenendi. Kullanıcı ayrıca fiziksel GNOME/Wayland fare testi için **olumlu sonuç** bildirdi: %100 görüntü üzerinde sürükleme, imleç ankrajlı yakınlaştırma, Fit sıfırlama ve resize akışı için bir problem bildirilmedi. Ayrı ölçülmeyen HiDPI fiziksel piksel eşlemesi, gerçek decoder süreç zaman çakışması ve FPS/gecikme ölçümleri PASS sayılmaz. **PIV-14 DONE; PIV-15 TODO.** Faz 0 temiz native kurulum INCOMPLETE, DESKTOP-06 Nautilus NOT RUN ve PIV-39 i18n kararı açık kalır.
+
+
+## PIV-15 — 24.10.2026 — TESTING
+
+Başlangıç `28505e4d377759f1550b20d8b199841ce6aa80dd`, origin/dev fast-forward.
+PIV-01–14 DONE ve kullanıcı kaynaklı native kabul korunur.
+
+| Gerçek SHA | Değişiklik |
+|---|---|
+| `5fec698673ea331eb6bf43922381349e26b2cd09` | Smooth/Nearest pencere state/action/modeli, aynı texture ve geometry üzerinde gerçek GSK filtresi, mevcut menü bölümü, zoom helper imza uyarlaması |
+| `fd36f560203f7de6830ef3c3a256c33df53a91f9` | CPU referans + gerçek GSK piksel/geometry/lifetime testleri; pending tercih/late callback, exact-color PNG/manifest/üretici, native giriş |
+
+**PASS — Codex:** fmt, locked check/build/test ve clippy all-targets -D warnings
+(mevcut stable/offline/-j2 helper). **64 Rust** = 40 unit + 24 integration,
+0 failed/ignored; **30 Python observer**; önceki fixture hash'leri ve yeni
+resampling-checker deterministik byte/manifest kontrolü; tüm örneklerin
+locked/offline derlemesi, shell/Python syntax ve diff whitespace.
+
+**PASS — 27 scoped GUI/helper:** X11 16, Sway 9, Weston 2. Eski PIV-09–14'ün
+24 çağrısı korunur. Yeni üç resampling çağrısında 34'er (**102**) snapshot;
+eski360 ile toplam **462 sentetik snapshot**. Kesin 2×2 kaynağın 2/4/8×,
+kesirli, %10/%3200, Fit/Fill/Actual çizimi; Nearest opaque palette/spatial
+örnekler ve 16×16 kaynakta deterministik0.5× küçültme; Smooth encoded-channel
+Cairo bilinear referansına 5/255 tolerans ve gerçek ara değerler doğrulandı.
+Bunlar sentetik source ile **gerçek üretim GSK rendering** testidir; gerçek
+Glycin başarısı veya hardware GPU/physical mouse kabulü değildir.
+
+Gradient photo örneğinde filtre sırasında rendered source koordinatları,
+zoom/pan/clip ve nearest roundtrip byte eşitliği korundu. 1000 hızlı filtre
+geçişinde aynı manuel paintable ve ardından weak adapter release PASS.
+Pending worker'da Nearest seçimi, yeni istekte ve late callback sonrası
+korunması, diğer pencerenin Smooth kalması ve 7 worker sayısı/close regresyonu
+PASS; controlled worker gerçek decoder değildir. Sway action/sinyalleri fiziksel
+GNOME girişi değildir. Weston normal close NOT RUN kalır.
+
+**BLOCKED/NOT RUN — 10 exit77:** PNG/JPEG-first image_probe, image_gui_probe,
+strict navigation/folder watch/media failure, active_decode_close, strict
+view_modes, strict zoom-pan ve yeni strict resampling. İlk secure baseline
+oluşmadı; bilinen Codex Bwrap/read-only proc kısıtı sürer. Yeni native pozitif
+PNG checker/palette, EXIF filtre, iki gerçek texture penceresi ve aktif drag
+filtre roundtrip'i yalnız derlendi, PASS değil. Güvenlik bypass'ı eklenmedi.
+
+GTK4.10+ append_scaled_texture / GSK Linear/Nearest mevcut GTK min4.16 içinde
+kullanılır; bağımlılık/ABI hack'i yok. GSK uygulaması backend'e aittir; Cairo
+renk/precision referansı GPU'ya genellenmez. %100 GTK mantıksal piksel tanımı
+korunur, fiziksel HiDPI/FPS/RSS ölçümü NOT RUN/NOT MEASURED.
+
+Kalan tek native komut **`bash tests/run_resampling_probe.sh`**. Secure JPEG/PNG/
+EXIF baseline sonrası gerçek üretim render/filter ve exact-color PNG kapısı;
+aktif drag'da filtre değişiminde aynı frame/konum, boş paintable olmaması,
+yeni medyada tercih, bozuk medyadan dönüş, iki pencere ve kaynak bütünlüğü
+kontrolleri hazırlanmıştır. Kullanıcı gerçek mouse/görsel kabulünü test SHA'sıyla
+bildirmeli. [Tam matris ve backend sınırları](PIV15_VALIDATION.md).
+
+**PIV-15 TESTING; native kabul olmadan DONE değil. PIV-16 başlamadı.** Mevcut
+PIV-14 DONE kaydına göre faz2/toplam sayaç2/14'e düzeltildi; PIV-15 eklenmedi.
+Tercih pencere içinde korunur, restart için persistence eklenmedi. Faz 0 temiz
+native kurulum INCOMPLETE, DESKTOP-06 Nautilus NOT RUN ve PIV-39 tr/en planı
+korunur. Cargo.toml/lock, decoder/sandbox, eski medya fixture'ları, kurulum,
+CI ve lisans değişmedi; manifest yalnız yeni özgün checker satırıyla genişledi.
+Main beklenen SHA `5d55ee599df4617bd51c09b1c7a008b8d0ece480`; push sonunda kontrol edilir.

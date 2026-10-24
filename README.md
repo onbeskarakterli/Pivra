@@ -3,7 +3,7 @@ A fast, lightweight GNOME image viewer with seamless photo and video navigation,
 
 ## Development status
 
-**PIV-01–14: DONE (PIV-14 Arch/GNOME native and physical mouse acceptance 2026-10-24), on `dev`.**
+**PIV-01–14: DONE. PIV-15: TESTING (2026-10-24), on `dev`.**
 Pivra accepts one local JPEG/PNG path or file URI and discovers a naturally ordered
 photo/video catalog. Left/Right now navigate that window's catalog without
 wrapping; video entries show an explicit unavailable-playback message. Every new
@@ -21,11 +21,15 @@ texture; 100% means one source pixel per GTK logical unit, including on HiDPI.
 PIV-13 native acceptance was reported by the user; see its validation record.
 PIV-14 adds cursor anchored wheel zoom (10–3200%) and bounded left-button drag
 pan. The header shows **Zoom** for manual transforms. Presets, a new photo and
-Refresh reset the transform; each window is independent. Native PIV-14 mouse
-acceptance remains pending; [results and limits](docs/PIV14_VALIDATION.md).
+Refresh reset the transform; each window is independent. PIV-14 native/mouse
+acceptance was reported by the user. PIV-15 adds **Smooth / Nearest** in the
+existing menu. Smooth is default; quality changes preserve zoom/pan and reuse
+the decoded texture. The preference survives photo changes in that window;
+it is not saved across restarts. Native PIV-15 acceptance remains pending;
+[render evidence and native checks](docs/PIV15_VALIDATION.md).
 
 ```bash
-bash tests/run_zoom_pan_probe.sh
+bash tests/run_resampling_probe.sh
 ```
 
 PIV-09 DONE is backed by **user-reported Arch/GNOME Wayland tests**, including

@@ -113,6 +113,8 @@ def main():
                     args = [binary] + (["--expect-image-error"] if blocked else [])
                     if "--media-failures" in sys.argv[2:]:
                         args.append("--media-failures")
+                    if "--synthetic" in sys.argv[2:]:
+                        args.append("--synthetic")
                     result = subprocess.run(args, env={**env, "G_DEBUG": "fatal-criticals"},
                                             capture_output=True, text=True, timeout=60)
                     print(result.stdout, end="")
@@ -121,7 +123,7 @@ def main():
                         return 77
                     assert result.returncode == 0, (result.returncode, result.stdout, result.stderr)
                     assert "panicked" not in result.stderr and "CRITICAL" not in result.stderr, result.stderr
-                    print("PASS headless native Wayland navigation probe; GTK key signals, not compositor keyboard injection")
+                    print("PASS headless native Wayland probe; action/signals are not physical input")
                     return 0
                 surfaces = []
                 cases = file_launches(root) if "--files" in sys.argv[2:] else [([], "Pivra")] * 2

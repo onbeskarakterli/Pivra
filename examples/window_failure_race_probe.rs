@@ -102,6 +102,43 @@ fn action(w: &adw::ApplicationWindow, name: &str, count: usize) {
     gio::prelude::ActionGroupExt::activate_action(w, name, None);
     wait(|| STARTED.load(Ordering::SeqCst) == count);
 }
+fn mode_key(w: &adw::ApplicationWindow, key: gtk::gdk::Key, expected: &str) {
+    let controllers = w.observe_controllers();
+    let controller = (0..controllers.n_items())
+        .find_map(|i| {
+            controllers
+                .item(i)
+                .unwrap()
+                .downcast::<gtk::EventControllerKey>()
+                .ok()
+        })
+        .unwrap();
+    assert!(controller.emit_by_name::<bool>(
+        "key-pressed",
+        &[&key, &0_u32, &gtk::gdk::ModifierType::empty()]
+    ));
+    let label = match expected {
+        "fit" => "Fit",
+        "fill" => "Fill",
+        _ => "100%",
+    };
+    assert!(
+        widgets(w.upcast_ref())
+            .into_iter()
+            .filter_map(|w| w.downcast::<gtk::MenuButton>().ok())
+            .any(|button| button.label().as_deref() == Some(label)),
+        "mode menu label did not track action"
+    );
+    assert_eq!(
+        w.lookup_action("image-mode")
+            .unwrap()
+            .state()
+            .unwrap()
+            .str(),
+        Some(expected)
+    );
+}
+
 fn main() {
     adw::init().unwrap();
     let app = adw::Application::builder()
@@ -117,12 +154,32 @@ fn main() {
     wait(|| STARTED.load(Ordering::SeqCst) == 1);
     let second = open(&app, &other.path().join("9.png"));
     wait(|| STARTED.load(Ordering::SeqCst) == 2);
+    mode_key(&first, gtk::gdk::Key::F7, "fill");
+    mode_key(&second, gtk::gdk::Key::F8, "actual");
     for name in ["1.png", "2.png"] {
         std::fs::write(dir.path().join(name), b"controlled fixture").unwrap();
     }
     wait(|| first.title().is_some_and(|s| s.ends_with("(3 candidates)")));
     action(&first, "next-media", 3);
     action(&first, "next-media", 4);
+    assert_eq!(
+        first
+            .lookup_action("image-mode")
+            .unwrap()
+            .state()
+            .unwrap()
+            .str(),
+        Some("fit")
+    );
+    assert_eq!(
+        second
+            .lookup_action("image-mode")
+            .unwrap()
+            .state()
+            .unwrap()
+            .str(),
+        Some("actual")
+    );
     std::fs::write(
         dir.path().join("2.png"),
         b"external change while controlled load pending",
@@ -158,6 +215,7 @@ fn main() {
     action(&first, "next-media", 7);
     // Close while a new worker and a monitor timer can both be pending.
     std::fs::write(dir.path().join("3.png"), b"closing event").unwrap();
+    mode_key(&first, gtk::gdk::Key::F7, "fill");
     let weak = first.downgrade();
     first.close();
     drop(first);
@@ -171,6 +229,7 @@ fn main() {
     RELEASE[1].store(true, Ordering::SeqCst);
     wait(|| status(&second).contains("controlled window error 1"));
     assert!(!CANCELLED[1].load(Ordering::SeqCst));
+    mode_key(&second, gtk::gdk::Key::F6, "fit");
     assert_eq!(
         STARTED.load(Ordering::SeqCst),
         7,

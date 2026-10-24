@@ -98,6 +98,7 @@ fn main() {
     load(&view, 0, &joined);
     load(&view, 1, &joined);
     load(&view, 2, &joined);
+    gio::prelude::ActionGroupExt::activate_action(&first, "image-mode", Some(&"fill".to_variant()));
     RELEASE[2].store(true, Ordering::SeqCst);
     wait(|| joined.get() == 1);
     assert!(text(&view).contains("controlled error 2"));
@@ -107,7 +108,25 @@ fn main() {
         assert!(CANCELLED[index].load(Ordering::SeqCst));
         assert!(text(&view).contains("controlled error 2"));
     }
+    assert_eq!(
+        first
+            .lookup_action("image-mode")
+            .unwrap()
+            .state()
+            .unwrap()
+            .str(),
+        Some("fill")
+    );
     load(&view, 3, &joined);
+    assert_eq!(
+        first
+            .lookup_action("image-mode")
+            .unwrap()
+            .state()
+            .unwrap()
+            .str(),
+        Some("fit")
+    );
     view.show_message("Video playback is not available yet.");
     RELEASE[3].store(true, Ordering::SeqCst);
     wait(|| joined.get() == 4);
@@ -142,6 +161,11 @@ fn main() {
     assert_eq!(
         RESULTS.load(Ordering::SeqCst),
         (1 << 2) | (1 << 5) | (1 << 7)
+    );
+    gio::prelude::ActionGroupExt::activate_action(
+        &second,
+        "image-mode",
+        Some(&"actual".to_variant()),
     );
     second.close();
     wait(|| !second.is_visible());

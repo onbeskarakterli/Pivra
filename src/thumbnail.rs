@@ -66,19 +66,35 @@ fn capability(gnome: bool, generator: Generator) -> Capability {
         }
     }
 }
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum FactoryObservation {
+    NotConfigured,
+    NotAttempted,
+    MimeUnavailable,
+    Eligible { mime: String },
+    Ineligible { mime: String },
+    Failed { mime: String, error: String },
+}
 pub struct Provider {
     gnome: bool,
     /// Explicit trusted metadata-only factory helper; never a decoder executable.
     factory: Option<PathBuf>,
     generator: Mutex<Generator>,
+    factory_observation: Mutex<FactoryObservation>,
     busy: AtomicBool,
     eligible: AtomicBool,
 }
 impl Provider {
     pub fn new(gnome: bool, factory: Option<PathBuf>) -> Self {
+        let observation = if factory.is_some() {
+            FactoryObservation::NotAttempted
+        } else {
+            FactoryObservation::NotConfigured
+        };
         Self {
             gnome,
             factory,
+            factory_observation: Mutex::new(observation),
             generator: Mutex::new(Generator::Absent),
             busy: AtomicBool::new(false),
             eligible: AtomicBool::new(false),
@@ -93,6 +109,9 @@ impl Provider {
     }
     pub fn capability(&self) -> Capability {
         capability(self.gnome, *self.generator.lock().unwrap())
+    }
+    pub fn factory_observation(&self) -> FactoryObservation {
+        self.factory_observation.lock().unwrap().clone()
     }
     pub fn generation_eligible(&self) -> bool {
         self.capability() == Capability::CacheAndGenerate && self.eligible.load(Ordering::Acquire)
@@ -123,6 +142,11 @@ impl Provider {
         }
         let _release = Release(&self.busy);
         self.eligible.store(false, Ordering::Release);
+        *self.factory_observation.lock().unwrap() = if self.factory.is_some() {
+            FactoryObservation::NotAttempted
+        } else {
+            FactoryObservation::NotConfigured
+        };
         if cancel.is_cancelled() {
             return Outcome::Cancelled;
         }
@@ -164,6 +188,18 @@ impl Provider {
                     info.attribute_uint64("time::modified"),
                     cancel,
                 );
+                *self.factory_observation.lock().unwrap() = match &state {
+                    Ok(true) => FactoryObservation::Eligible {
+                        mime: mime.to_string(),
+                    },
+                    Ok(false) => FactoryObservation::Ineligible {
+                        mime: mime.to_string(),
+                    },
+                    Err(error) => FactoryObservation::Failed {
+                        mime: mime.to_string(),
+                        error: error.clone(),
+                    },
+                };
                 self.eligible
                     .store(matches!(state, Ok(true)), Ordering::Release);
                 let mut previous = self.generator.lock().unwrap();
@@ -179,6 +215,8 @@ impl Provider {
                     }
                     Err(_) => Generator::Absent,
                 };
+            } else {
+                *self.factory_observation.lock().unwrap() = FactoryObservation::MimeUnavailable;
             }
         }
         if cancel.is_cancelled() {
@@ -320,7 +358,7 @@ fn factory_probe(
                 } else if status.success() && output == "0\n" {
                     Ok(false)
                 } else {
-                    Err("factory probe failed".into())
+                    Err(format!("factory probe exit={status}, stdout={output:?}"))
                 };
             }
             Ok(None) => std::thread::sleep(Duration::from_millis(5)),
@@ -460,10 +498,26 @@ mod tests {
         assert!(matches!(provider.query(&source, &token), Outcome::Missing));
         assert_eq!(provider.capability(), Capability::CacheAndGenerate);
         assert!(provider.generation_eligible());
+        assert!(matches!(
+            provider.factory_observation(),
+            FactoryObservation::Eligible { .. }
+        ));
+        fs::write(&helper, b"#!/bin/sh\nprintf '0\\n'\n").unwrap();
+        assert!(matches!(provider.query(&source, &token), Outcome::Missing));
+        assert_eq!(provider.capability(), Capability::CacheAndGenerate);
+        assert!(!provider.generation_eligible());
+        assert!(matches!(
+            provider.factory_observation(),
+            FactoryObservation::Ineligible { .. }
+        ));
         fs::remove_file(helper).unwrap();
         assert!(matches!(provider.query(&source, &token), Outcome::Missing));
         assert_eq!(provider.capability(), Capability::TemporarilyFailed);
         assert!(!provider.generation_eligible());
+        assert!(matches!(
+            provider.factory_observation(),
+            FactoryObservation::Failed { .. }
+        ));
     }
     #[test]
     fn no_queue_and_cancel_do_not_change_capability() {

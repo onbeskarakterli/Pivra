@@ -21,7 +21,7 @@ fn main() {
     // Real provider work is off the caller/UI thread, not GLib event polling.
     let result=std::thread::spawn(move || {
         let outcome=provider.query(&path,&token);
-        println!("capability={:?}",provider.capability());
+        println!("capability={:?} generation_eligible={} factory={:?}",provider.capability(),provider.generation_eligible(),provider.factory_observation());
         match outcome {
             Outcome::Hit(candidate) => {
                 println!("HIT metadata/container valid uri={} cache={:?} bytes={} current={} secure pixel decode still required",candidate.uri,candidate.thumbnail.path,candidate.png.len(),candidate.still_current(&token));

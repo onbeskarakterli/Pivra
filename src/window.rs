@@ -120,6 +120,16 @@ pub(super) fn build(app: &adw::Application, settings: &Settings, file: Option<Op
             item.set_action_and_target_value(Some("win.image-mode"), Some(&mode.id().to_variant()));
             menu.append_item(&item);
         }
+        let quality = gio::Menu::new();
+        for filter in pivra::viewing::Resampling::ALL {
+            let item = gio::MenuItem::new(Some(filter.label()), None);
+            item.set_action_and_target_value(
+                Some("win.image-resampling"),
+                Some(&filter.id().to_variant()),
+            );
+            quality.append_item(&item);
+        }
+        menu.append_section(Some(pivra::viewing::Resampling::MENU), &quality);
         let mode_button = gtk::MenuButton::builder()
             .label("Fit")
             .tooltip_text(pivra::viewing::ViewMode::HELP)

@@ -4,7 +4,7 @@
 mod actual_paintable;
 use adw::prelude::*;
 use gtk::{gio, glib};
-use pivra::viewing::{Transform, ViewMode};
+use pivra::viewing::{Resampling, Transform, ViewMode};
 use std::{
     cell::{Cell, RefCell},
     path::PathBuf,
@@ -44,6 +44,7 @@ pub(super) struct ImageView {
     mode_action: gio::SimpleAction,
     texture: Rc<RefCell<Option<gtk::gdk::Texture>>>,
     transform: Rc<RefCell<Transform>>,
+    filter: Rc<Cell<Resampling>>,
 }
 
 impl ImageView {
@@ -79,10 +80,18 @@ impl ImageView {
         mode_action.set_enabled(false);
         let texture: Rc<RefCell<Option<gtk::gdk::Texture>>> = Rc::default();
         let transform = Rc::new(RefCell::new(Transform::default()));
-        install_interaction(&picture, texture.clone(), transform.clone(), &mode_action);
+        let filter = Rc::new(Cell::new(Resampling::default()));
+        install_interaction(
+            &picture,
+            texture.clone(),
+            transform.clone(),
+            &mode_action,
+            filter.clone(),
+        );
         let mode_transform = transform.clone();
         let weak_picture = picture.downgrade();
         let current_texture = texture.clone();
+        let mode_filter = filter.clone();
         mode_action.connect_activate(move |action, parameter| {
             let Some(mode) = parameter.and_then(|v| v.str()).and_then(ViewMode::from_id) else {
                 return;
@@ -90,12 +99,51 @@ impl ImageView {
             mode_transform.borrow_mut().reset();
             action.set_state(&mode.id().to_variant());
             if let Some(picture) = weak_picture.upgrade() {
-                present(&picture, current_texture.borrow().as_ref(), mode);
+                present_filtered(
+                    &picture,
+                    current_texture.borrow().as_ref(),
+                    mode.id(),
+                    mode_transform.clone(),
+                    mode_filter.clone(),
+                );
             }
         });
         window.add_action(&mode_action);
+        let quality_action = gio::SimpleAction::new_stateful(
+            "image-resampling",
+            Some(glib::VariantTy::STRING),
+            &Resampling::default().id().to_variant(),
+        );
+        let weak_picture = picture.downgrade();
+        let current_texture = texture.clone();
+        let state = transform.clone();
+        let chosen = filter.clone();
+        let mode = mode_action.clone();
+        quality_action.connect_activate(move |action, parameter| {
+            let Some(value) = parameter
+                .and_then(|v| v.str())
+                .and_then(Resampling::from_id)
+            else {
+                return;
+            };
+            chosen.set(value);
+            action.set_state(&value.id().to_variant());
+            if let Some(picture) = weak_picture.upgrade() {
+                let mode = mode.state();
+                let id = mode.as_ref().and_then(|v| v.str()).unwrap_or("fit");
+                present_filtered(
+                    &picture,
+                    current_texture.borrow().as_ref(),
+                    id,
+                    state.clone(),
+                    chosen.clone(),
+                );
+            }
+        });
+        window.add_action(&quality_action);
         Self {
             mode_action,
+            filter,
             transform,
             texture,
             overlay,
@@ -153,6 +201,8 @@ impl ImageView {
         let slot = self.slot.clone();
         let mode_action = self.mode_action.clone();
         let texture = self.texture.clone();
+        let filter = self.filter.clone();
+        let transform = self.transform.clone();
         glib::MainContext::default().spawn_local(async move {
             let result = job
                 .await
@@ -179,7 +229,13 @@ impl ImageView {
                         .state()
                         .and_then(|v| v.str().and_then(ViewMode::from_id))
                         .unwrap_or_default();
-                    present(&picture, Some(&decoded), mode);
+                    present_filtered(
+                        &picture,
+                        Some(&decoded),
+                        mode.id(),
+                        transform.clone(),
+                        filter.clone(),
+                    );
                     texture.replace(Some(decoded));
                     status.set_visible(false);
                 }
@@ -199,6 +255,7 @@ pub(super) fn install_interaction(
     texture: Rc<RefCell<Option<gtk::gdk::Texture>>>,
     transform: Rc<RefCell<Transform>>,
     action: &gio::SimpleAction,
+    filter: Rc<Cell<Resampling>>,
 ) {
     let pointer = Rc::new(Cell::new((0., 0.)));
     let motion = gtk::EventControllerMotion::new();
@@ -212,6 +269,7 @@ pub(super) fn install_interaction(
     let source = texture.clone();
     let state = transform.clone();
     let mode_action = action.clone();
+    let scroll_filter = filter.clone();
     scroll.connect_scroll(move |_, _, dy| {
         let Some(picture) = weak.upgrade() else {
             return glib::Propagation::Proceed;
@@ -235,7 +293,14 @@ pub(super) fn install_interaction(
             dy,
         );
         if changed {
-            manual(&picture, texture, state.clone(), mode, &mode_action);
+            manual(
+                &picture,
+                texture,
+                state.clone(),
+                mode,
+                &mode_action,
+                scroll_filter.clone(),
+            );
         }
         glib::Propagation::Stop
     });
@@ -294,7 +359,14 @@ pub(super) fn install_interaction(
             (x - previous.0, y - previous.1),
         );
         if changed {
-            manual(&picture, texture, state.clone(), mode, &mode_action);
+            manual(
+                &picture,
+                texture,
+                state.clone(),
+                mode,
+                &mode_action,
+                filter.clone(),
+            );
         }
     });
     let end = last.clone();
@@ -308,6 +380,7 @@ fn manual(
     transform: Rc<RefCell<Transform>>,
     mode: ViewMode,
     action: &gio::SimpleAction,
+    filter: Rc<Cell<Resampling>>,
 ) {
     picture.set_overflow(gtk::Overflow::Hidden);
     picture.set_content_fit(gtk::ContentFit::Fill);
@@ -319,10 +392,41 @@ fn manual(
         current.invalidate_contents();
     } else {
         picture.set_paintable(Some(&actual_paintable::ActualPaintable::transformed(
-            texture, transform, mode,
+            texture, transform, mode, filter,
         )));
     }
     action.set_state(&"manual".to_variant());
+}
+
+pub(super) fn present_filtered(
+    picture: &gtk::Picture,
+    texture: Option<&gtk::gdk::Texture>,
+    id: &str,
+    transform: Rc<RefCell<Transform>>,
+    filter: Rc<Cell<Resampling>>,
+) {
+    let mode = ViewMode::from_id(id).unwrap_or(ViewMode::Actual);
+    if id != "manual" && filter.get() == Resampling::Smooth && mode != ViewMode::Actual {
+        present(picture, texture, mode);
+        return;
+    }
+    let Some(texture) = texture else {
+        return;
+    };
+    if let Some(current) = picture
+        .paintable()
+        .and_then(|p| p.downcast::<actual_paintable::ActualPaintable>().ok())
+        .filter(|p| p.has_transform(&transform))
+    {
+        current.set_mode(mode);
+        current.invalidate_contents();
+        return;
+    }
+    picture.set_overflow(gtk::Overflow::Hidden);
+    picture.set_content_fit(gtk::ContentFit::Fill);
+    picture.set_paintable(Some(&actual_paintable::ActualPaintable::transformed(
+        texture, transform, mode, filter,
+    )));
 }
 
 pub(super) fn present(picture: &gtk::Picture, texture: Option<&gtk::gdk::Texture>, mode: ViewMode) {

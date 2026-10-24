@@ -299,3 +299,42 @@ mod preset_transition_tests {
         assert!(t.zoom((1., 1.), (800., 600.), ViewMode::Fill, (400., 300.), 1.));
     }
 }
+
+/// Window-local preference; independent of geometry and decoder lifetime.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum Resampling {
+    #[default]
+    Smooth,
+    Nearest,
+}
+impl Resampling {
+    pub const MENU: &'static str = "Resampling";
+    pub const ALL: [Self; 2] = [Self::Smooth, Self::Nearest];
+    pub fn id(self) -> &'static str {
+        match self {
+            Self::Smooth => "smooth",
+            Self::Nearest => "nearest",
+        }
+    }
+    pub fn label(self) -> &'static str {
+        match self {
+            Self::Smooth => "Smooth",
+            Self::Nearest => "Nearest",
+        }
+    }
+    pub fn from_id(id: &str) -> Option<Self> {
+        Self::ALL.into_iter().find(|filter| filter.id() == id)
+    }
+}
+#[cfg(test)]
+mod resampling_tests {
+    use super::*;
+    #[test]
+    fn preference_defaults_and_ids_are_explicit() {
+        assert_eq!(Resampling::default(), Resampling::Smooth);
+        for f in Resampling::ALL {
+            assert_eq!(Resampling::from_id(f.id()), Some(f));
+        }
+        assert_eq!(Resampling::from_id("auto"), None);
+    }
+}

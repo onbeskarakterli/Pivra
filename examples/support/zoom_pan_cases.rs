@@ -108,7 +108,13 @@ pub(super) fn synthetic(app: &adw::Application) {
             Some(glib::VariantTy::STRING),
             &"actual".to_variant(),
         );
-        image_view::install_interaction(&p, source.clone(), state.clone(), &action);
+        image_view::install_interaction(
+            &p,
+            source.clone(),
+            state.clone(),
+            &action,
+            Rc::new(std::cell::Cell::new(pivra::viewing::Resampling::Smooth)),
+        );
         let survivor = adw::ApplicationWindow::builder()
             .application(app)
             .default_width(480)
@@ -134,6 +140,7 @@ pub(super) fn synthetic(app: &adw::Application) {
             Rc::new(RefCell::new(Some(tex.clone()))),
             other_state.clone(),
             &other_action,
+            Rc::new(std::cell::Cell::new(pivra::viewing::Resampling::Smooth)),
         );
         image_view::present(&other, Some(&tex), ViewMode::Actual);
         let other_paintable = other.paintable();

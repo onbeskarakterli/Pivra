@@ -1,7 +1,7 @@
 //! Native logical-pixel presentation without changing Picture's minimum size.
 use gtk::{gdk, glib, prelude::*, subclass::prelude::*};
 use std::{
-    cell::{OnceCell, RefCell},
+    cell::{Cell, OnceCell, RefCell},
     rc::Rc,
 };
 mod imp {
@@ -11,6 +11,7 @@ mod imp {
         pub texture: OnceCell<gdk::Texture>,
         pub transform: OnceCell<Rc<RefCell<pivra::viewing::Transform>>>,
         pub mode: std::cell::Cell<pivra::viewing::ViewMode>,
+        pub filter: OnceCell<Rc<Cell<pivra::viewing::Resampling>>>,
     }
     #[glib::object_subclass]
     impl ObjectSubclass for ActualPaintable {
@@ -50,8 +51,16 @@ mod imp {
                 width as f32,
                 height as f32,
             ));
-            snapshot.append_texture(
+            let filter = self
+                .filter
+                .get()
+                .map_or(pivra::viewing::Resampling::default(), |f| f.get());
+            snapshot.append_scaled_texture(
                 texture,
+                match filter {
+                    pivra::viewing::Resampling::Smooth => gtk::gsk::ScalingFilter::Linear,
+                    pivra::viewing::Resampling::Nearest => gtk::gsk::ScalingFilter::Nearest,
+                },
                 &gtk::graphene::Rect::new(g.x as f32, g.y as f32, g.width as f32, g.height as f32),
             );
             snapshot.pop();
@@ -60,6 +69,9 @@ mod imp {
 }
 glib::wrapper! { pub struct ActualPaintable(ObjectSubclass<imp::ActualPaintable>) @implements gdk::Paintable; }
 impl ActualPaintable {
+    pub fn set_mode(&self, mode: pivra::viewing::ViewMode) {
+        self.imp().mode.set(mode);
+    }
     pub fn has_transform(&self, transform: &Rc<RefCell<pivra::viewing::Transform>>) -> bool {
         self.imp()
             .transform
@@ -70,6 +82,7 @@ impl ActualPaintable {
         texture: &gdk::Texture,
         transform: Rc<RefCell<pivra::viewing::Transform>>,
         mode: pivra::viewing::ViewMode,
+        filter: Rc<Cell<pivra::viewing::Resampling>>,
     ) -> Self {
         let object = Self::new(texture);
         object
@@ -78,6 +91,7 @@ impl ActualPaintable {
             .set(transform)
             .expect("new transform");
         object.imp().mode.set(mode);
+        object.imp().filter.set(filter).expect("new filter");
         object
     }
     pub fn new(texture: &gdk::Texture) -> Self {

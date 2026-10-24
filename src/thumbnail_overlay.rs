@@ -9,14 +9,14 @@ fn install_css(display: &gtk::gdk::Display) {
         if installed.replace(true) { return; }
         let css=gtk::CssProvider::new();
         css.load_from_string("\
-            .pivra-thumbnail-panel { background-color: alpha(@window_bg_color, 0.84); border-radius: 12px; padding: 8px; }\n\
-            .pivra-thumbnail-toggle { background-image: none; background-color: alpha(@window_bg_color, 0.84); border-radius: 16px; padding: 4px; min-width: 24px; min-height: 24px; }\n\
-            .pivra-thumbnail-cell { background-color: @view_bg_color; border: 2px solid transparent; border-radius: 8px; }\n\
-            .pivra-thumbnail-cell.selected { border-color: @accent_color; }\n");
+            .pivra-thumbnail-panel { background-color: alpha(@window_bg_color, 0.25); border-radius: 12px; padding: 8px; }\n\
+            .pivra-thumbnail-toggle { background-image: none; background-color: alpha(@window_bg_color, 0.25); border-radius: 16px; padding: 4px; min-width: 24px; min-height: 24px; }\n\
+            .pivra-thumbnail-cell { background-color: transparent; border: none; border-radius: 0; box-shadow: none; }\n\
+            .pivra-thumbnail-cell.selected { box-shadow: inset 0 -1px 0 0 @accent_color; }\n");
         gtk::style_context_add_provider_for_display(display,&css,gtk::STYLE_PROVIDER_PRIORITY_APPLICATION);
     });
 }
-/// Theme border reserves the same space in selected/unselected states.
+/// Paint-only underline never changes selected/unselected allocation.
 #[allow(dead_code)] // Cell content is supplied only by the explicit TH-02 probe for now.
 pub(crate) fn cell(child: &impl IsA<gtk::Widget>, selected: bool) -> gtk::Frame {
     let frame = gtk::Frame::new(None);

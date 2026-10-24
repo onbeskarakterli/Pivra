@@ -98,9 +98,21 @@ fn open(app: &adw::Application) -> (adw::ApplicationWindow, image_view::ImageVie
         .default_height(600)
         .build();
     let view = image_view::ImageView::new(&w);
-    w.set_content(Some(view.widget()));
+    let header = adw::HeaderBar::new();
+    header.set_widget_name("th02-test-header");
+    header.set_title_widget(Some(&adw::WindowTitle::new(
+        "Pivra — TEST",
+        "Synthetic image / TEST placeholders",
+    )));
+    let content = gtk::Box::new(gtk::Orientation::Vertical, 0);
+    content.append(&header);
+    content.append(view.widget());
+    w.set_content(Some(&content));
     w.present();
     wait(|| w.is_mapped());
+    assert!(header.shows_end_title_buttons() && header.shows_start_title_buttons());
+    assert!(header.title_widget().is_some());
+    assert!(header.is_mapped());
     view.load(std::path::PathBuf::from("TH02-SYNTHETIC"));
     let p = view
         .widget()
@@ -149,6 +161,34 @@ fn image_bytes(w: &adw::ApplicationWindow, p: &gtk::Picture) -> Vec<u8> {
     t.download(&mut bytes, stride);
     bytes
 }
+fn widget_pixels(
+    w: &adw::ApplicationWindow,
+    p: &gtk::Picture,
+    widget: &impl IsA<gtk::Widget>,
+) -> (usize, usize, Vec<u8>) {
+    let paintable = gtk::WidgetPaintable::new(Some(widget));
+    // Keep the paintable alive while a real frame/layout is completed.
+    render_frame::rendered_node(w, p);
+    let snapshot = gtk::Snapshot::new();
+    let width = widget.width();
+    let height = widget.height();
+    paintable.snapshot(&snapshot, width as f64, height as f64);
+    let node = snapshot.to_node().expect("styled widget render node");
+    let texture = w.renderer().unwrap().render_texture(
+        node,
+        Some(&gtk::graphene::Rect::new(
+            0.,
+            0.,
+            width as f32,
+            height as f32,
+        )),
+    );
+    let width = texture.width() as usize;
+    let height = texture.height() as usize;
+    let mut bytes = vec![0; width * height * 4];
+    texture.download(&mut bytes, width * 4);
+    (width, height, bytes)
+}
 fn controller<T: IsA<glib::Object> + glib::types::StaticType>(p: &gtk::Picture) -> T {
     let list = p.observe_controllers();
     (0..list.n_items())
@@ -157,6 +197,9 @@ fn controller<T: IsA<glib::Object> + glib::types::StaticType>(p: &gtk::Picture) 
 }
 fn main() {
     adw::init().unwrap();
+    if std::env::args().any(|arg| arg == "--dark") {
+        adw::StyleManager::default().set_color_scheme(adw::ColorScheme::ForceDark);
+    }
     let app = adw::Application::builder()
         .application_id("io.github.onbeskarakterli.Pivra.TH02")
         .flags(gio::ApplicationFlags::NON_UNIQUE)
@@ -243,6 +286,39 @@ fn main() {
     assert!(cell.has_css_class("selected"));
     assert_eq!(cell.opacity(), 1.);
     assert_eq!(strip.opacity(), 1.);
+    button.set_active(true);
+    let selected = widget_pixels(&w, &p, &cell);
+    assert_eq!(
+        selected.2[(selected.0 * 24 + selected.0 / 2) * 4 + 3],
+        255,
+        "thumbnail pixels remain opaque"
+    );
+    assert_eq!(
+        selected.2[(selected.0 * 24 + 1) * 4 + 3],
+        0,
+        "no side frame/background"
+    );
+    assert_eq!(selected.2[(selected.0 + 1) * 4 + 3], 0, "no top frame");
+    assert!(
+        selected.2[((selected.1 - 1) * selected.0 + 1) * 4 + 3] > 0,
+        "selected underline"
+    );
+    cell.remove_css_class("selected");
+    let normal = widget_pixels(&w, &p, &cell);
+    assert_eq!((normal.0, normal.1), (selected.0, selected.1));
+    assert_eq!(
+        normal.2[((normal.1 - 1) * normal.0 + 1) * 4 + 3],
+        0,
+        "no normal-cell frame"
+    );
+    cell.add_css_class("selected");
+    let panel = widget_pixels(&w, &p, &strip);
+    let alpha = panel.2[(panel.0 * 2 + panel.0 / 2) * 4 + 3];
+    assert!(
+        (60..=68).contains(&alpha),
+        "panel alpha expected about25%, got {alpha}"
+    );
+    button.set_active(false);
     assert_eq!(LOADS.load(Ordering::SeqCst), loads);
     assert_eq!(v.load_stats().started, 1);
     assert_eq!(ov.load_stats().started, 1);
@@ -251,13 +327,13 @@ fn main() {
     assert!(other.is_visible());
     assert_eq!(stable, image_bytes(&other, &op));
     println!(
-        "PASS TH-02 synthetic UI: overlay allocation/unchanged Fit-Fill-Actual pixels, zoom/pan preservation, horizontal scroll, icons, selected class/opacity, narrow resize, pick-through when closed, two-window close/isolation, zero additional decoder jobs. scale_factor={}",
+        "PASS TH-02 synthetic UI: overlay allocation/unchanged Fit-Fill-Actual pixels, zoom/pan preservation, horizontal scroll, icons, 25% panel alpha/opaque cells/borderless underline/header controls, narrow resize, pick-through when closed, two-window close/isolation, zero additional decoder jobs. scale_factor={}",
         op.scale_factor()
     );
     if std::env::args().any(|s| s == "--manual") {
         other_button.set_active(true);
         println!(
-            "MANUAL: TEST MAIN IMAGE + TEST PLACEHOLDERS only. Inspect background alpha, opaque cells, selected border, bottom-center toggle and scroll. No provider/generation/selection binding/T/persistence."
+            "MANUAL: TEST MAIN IMAGE + TEST PLACEHOLDERS only. Inspect background alpha, opaque cells, selected underline, bottom-center toggle and scroll. No provider/generation/selection binding/T/persistence."
         );
         let (manual, _manual_view, _manual_picture) = open(&app);
         let loop_ = glib::MainLoop::new(None, false);

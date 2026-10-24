@@ -1,6 +1,6 @@
 # Pivra — Geliştirme Yol Haritası
 
-**Durum:** PIV-01–08 DONE (giriş, keşif ve doğal sıra); PIV-09 DONE (Arch gerçek JPEG/PNG/EXIF, geometri ve aktif-decode kapanış/temizlik PASS); PIV-10 DONE (native gerçek secure piksel/Fit ve fiziksel sol/sağ gezinme PASS); PIV-11 DONE (Arch native ve GNOME Yenile PASS); PIV-12 DONE (24.10.2026 native + manuel kabul); PIV-13 DONE (24.10.2026 Arch native ve manuel kabul); PIV-14 DONE (24.10.2026 Arch native + gerçek fare kabulü); PIV-15 TESTING; PIV-16–60 TODO. Faz 0 INCOMPLETE: temiz native kurulumun bağımsız yeniden üretimi NOT RUN; temiz Cargo target derlemesi ve headless regresyonlar geçti. [PIV-05 kanıtı ve ayrı faz kapısı](PIVRA_TECHNICAL_CAPABILITIES.md#102-piv-05-ve-faz-0-kapanışını-ayrı-değerlendirme).
+**Durum:** PIV-01–08 DONE (giriş, keşif ve doğal sıra); PIV-09 DONE (Arch gerçek JPEG/PNG/EXIF, geometri ve aktif-decode kapanış/temizlik PASS); PIV-10 DONE (native gerçek secure piksel/Fit ve fiziksel sol/sağ gezinme PASS); PIV-11 DONE (Arch native ve GNOME Yenile PASS); PIV-12 DONE (24.10.2026 native + manuel kabul); PIV-13 DONE (24.10.2026 Arch native ve manuel kabul); PIV-14 DONE (24.10.2026 Arch native + gerçek fare kabulü); PIV-15 DONE (24.10.2026 Arch native ve manuel Smooth/Nearest kabulü); PIV-16–60 TODO. Faz 0 INCOMPLETE: temiz native kurulumun bağımsız yeniden üretimi NOT RUN; temiz Cargo target derlemesi ve headless regresyonlar geçti. [PIV-05 kanıtı ve ayrı faz kapısı](PIVRA_TECHNICAL_CAPABILITIES.md#102-piv-05-ve-faz-0-kapanışını-ayrı-değerlendirme).
 **Başlangıç branch:** `dev` · **Kararlı sürümler:** `main`  
 **Kaynak şartname:** [PIVRA_FEATURE_SPEC_TR.md](PIVRA_FEATURE_SPEC_TR.md)  
 **Görev ve commit takibi:** [PIVRA_COMMIT_TRACKER.md](PIVRA_COMMIT_TRACKER.md)
@@ -333,3 +333,8 @@ Tek native komut: `bash tests/run_resampling_probe.sh`.
 [Matris, backend sınırları ve kalan kabul](PIV15_VALIDATION.md).
 PIV-01–14 DONE korunur; PIV-15 TESTING, PIV-16 başlamadı. Faz 0, DESKTOP-06 ve
 PIV-39 tr/en i18n planı bağımsız açık işlerdir.
+
+
+## PIV-15 Arch native ve GNOME manuel kabul kapanışı — 24.10.2026 — DONE
+
+Kullanıcı `3313113246baca8b2e19073b0ed20c64f569a50c` üzerinde `bash tests/run_resampling_probe.sh` çalıştırdı: **exit 0**, gerçek Glycin JPEG/PNG/EXIF 1–8, secure PNG checker Nearest palette ve Smooth interpolasyon, aynı decoded texture/paintable, yeni fotoğrafta tercih, iki pencere izolasyonu, kaynak bütünlüğü PASS. Beklenen bozuk PNG hata logları test verisindendi. Kullanıcı normal Pivra'da küçük checker görselinde Smooth/Nearest arasında görünür piksel farkını ve değiştirirken zoom/konumun korunduğunu **manuel PASS** olarak onayladı. Fill görüntüyü alanı dolduracak şekilde ölçeklediğinden bu davranış doğrudur; %100 hatası doğrulanmadı. Çok küçük test görsellerinde %3200 manuel zoom sınırı yetersiz hissedilebilir; mevcut PIV-14 sınırı korunur, artırma önerisi ayrı değerlendirmedir, PIV-15 kabulünü engellemez. Gerçek GPU/HiDPI eşlemesi, FPS/RSS ölçümü ve decoder overlap **NOT MEASURED**; Codex exit77 kayıtları geriye dönük PASS sayılmaz. **PIV-15 DONE, PIV-16 TODO.** Faz 0 bağımsız temiz native kurulum INCOMPLETE, DESKTOP-06 Nautilus NOT RUN ve PIV-39 i18n planı açık kalır.

@@ -88,6 +88,9 @@ pub(super) fn build(app: &adw::Application, settings: &Settings, file: Option<Op
     placeholder.set_wrap(true);
     placeholder.set_valign(gtk::Align::Center);
     placeholder.set_vexpand(true);
+    // Folder scan diagnostics are reflected in the window title and image errors.
+    // Keep the label for FolderWatch callbacks, but never allocate a bottom status bar.
+    placeholder.set_visible(false);
     if file.is_some() {
         placeholder.set_text("Discovering neighboring media…");
         viewport.append(&placeholder);

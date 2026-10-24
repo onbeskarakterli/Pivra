@@ -2009,3 +2009,17 @@ derlemesi, shell syntax ve whitespace PASS.
 ## PIV-17 Arch native ve manuel kabul kapanışı — 24.10.2026 — DONE
 
 Kullanıcı `07f47b5fb21200d8337933893128b700e5b8329d` üzerinde `bash tests/run_preload_probe.sh` çalıştırdı, **exit 0**. Gerçek secure JPEG/PNG/EXIF baseline, cache hit/texture reuse/Fit/filter, next-before-previous preload, LRU eviction, atomic replace/delete identity, hesaplanan bellek bütçesi, injected memory pressure, source integrity, worker-entry promotion ve foreground priority, window close/drain **PASS**. Örnek: hits=3, misses=6, evictions=5; enabled başlangıcı foreground=1/background=2; disabled foreground=2. Native secure secondary probe promoted=1, cancelled=2, started=completed=4, cache entries/bytes=0 after drain. PIV-09 gerçek active decoder memfd/pidfd/mapping/sandbox close checkpoint, job join, survivor pixels, children cleanup PASS. `Cleanup SIGCONT unavailable` hedef PID zaten çıkmışken fatal değildi. Kullanıcı gerçek GNOME arayüzünde hızlı Sol/Sağ gezinmenin sorunsuz olduğunu bildirdi; ayrı gerçek RSS/VRAM/FPS/hız kazanımı, OS gerçek memory-pressure sinyali ve decoder overlap **NOT MEASURED/NOT RUN**. **PIV-17 DONE; PIV-18 TODO.** Faz 0 temiz kurulum INCOMPLETE, DESKTOP-06 Nautilus NOT RUN, PIV-39 i18n açık.
+
+### PIV-18 native mode snapshot düzeltmesi — TESTING
+
+Kod/test SHA `bba76daa1879d8dfd310664bed47a9b83f239ce8`.
+Kullanıcı Arch native komutu exit101 / `rendered image` (WidgetPaintable boş
+node) bildirdi. Testte sabit100ms bekleme yerine GTK after-paint/frame bariyeri,
+hedef present ve bounded gerçek snapshot kontrolü eklendi. Ürün kodu değişmedi;
+node/piksel assertion'ları korundu. Arch kök tetikleyicisi bağımsız üretilmedi.
+PASS: önce hedefli X11 48 snapshot; sonra bir tam core (74 Rust/30 Python,
+fmt/check/build/test/Clippy/fixtures), X11 zoom/pan/resampling ve Sway 48 mode
+snapshot. Strict secure gate bir kez exit77: NOT RUN. Arch native **FAIL kaydı
+korunur / düzeltme sonrası yeniden test bekleniyor**. Komut değişmedi:
+`bash tests/run_preview_pipeline_probe.sh`. [Ayrıntı](PIV18_VALIDATION.md).
+PIV-18 TESTING; PIV-19 başlamadı. Main/üretim bağımlılıkları/sandbox değişmedi.

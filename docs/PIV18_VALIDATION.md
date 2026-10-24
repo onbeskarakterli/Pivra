@@ -105,3 +105,39 @@ korunur; PIV-19 başlamadı.
 - `29059174e800ed067414651c99b02c2e2a9c779e`: phase assertion'ları, tek native komut/JSON ve rapor testleri.
 
 Uzak belge değişiklikleri kodu değiştirmedi; kod testleri tekrar edilmedi.
+
+## Native render hatası — hedefli düzeltme — 24.10.2026
+
+Kullanıcı güncel dev üzerinde `bash tests/run_preview_pipeline_probe.sh` için
+**FAIL / exit101** bildirdi: `view_modes_probe.rs` render, `to_node()` None.
+Önceki secure JPEG/PNG/EXIF, preload/cache/LRU/priority/cleanup aşamalarının
+geçtiği kullanıcı tarafından bildirildi; bütün native komut PASS değildir.
+
+Düzeltme: `bba76daa1879d8dfd310664bed47a9b83f239ce8`.
+Üretim ImageView/decoder değişmedi. `loaded()` paintable varlığını bekliyor,
+ancak bu GTK widget render cache'inin üretildiğini garanti etmiyor. `render()`
+yalnız sabit 100ms settle kullanıyordu; anlık WidgetPaintable snapshot'ı yükleme,
+layout veya compositor frame completion bariyeri değildir. İki pencere testinde
+hedef pencere occluded da olabilir. Bu nedenle test senkronizasyon açığı düzeltildi;
+Arch'taki tam tetikleyicinin bağımsız yeniden üretildiği iddia edilmez.
+
+Yeni yardımcı hedef pencereyi present eder, WidgetPaintable'ı frame boyunca
+canlı tutar, frame clock after-paint sinyalinden sonra gerçek snapshot alır.
+Tick callback frame talebini sürdürür; nonempty node için en çok20s bekler.
+Boş node sürerse mapped/visible/allocation/content/mode tanısıyla FAIL verir.
+Tick ve sinyal bağlantısı bekleme sonunda kaldırılır. Sahte node, assertion
+kaldırma veya skip yoktur; mevcut clipping/geometry/alpha/gradient piksel
+assertion'ları aynı gerçek node üzerinde çalışmaya devam eder.
+
+Önce hedefli Xvfb synthetic mode testi: **48 snapshot PASS**. Ardından bir kez
+`bash tests/check.sh`: fmt, locked check/build/test, all-targets Clippy -D
+warnings; **74 Rust +30 Python**, fixture/hash PASS. X11 synthetic zoom/pan ve
+resampling PASS; headless Sway/Wayland synthetic mode **48 snapshot PASS**.
+Whitespace PASS. Bunlar gerçek decoder/native Arch sonucu değildir.
+Strict `view_modes_probe --zoom-pan` Codex'te yalnız bir kez **exit77 / NOT RUN**;
+secure baseline oluşmadı, tekrar denenmedi. Güvenlik değiştirilmedi.
+
+Arch kullanıcı yeniden aynı komutu çalıştırmalı:
+`bash tests/run_preview_pipeline_probe.sh`.
+Önceki native FAIL kaydı korunur; yeni native sonuç **bekleniyor**, PIV-18
+**TESTING**. Early-preview/preview-full continuity sınırlamaları değişmedi.

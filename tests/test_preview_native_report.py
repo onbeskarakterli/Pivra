@@ -11,7 +11,7 @@ class Reports(unittest.TestCase):
     def test_success_stays_full_only(self, run, write):
         run.return_value = Mock(returncode=0)
         self.assertEqual(native.main(), 0)
-        self.assertEqual(run.call_count, 6)
+        self.assertEqual(run.call_count, 7)
         self.assertIn("PASS full-only fallback", write.call_args.args[0])
         self.assertIn("NOT RUN: no early preview provider", write.call_args.args[0])
 

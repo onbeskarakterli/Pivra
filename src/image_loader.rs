@@ -10,6 +10,33 @@ const MAX_PIXELS: u64 = 32_000_000;
 const MAX_FRAME_BYTES: usize = 512 * 1024 * 1024;
 const MAX_EDGE: u32 = 32_768;
 
+// Error-only evidence from the same GFile backend used by Glycin, never a MIME override.
+fn input_diagnostic(path: &Path, cancel: &gio::Cancellable) -> String {
+    let file = gio::File::for_path(path);
+    let result = (|| -> Result<String, gtk::glib::Error> {
+        let stream = file.read(Some(cancel))?;
+        let bytes = stream.read_bytes(512, Some(cancel))?;
+        let (kind, uncertain) = gio::content_type_guess(None::<&Path>, bytes.as_ref());
+        let mime = gio::content_type_get_mime_type(&kind);
+        let signature = if bytes.starts_with(b"\x89PNG\r\n\x1a\n") {
+            "PNG"
+        } else if bytes.starts_with(&[0xff, 0xd8, 0xff]) {
+            "JPEG"
+        } else {
+            "other/truncated"
+        };
+        Ok(format!(
+            "content-only MIME={mime:?}, uncertain={uncertain}, signature={signature}, sampled={}",
+            bytes.len()
+        ))
+    })();
+    format!(
+        "input={path:?}, uri={}, {}",
+        file.uri(),
+        result.unwrap_or_else(|e| format!("diagnostic read failed: {e}"))
+    )
+}
+
 pub(crate) fn validate_dimensions(width: u32, height: u32) -> Result<(), String> {
     if width == 0
         || height == 0
@@ -59,10 +86,12 @@ async fn load_limited(
     loader.cancellable(cancellable.clone());
     loader.apply_transformations(true);
     loader.use_expose_base_dir(false);
-    let image = loader
-        .load()
-        .await
-        .map_err(|e| format!("Secure image loader failed: {e}"))?;
+    let image = loader.load().await.map_err(|e| {
+        format!(
+            "Secure image loader failed: {e}\n{}",
+            input_diagnostic(path, cancellable)
+        )
+    })?;
     if !matches!(
         image.mime_type().to_string().as_str(),
         "image/jpeg" | "image/png"
@@ -139,5 +168,33 @@ mod tests {
                 .unwrap_err()
                 .contains("cancelled")
         );
+    }
+    #[test]
+    fn content_diagnostic_uses_bytes_not_extension_or_uri_spelling() {
+        let dir = tempfile::tempdir().unwrap();
+        for (name, bytes, expected) in [
+            (
+                "wrong.jpg",
+                include_bytes!("../tests/fixtures/images/wide.png").as_slice(),
+                "signature=PNG",
+            ),
+            (
+                "wrong.png",
+                include_bytes!("../tests/fixtures/images/no-exif.jpg").as_slice(),
+                "signature=JPEG",
+            ),
+            (
+                "fake.png",
+                b"plain text, not an image".as_slice(),
+                "signature=other/truncated",
+            ),
+            ("empty.png", b"".as_slice(), "sampled=0"),
+        ] {
+            let path = dir.path().join(name);
+            std::fs::write(&path, bytes).unwrap();
+            let diagnostic = input_diagnostic(&path, &gio::Cancellable::new());
+            assert!(diagnostic.contains(expected), "{diagnostic}");
+            assert_eq!(std::fs::read(path).unwrap(), bytes);
+        }
     }
 }

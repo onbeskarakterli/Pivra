@@ -11,6 +11,7 @@ def main():
               "stages": [], "result": "NOT RUN"}
     commands = [
         ["target/debug/examples/image_probe"],
+        ["target/debug/examples/application_open_probe"],
         ["target/debug/examples/preload_probe"],
         ["target/debug/examples/view_modes_probe", "--zoom-pan"],
         ["target/debug/examples/view_modes_probe", "--resampling"],

@@ -58,30 +58,26 @@ pub(crate) fn install(overlay: &gtk::Overlay, available: bool) {
         .build();
     button.set_widget_name("thumbnail-toggle");
     button.add_css_class("pivra-thumbnail-toggle");
-    let dock = gtk::Box::new(gtk::Orientation::Vertical, 4);
-    dock.set_widget_name("thumbnail-controls");
-    dock.set_halign(gtk::Align::Center);
-    dock.set_valign(gtk::Align::End);
-    dock.set_margin_bottom(4);
-    dock.append(&strip);
-    dock.append(&button);
-    dock.set_visible(available);
-    overlay.add_overlay(&dock);
-    overlay.set_measure_overlay(&dock, false);
-    overlay.set_clip_overlay(&dock, true);
+    // Independent overlay siblings: no full-width box beneath the strip that
+    // can paint a dock background or intercept input around the small button.
+    button.set_valign(gtk::Align::End);
+    button.set_margin_bottom(4);
+    button.set_visible(available);
+    strip.set_valign(gtk::Align::End);
+    // Reserve only overlay spacing, never space in the image's allocation.
+    strip.set_margin_bottom(button.measure(gtk::Orientation::Vertical, -1).1 + 8);
+    for widget in [strip.upcast_ref::<gtk::Widget>(), button.upcast_ref()] {
+        overlay.add_overlay(widget);
+        overlay.set_measure_overlay(widget, false);
+        overlay.set_clip_overlay(widget, true);
+    }
     let panel = strip.downgrade();
-    let container = dock.downgrade();
     button.connect_toggled(move |button| {
-        let (Some(panel), Some(container)) = (panel.upgrade(), container.upgrade()) else {
+        let Some(panel) = panel.upgrade() else {
             return;
         };
         let open = button.is_active();
         panel.set_visible(open);
-        container.set_halign(if open {
-            gtk::Align::Fill
-        } else {
-            gtk::Align::Center
-        });
         button.set_icon_name(if open {
             "pan-down-symbolic"
         } else {

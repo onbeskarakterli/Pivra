@@ -209,10 +209,9 @@ fn main() {
     let (other, ov, op) = open(&app);
     let button: gtk::ToggleButton = find(v.widget().upcast_ref(), "thumbnail-toggle");
     let strip: gtk::ScrolledWindow = find(v.widget().upcast_ref(), "thumbnail-strip");
-    let dock: gtk::Box = find(v.widget().upcast_ref(), "thumbnail-controls");
     let other_button: gtk::ToggleButton = find(ov.widget().upcast_ref(), "thumbnail-toggle");
     assert!(
-        dock.is_visible(),
+        button.is_visible(),
         "run in GNOME or explicit XDG_CURRENT_DESKTOP=GNOME test environment"
     );
     assert!(!strip.is_visible());
@@ -244,7 +243,43 @@ fn main() {
                     && bounds.x() + bounds.width() <= p.width() as f32 + 1.
                     && bounds.y() + bounds.height() <= p.height() as f32 + 1.
             );
+            assert_eq!(strip.parent(), Some(v.widget().clone().upcast()));
+            assert_eq!(button.parent(), Some(v.widget().clone().upcast()));
+            assert!(!contains(v.widget().upcast_ref(), "thumbnail-controls"));
             let center = button.compute_bounds(v.widget()).unwrap();
+            assert!(
+                bounds.y() + bounds.height() <= center.y(),
+                "floating items overlap"
+            );
+            // Real composed overlay pixels below the panel must equal the
+            // picture outside the button, both visually and for pointer picks.
+            let composed = widget_pixels(&w, &p, v.widget());
+            let picture = image_bytes(&w, &p);
+            for y in (bounds.y() + bounds.height()).ceil() as usize..composed.1 {
+                for x in 0..composed.0 {
+                    if x as f32 >= center.x() && (x as f32) < center.x() + center.width() {
+                        continue;
+                    }
+                    let offset = (y * composed.0 + x) * 4;
+                    assert_eq!(
+                        &composed.2[offset..offset + 4],
+                        &picture[offset..offset + 4],
+                        "unexpected dock/background pixel at {x},{y}"
+                    );
+                }
+            }
+            for x in [8., p.width() as f64 - 8.] {
+                let hit = v
+                    .widget()
+                    .pick(x, p.height() as f64 - 8., gtk::PickFlags::DEFAULT)
+                    .unwrap();
+                assert_eq!(
+                    hit,
+                    p.clone().upcast::<gtk::Widget>(),
+                    "open strip leaves button sides interactive"
+                );
+            }
+
             assert!((center.x() + center.width() / 2. - p.width() as f32 / 2.).abs() <= 1.);
             let row: gtk::Box = find(v.widget().upcast_ref(), "thumbnail-items");
             let first = row.first_child().unwrap();
@@ -263,7 +298,7 @@ fn main() {
             button.set_active(false);
             assert_eq!(before, image_bytes(&w, &p));
             assert!(!strip.is_mapped());
-            assert!(dock.width() < 80, "closed target too wide");
+            assert!(button.width() < 80, "toggle target too wide");
             let hit = v
                 .widget()
                 .pick(8., p.height() as f64 - 8., gtk::PickFlags::DEFAULT)
@@ -327,7 +362,7 @@ fn main() {
     assert!(other.is_visible());
     assert_eq!(stable, image_bytes(&other, &op));
     println!(
-        "PASS TH-02 synthetic UI: overlay allocation/unchanged Fit-Fill-Actual pixels, zoom/pan preservation, horizontal scroll, icons, 25% panel alpha/opaque cells/borderless underline/header controls, narrow resize, pick-through when closed, two-window close/isolation, zero additional decoder jobs. scale_factor={}",
+        "PASS TH-02 synthetic UI: overlay allocation/unchanged Fit-Fill-Actual pixels, zoom/pan preservation, horizontal scroll, icons, 25% panel alpha/opaque cells/borderless underline/header controls, narrow resize, no bottom-band pixels/open-and-closed pick-through, two-window close/isolation, zero additional decoder jobs. scale_factor={}",
         op.scale_factor()
     );
     if std::env::args().any(|s| s == "--manual") {

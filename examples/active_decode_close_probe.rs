@@ -28,6 +28,13 @@ static JOB_JOINED: AtomicBool = AtomicBool::new(false);
 // Test-only observation around the unchanged production loader. The real view
 // calls this boundary; no mocked frame, decoder or alternate sandbox is used.
 mod image_loader {
+    pub async fn preload(
+        path: &std::path::Path,
+        token: &gtk::gio::Cancellable,
+        budget: usize,
+    ) -> Result<LoadedFrame, String> {
+        secure_loader::preload(path, token, budget).await
+    }
     pub(crate) type LoadedFrame = glycin::Frame;
     use super::*;
     pub async fn load(path: &Path, cancel: &gio::Cancellable) -> Result<glycin::Frame, String> {

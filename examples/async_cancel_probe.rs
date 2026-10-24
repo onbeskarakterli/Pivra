@@ -20,6 +20,19 @@ static CANCELLED: [AtomicBool; 14] = [const { AtomicBool::new(false) }; 14];
 static REQUESTS: std::sync::Mutex<Vec<(std::path::PathBuf, gio::Cancellable)>> =
     std::sync::Mutex::new(Vec::new());
 mod image_loader {
+    pub async fn preload(
+        path: &std::path::Path,
+        token: &gtk::gio::Cancellable,
+        budget: usize,
+    ) -> Result<LoadedFrame, String> {
+        if CONTROLLED.load(Ordering::SeqCst) {
+            load(path, token).await
+        } else {
+            secure_loader::preload(path, token, budget)
+                .await
+                .map(LoadedFrame::Secure)
+        }
+    }
     use super::*;
     pub enum LoadedFrame {
         Secure(glycin::Frame),

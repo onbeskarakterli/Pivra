@@ -20,6 +20,13 @@ static RELEASE: [AtomicBool; 7] = [const { AtomicBool::new(false) }; 7];
 static FINISHED: [AtomicBool; 7] = [const { AtomicBool::new(false) }; 7];
 static CANCELLED: [AtomicBool; 7] = [const { AtomicBool::new(false) }; 7];
 mod image_loader {
+    pub async fn preload(
+        path: &std::path::Path,
+        token: &gtk::gio::Cancellable,
+        _budget: usize,
+    ) -> Result<LoadedFrame, String> {
+        load(path, token).await
+    }
     pub(crate) type LoadedFrame = glycin::Frame;
     use super::*;
     pub async fn load(path: &Path, token: &gio::Cancellable) -> Result<glycin::Frame, String> {

@@ -3,7 +3,7 @@ A fast, lightweight GNOME image viewer with seamless photo and video navigation,
 
 ## Development status
 
-**PIV-01–16: DONE; PIV-17: TESTING (native acceptance pending), on `dev`.**
+**PIV-01–17: DONE (PIV-17 per user status declaration); PIV-18: TESTING, on `dev`.**
 Pivra accepts one local JPEG/PNG path or file URI and discovers a naturally ordered
 photo/video catalog. Left/Right now navigate that window's catalog without
 wrapping; video entries show an explicit unavailable-playback message. Every new
@@ -38,7 +38,7 @@ pressure delivery is unverified here. Accounted bytes are not RSS/VRAM.
 [Policy, measured tests and remaining native acceptance](docs/PIV17_VALIDATION.md).
 
 ```bash
-bash tests/run_preload_probe.sh
+bash tests/run_preview_pipeline_probe.sh
 ```
 
 PIV-09 DONE is backed by **user-reported Arch/GNOME Wayland tests**, including
@@ -829,3 +829,13 @@ Kullanıcı `3313113246baca8b2e19073b0ed20c64f569a50c` üzerinde `bash tests/run
 ## PIV-16 native ve manuel kapanış — 24.10.2026 — DONE
 
 Kullanıcı gerçek Arch/GNOME ortamında `0822e4b2028d414304ef3b2078bc5bc6d6da8852` üzerinde `bash tests/run_async_cancel_probe.sh` çalıştırdı: **exit 0**. Gerçek JPEG/PNG/EXIF baseline PASS; secure async latest-pixel, A→B→A, hata toparlanma, iki pencere ve kaynak bütünlüğü PASS. `LoadStats`: running=0, pending=0, started=11, completed=11, max_running=3, dropped_pending=97, suppressed=6, timed_out=0. Ek PIV-09 aktif secure decode close checkpoint'inde partial memfd/frame, pidfd/mapping/sandbox, worker join, stale mutation=0, survivor pixels ve child cleanup PASS. `Cleanup SIGCONT unavailable: No such process` süreç zaten çıktığı için fatal değildi; toplam test exit0. Burst içinde decoder active interval/overlap **NOT MEASURED**. Kullanıcı gerçek uygulamada hızlı Sol/Sağ, A→B→A ve yükleme sırasında görüntüleme tercihlerini denedikten sonra olumlu manuel yanıt verdi; ayrıntılı ayrı ölçüm iddiası yok. **PIV-16 DONE; PIV-17 TODO.** Faz 0 temiz native kurulum INCOMPLETE, DESKTOP-06 Nautilus NOT RUN ve PIV-39 i18n planı açık.
+
+
+## PIV-18 — full-only fallback (TESTING)
+
+The current JPEG/PNG provider has no certified early-preview path. Full decode
+remains single-pass, secure and asynchronous; no second full decode or fake
+preview was added. Lifecycle state is tracked through completion/cancellation.
+Preview/full model transitions are tested separately from real presentation.
+Actual early-preview and upgrade viewport continuity remain unavailable, not PASS.
+[Capabilities, limits and native command](docs/PIV18_VALIDATION.md).

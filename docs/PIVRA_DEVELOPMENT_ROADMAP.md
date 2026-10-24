@@ -1,6 +1,6 @@
 # Pivra — Geliştirme Yol Haritası
 
-**Durum:** PIV-01–08 DONE (giriş, keşif ve doğal sıra); PIV-09 DONE (Arch gerçek JPEG/PNG/EXIF, geometri ve aktif-decode kapanış/temizlik PASS); PIV-10 DONE (native gerçek secure piksel/Fit ve fiziksel sol/sağ gezinme PASS); PIV-11 DONE (Arch native ve GNOME Yenile PASS); PIV-12 DONE (24.10.2026 native + manuel kabul); PIV-13 DONE (24.10.2026 Arch native ve manuel kabul); PIV-14 DONE (24.10.2026 Arch native + gerçek fare kabulü); PIV-15 DONE (24.10.2026 Arch native ve manuel Smooth/Nearest kabulü); PIV-16 DONE (24.10.2026 Arch native + manuel kabul); PIV-17 TESTING; PIV-18–60 TODO. Faz 0 INCOMPLETE: temiz native kurulumun bağımsız yeniden üretimi NOT RUN; temiz Cargo target derlemesi ve headless regresyonlar geçti. [PIV-05 kanıtı ve ayrı faz kapısı](PIVRA_TECHNICAL_CAPABILITIES.md#102-piv-05-ve-faz-0-kapanışını-ayrı-değerlendirme).
+**Durum:** PIV-01–08 DONE (giriş, keşif ve doğal sıra); PIV-09 DONE (Arch gerçek JPEG/PNG/EXIF, geometri ve aktif-decode kapanış/temizlik PASS); PIV-10 DONE (native gerçek secure piksel/Fit ve fiziksel sol/sağ gezinme PASS); PIV-11 DONE (Arch native ve GNOME Yenile PASS); PIV-12 DONE (24.10.2026 native + manuel kabul); PIV-13 DONE (24.10.2026 Arch native ve manuel kabul); PIV-14 DONE (24.10.2026 Arch native + gerçek fare kabulü); PIV-15 DONE (24.10.2026 Arch native ve manuel Smooth/Nearest kabulü); PIV-16 DONE (24.10.2026 Arch native + manuel kabul); PIV-17 DONE (kullanıcının yeni görev durum beyanı); PIV-18 TESTING; PIV-19–60 TODO. Faz 0 INCOMPLETE: temiz native kurulumun bağımsız yeniden üretimi NOT RUN; temiz Cargo target derlemesi ve headless regresyonlar geçti. [PIV-05 kanıtı ve ayrı faz kapısı](PIVRA_TECHNICAL_CAPABILITIES.md#102-piv-05-ve-faz-0-kapanışını-ayrı-değerlendirme).
 **Başlangıç branch:** `dev` · **Kararlı sürümler:** `main`  
 **Kaynak şartname:** [PIVRA_FEATURE_SPEC_TR.md](PIVRA_FEATURE_SPEC_TR.md)  
 **Görev ve commit takibi:** [PIVRA_COMMIT_TRACKER.md](PIVRA_COMMIT_TRACKER.md)
@@ -366,3 +366,12 @@ başına 128 MiB/3 girdi/64 MiB girdi sınırı; kimlik/LRU/monitor/pressure ve
 promotion eklendi. 72 Rust + 30 Python ve 20 scoped grafik çağrısı PASS.
 Strict secure probe exit77, gerçek native kabul NOT RUN; PIV-01–16 DONE korunur.
 [Tam kanıt ve tek native komut](PIV17_VALIDATION.md). PIV-18 başlamadı.
+
+
+## PIV-18 — TESTING — 24.10.2026
+
+Sertifikalı early-preview sağlayıcısı bulunmadı; tek full decode fallback ve
+kalite yaşam döngüsü korundu. Preview/full model testleri gerçek preview sunumu
+değildir. [Kanıt, sınırlamalar ve native komut](PIV18_VALIDATION.md). PIV-17 DONE
+kullanıcının görev talimatındaki durum beyanıdır; yeni native log iddiası yoktur.
+PIV-19 başlamadı; Faz 0/DESKTOP-06 açık.

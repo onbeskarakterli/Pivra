@@ -114,6 +114,31 @@ pub(super) fn build(app: &adw::Application, settings: &Settings, file: Option<Op
         banner.set_child(Some(&notice));
         viewport.prepend(&banner);
         let view = ImageView::new(&window);
+        let menu = gio::Menu::new();
+        for mode in pivra::viewing::ViewMode::ALL {
+            let item = gio::MenuItem::new(Some(mode.label()), None);
+            item.set_action_and_target_value(Some("win.image-mode"), Some(&mode.id().to_variant()));
+            menu.append_item(&item);
+        }
+        let mode_button = gtk::MenuButton::builder()
+            .label("Fit")
+            .tooltip_text(pivra::viewing::ViewMode::HELP)
+            .menu_model(&menu)
+            .build();
+        header.pack_end(&mode_button);
+        let weak_button = mode_button.downgrade();
+        let action = window
+            .lookup_action("image-mode")
+            .expect("view mode action");
+        action.connect_notify_local(Some("state"), move |action, _| {
+            if let Some(button) = weak_button.upgrade() {
+                let mode = action
+                    .state()
+                    .and_then(|v| v.str().and_then(pivra::viewing::ViewMode::from_id))
+                    .unwrap_or_default();
+                button.set_label(mode.label());
+            }
+        });
         viewport.prepend(view.widget());
         placeholder.set_vexpand(false);
         update_title(&window, &title, &context.borrow());
@@ -154,6 +179,22 @@ pub(super) fn build(app: &adw::Application, settings: &Settings, file: Option<Op
                     | gdk::ModifierType::SUPER_MASK,
             ) {
                 return glib::Propagation::Proceed;
+            }
+            let mode = match key {
+                gdk::Key::F6 => Some("fit"),
+                gdk::Key::F7 => Some("fill"),
+                gdk::Key::F8 => Some("actual"),
+                _ => None,
+            };
+            if let Some(mode) = mode {
+                if let Some(window) = weak_window.upgrade() {
+                    gio::prelude::ActionGroupExt::activate_action(
+                        &window,
+                        "image-mode",
+                        Some(&mode.to_variant()),
+                    );
+                }
+                return glib::Propagation::Stop;
             }
             let name = match key {
                 gdk::Key::Left => "previous-media",

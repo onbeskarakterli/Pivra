@@ -1,7 +1,10 @@
 //! Per-window presentation and cancellation. Glycin alone applies orientation.
 
+#[path = "actual_paintable.rs"]
+mod actual_paintable;
 use adw::prelude::*;
 use gtk::{gio, glib};
+use pivra::viewing::ViewMode;
 use std::{cell::RefCell, path::PathBuf, rc::Rc};
 
 #[derive(Default)]
@@ -34,6 +37,8 @@ pub(super) struct ImageView {
     status: gtk::Label,
     slot: Rc<LoadSlot>,
     window: glib::WeakRef<adw::ApplicationWindow>,
+    mode_action: gio::SimpleAction,
+    texture: Rc<RefCell<Option<gtk::gdk::Texture>>>,
 }
 
 impl ImageView {
@@ -61,7 +66,28 @@ impl ImageView {
         });
         let destroying = slot.clone();
         window.connect_destroy(move |_| destroying.cancel());
+        let mode_action = gio::SimpleAction::new_stateful(
+            "image-mode",
+            Some(glib::VariantTy::STRING),
+            &"fit".to_variant(),
+        );
+        mode_action.set_enabled(false);
+        let texture: Rc<RefCell<Option<gtk::gdk::Texture>>> = Rc::default();
+        let weak_picture = picture.downgrade();
+        let current_texture = texture.clone();
+        mode_action.connect_activate(move |action, parameter| {
+            let Some(mode) = parameter.and_then(|v| v.str()).and_then(ViewMode::from_id) else {
+                return;
+            };
+            action.set_state(&mode.id().to_variant());
+            if let Some(picture) = weak_picture.upgrade() {
+                present(&picture, current_texture.borrow().as_ref(), mode);
+            }
+        });
+        window.add_action(&mode_action);
         Self {
+            mode_action,
+            texture,
             overlay,
             picture,
             status,
@@ -76,6 +102,9 @@ impl ImageView {
 
     pub(super) fn show_message(&self, message: &str) {
         self.slot.cancel();
+        self.mode_action.set_enabled(false);
+        self.texture.borrow_mut().take();
+        self.mode_action.set_state(&"fit".to_variant());
         self.picture.set_paintable(None::<&gtk::gdk::Paintable>);
         self.picture.set_content_fit(gtk::ContentFit::ScaleDown);
         self.status.set_text(message);
@@ -101,6 +130,7 @@ impl ImageView {
         on_result: impl FnOnce(bool) + 'static,
     ) {
         self.show_message("Loading image securely…");
+        self.mode_action.set_enabled(true);
         let cancellable = self.slot.begin();
         let loading = cancellable.clone();
         let job = gio::spawn_blocking(move || {
@@ -110,6 +140,8 @@ impl ImageView {
         let picture = self.picture.downgrade();
         let status = self.status.downgrade();
         let slot = self.slot.clone();
+        let mode_action = self.mode_action.clone();
+        let texture = self.texture.clone();
         glib::MainContext::default().spawn_local(async move {
             let result = job
                 .await
@@ -131,7 +163,13 @@ impl ImageView {
             on_result(result.is_ok());
             match result {
                 Ok(frame) => {
-                    picture.set_paintable(Some(&frame.texture()));
+                    let decoded = frame.texture();
+                    let mode = mode_action
+                        .state()
+                        .and_then(|v| v.str().and_then(ViewMode::from_id))
+                        .unwrap_or_default();
+                    present(&picture, Some(&decoded), mode);
+                    texture.replace(Some(decoded));
                     status.set_visible(false);
                 }
                 Err(error) => {
@@ -141,6 +179,24 @@ impl ImageView {
                 }
             }
         });
+    }
+}
+
+pub(super) fn present(picture: &gtk::Picture, texture: Option<&gtk::gdk::Texture>, mode: ViewMode) {
+    picture.set_overflow(gtk::Overflow::Hidden);
+    match mode {
+        ViewMode::Fit | ViewMode::Fill => {
+            picture.set_content_fit(if mode == ViewMode::Fit {
+                gtk::ContentFit::ScaleDown
+            } else {
+                gtk::ContentFit::Cover
+            });
+            picture.set_paintable(texture);
+        }
+        ViewMode::Actual => {
+            picture.set_content_fit(gtk::ContentFit::Fill);
+            picture.set_paintable(texture.map(actual_paintable::ActualPaintable::new).as_ref());
+        }
     }
 }
 

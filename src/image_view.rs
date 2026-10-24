@@ -686,7 +686,7 @@ pub(super) fn present(picture: &gtk::Picture, texture: Option<&gtk::gdk::Texture
     match mode {
         ViewMode::Fit | ViewMode::Fill => {
             picture.set_content_fit(if mode == ViewMode::Fit {
-                gtk::ContentFit::ScaleDown
+                gtk::ContentFit::Contain
             } else {
                 gtk::ContentFit::Cover
             });

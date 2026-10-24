@@ -3,7 +3,7 @@ A fast, lightweight GNOME image viewer with seamless photo and video navigation,
 
 ## Development status
 
-**PIV-01–16: DONE (PIV-16 native/manual acceptance 2026-10-24), on `dev`.**
+**PIV-01–16: DONE; PIV-17: TESTING (native acceptance pending), on `dev`.**
 Pivra accepts one local JPEG/PNG path or file URI and discovers a naturally ordered
 photo/video catalog. Left/Right now navigate that window's catalog without
 wrapping; video entries show an explicit unavailable-playback message. Every new
@@ -29,10 +29,16 @@ it is not saved across restarts. PIV-15 native acceptance was reported by the us
 PIV-16 bounds each view to three admitted image jobs and one latest pending
 request, with cooperative cancellation and a five-second admission deadline.
 Stale results cannot replace the latest image or its settings. Native PIV-16
-acceptance remains pending; [limits and evidence](docs/PIV16_VALIDATION.md).
+acceptance was reported by the user; [limits and evidence](docs/PIV16_VALIDATION.md).
+PIV-17 preloads the next then previous supported photo with one background
+worker and a per-window 128 MiB / three-entry RAM cache (64 MiB per entry).
+Selected work keeps priority; file identity/monitor invalidation and explicit
+Refresh prevent stale cache reuse. GMemoryMonitor is connected; actual OS
+pressure delivery is unverified here. Accounted bytes are not RSS/VRAM.
+[Policy, measured tests and remaining native acceptance](docs/PIV17_VALIDATION.md).
 
 ```bash
-bash tests/run_async_cancel_probe.sh
+bash tests/run_preload_probe.sh
 ```
 
 PIV-09 DONE is backed by **user-reported Arch/GNOME Wayland tests**, including

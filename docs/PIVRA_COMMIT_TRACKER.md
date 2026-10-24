@@ -1,7 +1,7 @@
 # Pivra — Planlı Commit ve İlerleme Takibi
 
 **Kaynak:** [Özellik Şartnamesi](PIVRA_FEATURE_SPEC_TR.md) · [Yol Haritası](PIVRA_DEVELOPMENT_ROADMAP.md)  
-**Branch:** `dev` · **Durum:** PIV-01 **DONE (21.10.2026)**; PIV-02 **DONE (21.10.2026, Xvfb GTK pencere doğrulaması)**; PIV-03 **DONE (21.10.2026)**; PIV-04 **DONE (21.10.2026; grafik test kategorileri ayrı)**; PIV-05 **DONE (21.10.2026; belgeleme/probe kapsamı)**; PIV-06 **DONE (21.10.2026; dosya/URI ve desktop giriş altyapısı; gerçek Nautilus NOT RUN)**; PIV-07 **DONE (21.10.2026; sırasız komşu medya keşfi)**; PIV-08 **DONE (21.10.2026; deterministik doğal sıra)**; PIV-09 **DONE (21.10.2026; Arch gerçek JPEG/PNG/EXIF, otomatik geometri ve güvenli aktif-decode kapanış PASS)**; PIV-10 **DONE (22.10.2026; native piksel/Fit/gezinti PASS ve kullanıcı fiziksel sol/sağ doğrulaması)**; PIV-11 **DONE (22.10.2026; Arch native probe exit0 ve gerçek GNOME Yenile PASS)**; PIV-12 **DONE (24.10.2026; Arch secure medya hata testi ve manuel iki pencere izolasyonu PASS)**; PIV-13 **DONE (24.10.2026; Arch gerçek secure Fit/Fill/%100 probe exit0 ve GNOME manuel kontrol PASS)**; PIV-14 **DONE (24.10.2026; Arch secure zoom/pan probe exit0 ve GNOME gerçek fare kabulü PASS)**; PIV-15 **DONE (24.10.2026; Arch secure resampling probe exit0 ve GNOME manuel Smooth/Nearest PASS)**; PIV-16 **DONE (24.10.2026; Arch secure async/aktif decoder kapanış exit0 ve GNOME manuel hızlı gezinme PASS)**; PIV-17–60 TODO, başlatılmadı. Faz 0 **INCOMPLETE** (temiz native kurulum yeniden üretimi NOT RUN). Güncel kapanış kanıtı son bölümde; 20.10.2026 kayıtları tarihçedir. Burada listelenen `PIV-xx` kimlikleri gerçek Git commit SHA'sı **değildir**.
+**Branch:** `dev` · **Durum:** PIV-01 **DONE (21.10.2026)**; PIV-02 **DONE (21.10.2026, Xvfb GTK pencere doğrulaması)**; PIV-03 **DONE (21.10.2026)**; PIV-04 **DONE (21.10.2026; grafik test kategorileri ayrı)**; PIV-05 **DONE (21.10.2026; belgeleme/probe kapsamı)**; PIV-06 **DONE (21.10.2026; dosya/URI ve desktop giriş altyapısı; gerçek Nautilus NOT RUN)**; PIV-07 **DONE (21.10.2026; sırasız komşu medya keşfi)**; PIV-08 **DONE (21.10.2026; deterministik doğal sıra)**; PIV-09 **DONE (21.10.2026; Arch gerçek JPEG/PNG/EXIF, otomatik geometri ve güvenli aktif-decode kapanış PASS)**; PIV-10 **DONE (22.10.2026; native piksel/Fit/gezinti PASS ve kullanıcı fiziksel sol/sağ doğrulaması)**; PIV-11 **DONE (22.10.2026; Arch native probe exit0 ve gerçek GNOME Yenile PASS)**; PIV-12 **DONE (24.10.2026; Arch secure medya hata testi ve manuel iki pencere izolasyonu PASS)**; PIV-13 **DONE (24.10.2026; Arch gerçek secure Fit/Fill/%100 probe exit0 ve GNOME manuel kontrol PASS)**; PIV-14 **DONE (24.10.2026; Arch secure zoom/pan probe exit0 ve GNOME gerçek fare kabulü PASS)**; PIV-15 **DONE (24.10.2026; Arch secure resampling probe exit0 ve GNOME manuel Smooth/Nearest PASS)**; PIV-16 **DONE (24.10.2026; Arch secure async/aktif decoder kapanış exit0 ve GNOME manuel hızlı gezinme PASS)**; PIV-17 **TESTING**; PIV-18–60 TODO, başlatılmadı. Faz 0 **INCOMPLETE** (temiz native kurulum yeniden üretimi NOT RUN). Güncel kapanış kanıtı son bölümde; 20.10.2026 kayıtları tarihçedir. Burada listelenen `PIV-xx` kimlikleri gerçek Git commit SHA'sı **değildir**.
 
 ## Kullanım kuralları
 
@@ -42,7 +42,7 @@
 | PIV-14 | `feat: implement cursor anchored zoom and pan` | 63 Rust + 30 Python, 24 scoped GTK/GIO ve 360 sentetik snapshot PASS; native zoom/pan kabulü NOT RUN | **TESTING** | `0bacddb`, `e1d9771`; tam SHA aşağıda |
 | PIV-15 | `feat: add image resampling choices` | 64 Rust + 30 Python, 27 scoped GTK/GIO ve 462 sentetik snapshot PASS; native secure resampling NOT RUN | **TESTING** | `5fec698`, `fd36f56`; tam SHA aşağıda |
 | PIV-16 | `feat: add cancellable async image loading` | 67 Rust + 30 Python, 33 scoped GTK/GIO PASS; 3+1 bound / stale success/error / reentrancy / rename; secure native NOT RUN | **TESTING** | `636498c`, `d9c93eb`; tam SHA aşağıda |
-| PIV-17 | `perf: preload neighbors with bounded memory` | Öncelik mevcut medya; RAM baskısında önbellek azalır | TODO | — |
+| PIV-17 | `perf: preload neighbors with bounded memory` | Öncelik mevcut medya; RAM baskısında önbellek azalır | TESTING | `e2f7504`, `a4fd9e0`; 72 Rust/30 Python/20 GUI PASS, secure native NOT RUN; [kanıt](PIV17_VALIDATION.md) |
 | PIV-18 | `perf: preview and full resolution image pipeline` | RAW/TIFF önizleme, yükleme göstergesi ve viewport sürekliliği | TODO | — |
 
 ## Faz 3 — Video çekirdeği ve karma gezinme
@@ -123,16 +123,16 @@
 |---|---|---:|---:|
 | 0 — Temel | 01–05 | 5 | 5 |
 | 1 — Fotoğraf | 06–12 | 7 | 7 |
-| 2 — Zoom/performans | 13–18 | 6 | 3 |
+| 2 — Zoom/performans | 13–18 | 6 | 4 |
 | 3 — Video temel | 19–24 | 6 | 0 |
 | 4 — Video gelişmiş | 25–31 | 7 | 0 |
 | 5 — Arayüz | 32–39 | 8 | 0 |
 | 6 — Uyumluluk/paket | 40–47 | 8 | 0 |
 | 7 — Edit (en son özellik geliştirmesi) | 48–57 | 10 | 0 |
 | 8 — Son doğrulama | 58–60 | 3 | 0 |
-| **TOPLAM** | **PIV-01–60** | **60** | **15** |
+| **TOPLAM** | **PIV-01–60** | **60** | **16** |
 
-> PIV-01–15 tamamlandı; PIV-16 TESTING, PIV-17–60 gelecekteki işlerdir. Görev sayacı 5/5 olsa da Faz 0 kapısı INCOMPLETE: temiz native kurulum yeniden üretimi NOT RUN. Görev kimlikleri commit SHA'sı değildir. İlk planlama ve önceki engel kayıtları aşağıda tarihçe olarak korunur.
+> PIV-01–16 tamamlandı; PIV-17 TESTING, PIV-18–60 gelecekteki işlerdir. Görev sayacı 5/5 olsa da Faz 0 kapısı INCOMPLETE: temiz native kurulum yeniden üretimi NOT RUN. Görev kimlikleri commit SHA'sı değildir. İlk planlama ve önceki engel kayıtları aşağıda tarihçe olarak korunur.
 
 ## PIV-01 ayrıntılı ilerleme — 20.10.2026
 
@@ -1944,3 +1944,41 @@ Bu son kayıt ayrı belge commit'idir; kendi SHA'sı Git geçmişindedir. PIV-16
 ## PIV-16 native ve manuel kapanış — 24.10.2026 — DONE
 
 Kullanıcı gerçek Arch/GNOME ortamında `0822e4b2028d414304ef3b2078bc5bc6d6da8852` üzerinde `bash tests/run_async_cancel_probe.sh` çalıştırdı: **exit 0**. Gerçek JPEG/PNG/EXIF baseline PASS; secure async latest-pixel, A→B→A, hata toparlanma, iki pencere ve kaynak bütünlüğü PASS. `LoadStats`: running=0, pending=0, started=11, completed=11, max_running=3, dropped_pending=97, suppressed=6, timed_out=0. Ek PIV-09 aktif secure decode close checkpoint'inde partial memfd/frame, pidfd/mapping/sandbox, worker join, stale mutation=0, survivor pixels ve child cleanup PASS. `Cleanup SIGCONT unavailable: No such process` süreç zaten çıktığı için fatal değildi; toplam test exit0. Burst içinde decoder active interval/overlap **NOT MEASURED**. Kullanıcı gerçek uygulamada hızlı Sol/Sağ, A→B→A ve yükleme sırasında görüntüleme tercihlerini denedikten sonra olumlu manuel yanıt verdi; ayrıntılı ayrı ölçüm iddiası yok. **PIV-16 DONE; PIV-17 TODO.** Faz 0 temiz native kurulum INCOMPLETE, DESKTOP-06 Nautilus NOT RUN ve PIV-39 i18n planı açık.
+
+
+## PIV-17 — 24.10.2026 — TESTING
+
+Başlangıç `e67bebf5e5aef7ffa64b12d997596d489e6ad241` (güncel origin/dev'den FF).
+
+| Gerçek SHA | Değişiklik |
+|---|---|
+| `e2f7504c19f5b49d405e9f45c36d954e84e301a3` | Per-window RAM cache, next/previous politika, metadata/monitor invalidation, tek background admission/promotion, GMemoryMonitor, bounded header kontrolü; model testleri |
+| `a4fd9e083176ce885b9557db10860db5f513608e` | Controlled/native preload probe, tek native giriş; eski mock/probe sınırlarının uyarlanması |
+
+**PASS:** fmt, locked check/build/test, all-targets Clippy -D warnings;
+stable/offline/-j2 mevcut helper ile **72 Rust = 48 unit + 24 integration**, 0
+failed/ignored; **30 Python observer**, fixture hash'leri, tüm örnekler, shell
+syntax ve whitespace. **20 scoped grafik çağrısı PASS**: 14 X11 (yeni controlled
+probe dahil), 4 Sway, 2 Weston. Kontrollü cache/texture reuse/Fit/filter,
+LRU/re-decode, metadata değişimi/silinme, pressure enjeksiyonu, promotion,
+foreground priority, Yenile yarışı, 300 seçim ve iki pencere close/drain geçti.
+Bu sonuçlar gerçek decoder piksel/aktif process kanıtı değildir.
+
+**BLOCKED/NOT RUN:** strict preload probe bir kez secure baseline denedi,
+exit77 / bwrap loader early exit1. Önceki Codex read-only proc engeli sürer;
+yeni denemede UID-map stderr'i ayrıca alınmadı. JPEG/PNG/EXIF/cache gerçek native
+kabulü ve yeni kodda aktif secure process cleanup PASS sayılmadı; aynı engel
+tekrarlanmadı. GMemoryMonitorDBus seçildi, system bus yok; gerçek OS basınç
+sinyali NOT RUN. RSS/VRAM/FPS/hız kazanımı ve decoder overlap NOT MEASURED.
+
+[Tam politika, komutlar ve test ayrımları](PIV17_VALIDATION.md).
+Native tek komut: **`bash tests/run_preload_probe.sh`**; image_probe → secure
+preload_probe → mevcut aktif-decode observer, JSON
+`/tmp/pivra-preload-active-close.json`. Native worker-entry barrier gerçek aktif
+decoder checkpoint'i sayılmaz; process cleanup son bağımsız checkpoint'le
+sınanır. Yeni native/manual GNOME kabulü beklenir, **PIV-17 TESTING**.
+PIV-01–16 DONE, Faz 0/DESKTOP-06/PIV-39 açık kayıtları korunur; PIV-18 başlamadı.
+Cargo.toml/lock, fixture içerikleri, UI candidates metni, Bwrap zorunluluğu ve
+Rust/GTK ortamı değiştirilmedi. Belgeler bu iki gerçek SHA'yı kaydeder; belge
+commit'inin SHA'sı Git geçmişi ve teslim raporundadır. Normal push sonrası dev
+HEAD/origin eşitliği doğrulanacak; ek push-kanıt commit'i oluşturulmayacak.

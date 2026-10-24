@@ -1929,3 +1929,13 @@ fixture byte'ları, CI/lisans değişmedi; loader'a yalnız eşdeğer LoadedFram
 alias'ı eklendi. X candidates arayüzü değiştirilmedi. Faz 0 temiz native kurulum
 INCOMPLETE, DESKTOP-06 Nautilus NOT RUN ve PIV-39 tr/en planı korunur. Hardware
 GPU/FPS/latency/RSS benchmark'ı NOT RUN/NOT MEASURED; Weston normal close NOT RUN.
+
+### PIV-16 belge ve uzak dal kanıtı
+
+Belge/matris commit'i `0d35712b7e5ed08f772e0a27ba5c4d3e225f86ac`.
+Normal push `d9a127f..0d35712 dev -> dev` başarılı; açık dev refspec'iyle fetch
+sonrasında HEAD/origin/dev aynı SHA doğrulandı. `ls-remote` main'i değişmemiş
+`5d55ee599df4617bd51c09b1c7a008b8d0ece480` gösterdi. Başlangıca karşı Cargo.toml,
+Cargo.lock, viewing.rs, fixture'lar ve PIV-09 Python aktif gözlemcisinde fark yok.
+Loader diff'i yalnız eşdeğer LoadedFrame alias'ıdır, sandbox uygulaması aynı.
+Bu son kayıt ayrı belge commit'idir; kendi SHA'sı Git geçmişindedir. PIV-16 TESTING.

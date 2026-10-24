@@ -21,11 +21,8 @@ fn drag(p: &gtk::Picture, x: f64, y: f64) {
     d.emit_by_name::<()>("drag-end", &[&x, &y]);
 }
 fn snapshot(w: &adw::ApplicationWindow, p: &gtk::Picture, g: pivra::viewing::Geometry) {
-    settle();
+    let node = rendered_node(w, p);
     let (width, height) = (p.width(), p.height());
-    let s = gtk::Snapshot::new();
-    gtk::WidgetPaintable::new(Some(p)).snapshot(&s, width as f64, height as f64);
-    let node = s.to_node().unwrap();
     let bounds = node.bounds();
     assert!(
         bounds.x() >= -1.

@@ -13,11 +13,8 @@ fn filtered(w: &adw::ApplicationWindow, filter: Resampling) {
     );
 }
 fn pixels(w: &adw::ApplicationWindow, p: &gtk::Picture) -> Vec<u8> {
-    settle();
+    let n = rendered_node(w, p);
     let (width, height) = (p.width(), p.height());
-    let s = gtk::Snapshot::new();
-    gtk::WidgetPaintable::new(Some(p)).snapshot(&s, width as f64, height as f64);
-    let n = s.to_node().expect("resampling render node");
     let bounds = n.bounds();
     assert!(
         bounds.x() >= -1.

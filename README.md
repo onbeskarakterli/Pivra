@@ -3,7 +3,7 @@ A fast, lightweight GNOME image viewer with seamless photo and video navigation,
 
 ## Development status
 
-**PIV-01–16: DONE; PIV-17: TESTING (native acceptance pending), on `dev`.**
+**PIV-01–17: DONE (PIV-17 native/manual acceptance 2026-10-24), on `dev`.**
 Pivra accepts one local JPEG/PNG path or file URI and discovers a naturally ordered
 photo/video catalog. Left/Right now navigate that window's catalog without
 wrapping; video entries show an explicit unavailable-playback message. Every new
@@ -829,3 +829,8 @@ Kullanıcı `3313113246baca8b2e19073b0ed20c64f569a50c` üzerinde `bash tests/run
 ## PIV-16 native ve manuel kapanış — 24.10.2026 — DONE
 
 Kullanıcı gerçek Arch/GNOME ortamında `0822e4b2028d414304ef3b2078bc5bc6d6da8852` üzerinde `bash tests/run_async_cancel_probe.sh` çalıştırdı: **exit 0**. Gerçek JPEG/PNG/EXIF baseline PASS; secure async latest-pixel, A→B→A, hata toparlanma, iki pencere ve kaynak bütünlüğü PASS. `LoadStats`: running=0, pending=0, started=11, completed=11, max_running=3, dropped_pending=97, suppressed=6, timed_out=0. Ek PIV-09 aktif secure decode close checkpoint'inde partial memfd/frame, pidfd/mapping/sandbox, worker join, stale mutation=0, survivor pixels ve child cleanup PASS. `Cleanup SIGCONT unavailable: No such process` süreç zaten çıktığı için fatal değildi; toplam test exit0. Burst içinde decoder active interval/overlap **NOT MEASURED**. Kullanıcı gerçek uygulamada hızlı Sol/Sağ, A→B→A ve yükleme sırasında görüntüleme tercihlerini denedikten sonra olumlu manuel yanıt verdi; ayrıntılı ayrı ölçüm iddiası yok. **PIV-16 DONE; PIV-17 TODO.** Faz 0 temiz native kurulum INCOMPLETE, DESKTOP-06 Nautilus NOT RUN ve PIV-39 i18n planı açık.
+
+
+## PIV-17 Arch native ve manuel kabul kapanışı — 24.10.2026 — DONE
+
+Kullanıcı `07f47b5fb21200d8337933893128b700e5b8329d` üzerinde `bash tests/run_preload_probe.sh` çalıştırdı, **exit 0**. Gerçek secure JPEG/PNG/EXIF baseline, cache hit/texture reuse/Fit/filter, next-before-previous preload, LRU eviction, atomic replace/delete identity, hesaplanan bellek bütçesi, injected memory pressure, source integrity, worker-entry promotion ve foreground priority, window close/drain **PASS**. Örnek: hits=3, misses=6, evictions=5; enabled başlangıcı foreground=1/background=2; disabled foreground=2. Native secure secondary probe promoted=1, cancelled=2, started=completed=4, cache entries/bytes=0 after drain. PIV-09 gerçek active decoder memfd/pidfd/mapping/sandbox close checkpoint, job join, survivor pixels, children cleanup PASS. `Cleanup SIGCONT unavailable` hedef PID zaten çıkmışken fatal değildi. Kullanıcı gerçek GNOME arayüzünde hızlı Sol/Sağ gezinmenin sorunsuz olduğunu bildirdi; ayrı gerçek RSS/VRAM/FPS/hız kazanımı, OS gerçek memory-pressure sinyali ve decoder overlap **NOT MEASURED/NOT RUN**. **PIV-17 DONE; PIV-18 TODO.** Faz 0 temiz kurulum INCOMPLETE, DESKTOP-06 Nautilus NOT RUN, PIV-39 i18n açık.

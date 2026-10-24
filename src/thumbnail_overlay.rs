@@ -52,6 +52,9 @@ impl ThumbnailStrip {
     pub(crate) fn on_select(&self, callback: impl Fn(usize) + 'static) {
         self.on_select.replace(Some(Box::new(callback)));
     }
+    pub(crate) fn clear_on_select(&self) {
+        self.on_select.borrow_mut().take();
+    }
     pub(crate) fn set_catalog(&self, photos: &[(usize, PathBuf)], selected: Option<usize>) {
         // Reconcile the small placeholder strip on the GTK main thread. Real
         // thumbnail decoding is intentionally deferred to TH-05.

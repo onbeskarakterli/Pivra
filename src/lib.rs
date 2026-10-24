@@ -2,6 +2,7 @@
 
 pub mod catalog;
 pub mod discovery;
+pub mod image_cache;
 pub mod media;
 pub mod natural;
 pub mod settings;

@@ -30,6 +30,22 @@ pub(crate) async fn load(
     path: &Path,
     cancellable: &gio::Cancellable,
 ) -> Result<LoadedFrame, String> {
+    load_limited(path, cancellable, None).await
+}
+
+#[allow(dead_code)] // Standalone image_probe includes only the foreground path.
+pub(crate) async fn preload(
+    path: &Path,
+    cancellable: &gio::Cancellable,
+    budget: usize,
+) -> Result<LoadedFrame, String> {
+    load_limited(path, cancellable, Some(budget)).await
+}
+async fn load_limited(
+    path: &Path,
+    cancellable: &gio::Cancellable,
+    budget: Option<usize>,
+) -> Result<LoadedFrame, String> {
     if cancellable.is_cancelled() {
         return Err("Image loading cancelled".into());
     }
@@ -54,6 +70,13 @@ pub(crate) async fn load(
         return Err("Decoded content is not a JPEG or PNG image".into());
     }
     validate_dimensions(image.details().width(), image.details().height())?;
+    if let Some(budget) = budget {
+        if pivra::image_cache::texture_cost(image.details().width(), image.details().height())
+            .is_none_or(|cost| cost > budget)
+        {
+            return Err("Preload exceeds cache entry budget".into());
+        }
+    }
     let frame = image
         .next_frame()
         .await

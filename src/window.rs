@@ -52,23 +52,27 @@ fn update_title(window: &adw::ApplicationWindow, title: &adw::WindowTitle, conte
 
 fn display_selected(view: &ImageView, context: &FileContext) {
     let Some(item) = context.collection.current() else {
+        view.set_neighbors(vec![]);
         view.show_message("No media selected.");
         return;
     };
     if item.kind() == MediaKind::Video {
+        view.set_neighbors(vec![]);
         view.show_message("Video playback is not available yet.");
     } else if item
         .path()
         .extension()
-        .and_then(|s| s.to_str())
-        .is_some_and(|ext| {
+        .and_then(|e| e.to_str())
+        .is_some_and(|e| {
             ["jpg", "jpeg", "png"]
                 .iter()
-                .any(|s| ext.eq_ignore_ascii_case(s))
+                .any(|s| e.eq_ignore_ascii_case(s))
         })
     {
         view.load(item.path().to_owned());
+        view.set_neighbors(context.collection.photo_neighbors());
     } else {
+        view.set_neighbors(vec![]);
         view.show_message("This image format is not supported yet. JPEG and PNG only.");
     }
 }
@@ -342,6 +346,9 @@ impl FolderWatch {
                         if state.cancelled.load(Ordering::Relaxed) {
                             return;
                         }
+                        state
+                            .view
+                            .invalidate_cache_paths(std::slice::from_ref(&alias));
                         let mut context = state.context.borrow_mut();
                         if context
                             .collection
@@ -443,6 +450,7 @@ impl FolderWatch {
                         state.view.show_message("Selected media was removed or is inaccessible. Use arrow keys to continue.");
                         if let Some(banner) = state.banner.upgrade() { banner.set_reveal_child(false); }
                     }
+                    state.view.set_neighbors(context.collection.photo_neighbors());
                     let count = context.collection.items().len();
                     let suffix = if warnings == 0 {
                         format!("{count} {}", if count == 1 { "candidate" } else { "candidates" })
@@ -519,6 +527,12 @@ fn watch(
                     return;
                 }
                 let path = file.path();
+                let affected: Vec<_> = path
+                    .iter()
+                    .cloned()
+                    .chain(other.and_then(|f| f.path()))
+                    .collect();
+                state.view.invalidate_cache_paths(&affected);
                 let mut retarget = None;
                 let mut context = state.context.borrow_mut();
                 let selected = context

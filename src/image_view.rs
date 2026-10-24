@@ -13,7 +13,10 @@ use std::{
 
 #[path = "image_requests.rs"]
 mod image_requests;
+#[path = "preload.rs"]
+mod preload;
 use image_requests::LoadSlot;
+use pivra::image_cache::texture_cost;
 #[derive(Clone)]
 pub(super) struct ImageView {
     overlay: gtk::Overlay,
@@ -26,6 +29,7 @@ pub(super) struct ImageView {
     transform: Rc<RefCell<Transform>>,
     filter: Rc<Cell<Resampling>>,
     requested: Rc<RefCell<Option<PathBuf>>>,
+    prefetch: Rc<RefCell<preload::State>>,
 }
 
 impl ImageView {
@@ -45,6 +49,14 @@ impl ImageView {
         overlay.set_vexpand(true);
         overlay.set_child(Some(&picture));
         overlay.add_overlay(&status);
+        let prefetch = preload::State::new();
+        let closing_prefetch = prefetch.clone();
+        window.connect_close_request(move |_| {
+            closing_prefetch.borrow_mut().close();
+            glib::Propagation::Proceed
+        });
+        let destroyed_prefetch = prefetch.clone();
+        window.connect_destroy(move |_| destroyed_prefetch.borrow_mut().close());
         let slot = Rc::new(LoadSlot::default());
         let closing = slot.clone();
         window.connect_close_request(move |_| {
@@ -133,6 +145,7 @@ impl ImageView {
         window.add_action(&quality_action);
         Self {
             mode_action,
+            prefetch,
             requested: Rc::default(),
             filter,
             transform,
@@ -155,8 +168,20 @@ impl ImageView {
         &self.overlay
     }
 
+    #[allow(dead_code)] // Some standalone view probes never display a non-image selection.
     pub(super) fn show_message(&self, message: &str) {
-        self.slot.cancel();
+        self.prepare(message, true);
+    }
+    fn prepare(&self, message: &str, cancel: bool) {
+        if cancel {
+            self.slot.cancel();
+        }
+        {
+            let mut state = self.prefetch.borrow_mut();
+            state.current_path = None;
+            state.cache.lock().unwrap().pin(None);
+            state.queue = state.neighbors.clone().into();
+        }
         self.requested.borrow_mut().take();
         self.transform.borrow_mut().reset();
         self.mode_action.set_enabled(false);
@@ -166,6 +191,72 @@ impl ImageView {
         self.picture.set_content_fit(gtk::ContentFit::ScaleDown);
         self.status.set_text(message);
         self.status.set_visible(true);
+    }
+
+    #[allow(dead_code)] // Standalone view probes do not own a catalog.
+    pub(super) fn set_neighbors(&self, paths: Vec<PathBuf>) {
+        let paths: Vec<_> = paths
+            .into_iter()
+            .filter(|p| {
+                p.extension().and_then(|e| e.to_str()).is_some_and(|e| {
+                    ["jpg", "jpeg", "png"]
+                        .iter()
+                        .any(|s| e.eq_ignore_ascii_case(s))
+                })
+            })
+            .take(2)
+            .collect();
+        {
+            let mut state = self.prefetch.borrow_mut();
+            if state.neighbors != paths {
+                if let Some(bg) = state
+                    .background
+                    .as_ref()
+                    .filter(|b| b.consumer.borrow().is_none())
+                {
+                    bg.token.cancel();
+                }
+                state.neighbors = paths.clone();
+            }
+            state.queue = paths.into();
+        }
+        preload::maybe_start(&self.prefetch, &self.slot, self.texture.borrow().is_some());
+    }
+    #[allow(dead_code)]
+    pub(super) fn invalidate_cache_paths(&self, paths: &[PathBuf]) {
+        self.prefetch.borrow_mut().invalidate_paths(paths);
+    }
+    #[allow(dead_code)]
+    pub(super) fn preload_stats(&self) -> preload::PreloadStats {
+        self.prefetch.borrow().stats()
+    }
+    #[allow(dead_code)]
+    pub(super) fn memory_pressure(&self) {
+        self.prefetch.borrow_mut().pressure();
+    }
+    #[allow(dead_code)]
+    pub(super) fn disable_preload(&self) {
+        let mut state = self.prefetch.borrow_mut();
+        state.enabled = false;
+        state.queue.clear();
+        if let Some(bg) = state
+            .background
+            .as_ref()
+            .filter(|b| b.consumer.borrow().is_none())
+        {
+            bg.token.cancel();
+        }
+    }
+
+    #[allow(dead_code)]
+    pub(super) fn configure_cache(&self, budget: usize, entry: usize) {
+        let mut state = self.prefetch.borrow_mut();
+        state.invalidate();
+        *state.cache.lock().unwrap() = pivra::image_cache::Cache::new(budget, entry);
+    }
+    #[allow(dead_code)]
+    pub(super) fn cached_texture(&self, path: &std::path::Path) -> Option<gtk::gdk::Texture> {
+        self.prefetch.borrow().cache.lock().unwrap().peek(path)
     }
 
     /// Retarget only an unfinished JPEG/PNG request after a paired folder rename.
@@ -193,7 +284,7 @@ impl ImageView {
         if self.requested.borrow().as_ref() == Some(&path) && self.slot.current_in_flight() {
             return;
         }
-        self.load_with_completion(path, || {});
+        self.load_request(path, true, || {}, |_| {});
     }
 
     pub(super) fn load_with_completion(
@@ -210,10 +301,44 @@ impl ImageView {
         on_completion: impl FnOnce() + 'static,
         on_result: impl FnOnce(bool) + 'static,
     ) {
-        self.show_message("Loading image securely…");
+        self.load_request(path, false, on_completion, on_result);
+    }
+    fn load_request(
+        &self,
+        path: PathBuf,
+        allow_cache: bool,
+        on_completion: impl FnOnce() + 'static,
+        on_result: impl FnOnce(bool) + 'static,
+    ) {
+        if !allow_cache {
+            self.prefetch.borrow_mut().invalidate();
+        }
+        let promoted = if allow_cache {
+            self.prefetch
+                .borrow()
+                .background
+                .as_ref()
+                .filter(|b| {
+                    b.path == path && !b.token.is_cancelled() && b.consumer.borrow().is_none()
+                })
+                .map(|b| (b.token.clone(), b.consumer.clone()))
+        } else {
+            None
+        };
+        let cancellable = if let Some((background, _)) = &promoted {
+            self.slot.begin_promoting(background)
+        } else {
+            self.slot.begin()
+        };
+        self.prepare("Loading image securely…", false);
+        {
+            let mut state = self.prefetch.borrow_mut();
+            state.current_path = Some(path.clone());
+            state.active_large = false;
+        }
+
         self.requested.replace(Some(path.clone()));
         self.mode_action.set_enabled(true);
-        let cancellable = self.slot.begin();
         let window = self.window.clone();
         let picture = self.picture.downgrade();
         let status = self.status.downgrade();
@@ -222,7 +347,9 @@ impl ImageView {
         let texture = self.texture.clone();
         let filter = self.filter.clone();
         let transform = self.transform.clone();
-        type Completion = Box<dyn FnOnce(Result<crate::image_loader::LoadedFrame, String>, bool)>;
+        let prefetch = self.prefetch.clone();
+        let epoch = prefetch.borrow().epoch.clone();
+        type Completion = preload::Completion;
         let completion: Rc<RefCell<Option<Completion>>> = Rc::new(RefCell::new(Some(Box::new({
             let slot = slot.clone();
             let cancellable = cancellable.clone();
@@ -244,10 +371,35 @@ impl ImageView {
                 if !window.is_visible() {
                     return;
                 }
+                let result = match result {
+                    Ok(preload::Output::Cached(_, _))
+                        if !Rc::ptr_eq(&epoch, &prefetch.borrow().epoch) =>
+                    {
+                        Err("Image changed during cache lookup; refresh to reload.".into())
+                    }
+                    other => other,
+                };
                 let success = result.is_ok();
                 match result {
-                    Ok(frame) => {
-                        let decoded = frame.texture();
+                    Ok(output) => {
+                        let (decoded, key) = match output {
+                            preload::Output::Decoded(frame, key) => (frame.texture(), key),
+                            preload::Output::Cached(texture, key) => (texture, Some(key)),
+                        };
+                        let cost = texture_cost(decoded.width() as u32, decoded.height() as u32);
+                        {
+                            let mut state = prefetch.borrow_mut();
+                            state.active_large =
+                                cost.is_none_or(|c| c > state.cache.lock().unwrap().entry_limit());
+                            let mut cache = state.cache.lock().unwrap();
+                            if Rc::ptr_eq(&epoch, &state.epoch) {
+                                cache.pin(key.clone());
+                                if let (Some(key), Some(cost)) = (key, cost) {
+                                    cache.insert(key, decoded.clone(), cost, &[]);
+                                }
+                            }
+                        }
+
                         let mode = mode_action
                             .state()
                             .and_then(|v| v.str().and_then(ViewMode::from_id))
@@ -268,25 +420,39 @@ impl ImageView {
                         status.set_text(&format!("Unable to display image.\n{summary}"));
                     }
                 }
+                preload::maybe_start(&prefetch, &slot, texture.borrow().is_some());
                 // User observers can reenter/close/start a request. Never mutate GTK after them.
                 on_result(success);
             }
         }))));
+        if let Some((_, consumer)) = promoted {
+            self.prefetch.borrow_mut().promoted();
+            let callback = completion.borrow_mut().take();
+            *consumer.borrow_mut() = callback;
+            return;
+        }
         let deliver = completion.clone();
         let expired = completion;
         let running = slot.clone();
         let token = cancellable.clone();
+        let prefetch = self.prefetch.clone();
+        let requested = std::time::Instant::now();
+        let cache = prefetch.borrow().cache.clone();
         slot.dispatch(
             &cancellable,
             move || {
+                prefetch.borrow_mut().admission(requested);
                 let loading = token.clone();
                 let job = gio::spawn_blocking(move || {
-                    glib::MainContext::new().block_on(crate::image_loader::load(&path, &loading))
+                    preload::fetch(&path, &loading, &cache, allow_cache, None)
                 });
                 glib::MainContext::default().spawn_local(async move {
-                    let result = job
+                    let (result, decoded) = job
                         .await
-                        .unwrap_or_else(|_| Err("Image worker failed".into()));
+                        .unwrap_or_else(|_| (Err("Image worker failed".into()), true));
+                    if decoded {
+                        prefetch.borrow_mut().foreground_decode();
+                    }
                     running.finish(&token);
                     let callback = deliver.borrow_mut().take();
                     if let Some(callback) = callback {

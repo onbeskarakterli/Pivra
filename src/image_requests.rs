@@ -30,6 +30,7 @@ pub(super) struct LoadSlot {
     active: RefCell<Vec<gio::Cancellable>>,
     pending: RefCell<Option<Pending>>,
     stats: Cell<LoadStats>,
+    promoted: RefCell<Option<(gio::Cancellable, gio::Cancellable)>>,
 }
 impl LoadSlot {
     pub fn begin(&self) -> gio::Cancellable {
@@ -39,6 +40,7 @@ impl LoadSlot {
         token
     }
     pub fn cancel(&self) {
+        self.promoted.borrow_mut().take();
         let current = self.current.borrow_mut().take();
         let pending = self.pending.borrow_mut().take();
         if let Some(pending) = pending {
@@ -55,6 +57,41 @@ impl LoadSlot {
         for token in active {
             token.cancel();
         }
+    }
+    pub fn begin_promoting(&self, background: &gio::Cancellable) -> gio::Cancellable {
+        let current = self.current.borrow_mut().take();
+        let pending = self.pending.borrow_mut().take();
+        if let Some(pending) = pending {
+            pending.timer.remove();
+            let mut stats = self.stats.get();
+            stats.dropped_pending = stats.dropped_pending.saturating_add(1);
+            self.stats.set(stats);
+        }
+        if let Some(current) = current {
+            current.cancel();
+        }
+        for token in self.active.borrow().clone() {
+            if &token != background {
+                token.cancel();
+            }
+        }
+        let token = gio::Cancellable::new();
+        self.current.replace(Some(token.clone()));
+        self.promoted
+            .replace(Some((token.clone(), background.clone())));
+        token
+    }
+    pub fn try_background(&self, token: &gio::Cancellable, start: impl FnOnce()) -> bool {
+        if !self.active.borrow().is_empty() || self.pending.borrow().is_some() {
+            return false;
+        }
+        self.active.borrow_mut().push(token.clone());
+        let mut s = self.stats.get();
+        s.started = s.started.saturating_add(1);
+        s.max_running = s.max_running.max(1);
+        self.stats.set(s);
+        start();
+        true
     }
     pub fn accepts(&self, token: &gio::Cancellable) -> bool {
         !token.is_cancelled() && self.current.borrow().as_ref() == Some(token)
@@ -122,6 +159,14 @@ impl LoadSlot {
             };
             active.remove(index);
         }
+        if self
+            .promoted
+            .borrow()
+            .as_ref()
+            .is_some_and(|(_, background)| background == token)
+        {
+            self.promoted.borrow_mut().take();
+        }
         let mut s = self.stats.get();
         s.completed = s.completed.saturating_add(1);
         self.stats.set(s);
@@ -143,7 +188,11 @@ impl LoadSlot {
         let Some(token) = current.as_ref().filter(|t| !t.is_cancelled()) else {
             return false;
         };
-        self.active.borrow().contains(token)
+        self.promoted
+            .borrow()
+            .as_ref()
+            .is_some_and(|(owner, _)| owner == token)
+            || self.active.borrow().contains(token)
             || self
                 .pending
                 .borrow()
@@ -274,5 +323,26 @@ mod tests {
         }
         assert_eq!(slot.stats().running, 0);
         assert_eq!(slot.stats().pending, 0);
+    }
+    #[test]
+    fn background_leaves_foreground_capacity_and_promotes_without_duplicate_job() {
+        let _serial = CONTEXT.lock().unwrap();
+        let slot = Rc::new(LoadSlot::default());
+        let background = gio::Cancellable::new();
+        assert!(slot.try_background(&background, || {}));
+        assert!(!slot.try_background(&gio::Cancellable::new(), || panic!("second background")));
+        let selected = slot.begin_promoting(&background);
+        assert!(slot.accepts(&selected));
+        assert!(!background.is_cancelled());
+        assert!(slot.current_in_flight());
+        assert_eq!(slot.stats().started, 1);
+        let next = slot.begin();
+        assert!(background.is_cancelled());
+        slot.dispatch(&next, || {}, || panic!("foreground delayed"));
+        assert_eq!(slot.stats().running, 2);
+        slot.finish(&background);
+        assert!(slot.accepts(&next));
+        slot.finish(&next);
+        assert_eq!(slot.stats().running, 0);
     }
 }

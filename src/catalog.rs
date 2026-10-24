@@ -39,6 +39,32 @@ impl MediaCollection {
         }
     }
 
+    /// Next, then previous supported JPEG/PNG; video/unsupported candidates are skipped.
+    pub fn photo_neighbors(&self) -> Vec<std::path::PathBuf> {
+        let Some(index) = self.selected else {
+            return vec![];
+        };
+        let supported = |item: &&MediaItem| {
+            item.kind() == crate::media::MediaKind::Image
+                && item
+                    .path()
+                    .extension()
+                    .and_then(|e| e.to_str())
+                    .is_some_and(|e| {
+                        ["jpg", "jpeg", "png"]
+                            .iter()
+                            .any(|s| e.eq_ignore_ascii_case(s))
+                    })
+        };
+        self.items[index + 1..]
+            .iter()
+            .find(supported)
+            .into_iter()
+            .chain(self.items[..index].iter().rev().find(supported))
+            .map(|i| i.path().to_owned())
+            .collect()
+    }
+
     pub fn items(&self) -> &[MediaItem] {
         &self.items
     }
@@ -241,5 +267,38 @@ mod reconciliation_tests {
         c.rename_selected("10.png".as_ref(), "20.png".as_ref());
         assert!(!c.replace_preserving(items(&["2.png", "20.png"])));
         assert_eq!(c.selected_index(), Some(0));
+    }
+}
+
+#[cfg(test)]
+mod neighbor_tests {
+    use super::*;
+    use crate::media::MediaKind;
+    #[test]
+    fn next_previous_boundaries_and_mixed_candidates() {
+        let mut c = MediaCollection::new(vec![
+            MediaItem::new("1.png", MediaKind::Image),
+            MediaItem::new("2.mp4", MediaKind::Video),
+            MediaItem::new("3.webp", MediaKind::Image),
+            MediaItem::new("4.jpg", MediaKind::Image),
+            MediaItem::new("10.PNG", MediaKind::Image),
+        ]);
+        assert_eq!(c.photo_neighbors(), vec![std::path::PathBuf::from("4.jpg")]);
+        c.select(3);
+        assert_eq!(
+            c.photo_neighbors(),
+            vec![
+                std::path::PathBuf::from("10.PNG"),
+                std::path::PathBuf::from("1.png")
+            ]
+        );
+        c.select(4);
+        assert_eq!(c.photo_neighbors(), vec![std::path::PathBuf::from("4.jpg")]);
+        assert!(MediaCollection::new(vec![]).photo_neighbors().is_empty());
+        assert!(
+            MediaCollection::new(vec![MediaItem::new("only.png", MediaKind::Image)])
+                .photo_neighbors()
+                .is_empty()
+        );
     }
 }

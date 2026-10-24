@@ -4,6 +4,7 @@ use gtk::{gdk, glib};
 use std::{
     cell::{Cell, RefCell},
     rc::Rc,
+    path::PathBuf,
     time::Duration,
 };
 thread_local! { static CSS_INSTALLED: Cell<bool> = const { Cell::new(false) }; }
@@ -39,7 +40,70 @@ pub(crate) fn cell(child: &impl IsA<gtk::Widget>, selected: bool) -> gtk::Frame 
     frame.set_child(Some(&content));
     frame
 }
-pub(crate) fn install(window: &impl IsA<gtk::Window>, overlay: &gtk::Overlay, available: bool) {
+/// TH-04 interaction model. TH-05 will replace the text placeholders with images.
+#[derive(Clone)]
+pub(crate) struct ThumbnailStrip {
+    items: gtk::Box,
+    scroller: gtk::ScrolledWindow,
+    on_select: Rc<RefCell<Option<Box<dyn Fn(usize)>>>>,
+    manually_scrolled: Rc<Cell<bool>>,
+}
+impl ThumbnailStrip {
+    pub(crate) fn on_select(&self, callback: impl Fn(usize) + 'static) {
+        self.on_select.replace(Some(Box::new(callback)));
+    }
+    pub(crate) fn set_catalog(&self, photos: &[(usize, PathBuf)], selected: Option<usize>) {
+        // Reconcile the small placeholder strip on the GTK main thread. Real
+        // thumbnail decoding is intentionally deferred to TH-05.
+        while let Some(child) = self.items.first_child() {
+            self.items.remove(&child);
+        }
+        for (index, path) in photos {
+            let name = path.file_name().unwrap_or_default().to_string_lossy();
+            let label = gtk::Label::new(Some(&name));
+            label.set_ellipsize(gtk::pango::EllipsizeMode::Middle);
+            label.set_max_width_chars(12);
+            let button = gtk::Button::new();
+            button.set_child(Some(&label));
+            button.set_size_request(CELL_WIDTH, CELL_HEIGHT);
+            button.add_css_class("pivra-thumbnail-cell");
+            if selected == Some(*index) {
+                button.add_css_class("selected");
+            }
+            button.set_tooltip_text(Some(&name));
+            let on_select = self.on_select.clone();
+            let index = *index;
+            let manually_scrolled = self.manually_scrolled.clone();
+            button.connect_clicked(move |_| {
+                manually_scrolled.set(false);
+                if let Some(callback) = on_select.borrow().as_ref() {
+                    callback(index);
+                }
+            });
+            self.items.append(&button);
+        }
+        if !self.manually_scrolled.get() {
+            if let Some(index) = photos.iter().position(|(index, _)| Some(*index) == selected) {
+                let scroller = self.scroller.clone();
+                glib::idle_add_local_once(move || {
+                    let adj = scroller.hadjustment();
+                    let x = index as f64 * f64::from(CELL_WIDTH + 8);
+                    let start = adj.value();
+                    let page = adj.page_size();
+                    let target = if x < start {
+                        x
+                    } else if x + f64::from(CELL_WIDTH) > start + page {
+                        x + f64::from(CELL_WIDTH) - page
+                    } else {
+                        start
+                    };
+                    adj.set_value(target.clamp(adj.lower(), (adj.upper() - page).max(adj.lower())));
+                });
+            }
+        }
+    }
+}
+pub(crate) fn install(window: &impl IsA<gtk::Window>, overlay: &gtk::Overlay, available: bool) -> ThumbnailStrip {
     install_css(&overlay.display());
     let items = gtk::Box::new(gtk::Orientation::Horizontal, 8);
     items.set_widget_name("thumbnail-items");
@@ -51,6 +115,27 @@ pub(crate) fn install(window: &impl IsA<gtk::Window>, overlay: &gtk::Overlay, av
         .height_request(112)
         .child(&items)
         .build();
+    let manually_scrolled = Rc::new(Cell::new(false));
+    let wheel = gtk::EventControllerScroll::new(
+        gtk::EventControllerScrollFlags::VERTICAL
+            | gtk::EventControllerScrollFlags::HORIZONTAL,
+    );
+    let wheel_strip = strip.clone();
+    let wheel_flag = manually_scrolled.clone();
+    wheel.connect_scroll(move |_, dx, dy| {
+        if dy.abs() > f64::EPSILON {
+            let adj = wheel_strip.hadjustment();
+            let delta = if dx.abs() > f64::EPSILON { dx } else { dy };
+            adj.set_value((adj.value() + delta * 48.0).clamp(
+                adj.lower(), (adj.upper() - adj.page_size()).max(adj.lower()),
+            ));
+            wheel_flag.set(true);
+            glib::Propagation::Stop
+        } else {
+            glib::Propagation::Proceed
+        }
+    });
+    strip.add_controller(wheel);
     strip.set_widget_name("thumbnail-strip");
     strip.add_css_class("pivra-thumbnail-panel");
     strip.set_margin_start(8);
@@ -196,6 +281,7 @@ pub(crate) fn install(window: &impl IsA<gtk::Window>, overlay: &gtk::Overlay, av
         unmap.cancel();
         unmap.render(false);
     });
+    ThumbnailStrip { items, scroller: strip, on_select: Rc::default(), manually_scrolled }
 }
 type PreferenceListener = Rc<dyn Fn(bool)>;
 struct Visibility {

@@ -21,6 +21,7 @@ static CANCELLED: [AtomicBool; 8] = [const { AtomicBool::new(false) }; 8];
 // Test-only controlled error boundary. The application still uses image_loader.rs
 // and mandatory Bwrap; this module provides no decoder or production fallback.
 mod image_loader {
+    pub(crate) type LoadedFrame = glycin::Frame;
     use super::*;
     pub async fn load(path: &Path, token: &gio::Cancellable) -> Result<glycin::Frame, String> {
         let index: usize = path.to_str().unwrap().parse().unwrap();

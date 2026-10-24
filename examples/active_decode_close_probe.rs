@@ -28,6 +28,7 @@ static JOB_JOINED: AtomicBool = AtomicBool::new(false);
 // Test-only observation around the unchanged production loader. The real view
 // calls this boundary; no mocked frame, decoder or alternate sandbox is used.
 mod image_loader {
+    pub(crate) type LoadedFrame = glycin::Frame;
     use super::*;
     pub async fn load(path: &Path, cancel: &gio::Cancellable) -> Result<glycin::Frame, String> {
         let target = TARGET.get().is_some_and(|p| p == path);

@@ -3,6 +3,8 @@
 use gtk::gio::{self, prelude::*};
 use std::path::Path;
 
+pub(crate) type LoadedFrame = glycin::Frame;
+
 const MAX_FILE_BYTES: u64 = 64 * 1024 * 1024;
 const MAX_PIXELS: u64 = 32_000_000;
 const MAX_FRAME_BYTES: usize = 512 * 1024 * 1024;
@@ -27,7 +29,7 @@ pub(crate) fn validate_dimensions(width: u32, height: u32) -> Result<(), String>
 pub(crate) async fn load(
     path: &Path,
     cancellable: &gio::Cancellable,
-) -> Result<glycin::Frame, String> {
+) -> Result<LoadedFrame, String> {
     if cancellable.is_cancelled() {
         return Err("Image loading cancelled".into());
     }

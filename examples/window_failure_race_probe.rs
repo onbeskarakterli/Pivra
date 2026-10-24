@@ -13,14 +13,18 @@ use std::{
     sync::atomic::{AtomicBool, AtomicUsize, Ordering},
     time::{Duration, Instant},
 };
+static PATHS: std::sync::Mutex<Vec<(usize, std::path::PathBuf)>> =
+    std::sync::Mutex::new(Vec::new());
 static STARTED: AtomicUsize = AtomicUsize::new(0);
 static RELEASE: [AtomicBool; 7] = [const { AtomicBool::new(false) }; 7];
 static FINISHED: [AtomicBool; 7] = [const { AtomicBool::new(false) }; 7];
 static CANCELLED: [AtomicBool; 7] = [const { AtomicBool::new(false) }; 7];
 mod image_loader {
+    pub(crate) type LoadedFrame = glycin::Frame;
     use super::*;
-    pub async fn load(_: &Path, token: &gio::Cancellable) -> Result<glycin::Frame, String> {
+    pub async fn load(path: &Path, token: &gio::Cancellable) -> Result<glycin::Frame, String> {
         let id = STARTED.fetch_add(1, Ordering::SeqCst);
+        PATHS.lock().unwrap().push((id, path.to_owned()));
         assert!(id < 7, "unexpected automatic retry/extra load");
         let end = Instant::now() + Duration::from_secs(30);
         while !RELEASE[id].load(Ordering::SeqCst) {
@@ -165,6 +169,81 @@ fn input_while_pending(w: &adw::ApplicationWindow) {
     drag.emit_by_name::<()>("drag-end", &[&200_f64, &200_f64]);
 }
 
+fn rename_pending(app: &adw::Application) {
+    let dir = tempfile::tempdir().unwrap();
+    let other = tempfile::tempdir().unwrap();
+    let old = dir.path().join("old.png");
+    let new = dir.path().join("renamed.png");
+    std::fs::write(&old, b"controlled source").unwrap();
+    std::fs::write(other.path().join("only.png"), b"controlled source").unwrap();
+    let first = open(app, &old);
+    wait(|| STARTED.load(Ordering::SeqCst) == 1);
+    let second = open(app, &other.path().join("only.png"));
+    wait(|| STARTED.load(Ordering::SeqCst) == 2);
+    mode_key(&first, gtk::gdk::Key::F7, "fill");
+    gio::prelude::ActionGroupExt::activate_action(
+        &first,
+        "image-resampling",
+        Some(&"nearest".to_variant()),
+    );
+    std::fs::rename(&old, &new).unwrap();
+    wait(|| STARTED.load(Ordering::SeqCst) == 3 && PATHS.lock().unwrap().len() == 3);
+    assert!(
+        PATHS
+            .lock()
+            .unwrap()
+            .iter()
+            .any(|(id, path)| *id == 2 && path == &new)
+    );
+    wait(|| first.title().is_some_and(|s| s.starts_with("renamed.png")));
+    assert_eq!(
+        first
+            .lookup_action("image-mode")
+            .unwrap()
+            .state()
+            .unwrap()
+            .str(),
+        Some("fill")
+    );
+    RELEASE[2].store(true, Ordering::SeqCst);
+    wait(|| status(&first).contains("controlled window error 2"));
+    RELEASE[0].store(true, Ordering::SeqCst);
+    wait(|| FINISHED[0].load(Ordering::SeqCst));
+    settle();
+    assert!(CANCELLED[0].load(Ordering::SeqCst));
+    assert!(status(&first).contains("controlled window error 2"));
+    assert_eq!(
+        first
+            .lookup_action("image-resampling")
+            .unwrap()
+            .state()
+            .unwrap()
+            .str(),
+        Some("nearest")
+    );
+    let completed = dir.path().join("completed.png");
+    std::fs::rename(&new, &completed).unwrap();
+    wait(|| {
+        first
+            .title()
+            .is_some_and(|s| s.starts_with("completed.png"))
+    });
+    assert_eq!(
+        STARTED.load(Ordering::SeqCst),
+        3,
+        "completed rename automatically decoded again"
+    );
+    first.close();
+    RELEASE[1].store(true, Ordering::SeqCst);
+    wait(|| status(&second).contains("controlled window error 1"));
+    assert!(!CANCELLED[1].load(Ordering::SeqCst));
+    second.close();
+    assert_eq!(std::fs::read(completed).unwrap(), b"controlled source");
+    println!(
+        "PASS real GIO paired rename retargets pending JPEG/PNG request, preserves mode/filter, suppresses old path error and leaves completed-image rename decode-free; controlled worker, NOT real decoder"
+    );
+}
+
 fn main() {
     adw::init().unwrap();
     let app = adw::Application::builder()
@@ -172,6 +251,10 @@ fn main() {
         .flags(gio::ApplicationFlags::NON_UNIQUE)
         .build();
     app.register(None::<&gio::Cancellable>).unwrap();
+    if std::env::args().any(|s| s == "--rename-pending") {
+        rename_pending(&app);
+        return;
+    }
     let dir = tempfile::tempdir().unwrap();
     let other = tempfile::tempdir().unwrap();
     std::fs::write(dir.path().join("0.png"), b"controlled fixture").unwrap();
@@ -263,7 +346,14 @@ fn main() {
         "monitor automatically decoded"
     );
     assert!(!banner(&second));
+    // Admission is bounded: release cancelled A before admitting refresh.
+    RELEASE[0].store(true, Ordering::SeqCst);
+    wait(|| FINISHED[0].load(Ordering::SeqCst));
+    settle();
     action(&first, "reload-media", 5);
+    RELEASE[2].store(true, Ordering::SeqCst);
+    wait(|| FINISHED[2].load(Ordering::SeqCst));
+    settle();
     action(&first, "reload-media", 6);
     std::fs::remove_file(dir.path().join("2.png")).unwrap();
     wait(|| {

@@ -519,6 +519,7 @@ fn watch(
                     return;
                 }
                 let path = file.path();
+                let mut retarget = None;
                 let mut context = state.context.borrow_mut();
                 let selected = context
                     .collection
@@ -531,6 +532,9 @@ fn watch(
                     if let (Some(old), Some(new)) =
                         (path.as_ref(), other.and_then(|file| file.path()))
                     {
+                        if selected.as_ref() == Some(old) {
+                            retarget = Some((old.clone(), new.clone()));
+                        }
                         context.collection.rename_selected(old, &new);
                     }
                 }
@@ -556,6 +560,9 @@ fn watch(
                     }
                 }
                 drop(context);
+                if let Some((old, new)) = retarget {
+                    state.view.retarget_pending(&old, &new);
+                }
                 state.schedule();
             });
             state.monitor.replace(Some(monitor));

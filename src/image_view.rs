@@ -11,29 +11,9 @@ use std::{
     rc::Rc,
 };
 
-#[derive(Default)]
-struct LoadSlot(RefCell<Option<gio::Cancellable>>);
-
-impl LoadSlot {
-    fn begin(&self) -> gio::Cancellable {
-        self.cancel();
-        let token = gio::Cancellable::new();
-        self.0.replace(Some(token.clone()));
-        token
-    }
-
-    fn cancel(&self) {
-        let previous = self.0.borrow_mut().take();
-        if let Some(previous) = previous {
-            previous.cancel();
-        }
-    }
-
-    fn accepts(&self, token: &gio::Cancellable) -> bool {
-        !token.is_cancelled() && self.0.borrow().as_ref() == Some(token)
-    }
-}
-
+#[path = "image_requests.rs"]
+mod image_requests;
+use image_requests::LoadSlot;
 #[derive(Clone)]
 pub(super) struct ImageView {
     overlay: gtk::Overlay,
@@ -45,6 +25,7 @@ pub(super) struct ImageView {
     texture: Rc<RefCell<Option<gtk::gdk::Texture>>>,
     transform: Rc<RefCell<Transform>>,
     filter: Rc<Cell<Resampling>>,
+    requested: Rc<RefCell<Option<PathBuf>>>,
 }
 
 impl ImageView {
@@ -79,6 +60,15 @@ impl ImageView {
         );
         mode_action.set_enabled(false);
         let texture: Rc<RefCell<Option<gtk::gdk::Texture>>> = Rc::default();
+        let closing_texture = texture.clone();
+        window.connect_close_request(move |_| {
+            closing_texture.borrow_mut().take();
+            glib::Propagation::Proceed
+        });
+        let destroyed_texture = texture.clone();
+        window.connect_destroy(move |_| {
+            destroyed_texture.borrow_mut().take();
+        });
         let transform = Rc::new(RefCell::new(Transform::default()));
         let filter = Rc::new(Cell::new(Resampling::default()));
         install_interaction(
@@ -143,6 +133,7 @@ impl ImageView {
         window.add_action(&quality_action);
         Self {
             mode_action,
+            requested: Rc::default(),
             filter,
             transform,
             texture,
@@ -154,12 +145,19 @@ impl ImageView {
         }
     }
 
+    /// Bounded queue diagnostics for native/controlled probes; no product UI.
+    #[allow(dead_code)]
+    pub(super) fn load_stats(&self) -> image_requests::LoadStats {
+        self.slot.stats()
+    }
+
     pub(super) fn widget(&self) -> &gtk::Overlay {
         &self.overlay
     }
 
     pub(super) fn show_message(&self, message: &str) {
         self.slot.cancel();
+        self.requested.borrow_mut().take();
         self.transform.borrow_mut().reset();
         self.mode_action.set_enabled(false);
         self.texture.borrow_mut().take();
@@ -170,7 +168,31 @@ impl ImageView {
         self.status.set_visible(true);
     }
 
+    /// Retarget only an unfinished JPEG/PNG request after a paired folder rename.
+    #[allow(dead_code)] // Standalone view probes omit the folder-monitor integration.
+    pub(super) fn retarget_pending(&self, old: &std::path::Path, new: &std::path::Path) {
+        let supported = new.extension().and_then(|s| s.to_str()).is_some_and(|ext| {
+            ["jpg", "jpeg", "png"]
+                .iter()
+                .any(|s| ext.eq_ignore_ascii_case(s))
+        });
+        if !supported
+            || self.requested.borrow().as_deref() != Some(old)
+            || !self.slot.current_in_flight()
+        {
+            return;
+        }
+        let mode = self.mode_action.state();
+        self.load(new.to_owned());
+        if let Some(mode) = mode {
+            self.mode_action.activate(Some(&mode));
+        }
+    }
+
     pub(super) fn load(&self, path: PathBuf) {
+        if self.requested.borrow().as_ref() == Some(&path) && self.slot.current_in_flight() {
+            return;
+        }
         self.load_with_completion(path, || {});
     }
 
@@ -189,12 +211,9 @@ impl ImageView {
         on_result: impl FnOnce(bool) + 'static,
     ) {
         self.show_message("Loading image securely…");
+        self.requested.replace(Some(path.clone()));
         self.mode_action.set_enabled(true);
         let cancellable = self.slot.begin();
-        let loading = cancellable.clone();
-        let job = gio::spawn_blocking(move || {
-            glib::MainContext::new().block_on(crate::image_loader::load(&path, &loading))
-        });
         let window = self.window.clone();
         let picture = self.picture.downgrade();
         let status = self.status.downgrade();
@@ -203,49 +222,88 @@ impl ImageView {
         let texture = self.texture.clone();
         let filter = self.filter.clone();
         let transform = self.transform.clone();
-        glib::MainContext::default().spawn_local(async move {
-            let result = job
-                .await
-                .unwrap_or_else(|_| Err("Image worker failed".into()));
-            on_completion();
-            // A completed old request may already be queued on the GTK context.
-            // Cancellation and identity both gate every mutation/diagnostic.
-            if !slot.accepts(&cancellable) {
-                return;
+        type Completion = Box<dyn FnOnce(Result<crate::image_loader::LoadedFrame, String>, bool)>;
+        let completion: Rc<RefCell<Option<Completion>>> = Rc::new(RefCell::new(Some(Box::new({
+            let slot = slot.clone();
+            let cancellable = cancellable.clone();
+            move |result, started| {
+                if started {
+                    on_completion();
+                }
+                // A completed old request may already be queued on the GTK context.
+                // Cancellation and identity both gate every mutation/diagnostic.
+                if !slot.accepts(&cancellable) {
+                    slot.suppress();
+                    return;
+                }
+                let (Some(window), Some(picture), Some(status)) =
+                    (window.upgrade(), picture.upgrade(), status.upgrade())
+                else {
+                    return;
+                };
+                if !window.is_visible() {
+                    return;
+                }
+                let success = result.is_ok();
+                match result {
+                    Ok(frame) => {
+                        let decoded = frame.texture();
+                        let mode = mode_action
+                            .state()
+                            .and_then(|v| v.str().and_then(ViewMode::from_id))
+                            .unwrap_or_default();
+                        present_filtered(
+                            &picture,
+                            Some(&decoded),
+                            mode.id(),
+                            transform.clone(),
+                            filter.clone(),
+                        );
+                        texture.replace(Some(decoded));
+                        status.set_visible(false);
+                    }
+                    Err(error) => {
+                        eprintln!("Pivra: image load failed: {error}");
+                        let summary = error.lines().next().unwrap_or("Secure loading failed.");
+                        status.set_text(&format!("Unable to display image.\n{summary}"));
+                    }
+                }
+                // User observers can reenter/close/start a request. Never mutate GTK after them.
+                on_result(success);
             }
-            let (Some(window), Some(picture), Some(status)) =
-                (window.upgrade(), picture.upgrade(), status.upgrade())
-            else {
-                return;
-            };
-            if !window.is_visible() {
-                return;
-            }
-            on_result(result.is_ok());
-            match result {
-                Ok(frame) => {
-                    let decoded = frame.texture();
-                    let mode = mode_action
-                        .state()
-                        .and_then(|v| v.str().and_then(ViewMode::from_id))
-                        .unwrap_or_default();
-                    present_filtered(
-                        &picture,
-                        Some(&decoded),
-                        mode.id(),
-                        transform.clone(),
-                        filter.clone(),
+        }))));
+        let deliver = completion.clone();
+        let expired = completion;
+        let running = slot.clone();
+        let token = cancellable.clone();
+        slot.dispatch(
+            &cancellable,
+            move || {
+                let loading = token.clone();
+                let job = gio::spawn_blocking(move || {
+                    glib::MainContext::new().block_on(crate::image_loader::load(&path, &loading))
+                });
+                glib::MainContext::default().spawn_local(async move {
+                    let result = job
+                        .await
+                        .unwrap_or_else(|_| Err("Image worker failed".into()));
+                    running.finish(&token);
+                    let callback = deliver.borrow_mut().take();
+                    if let Some(callback) = callback {
+                        callback(result, true);
+                    }
+                });
+            },
+            move || {
+                let callback = expired.borrow_mut().take();
+                if let Some(callback) = callback {
+                    callback(
+                        Err("Image loading is busy. Please try again shortly.".into()),
+                        false,
                     );
-                    texture.replace(Some(decoded));
-                    status.set_visible(false);
                 }
-                Err(error) => {
-                    eprintln!("Pivra: image load failed: {error}");
-                    let summary = error.lines().next().unwrap_or("Secure loading failed.");
-                    status.set_text(&format!("Unable to display image.\n{summary}"));
-                }
-            }
-        });
+            },
+        );
     }
 }
 

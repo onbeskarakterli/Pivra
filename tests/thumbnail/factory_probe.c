@@ -7,7 +7,9 @@
 int main(int argc, char **argv) {
     if (argc!=4) return 2;
     struct rlimit memory={256UL*1024*1024,256UL*1024*1024};
-    struct rlimit cpu={1,1}, output={0,0};
+    /* GSettings/runtime initialization may grow a small regular file or memfd.
+       Zero forbids even that metadata IPC. Keep a 1MiB per-file hard ceiling. */
+    struct rlimit cpu={1,1}, output={1024UL*1024,1024UL*1024};
     if (setrlimit(RLIMIT_AS,&memory) || setrlimit(RLIMIT_CPU,&cpu) ||
         setrlimit(RLIMIT_FSIZE,&output)) return 2;
     char *end=NULL; errno=0;

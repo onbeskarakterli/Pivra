@@ -24,7 +24,7 @@ if '--list-all' in sys.argv:
     # Exceeds a pipe buffer. An early awk exit used to break the producer.
     for n in range(12000):print('unrelated-'+str(n),'description'*16)
 elif '--cflags' in sys.argv:
-    print('-DMODULE_4' if sys.argv[-1]=='gnome-desktop-4' else '-DMODULE_3')
+    print(('-DMODULE_4' if 'gnome-desktop-4' in sys.argv else '-DMODULE_3') + (' -lgobject-2.0 -lglib-2.0' if 'gobject-2.0' in sys.argv else ''))
 else:sys.exit(2)
 ''')
         self.program('cc', '''import json,os,pathlib,sys
@@ -52,6 +52,8 @@ p.chmod(0o700)
         out,_,calls=self.run_script()
         self.assertIn('GNOME factory module: gnome-desktop-4\n',out)
         self.assertEqual(len(calls),1);self.assertIn('-DMODULE_4',calls[0])
+        self.assertGreater(calls[0].index('-lgobject-2.0'), calls[0].index('tests/thumbnail/factory_probe.c'))
+        self.assertGreater(calls[0].index('-lglib-2.0'), calls[0].index('-lgobject-2.0'))
         self.assertIn('factory=Eligible',out);self.assertIn('capability=CacheAndGenerate',out)
         self.assertIn('OUTCOME Missing',out)
     def test_unbuildable_four_falls_back_to_three(self):

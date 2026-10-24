@@ -10,6 +10,11 @@ use std::{
     time::{Duration, Instant},
 };
 static LOADS: AtomicUsize = AtomicUsize::new(0);
+thread_local! {
+    // Detached only in automated mode: actual GDK crossings/reset must not be
+    // mixed with the explicit controller signal sequence under test.
+    static TEST_MOTIONS: std::cell::RefCell<Vec<(glib::WeakRef<gtk::Widget>, gtk::EventControllerMotion)>> = const { std::cell::RefCell::new(Vec::new()) };
+}
 mod image_loader {
     use super::*;
     pub struct LoadedFrame;
@@ -102,10 +107,13 @@ fn open(app: &adw::Application) -> (adw::ApplicationWindow, image_view::ImageVie
     if !std::env::args().any(|s| s == "--manual") {
         let motion = controller::<gtk::EventControllerMotion>(view.widget());
         assert_eq!(motion.propagation_phase(), gtk::PropagationPhase::Capture);
-        // Automated tests inject explicit real controller signals. Prevent the
-        // compositor's physical pointer from adding unrelated resize crossings.
-        // Manual mode keeps production event delivery unchanged.
-        motion.set_propagation_phase(gtk::PropagationPhase::None);
+        view.widget().remove_controller(&motion);
+        TEST_MOTIONS.with(|motions| {
+            motions.borrow_mut().push((
+                view.widget().upcast_ref::<gtk::Widget>().downgrade(),
+                motion,
+            ))
+        });
     }
     let header = adw::HeaderBar::new();
     header.set_widget_name("th02-test-header");
@@ -202,6 +210,17 @@ fn controller<T: IsA<glib::Object> + glib::types::StaticType>(p: &impl IsA<gtk::
     let list = p.observe_controllers();
     (0..list.n_items())
         .find_map(|i| list.item(i).unwrap().downcast().ok())
+        .or_else(|| {
+            TEST_MOTIONS.with(|motions| {
+                motions.borrow().iter().find_map(|(widget, motion)| {
+                    if widget.upgrade().as_ref() == Some(p.as_ref()) {
+                        motion.clone().upcast::<glib::Object>().downcast::<T>().ok()
+                    } else {
+                        None
+                    }
+                })
+            })
+        })
         .expect("controller")
 }
 fn point(v: &image_view::ImageView, bottom: bool) {
@@ -225,6 +244,33 @@ fn pause(milliseconds: u64) {
     let until = Instant::now() + Duration::from_millis(milliseconds);
     while Instant::now() < until {
         pump();
+    }
+}
+fn resize_until(
+    w: &adw::ApplicationWindow,
+    p: &gtk::Picture,
+    width: i32,
+    height: i32,
+    predicate: impl Fn() -> bool,
+) {
+    let deadline = Instant::now() + Duration::from_secs(20);
+    loop {
+        // Configure replies may update GTK's default-size after our request.
+        // Reassert the requested test size after each real frame/roundtrip until
+        // the allocation AND visibility criterion hold; never accept a size hint.
+        w.set_default_size(width, height);
+        image_bytes(w, p);
+        p.display().sync();
+        pump();
+        if predicate() {
+            return;
+        }
+        assert!(
+            Instant::now() < deadline,
+            "resize not confirmed: requested={width}x{height} actual={}x{}",
+            w.width(),
+            w.height()
+        );
     }
 }
 fn key(w: &adw::ApplicationWindow, modifiers: gdk::ModifierType) -> bool {
@@ -312,16 +358,12 @@ fn main() {
     controller::<gtk::EventControllerMotion>(v.widget())
         .emit_by_name::<()>("motion", &[&20f64, &100f64]);
     wait(|| !strip.is_visible());
-    w.set_default_size(800, 240);
-    wait(|| v.widget().height() < 250 && strip.is_visible());
-    // Complete the small frame and compositor roundtrip before issuing the
-    // opposite resize; a late Wayland configure can overwrite default-size.
-    image_bytes(&w, &p);
-    p.display().sync();
-    image_bytes(&w, &p);
-    w.set_default_size(800, 600);
-    image_bytes(&w, &p);
-    wait(|| v.widget().height() > 400 && !strip.is_visible());
+    resize_until(&w, &p, 800, 240, || {
+        v.widget().height() < 250 && strip.is_visible()
+    });
+    resize_until(&w, &p, 800, 600, || {
+        v.widget().height() > 400 && !strip.is_visible()
+    });
     for _ in 0..8 {
         point(&v, true);
         point(&v, false);

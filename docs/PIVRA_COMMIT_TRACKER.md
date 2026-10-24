@@ -2125,3 +2125,19 @@ Native: `bash tests/run_thumbnail_provider_probe.sh /tam/yol/fotograf.jpg`.
 Normal app'e bağlantı/UI/şerit/T/kalıcı ayar eklenmedi; üretim ImageView/loader/
 cache/preload/cancellation/settings ve Cargo bağımlılıkları korundu.
 **TH-01 TESTING; PIV-18 TESTING; PIV-19 başlamadı.**
+
+### TH-01 native SIGPIPE/modül seçimi ve CacheOnly teşhisi — TESTING
+
+`1443a4762d5d8db852b4d0d027bfb1872ddf5c69`: listing tamamen okunur, adaylar
+tekilleştirilip sürüm sırasıyla tek tek derlenir; yalnız bir başarılı module
+seçilir. Pipefail korunur,141 nedeni olan erken pipe consumer kaldırıldı.
+Helper configured/attempted/eligible/ineligible/failed ve MIME artık probe
+çıktısında ayrılır. CacheOnly başlangıç varsayılanıdır; Missing yalnız cache
+path yokluğudur. CacheAndGenerate sadece helper can_thumbnail=true ile mümkün;
+eski native CacheOnly çıktısının gerçek sebebi yeni Arch çıktısı bekler.
+PASS:80 Rust+50 Python (6 yeni module-driver,11 GIO cache,30 observer,3 rapor),
+zorunlu Rust kontrolleri/fixture/shell/whitespace. Modül seçim testlerinde4
+seçildi,4 derlenmezse3.0 seçildi; compiler/factory stub gerçek GNOME değildir.
+Codex'te gerçek GNOME factory bulunmadı: native module compile/çalışma NOT RUN.
+[Teşhis/tek Arch komutu](TH01_THUMBNAIL_VALIDATION.md). TH-01 TESTING;
+TH-02/PIV-19 başlamadı. Glycin/preload/viewport ve görüntüleme kodu korunur.

@@ -1,6 +1,6 @@
 # PIV-12 — medya hataları ve pencere izolasyonu
 
-22.10.2026 · `dev` · **TESTING**, native kabul bekleniyor.
+24.10.2026 · `dev` · **DONE**, Arch native ve gerçek GNOME manuel kabul tamamlandı.
 Başlangıç: `1ceaa04e202e94a320d2dd3f632f48aa1554a7bd` (güncel origin/dev'e fast-forward).
 PIV-01–11 DONE kayıtları ve kullanıcı kaynaklı Arch/GNOME kabul kanıtları korunur.
 Bu eski native sonuçlar yeni testlerin Codex'te çalıştırıldığı anlamına gelmez.
@@ -139,3 +139,8 @@ PIV-01–11 DONE kalır. PIV-13 başlamadı. PIV-39 Türkçe/İngilizce i18n kar
 korunur. Faz 0 bağımsız temiz kurulum INCOMPLETE ve DESKTOP-06 gerçek Nautilus
 NOT RUN ayrı açık işlerdir. Kaynak medya, Cargo.toml/lock, sistem güvenliği,
 main ve otomatik CI değiştirilmedi.
+
+
+## PIV-12 native ve manuel kabul kapanışı — 24.10.2026 — DONE
+
+Kullanıcı `b12970f6a3a7ea2dddc890a747977d5d68437a63` üzerinde `bash tests/run_media_failure_probe.sh` çalıştırdı: **exit0**, gerçek secure Glycin, bozuk/yarım/boş/yanlış format JPEG/PNG hataları, sağlam kareye geri dönüş, katalog/seçim/monitor/bildirim izolasyonu, Yenile ve close cleanup PASS. Bozuk dosya hata logları beklenen test senaryolarıydı. Gerçek GNOME/Wayland manuel testinde kullanıcı iki Pivra penceresi açtı; birincide kırmızı→yeşil→bozuk→mavi gezinmesini, diğer pencerenin etkilenmemesini ve birinci kapatılınca ikincinin çalışmaya devam etmesini **PASS** bildirdi. Aktif gerçek secure decode sırasında silme/kapatma ve decoder süreçlerinin zamansal çakışması **NOT MEASURED**; bu ölçümler PASS sayılmaz. PIV-12 DONE; PIV-13 TODO. Faz 0 bağımsız temiz native kurulum INCOMPLETE, DESKTOP-06 Nautilus NOT RUN, PIV-39 tr/en i18n planı açık.

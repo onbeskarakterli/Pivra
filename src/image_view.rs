@@ -355,7 +355,15 @@ impl ImageView {
         } else {
             self.slot.begin()
         };
+        // Keep the selected preset across catalog navigation. The per-image
+        // manual transform is still reset by prepare(), preventing stale pan/zoom.
+        let selected_mode = self.mode_action.state().and_then(|state| {
+            state.str().and_then(ViewMode::from_id)
+        });
         self.prepare("Loading image securely…", false);
+        if let Some(mode) = selected_mode {
+            self.mode_action.set_state(&mode.id().to_variant());
+        }
         self.phase.set(Phase::FullLoading);
         {
             let mut state = self.prefetch.borrow_mut();

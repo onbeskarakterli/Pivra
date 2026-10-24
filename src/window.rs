@@ -59,7 +59,16 @@ fn update_title(window: &adw::ApplicationWindow, title: &adw::WindowTitle, conte
     }
 }
 
+fn update_thumbnail_catalog(view: &ImageView, context: &FileContext) {
+    let photos: Vec<_> = context.collection.items().iter().enumerate()
+        .filter(|(_, item)| item.kind() == MediaKind::Image)
+        .map(|(index, item)| (index, item.path().to_owned()))
+        .collect();
+    view.set_thumbnail_catalog(&photos, context.collection.selected_index());
+}
+
 fn display_selected(view: &ImageView, context: &FileContext) {
+    update_thumbnail_catalog(view, context);
     let Some(item) = context.collection.current() else {
         view.set_neighbors(vec![]);
         view.show_message("No media selected.");
@@ -167,6 +176,25 @@ pub(super) fn build(app: &adw::Application, settings: &Settings, file: Option<Op
                         .unwrap_or_default()
                         .label()
                 });
+            }
+        });
+        // Thumbnail clicks select the same catalog indices used by keyboard navigation.
+        let select_context = context.clone();
+        let select_view = view.clone();
+        let select_title = title.clone();
+        let select_banner = banner.clone();
+        let select_window = window.downgrade();
+        view.on_thumbnail_select(move |index| {
+            let Some(window) = select_window.upgrade() else { return; };
+            let mut context = select_context.borrow_mut();
+            if context.collection.selected_index() == Some(index) {
+                return;
+            }
+            if context.collection.select(index) {
+                context.revision = context.revision.wrapping_add(1);
+                select_banner.set_reveal_child(false);
+                update_title(&window, &select_title, &context);
+                display_selected(&select_view, &context);
             }
         });
         viewport.prepend(view.widget());
@@ -463,6 +491,7 @@ impl FolderWatch {
                         if let Some(banner) = state.banner.upgrade() { banner.set_reveal_child(false); }
                     }
                     state.view.set_neighbors(context.collection.photo_neighbors());
+                    update_thumbnail_catalog(&state.view, &context);
                     let count = context.collection.items().len();
                     let suffix = if warnings == 0 {
                         format!("{count} {}", if count == 1 { "candidate" } else { "candidates" })
@@ -480,6 +509,7 @@ impl FolderWatch {
                     }
                     context.suffix = Some("folder scan failed".into());
                     context.warning = true;
+                    update_thumbnail_catalog(&state.view, &context);
                     if state.initialized.get() {
                         state.view.show_message("Folder unavailable. Media cannot be accessed.");
                     }

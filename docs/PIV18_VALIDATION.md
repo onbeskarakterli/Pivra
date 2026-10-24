@@ -173,3 +173,62 @@ Bilinen Codex Bwrap engeli yeniden denenmedi. Yeni secure/native sonuç
 **NOT RUN**; kullanıcının Arch native FAIL kaydı düzeltme sonrasında yeniden
 çalıştırılmayı bekler. Aynı komut: `bash tests/run_preview_pipeline_probe.sh`.
 PIV-18 **TESTING**; PIV-19 başlamadı. Önceki erken-preview sınırlamaları sürer.
+
+## Normal uygulamada PNG MIME hatası — açık teşhis — 24.10.2026
+
+Kullanıcı gerçek Arch/GNOME'da native paket **exit0** bildirdi; buna rağmen
+normal `cargo run --locked -- <wide.png veya large.png>` geçerli PNG için
+`Unknown image format: text/plain` verdi. **Gerçek kullanıcı senaryosu FAIL**;
+paket başarısı bunu geçersiz kılmaz. Kök neden henüz doğrulanmadı ve bu değişiklik
+PNG açılış hatasını çözmüş olarak sunulmaz. PIV-18 TESTING kalır.
+
+Kod/test SHA `44560357e6a8061308c4666c269bc13461f86248`.
+CLI → OpenedFile → app::launch → GIO open → window → ImageView → worker →
+Glycin akışı incelendi. CLI ve URI yerel GFile'a dönüştürülüyor, katalog ilk
+açılan dosyayı koruyor. MIME katalog uzantısından atanmaz. Glycin3.0.8
+`src/api_common.rs::guess_mime_type`, `dbus.rs::GFileWorker` tarafından okunan
+başlangıç baytlarını `gio::content_type_guess(None, bytes)` ile sınıflandırır.
+Belirsiz/TIFF/XML/gzip durumunda filename de kullanabilir. `Unknown image format`
+loader config seçimine aittir; burada decoder pikselleri henüz çözülmemiştir.
+Kod incelemesiyle yanlış path/seçim kanıtı bulunmadı; Arch nedeninin farklı MIME
+veritabanı, içerik değişimi veya başka bir ortam etkisi olduğu **kanıtlanmadı**.
+
+Üretim değişikliği yalnız hata teşhisidir: secure loader load hatasında aynı
+GFile backend ile en çok512 bayt salt okunur, gerçek path/URI, content-only MIME,
+uncertain, PNG/JPEG/other-truncated imzası ve örnek uzunluğu hataya eklenir.
+Bu ikinci okuma hata anındaki ayrı point-in-time kanıttır; Glycin'in önceki
+okumasıyla aynı içerik görüldüğünü garanti etmez. Ham dosya metni dökülmez.
+Uzantıdan MIME zorlama, signature'ı decode sayma, loader/sandbox bypass veya
+üretim decoder yolunu değiştirme yoktur. Bozuk içerik secure loader'da hata kalır.
+
+Yeni `application_open_probe` doğrudan üretim `app::launch` ve GIO-open sinyalini
+çalıştırır. Original fixture klasöründeki wide.png, large.png, no-exif.jpg;
+path ve file URI için dosya ilişkisinin korunmasını, gerçek texture boyutlarını,
+indirilen texture'da opak piksel bulunmasını, normal close ve kaynak byte
+bütünlüğünü kontrol eder. Pencere/render kodunu taklit etmez, CLI alt süreç
+olmadığı açıkça belirtilir; aynı uygulama başlatma fonksiyonu kullanılır.
+Native JSON paketine image_probe sonrasında bu kapı eklendi. Bir hata sonrası
+diğer aşamalar PASS olmaz. İlk loader early exit için77, MIME hatası içinFAIL
+verir. Mevcut paket testi gerçek uygulama girişini atlayamaz.
+
+**PASS — Codex:** hedefli yanlış uzantı/PNG/JPEG/text/empty header teşhis birim
+testi; sonra bir tam zorunlu core: fmt/check/build/test/all-targets Clippy
+-D warnings, **75 Rust +30 Python**, fixture/hash. Native rapor sürücüsü **3
+Python** PASS. Normal binary X11 GUI path/URI error-mode smoke PASS (görüntü
+decode başarısı değildir). Whitespace PASS.
+
+**NOT RUN:** application_open_probe bir kez Codex Xvfb'de exit77. Gerçek
+production app girişinde wide.png için path/URI doğru, `image/png`,
+uncertain=false, PNG signature, sampled=124; ardından secure loader early exit.
+Arch text/plain sorunu yeniden üretilemedi; bilinen Bwrap engeli tekrar denenmedi.
+PNG/JPEG gerçek normal açılış regresyonu için native sonuç bekleniyor.
+
+Kullanıcı aynı normal komutu yeniden çalıştırmalı; hata sürerse ek teşhis
+satırıyla birlikte bildirmeli:
+
+```bash
+GDK_BACKEND=wayland cargo run --locked -- "$PWD/tests/fixtures/images/wide.png"
+```
+
+Paket komutu değişmedi: `bash tests/run_preview_pipeline_probe.sh`.
+Geçerli PNG/JPEG kullanıcı senaryosu doğrulanmadan bu açık hata kapanmaz.

@@ -2036,3 +2036,17 @@ kontrolleri/fixture), 3 Python rapor testi; X11 48 mode snapshot ve zoom/pan,
 Sway resampling. Synthetic veri ile gerçek decoder ayrımı korunur. Secure kapı
 NOT RUN; bilinen Bwrap engeli tekrar denenmedi. [Ayrıntı](PIV18_VALIDATION.md).
 Native komut: `bash tests/run_preview_pipeline_probe.sh`. PIV-18 TESTING.
+
+### PIV-18 normal uygulama PNG/MIME hatası — TESTING, açık
+
+Kullanıcı native paketi exit0 bildirdi; normal GNOME uygulamasında iki geçerli
+PNG `Unknown image format: text/plain` ile **FAIL**. Kök neden henüz bulunmadı;
+ürün açılış sorunu giderildi/PASS iddiası yoktur.
+`44560357e6a8061308c4666c269bc13461f86248`: aynı production app::launch/GIO-open
+akışını kullanan PNG/JPEG path/URI probe, paket kapısı ve hataya sınırlı GFile
+MIME/signature/path teşhisi. Uzantıya göre MIME zorlama/sandbox değişikliği yok.
+PASS: hedefli içerik teşhis testi, tek core75 Rust/30 Python, 3 Python rapor testi,
+normal binary X11 error-mode input smoke. NOT RUN: gerçek app giriş probe'u bir
+kez exit77, Codex wide.png içeriğini image/png olarak algıladı; Arch text/plain
+tekrar üretilemedi. [Kanıt ve manuel komut](PIV18_VALIDATION.md). PIV-18 TESTING;
+kullanıcının normal GNOME yeniden testi gereklidir. PIV-19 başlamadı.

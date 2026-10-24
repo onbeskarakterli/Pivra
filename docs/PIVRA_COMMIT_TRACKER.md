@@ -1719,3 +1719,12 @@ Faz 0 bağımsız temiz native kurulum INCOMPLETE, DESKTOP-06 Nautilus NOT RUN v
 PIV-39 tr/en i18n kararı korunur. Kurulum, Cargo.toml/lock, image_loader,
 kaynak fixture'lar, CI ve lisans değişmedi. Main beklenen SHA
 `5d55ee599df4617bd51c09b1c7a008b8d0ece480`; normal push sonunda kontrol edilir.
+
+### PIV-13 belge ve uzak dal kanıtı
+
+Belge/matris commit'i `2644a433d0b0471d4778fb3509706342e2f69d68`.
+Normal push `f9d7157..2644a43 dev -> dev` başarılı; açık dev refspec'iyle fetch
+sonrasında HEAD/origin/dev aynı SHA olarak doğrulandı. `ls-remote` main'in
+`5d55ee599df4617bd51c09b1c7a008b8d0ece480` kaldığını gösterdi. Başlangıca karşı
+Cargo.toml, Cargo.lock, image_loader.rs ve fixture farkı yok. Bu son kanıt
+kaydı ayrı belge commit'idir; kendi SHA'sı Git geçmişindedir. PIV-13 TESTING.

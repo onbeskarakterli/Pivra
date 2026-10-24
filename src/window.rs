@@ -184,6 +184,8 @@ pub(super) fn build(app: &adw::Application, settings: &Settings, file: Option<Op
         let select_title = title.clone();
         let select_banner = banner.clone();
         let select_window = window.downgrade();
+        let teardown_view = view.clone();
+        window.connect_destroy(move |_| teardown_view.clear_thumbnail_select());
         view.on_thumbnail_select(move |index| {
             let Some(window) = select_window.upgrade() else { return; };
             let mut context = select_context.borrow_mut();

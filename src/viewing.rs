@@ -35,7 +35,7 @@ impl ViewMode {
             return None;
         }
         let scale = match self {
-            Self::Fit => (vw / iw).min(vh / ih).min(1.),
+            Self::Fit => (vw / iw).min(vh / ih),
             Self::Fill => (vw / iw).max(vh / ih),
             Self::Actual => 1.,
         };
@@ -71,7 +71,7 @@ mod tests {
                     match mode {
                         ViewMode::Fit => {
                             assert!(g.width <= viewport.0 + 1e-9 && g.height <= viewport.1 + 1e-9);
-                            assert!(g.width <= image.0 + 1e-9);
+                            assert!((g.width - viewport.0).abs() < 1e-9 || (g.height - viewport.1).abs() < 1e-9);
                         }
                         ViewMode::Fill => {
                             assert!(g.width + 1e-9 >= viewport.0 && g.height + 1e-9 >= viewport.1);
@@ -80,6 +80,19 @@ mod tests {
                     }
                 }
             }
+        }
+    }
+    #[test]
+    fn fit_upscales_small_images_and_tracks_viewport_without_cropping() {
+        let image = (320., 200.);
+        for viewport in [(640., 400.), (1200., 600.), (300., 300.)] {
+            let g = ViewMode::Fit.geometry(image, viewport).unwrap();
+            let scale = (viewport.0 / image.0).min(viewport.1 / image.1);
+            assert!((g.width - image.0 * scale).abs() < 1e-9);
+            assert!((g.height - image.1 * scale).abs() < 1e-9);
+            assert!(g.x >= -1e-9 && g.y >= -1e-9);
+            assert!(g.x + g.width <= viewport.0 + 1e-9);
+            assert!(g.y + g.height <= viewport.1 + 1e-9);
         }
     }
     #[test]

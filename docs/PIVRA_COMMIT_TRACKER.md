@@ -1784,3 +1784,12 @@ iddiası yoktur. Fiziksel HiDPI ve input FPS/latency ölçümü NOT RUN. Faz 0 t
 native kurulum INCOMPLETE, DESKTOP-06 Nautilus NOT RUN ve PIV-39 tr/en planı
 korunur. Kurulum/Cargo.toml/lock/loader/kaynak fixture/CI/lisans değişmedi.
 Main beklenen SHA `5d55ee599df4617bd51c09b1c7a008b8d0ece480`; push sonunda kontrol edilir.
+
+### PIV-14 belge ve uzak dal kanıtı
+
+Belge/matris commit'i `e739a09418fd9e6aa30fc5de0dd3f5e174d4e33f`.
+Normal push `8b31944..e739a09 dev -> dev` başarılı; açık dev refspec'iyle fetch
+sonrasında HEAD/origin/dev aynı SHA doğrulandı. `ls-remote` main'i değişmemiş
+`5d55ee599df4617bd51c09b1c7a008b8d0ece480` gösterdi. Başlangıca karşı
+Cargo.toml, Cargo.lock, image_loader.rs ve fixture farkı yok. Bu son kayıt
+ayrı belge commit'idir; kendi SHA'sı Git geçmişindedir. PIV-14 TESTING.

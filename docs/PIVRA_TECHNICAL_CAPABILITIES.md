@@ -1,6 +1,6 @@
 # Pivra — Teknik Yetenekler ve Faz 0 Kararları
 
-**Tarih:** 21.10.2026 · **Dal:** dev · **Güncel durum:** PIV-01–14 DONE, PIV-15 TESTING; aşağıdaki ilk kayıt yalnız PIV-05 tarihçesidir.
+**Tarih:** 21.10.2026 · **Dal:** dev · **Güncel durum:** PIV-01–15 DONE, PIV-16 TESTING; aşağıdaki ilk kayıt yalnız PIV-05 tarihçesidir.
 Başlangıç commit'i: `8b3947215c54dfd2515df61a50dd05c080eccf31`.
 PIV-06 uygulanmadı. Production kaynakları, Cargo.toml ve Cargo.lock değiştirilmedi;
 görüntü decoder'ı veya video oynatıcı yazılmadı. Proje lisansı seçilmedi.
@@ -753,3 +753,16 @@ Cairo encoded-channel bilinear referansı hardware GPU doğrulaması değildir.
 snapshot PASS; 10 secure kapı NOT RUN/exit77. Native GPU/GNOME kabulü bekleniyor.
 Tercih pencereye özel/yeni medyada korunur, restart persistence yoktur. Önceki
 native kabul ve açık Faz 0/DESKTOP-06/i18n kapıları, Bwrap ve kurulum korunur.
+
+
+## PIV-16 — admission, cancellation ve process kanıtı
+
+Mevcut blocking worker/Glycin/GLib-context yolu korunur; pencere başına 3 admitted
+job ve 1 latest pending, 5s admission timeout ve izlenebilir job sayaçları vardır.
+Bu timeout decoder kill değildir. GIO cancellation/suppression/worker join ile
+Glycin global pool PID cleanup ayrı kavramlardır (SDK idle retention30s).
+[Matris](PIV16_VALIDATION.md): 67 Rust + 30 Python, 33 scoped GTK/GIO PASS;
+11 secure kapı exit77/NOT RUN. Yeni controlled successes sentetik texture'dır.
+Native tek giriş mevcut PIV-09 gerçek aktif decode checkpoint'ini de çalıştırır.
+Decoder algoritması/sandbox değişmedi; yalnız eşdeğer LoadedFrame alias'ı eklendi.
+Önceki kullanıcı kabulü, kurulum, Faz 0/DESKTOP-06 ve i18n planı korunur.

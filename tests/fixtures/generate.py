@@ -34,6 +34,16 @@ def fixtures():
     }
 
 
+def resampling_checker():
+    # Exact opaque black/white texels; no gamma/ICC metadata or external encoder.
+    raw = b"".join(b"\0" + b"".join(bytes([255 * ((x + y) % 2)]) * 3 + b"\xff"
+                                for x in range(16)) for y in range(16))
+    stream = (b"\x78\x01\x01" + struct.pack("<HH", len(raw), len(raw) ^ 0xFFFF)
+              + raw + struct.pack(">I", zlib.adler32(raw) & 0xFFFFFFFF))
+    return (b"\x89PNG\r\n\x1a\n" + chunk(b"IHDR", struct.pack(">IIBBBBB", 16, 16, 8, 6, 0, 0, 0))
+            + chunk(b"IDAT", stream) + chunk(b"IEND", b""))
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     action = parser.add_mutually_exclusive_group(required=True)
@@ -42,6 +52,7 @@ def main():
     args = parser.parse_args()
     root = Path(__file__).resolve().parent
     files = fixtures()
+    files["resampling-checker.png"] = resampling_checker()
     metadata = {
         "source": "Original hard-coded values in generate.py; no downloaded third-party assets",
         "license_status": "Repository license undecided; no license grant or selection introduced",

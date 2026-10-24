@@ -5,6 +5,8 @@ mod image_loader;
 mod image_view;
 #[path = "../src/input.rs"]
 mod input;
+#[path = "support/resampling_cases.rs"]
+mod resampling_cases;
 #[path = "../src/window.rs"]
 mod window;
 #[path = "support/zoom_pan_cases.rs"]
@@ -379,6 +381,10 @@ fn native(app: &adw::Application) {
             _ => (64, 32),
         };
         assert_eq!(size, expected, "EXIF-transformed source dimensions");
+        if std::env::args().any(|s| s == "--resampling") {
+            resampling_cases::native(&w);
+            select(&w, ViewMode::Fill);
+        }
         if std::env::args().any(|s| s == "--zoom-pan") {
             zoom_pan_cases::native(&w);
             select(&w, ViewMode::Fill);
@@ -408,6 +414,9 @@ fn native(app: &adw::Application) {
         drop(w);
         settle();
     }
+    if std::env::args().any(|s| s == "--resampling") {
+        resampling_cases::native_checker(app);
+    }
     native_isolation(app, &root);
     println!(
         "PASS secure production mode/render/resize/EXIF 1–8/source integrity gate; physical GNOME menu/keys remain manual"
@@ -421,7 +430,9 @@ fn main() {
         .build();
     app.register(None::<&gio::Cancellable>).unwrap();
     if std::env::args().any(|s| s == "--synthetic") {
-        if std::env::args().any(|s| s == "--zoom-pan") {
+        if std::env::args().any(|s| s == "--resampling") {
+            resampling_cases::synthetic(&app);
+        } else if std::env::args().any(|s| s == "--zoom-pan") {
             zoom_pan_cases::synthetic(&app);
         } else {
             synthetic(&app);

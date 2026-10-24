@@ -180,6 +180,29 @@ fn main() {
     wait(|| STARTED.load(Ordering::SeqCst) == 1);
     let second = open(&app, &other.path().join("9.png"));
     wait(|| STARTED.load(Ordering::SeqCst) == 2);
+    assert_eq!(
+        first
+            .lookup_action("image-resampling")
+            .unwrap()
+            .state()
+            .unwrap()
+            .str(),
+        Some("smooth")
+    );
+    gio::prelude::ActionGroupExt::activate_action(
+        &first,
+        "image-resampling",
+        Some(&"nearest".to_variant()),
+    );
+    assert_eq!(
+        second
+            .lookup_action("image-resampling")
+            .unwrap()
+            .state()
+            .unwrap()
+            .str(),
+        Some("smooth")
+    );
     mode_key(&first, gtk::gdk::Key::F7, "fill");
     mode_key(&second, gtk::gdk::Key::F8, "actual");
     input_while_pending(&first);
@@ -200,6 +223,15 @@ fn main() {
     wait(|| first.title().is_some_and(|s| s.ends_with("(3 candidates)")));
     action(&first, "next-media", 3);
     action(&first, "next-media", 4);
+    assert_eq!(
+        first
+            .lookup_action("image-resampling")
+            .unwrap()
+            .state()
+            .unwrap()
+            .str(),
+        Some("nearest")
+    );
     assert_eq!(
         first
             .lookup_action("image-mode")
@@ -246,6 +278,16 @@ fn main() {
     }
     settle();
     assert_eq!(status(&first), removed_status);
+    assert_eq!(
+        first
+            .lookup_action("image-resampling")
+            .unwrap()
+            .state()
+            .unwrap()
+            .str(),
+        Some("nearest"),
+        "late callback reset filter"
+    );
     for id in [0, 2, 3, 4, 5] {
         assert!(CANCELLED[id].load(Ordering::SeqCst));
     }
@@ -274,6 +316,20 @@ fn main() {
         "unbounded/automatic retry"
     );
     assert!(second.title().unwrap().starts_with("9.png"));
+    assert_eq!(
+        second
+            .lookup_action("image-resampling")
+            .unwrap()
+            .state()
+            .unwrap()
+            .str(),
+        Some("smooth")
+    );
+    gio::prelude::ActionGroupExt::activate_action(
+        &second,
+        "image-resampling",
+        Some(&"nearest".to_variant()),
+    );
     second.close();
     println!(
         "PASS production-window/GIO controlled-worker races: monitor while loading, no auto retry, repeated refresh, selected deletion, stale callbacks, close and independent pending survivor"

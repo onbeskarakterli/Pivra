@@ -9,6 +9,10 @@
     "model-video.txt": {
       "bytes": 83,
       "sha256": "cac14479c5a3c8cac4eca19a7544115a95f4d096341ad8a5e11c65b58280097e"
+    },
+    "resampling-checker.png": {
+      "bytes": 1108,
+      "sha256": "62e7c1175a5faed50333bcfdae10eaae35fcce7613934bf6db61fba1372a491d"
     }
   }
 }

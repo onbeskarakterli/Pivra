@@ -113,6 +113,8 @@ def main():
                     args = [binary] + (["--expect-image-error"] if blocked else [])
                     if "--media-failures" in sys.argv[2:]:
                         args.append("--media-failures")
+                    if "--resampling" in sys.argv[2:]:
+                        args.append("--resampling")
                     if "--zoom-pan" in sys.argv[2:]:
                         args.append("--zoom-pan")
                     if "--synthetic" in sys.argv[2:]:

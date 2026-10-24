@@ -1,7 +1,7 @@
 # Pivra — Planlı Commit ve İlerleme Takibi
 
 **Kaynak:** [Özellik Şartnamesi](PIVRA_FEATURE_SPEC_TR.md) · [Yol Haritası](PIVRA_DEVELOPMENT_ROADMAP.md)  
-**Branch:** `dev` · **Durum:** PIV-01 **DONE (21.10.2026)**; PIV-02 **DONE (21.10.2026, Xvfb GTK pencere doğrulaması)**; PIV-03 **DONE (21.10.2026)**; PIV-04 **DONE (21.10.2026; grafik test kategorileri ayrı)**; PIV-05 **DONE (21.10.2026; belgeleme/probe kapsamı)**; PIV-06 **DONE (21.10.2026; dosya/URI ve desktop giriş altyapısı; gerçek Nautilus NOT RUN)**; PIV-07 **DONE (21.10.2026; sırasız komşu medya keşfi)**; PIV-08 **DONE (21.10.2026; deterministik doğal sıra)**; PIV-09 **DONE (21.10.2026; Arch gerçek JPEG/PNG/EXIF, otomatik geometri ve güvenli aktif-decode kapanış PASS)**; PIV-10 **DONE (22.10.2026; native piksel/Fit/gezinti PASS ve kullanıcı fiziksel sol/sağ doğrulaması)**; PIV-11 **DONE (22.10.2026; Arch native probe exit0 ve gerçek GNOME Yenile PASS)**; PIV-12 **DONE (24.10.2026; Arch secure medya hata testi ve manuel iki pencere izolasyonu PASS)**; PIV-13–60 TODO, başlatılmadı. Faz 0 **INCOMPLETE** (temiz native kurulum yeniden üretimi NOT RUN). Güncel kapanış kanıtı son bölümde; 20.10.2026 kayıtları tarihçedir. Burada listelenen `PIV-xx` kimlikleri gerçek Git commit SHA'sı **değildir**.
+**Branch:** `dev` · **Durum:** PIV-01 **DONE (21.10.2026)**; PIV-02 **DONE (21.10.2026, Xvfb GTK pencere doğrulaması)**; PIV-03 **DONE (21.10.2026)**; PIV-04 **DONE (21.10.2026; grafik test kategorileri ayrı)**; PIV-05 **DONE (21.10.2026; belgeleme/probe kapsamı)**; PIV-06 **DONE (21.10.2026; dosya/URI ve desktop giriş altyapısı; gerçek Nautilus NOT RUN)**; PIV-07 **DONE (21.10.2026; sırasız komşu medya keşfi)**; PIV-08 **DONE (21.10.2026; deterministik doğal sıra)**; PIV-09 **DONE (21.10.2026; Arch gerçek JPEG/PNG/EXIF, otomatik geometri ve güvenli aktif-decode kapanış PASS)**; PIV-10 **DONE (22.10.2026; native piksel/Fit/gezinti PASS ve kullanıcı fiziksel sol/sağ doğrulaması)**; PIV-11 **DONE (22.10.2026; Arch native probe exit0 ve gerçek GNOME Yenile PASS)**; PIV-12 **DONE (24.10.2026; Arch secure medya hata testi ve manuel iki pencere izolasyonu PASS)**; PIV-13 **TESTING** (Fit/Fill/%100 kod ve Codex kontrolleri; native kabul bekleniyor); PIV-14–60 TODO, başlatılmadı. Faz 0 **INCOMPLETE** (temiz native kurulum yeniden üretimi NOT RUN). Güncel kapanış kanıtı son bölümde; 20.10.2026 kayıtları tarihçedir. Burada listelenen `PIV-xx` kimlikleri gerçek Git commit SHA'sı **değildir**.
 
 ## Kullanım kuralları
 
@@ -38,7 +38,7 @@
 
 | ID | Planlı commit başlığı | Kabul / test kontrolü | Durum | SHA |
 |---|---|---|---|---|
-| PIV-13 | `feat: implement fit fill and actual size` | Sığdır/doldur/%100; oran bozulmaz, yeniden boyutta güncellenir | TODO | — |
+| PIV-13 | `feat: implement fit fill and actual size` | 59 Rust + 30 Python, 21 scoped GUI/helper ve 144 sentetik snapshot PASS; secure native mod kabulü NOT RUN | **TESTING** | `b576c35`, `5ad7b98`; tam SHA aşağıda |
 | PIV-14 | `feat: implement cursor anchored zoom and pan` | %10–3200, imleç ankrajı, sürükleyerek kaydırma | TODO | — |
 | PIV-15 | `feat: add image resampling choices` | Yumuşak/piksel keskinliği, büyütme-küçültme regresyonu | TODO | — |
 | PIV-16 | `feat: add cancellable async image loading` | Hızlı gezinmede eski decode sonucu yeni görselin üzerine yazılmaz | TODO | — |
@@ -122,7 +122,7 @@
 | Faz | ID aralığı | Planlı commit | Tamamlanan |
 |---|---|---:|---:|
 | 0 — Temel | 01–05 | 5 | 5 |
-| 1 — Fotoğraf | 06–12 | 7 | 6 |
+| 1 — Fotoğraf | 06–12 | 7 | 7 |
 | 2 — Zoom/performans | 13–18 | 6 | 0 |
 | 3 — Video temel | 19–24 | 6 | 0 |
 | 4 — Video gelişmiş | 25–31 | 7 | 0 |
@@ -130,9 +130,9 @@
 | 6 — Uyumluluk/paket | 40–47 | 8 | 0 |
 | 7 — Edit (en son özellik geliştirmesi) | 48–57 | 10 | 0 |
 | 8 — Son doğrulama | 58–60 | 3 | 0 |
-| **TOPLAM** | **PIV-01–60** | **60** | **11** |
+| **TOPLAM** | **PIV-01–60** | **60** | **12** |
 
-> PIV-01–11 tamamlandı; PIV-12 TESTING, PIV-13–60 gelecekteki işlerdir. Görev sayacı 5/5 olsa da Faz 0 kapısı INCOMPLETE: temiz native kurulum yeniden üretimi NOT RUN. Görev kimlikleri commit SHA'sı değildir. İlk planlama ve önceki engel kayıtları aşağıda tarihçe olarak korunur.
+> PIV-01–12 tamamlandı; PIV-13 TESTING, PIV-14–60 gelecekteki işlerdir. Görev sayacı 5/5 olsa da Faz 0 kapısı INCOMPLETE: temiz native kurulum yeniden üretimi NOT RUN. Görev kimlikleri commit SHA'sı değildir. İlk planlama ve önceki engel kayıtları aşağıda tarihçe olarak korunur.
 
 ## PIV-01 ayrıntılı ilerleme — 20.10.2026
 
@@ -1669,3 +1669,53 @@ PIV-12 TESTING, native kabul bekleniyor.
 ## PIV-12 native ve manuel kabul kapanışı — 24.10.2026 — DONE
 
 Kullanıcı `b12970f6a3a7ea2dddc890a747977d5d68437a63` üzerinde `bash tests/run_media_failure_probe.sh` çalıştırdı: **exit0**, gerçek secure Glycin, bozuk/yarım/boş/yanlış format JPEG/PNG hataları, sağlam kareye geri dönüş, katalog/seçim/monitor/bildirim izolasyonu, Yenile ve close cleanup PASS. Bozuk dosya hata logları beklenen test senaryolarıydı. Gerçek GNOME/Wayland manuel testinde kullanıcı iki Pivra penceresi açtı; birincide kırmızı→yeşil→bozuk→mavi gezinmesini, diğer pencerenin etkilenmemesini ve birinci kapatılınca ikincinin çalışmaya devam etmesini **PASS** bildirdi. Aktif gerçek secure decode sırasında silme/kapatma ve decoder süreçlerinin zamansal çakışması **NOT MEASURED**; bu ölçümler PASS sayılmaz. PIV-12 DONE; PIV-13 TODO. Faz 0 bağımsız temiz native kurulum INCOMPLETE, DESKTOP-06 Nautilus NOT RUN, PIV-39 tr/en i18n planı açık.
+
+
+## PIV-13 — 24.10.2026 — TESTING
+
+Başlangıç: `f9d7157cb4da22bc763b7fc2bf4f0607923f4df8`, güncel origin/dev'e
+fast-forward. PIV-01–12 DONE ve kullanıcı kaynaklı Arch/GNOME kanıtları korunur.
+
+| Gerçek SHA | Değişiklik |
+|---|---|
+| `b576c35f30e0fb42b1e971c8162afe9fa7f37873` | Test edilebilir Fit/Fill/%100 geometri modeli; kaynak mantıksal boyutunda clip paintable; ImageView texture/mod state'i; pencere menüsü ve F6/F7/F8 |
+| `5ad7b98bf0f020c8fa7bb21c54165a2148b662f7` | Render/native test probu, tek native giriş; mevcut worker/window yarışlarında mod reset/izolasyon/menü etiketi/tuş testleri; Sway sentetik argümanı |
+
+**PASS — Codex:** fmt, locked check/build/test ve clippy all-targets -D warnings
+(mevcut stable/offline/-j2 helper); **59 Rust** = 35 unit + 24 integration,
+0 failed/ignored; **30 Python observer**, eski fixture ve 18 image hash'i; tüm
+örneklerin locked/offline derlemesi, shell/Python syntax, diff whitespace.
+
+**PASS — 21 scoped GUI/helper:** X11 12, Sway 7, Weston 2. PIV-09–12'nin 18
+mevcut pencere/gezinti/folder/Yenile/hata/controlled race çağrısı korunur.
+Yeni üç sentetik mode render çağrısı Xvfb scale1, Xvfb GDK_SCALE=2 ve headless
+Sway: her birinde 48, toplam **144 snapshot**. Gerçek üretim sunumu, gerçek
+atanmış widget boyutu, alpha sınırı, kaynak degrade renk örnekleri, merkez,
+en-boy oranı ve clip doğrulandı. **Sentetik texture decoder PASS'ı değildir.**
+
+Mod değişiminde worker sayısının artmaması, F6/F7/F8 capture sinyalleri, menü
+etiketi, iki pencerenin farklı modu, yeni yüklemede Fit, gecikmiş callback ve
+mode/close kontrollü GTK/GIO worker testlerinde doğrulandı. Gerçek decoder
+etkinliği/overlap bu testlerde ölçülmez. Sol/Sağ gerçek X11 tuş regresyonu PASS.
+Sway sinyalleri fiziksel GNOME girişi değildir; Weston normal close NOT RUN.
+
+**BLOCKED/NOT RUN — 8 exit77:** image_probe PNG/JPEG-first, image_gui_probe,
+strict navigation, strict folder watch, strict PIV-12 medya hatası,
+active_decode_close ve yeni strict view_modes_probe. İlk secure baseline
+oluşmadı; bilinen Codex Bwrap/read-only proc kısıtı sürer. Yeni native
+EXIF/mod/render/two-texture-window pozitif yolu yalnız derlendi, PASS değil.
+Bwrap zorunluluğu korunur; loader/sandbox bypass veya decoder fallback yoktur.
+
+**Kalan native kabul:** `bash tests/run_view_modes_probe.sh` önce mevcut gerçek
+JPEG/PNG/EXIF piksel probunu, sonra yeni mod/resize/EXIF geometri ve bağımsız
+iki gerçek frame penceresi probunu çalıştırır. Fiziksel GNOME menü/F6–F8,
+resize, yeni medyada Fit ve pencere bağımsızlığı ayrıca kullanıcıca doğrulanmalı.
+%100 tanımı **1 kaynak piksel = 1 GTK mantıksal birimi**, HiDPI fiziksel 1:1
+değildir; gerçek HiDPI monitör testi NOT RUN. [Tam matris](PIV13_VALIDATION.md).
+
+**PIV-13 TESTING, DONE değil. PIV-14 başlamadı.** Önceki PIV-12 DONE kaydıyla
+uyumsuz kalan faz/toplam sayaçları 7/12 olarak düzeltildi; PIV-13 sayaca eklenmedi.
+Faz 0 bağımsız temiz native kurulum INCOMPLETE, DESKTOP-06 Nautilus NOT RUN ve
+PIV-39 tr/en i18n kararı korunur. Kurulum, Cargo.toml/lock, image_loader,
+kaynak fixture'lar, CI ve lisans değişmedi. Main beklenen SHA
+`5d55ee599df4617bd51c09b1c7a008b8d0ece480`; normal push sonunda kontrol edilir.

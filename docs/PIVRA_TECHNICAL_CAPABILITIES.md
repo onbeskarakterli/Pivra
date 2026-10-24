@@ -1,6 +1,6 @@
 # Pivra — Teknik Yetenekler ve Faz 0 Kararları
 
-**Tarih:** 21.10.2026 · **Dal:** dev · **Güncel durum:** PIV-01–11 DONE, PIV-12 TESTING; aşağıdaki ilk kayıt yalnız PIV-05 tarihçesidir.
+**Tarih:** 21.10.2026 · **Dal:** dev · **Güncel durum:** PIV-01–12 DONE, PIV-13 TESTING; aşağıdaki ilk kayıt yalnız PIV-05 tarihçesidir.
 Başlangıç commit'i: `8b3947215c54dfd2515df61a50dd05c080eccf31`.
 PIV-06 uygulanmadı. Production kaynakları, Cargo.toml ve Cargo.lock değiştirilmedi;
 görüntü decoder'ı veya video oynatıcı yazılmadı. Proje lisansı seçilmedi.
@@ -717,3 +717,15 @@ kullanıcı PIV-09–11 native kanıtları korunur. Kontrollü worker testleri g
 Glycin/piksel başarısı değildir; secure decode etkinliği/overlap ölçülmedi.
 Yalnız unsupported/video Yenile yolu düzeltildi; Bwrap zorunluluğu, bağımlılıklar
 ve önceki açık dağıtım/temiz kurulum/Nautilus işleri değişmedi. PIV-12 TESTING.
+
+
+## PIV-13 — görüntüleme modu ve HiDPI sınırı
+
+Fit GTK ScaleDown, Fill Cover; %100 aynı texture'ı kaynak mantıksal boyutunda
+merkezleyip clip eden küçük bir paintable kullanır. Yeniden decode veya serbest
+zoom/pan eklenmedi. %100 HiDPI'da fiziksel piksel 1:1 garantisi değildir.
+[Ayrıntılı tanım ve test matrisi](PIV13_VALIDATION.md): 59 Rust + 30 Python,
+21 scoped GUI/helper çağrısı ve bunların üçünde 144 sentetik snapshot PASS.
+Sekiz gerçek secure kapı exit77/NOT RUN; gerçek native mod/EXIF pozitif yolu
+bekleniyor. Önceki PIV-01–12 kullanıcı kabul kayıtları korunur. Bwrap, native
+kurulum, bağımlılıklar ve önceki dağıtım/Faz 0/DESKTOP-06/i18n kapıları değişmedi.

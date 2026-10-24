@@ -248,8 +248,17 @@ Kullanıcı güncel `dev` üzerinde `bash tests/run_preview_pipeline_probe.sh` �
 Mevcut full-only açılış değişmedi. Erken preview kanıtlanmadı; PIV-18 TESTING.
 
 
-## PIV-18C — bağımsız JPEG prototipleri
+## PIV-18C — tarihsel deney; reddedildi ve kaldırıldı (25.10.2026)
 
-[Embedded EXIF thumbnail ve baseline 1/8 IDCT prototipleri](PIV18_JPEG_PREVIEW_PROTOTYPE.md).
-Üretim yolu değişmedi; tek Codex Bwrap denemesi77, gerçek erken frame NOT PROVEN.
-PIV-18 TESTING kalır.
+Embedded JPEG thumbnail ve reduced-resolution libjpeg prototipleri
+`f69b0edef8f1e5f33f404e234c20d49a08bae170` ile denendi; üretime bağlanmadı.
+O zamanki hedefli metadata/sürücü testleri geçti, tek Codex Bwrap denemesi77
+verdi; gerçek erken frame NOT PROVEN kaldı. Bunlar tarihsel sonuçlardır.
+
+Kullanıcı iki yöntemi de reddetti. Deneysel decoder, Python sürücüsü/testi,
+native betik ve prototip belgesi depodan kaldırıldı. Decoder silinmesi uzak
+`87aa792a8f03a8979bd181733bfa9196d4ee313b` commit'inde zaten yapılmıştı;
+bu temizlik kalan dosyaları ve aktif belge referanslarını kaldırır.
+Silinen prototip için native test, geliştirme veya üretim entegrasyonu beklenmez.
+PIV-18B Glycin araştırması ve mevcut secure full-only üretim davranışı korunur.
+**PIV-18 TESTING; PIV-19 başlamadı.**

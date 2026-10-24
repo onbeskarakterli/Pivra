@@ -49,11 +49,11 @@ Aşağıdaki boyut/zamanlar **gerçek ölçüm**, değilse açıkça NOT RUN'dı
 | Aynı deney, JPEG | NOT RUN | NOT RUN / NOT RUN | İlk PNG engelinde duruldu; tekrar deneme yok | Kaynak yolu tam allocation; üretime HAYIR |
 | Aynı deney, TIFF | NOT RUN | NOT RUN / NOT RUN | Özel Codex config yalnız JPEG/PNG; TIFF runtime kaydı/fixture yok | Source dispatcher mevcut, Pivra TIFF desteği yok; DEFERRED PIV-40/41 |
 | Aynı deney, RAW/DNG | NOT RUN | NOT RUN / NOT RUN | Özel prefix ve sistem standart dizinlerinde kurulu loader bulunmadı; fixture yok | Kaynakta full render var, üretim desteği yok; DEFERRED PIV-40/41 |
-| Embedded preview erişimi, JPEG | NOT RUN | NOT RUN / NOT RUN | Glycin3.0.8'de kullanılabilir embedded-preview seçim API'si doğrulanmadı | Üretime HAYIR; bounded EXIF thumbnail sağlayıcısı araştırılabilir |
+| Embedded preview erişimi, JPEG | NOT RUN | NOT RUN / NOT RUN | Glycin3.0.8'de kullanılabilir embedded-preview seçim API'si doğrulanmadı | Üretime HAYIR; ilgili PIV-18C prototipi 25.10.2026 tarihinde reddedilip kaldırıldı |
 | Embedded preview erişimi, PNG | NOT RUN | NOT RUN / NOT RUN | İncelenen sağlayıcıda UNSUPPORTED; full decode → resize kabul edilmez | Üretime HAYIR |
 | Embedded preview erişimi, TIFF/RAW | NOT RUN | NOT RUN / NOT RUN | Mevcut kurulu güvenli yol yok / API doğrulanmadı | Üretime HAYIR; PIV-40/41 desteği iddiası yok |
 | Glycin thumbnailer, bütün formatlar | NOT RUN | NOT RUN / NOT RUN | Dış sandbox gerektirir, fallback resize yapabilir | Yeni bağımlılık/izolasyon işi; doğrudan kullanımı önerilmez |
-| Yeni loader reduced decode / sınırlı adapter | NOT RUN | NOT RUN / NOT RUN | Bu görevde kurulmadı/çalıştırılmadı | En küçük gelecek alternatif: önce ayrı güvenli JPEG thumbnail prototipi |
+| Yeni loader reduced decode / sınırlı adapter | NOT RUN | NOT RUN / NOT RUN | Bu görevde kurulmadı/çalıştırılmadı | Tarihsel alternatif; PIV-18C prototipi reddedilip kaldırıldı, aktif görev yok |
 
 NOT RUN, FAIL decode sonucu veya PASS preview değildir. Kaynakta isteğin yok
 sayılması loader yetenek sınırıdır; bozuk API diye raporlanmaz.
@@ -118,20 +118,14 @@ protokol JPEG/PNG config. Rust/GTK kurulumu değiştirilmedi.
 - Üretim kodu değişmediğinden mevcut büyük core/GUI paketleri tekrar çalıştırılmadı.
   Eski native/manuel kabul yeni preview PASS sayılmadı.
 
-## En küçük sonraki adımlar (uygulama değil plan)
+## Tarihsel alternatif planı — artık aktif değil
 
-1. Arch probe çıktılarını ve gerçek loader sürümünü kaydet; scale görmezden
-   geliniyorsa mevcut runtime yolunu erken-preview için reddet.
-2. JPEG için güvenilir bir loader içinde bounded embedded thumbnail seçimi veya
-   gerçekten reduced IDCT desteğini ayrı prototipte doğrula. Header/EXIF parse ve
-   decode mevcut güvenlik sınırı içinde olmalı; host'ta yeni decoder çalıştırma.
-3. Küçük frame'in öncesinde full allocation/decode yapılmadığını loader kaynak
-   ve runtime gözlemiyle göster; monotonic frame + ekranda sunum + fresh full
-   baseline, process/buffer maliyeti ve bozuk dosya limitlerini ölç.
-4. Yalnız kanıt sonrası üretim entegrasyonu: token'lı preview/full event'leri,
-   source-pixel viewport sürekliliği, full-only cache kalite etiketi ve çift-frame
-   bütçesi. PIV-09 Bwrap, PIV-16 cancel/admission, PIV-17 foreground/cache
-   regresyonları ve native iki pencere kabulü olmadan etkinleştirme.
+Bu araştırmada ayrı güvenli JPEG embedded-thumbnail/reduced-IDCT prototipi,
+sonrasında kaynak maliyeti ve üretim entegrasyonu değerlendirmesi önerilmişti.
+PIV-18C bu alternatifleri denedi; kullanıcı 25.10.2026 tarihinde reddetti ve
+prototip dosyaları kaldırıldı. Bu planın native testi, devam geliştirmesi veya
+ürün entegrasyonu beklenmiyor. PIV-18B Glycin API/source ve native gözlemleri
+korunur; mevcut full-only pipeline değişmez. **PIV-18 TESTING; PIV-19 başlamadı.**
 
 Kod/test commit'i: `b0caa4f99e30031271b870d381b7fafee1d53fd0`.
 
@@ -142,4 +136,4 @@ Kullanıcı `807b67a402d19f81e6b2814fa6d3d644830e2786` sürümünde `bash tests/
 - `large.png`: source 1600×1200; request 16×12; returned 1600×1200 (**REDUCED_FRAME=false**), frame_ready 13051µs, fresh full baseline 6366µs; same-image `next_frame` NoMoreFrames.
 - `no-exif.jpg`: source 64×32; request 16×8; returned 64×32 (**REDUCED_FRAME=false**), frame_ready 658µs, fresh full baseline 541µs; same-image `next_frame` NoMoreFrames.
 
-**Karar:** Bu runtime JPEG/PNG scale isteğini küçültülmüş çözümleme olarak uygulamıyor. Aynı Image üzerinden ikinci still frame elde edilemiyor. Ölçümler küçük fixture ve seri warm-pool etkileriyle genel performans kıyası değildir. Tam decode→resize üretim erken preview seçeneği olarak reddedilir. Sonraki ayrı kontrollü görev: güvenli, boyut/iş bütçesi sınırlı JPEG embedded thumbnail veya reduced-IDCT adapter fizibilite prototipi; ürün entegrasyonu yalnız gerçek erken frame ve kaynak maliyeti kanıtından sonra. PIV-18 TESTING.
+**Karar:** Bu runtime JPEG/PNG scale isteğini küçültülmüş çözümleme olarak uygulamıyor. Aynı Image üzerinden ikinci still frame elde edilemiyor. Ölçümler küçük fixture ve seri warm-pool etkileriyle genel performans kıyası değildir. Tam decode→resize üretim erken preview seçeneği olarak reddedilir. O tarihte önerilen ayrı JPEG embedded-thumbnail/reduced-IDCT deneyi PIV-18C olarak yapıldı; 25.10.2026 kullanıcı kararıyla reddedildi ve kaldırıldı. Bu prototip için aktif test veya entegrasyon beklentisi yoktur. PIV-18 TESTING.

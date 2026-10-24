@@ -2067,7 +2067,7 @@ Native: `bash tests/run_preview_feasibility_probe.sh`; exit0 preview PASS değil
 PIV-18 TESTING, PIV-19 başlamadı; mevcut full-only native kabul korunur.
 
 
-### PIV-18C — JPEG embedded/reduced prototipleri — TESTING
+### PIV-18C — JPEG embedded/reduced prototipleri — tarihsel, reddedildi/kaldırıldı
 
 `f69b0edef8f1e5f33f404e234c20d49a08bae170`: bounded EXIF IFD1 çıkarımı,
 ayrı Bwrap libjpeg-turbo helper baseline 1/8 IDCT; üretim modülleri değişmedi.
@@ -2075,5 +2075,24 @@ PASS: C Werror compile, 6 metadata/driver test, shell/whitespace. Tek Bwrap77
 (uid map read-only proc): frame/zaman/RSS/gerçek iptal NOT RUN. Glycin scale
 deneyi tekrar edilmedi. Gerçek erken preview NOT PROVEN; no-thumbnail ve
 progressive/arithmetic JPEG sınırlamaları açık.
-[Kanıt, güvenlik farkları, native komut](PIV18_JPEG_PREVIEW_PROTOTYPE.md).
+Deney belgesi ve çalıştırma betiği 25.10.2026 kullanıcı kararıyla kaldırıldı;
+yukarıdaki test sonuçları yalnız tarihsel kayıttır.
 PIV-18 TESTING, PIV-19 başlamadı; yeni decoder üretime bağlanmadı.
+
+
+### PIV-18C temizlik kararı — 25.10.2026
+
+Kullanıcı embedded-thumbnail ve libjpeg reduced-resolution prototiplerini
+reddetti; üretime entegre edilmeyecek. Decoder silinmesi uzak
+`87aa792a8f03a8979bd181733bfa9196d4ee313b` ile alındı; kalan deney sürücüsü,
+metadata testi, native betik ve prototip belgesi bu temizlikte kaldırıldı.
+Üç mevcut belgede aktif prototip linkleri/test/entegrasyon beklentileri kaldırıldı.
+Silinen prototip için yeniden native test veya devam geliştirmesi beklenmez.
+PIV-18B Glycin araştırması ve bütün üretim kodu korunur.
+**PIV-18 TESTING; PIV-19 başlamadı.**
+
+Temizlik doğrulaması PASS: beş hedef path yok; değişen yollar yalnız izin verilen
+silmeler ve üç belge; kalan prototip link/komut referansı yok; üretim src/Cargo/
+examples ve PIV-18B betiği değişmedi. Mevcut 30 Python observer +3 native rapor
+sürücüsü testi PASS; git diff --check PASS. Üretim kodu değişmediğinden Rust/GUI
+paketleri tekrar çalıştırılmadı; bu bir native decode PASS iddiası değildir.

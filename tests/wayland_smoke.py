@@ -113,6 +113,12 @@ def main():
                     args = [binary] + (["--expect-image-error"] if blocked else [])
                     if "--media-failures" in sys.argv[2:]:
                         args.append("--media-failures")
+                    if "--rename-pending" in sys.argv[2:]:
+                        args.append("--rename-pending")
+                    if "--queue-timeout" in sys.argv[2:]:
+                        args.append("--queue-timeout")
+                    if "--controlled" in sys.argv[2:]:
+                        args.append("--controlled")
                     if "--resampling" in sys.argv[2:]:
                         args.append("--resampling")
                     if "--zoom-pan" in sys.argv[2:]:

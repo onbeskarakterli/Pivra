@@ -147,7 +147,7 @@ pub(super) fn build(app: &adw::Application, settings: &Settings, file: Option<Op
         }
         menu.append_section(Some(pivra::viewing::Resampling::MENU), &quality);
         let mode_button = gtk::MenuButton::builder()
-            .label("Fit")
+            .label(pivra::settings::load_view_mode().label())
             .tooltip_text(pivra::viewing::ViewMode::HELP)
             .menu_model(&menu)
             .build();

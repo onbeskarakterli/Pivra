@@ -71,7 +71,10 @@ mod tests {
                     match mode {
                         ViewMode::Fit => {
                             assert!(g.width <= viewport.0 + 1e-9 && g.height <= viewport.1 + 1e-9);
-                            assert!((g.width - viewport.0).abs() < 1e-9 || (g.height - viewport.1).abs() < 1e-9);
+                            assert!(
+                                (g.width - viewport.0).abs() < 1e-9
+                                    || (g.height - viewport.1).abs() < 1e-9
+                            );
                         }
                         ViewMode::Fill => {
                             assert!(g.width + 1e-9 >= viewport.0 && g.height + 1e-9 >= viewport.1);

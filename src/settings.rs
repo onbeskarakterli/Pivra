@@ -129,3 +129,44 @@ mod thumbnail_tests {
         assert!(p.listeners.borrow().is_empty());
     }
 }
+
+/// Remember the last chosen Fit / Fill / 100% preset between launches.
+pub fn load_view_mode() -> crate::viewing::ViewMode {
+    use std::io::Read;
+    let path = glib::user_config_dir().join("pivra/view-mode.conf");
+    let mut content = Vec::new();
+    if std::fs::File::open(path)
+        .and_then(|f| f.take(32).read_to_end(&mut content))
+        .is_ok()
+    {
+        match content.as_slice() {
+            b"fill\n" => return crate::viewing::ViewMode::Fill,
+            b"actual\n" => return crate::viewing::ViewMode::Actual,
+            _ => {}
+        }
+    }
+    crate::viewing::ViewMode::Fit
+}
+
+pub fn save_view_mode(mode: crate::viewing::ViewMode) {
+    let dir = glib::user_config_dir().join("pivra");
+    let result = (|| -> Result<(), Box<dyn std::error::Error>> {
+        std::fs::create_dir_all(&dir)?;
+        let value: &[u8] = match mode {
+            crate::viewing::ViewMode::Fit => b"fit\n",
+            crate::viewing::ViewMode::Fill => b"fill\n",
+            crate::viewing::ViewMode::Actual => b"actual\n",
+        };
+        gio::File::for_path(dir.join("view-mode.conf")).replace_contents(
+            value,
+            None,
+            false,
+            gio::FileCreateFlags::PRIVATE | gio::FileCreateFlags::REPLACE_DESTINATION,
+            None::<&gio::Cancellable>,
+        )?;
+        Ok(())
+    })();
+    if let Err(err) = result {
+        eprintln!("Pivra: could not save view mode: {err}");
+    }
+}

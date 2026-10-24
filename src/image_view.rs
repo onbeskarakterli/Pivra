@@ -86,7 +86,7 @@ impl ImageView {
         let mode_action = gio::SimpleAction::new_stateful(
             "image-mode",
             Some(glib::VariantTy::STRING),
-            &"fit".to_variant(),
+            &pivra::settings::load_view_mode().id().to_variant(),
         );
         mode_action.set_enabled(false);
         let texture: Rc<RefCell<Option<gtk::gdk::Texture>>> = Rc::default();
@@ -118,6 +118,7 @@ impl ImageView {
             };
             mode_transform.borrow_mut().reset();
             action.set_state(&mode.id().to_variant());
+            pivra::settings::save_view_mode(mode);
             if let Some(picture) = weak_picture.upgrade() {
                 present_filtered(
                     &picture,
@@ -357,9 +358,10 @@ impl ImageView {
         };
         // Keep the selected preset across catalog navigation. The per-image
         // manual transform is still reset by prepare(), preventing stale pan/zoom.
-        let selected_mode = self.mode_action.state().and_then(|state| {
-            state.str().and_then(ViewMode::from_id)
-        });
+        let selected_mode = self
+            .mode_action
+            .state()
+            .and_then(|state| state.str().and_then(ViewMode::from_id));
         self.prepare("", false);
         if let Some(mode) = selected_mode {
             self.mode_action.set_state(&mode.id().to_variant());

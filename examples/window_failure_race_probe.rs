@@ -139,6 +139,32 @@ fn mode_key(w: &adw::ApplicationWindow, key: gtk::gdk::Key, expected: &str) {
     );
 }
 
+fn input_while_pending(w: &adw::ApplicationWindow) {
+    let p = widgets(w.upcast_ref())
+        .into_iter()
+        .find_map(|w| w.downcast::<gtk::Picture>().ok())
+        .unwrap();
+    let list = p.observe_controllers();
+    let scroll = (0..list.n_items())
+        .find_map(|i| {
+            list.item(i)
+                .unwrap()
+                .downcast::<gtk::EventControllerScroll>()
+                .ok()
+        })
+        .unwrap();
+    assert!(
+        !scroll.emit_by_name::<bool>("scroll", &[&0_f64, &-1_f64]),
+        "pending input must not fabricate a texture"
+    );
+    let drag = (0..list.n_items())
+        .find_map(|i| list.item(i).unwrap().downcast::<gtk::GestureDrag>().ok())
+        .unwrap();
+    drag.emit_by_name::<()>("drag-begin", &[&100_f64, &100_f64]);
+    drag.emit_by_name::<()>("drag-update", &[&200_f64, &200_f64]);
+    drag.emit_by_name::<()>("drag-end", &[&200_f64, &200_f64]);
+}
+
 fn main() {
     adw::init().unwrap();
     let app = adw::Application::builder()
@@ -156,6 +182,18 @@ fn main() {
     wait(|| STARTED.load(Ordering::SeqCst) == 2);
     mode_key(&first, gtk::gdk::Key::F7, "fill");
     mode_key(&second, gtk::gdk::Key::F8, "actual");
+    input_while_pending(&first);
+    input_while_pending(&second);
+    assert_eq!(
+        first
+            .lookup_action("image-mode")
+            .unwrap()
+            .state()
+            .unwrap()
+            .str(),
+        Some("fill")
+    );
+    assert_eq!(STARTED.load(Ordering::SeqCst), 2);
     for name in ["1.png", "2.png"] {
         std::fs::write(dir.path().join(name), b"controlled fixture").unwrap();
     }

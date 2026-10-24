@@ -113,6 +113,8 @@ def main():
                     args = [binary] + (["--expect-image-error"] if blocked else [])
                     if "--media-failures" in sys.argv[2:]:
                         args.append("--media-failures")
+                    if "--zoom-pan" in sys.argv[2:]:
+                        args.append("--zoom-pan")
                     if "--synthetic" in sys.argv[2:]:
                         args.append("--synthetic")
                     result = subprocess.run(args, env={**env, "G_DEBUG": "fatal-criticals"},

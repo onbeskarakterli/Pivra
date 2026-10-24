@@ -7,6 +7,8 @@ mod image_view;
 mod input;
 #[path = "../src/window.rs"]
 mod window;
+#[path = "support/zoom_pan_cases.rs"]
+mod zoom_pan_cases;
 use adw::prelude::*;
 use gtk::{gdk, gio, glib};
 use pivra::viewing::ViewMode;
@@ -247,6 +249,12 @@ fn native_isolation(app: &adw::Application, fixtures: &Path) {
     wait(|| first.title().is_some_and(|s| s.ends_with("(4 candidates)")));
     let p = loaded(&first);
     let q = loaded(&second);
+    if std::env::args().any(|s| s == "--zoom-pan") {
+        zoom_pan_cases::native(&first);
+        assert_eq!(state(&second), "fit");
+        zoom_pan_cases::native(&second);
+        assert_eq!(state(&first), "fit");
+    }
     select(&first, ViewMode::Actual);
     select(&second, ViewMode::Fill);
     let survivor = q.paintable();
@@ -371,6 +379,10 @@ fn native(app: &adw::Application) {
             _ => (64, 32),
         };
         assert_eq!(size, expected, "EXIF-transformed source dimensions");
+        if std::env::args().any(|s| s == "--zoom-pan") {
+            zoom_pan_cases::native(&w);
+            select(&w, ViewMode::Fill);
+        }
         assert_eq!(state(&w), "fill");
         for (vw, vh) in [(800, 600), (320, 700)] {
             w.set_default_size(vw, vh);
@@ -409,7 +421,11 @@ fn main() {
         .build();
     app.register(None::<&gio::Cancellable>).unwrap();
     if std::env::args().any(|s| s == "--synthetic") {
-        synthetic(&app);
+        if std::env::args().any(|s| s == "--zoom-pan") {
+            zoom_pan_cases::synthetic(&app);
+        } else {
+            synthetic(&app);
+        }
     } else {
         native(&app);
     }

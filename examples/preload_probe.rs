@@ -122,6 +122,7 @@ fn loaded(v: &image_view::ImageView) {
         "valid load failed: {}",
         status(v).text()
     );
+    assert_eq!(v.phase(), pivra::image_pipeline::Phase::FullReady);
 }
 fn idle(v: &image_view::ImageView) {
     wait(|| {
@@ -168,6 +169,7 @@ fn run(app: &adw::Application, controlled: bool) {
     v.configure_cache(256 * 1024, 96 * 1024);
     v.set_neighbors(vec![paths[2].clone(), paths[0].clone()]);
     v.load(paths[1].clone());
+    assert_eq!(v.phase(), pivra::image_pipeline::Phase::FullLoading);
     wait(|| picture(&v).paintable().is_some() || status(&v).text().starts_with("Unable"));
     if !controlled && picture(&v).paintable().is_none() {
         eprintln!("NOT RUN secure preload baseline: {}", status(&v).text());
@@ -366,6 +368,7 @@ fn controlled_priority(app: &adw::Application) {
     RELEASE.store(true, Ordering::SeqCst);
     idle(&v);
     assert_eq!(v.preload_stats().cache.entries, 0);
+    assert_eq!(v.phase(), pivra::image_pipeline::Phase::Cancelled);
     assert_eq!(picture(&survivor).paintable(), stable);
     assert!(other.is_visible());
     other.close();
@@ -418,6 +421,7 @@ fn native_priority(app: &adw::Application) {
     RELEASE.store(true, Ordering::SeqCst);
     idle(&v);
     assert_eq!(v.preload_stats().cache.entries, 0);
+    assert_eq!(v.phase(), pivra::image_pipeline::Phase::Cancelled);
     assert_eq!(picture(&survivor).paintable(), stable);
     assert!(other.is_visible());
     println!(

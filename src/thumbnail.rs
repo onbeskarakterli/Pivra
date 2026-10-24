@@ -1,0 +1,485 @@
+//! TH-01 only: blocking GIO metadata/cache adapter, never image pixel decode or UI.
+//! Call `query` from a worker. No thumbnail generation/scheduling (TH-05).
+use crate::image_cache::FileKey;
+use gtk::{gio, prelude::*};
+use std::{
+    fs,
+    io::Read,
+    os::unix::fs::MetadataExt,
+    path::{Path, PathBuf},
+    process::{Command, Stdio},
+    sync::{
+        Mutex,
+        atomic::{AtomicBool, Ordering},
+    },
+    time::{Duration, Instant},
+};
+const MAX_CACHE: u64 = 2 * 1024 * 1024;
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Capability {
+    Unavailable,
+    CacheOnly,
+    CacheAndGenerate,
+    TemporarilyFailed,
+}
+#[derive(Debug)]
+pub enum Outcome {
+    Hit(Candidate),
+    Missing,
+    FailedCached,
+    Stale,
+    Invalid(String),
+    SourceUnavailable(String),
+    Cancelled,
+    Busy,
+    UnsupportedDesktop,
+}
+#[derive(Debug)]
+pub struct Candidate {
+    pub uri: String,
+    pub source: FileKey,
+    pub thumbnail: FileKey,
+    /// Container/metadata validated only. Still untrusted pixels: secure decode required.
+    pub png: Vec<u8>,
+}
+impl Candidate {
+    pub fn still_current(&self, cancel: &gio::Cancellable) -> bool {
+        !cancel.is_cancelled()
+            && FileKey::read(&self.source.path).ok().as_ref() == Some(&self.source)
+            && FileKey::read(&self.thumbnail.path).ok().as_ref() == Some(&self.thumbnail)
+    }
+}
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum Generator {
+    Absent,
+    Available,
+    Transient,
+}
+fn capability(gnome: bool, generator: Generator) -> Capability {
+    if !gnome {
+        Capability::Unavailable
+    } else {
+        match generator {
+            Generator::Absent => Capability::CacheOnly,
+            Generator::Available => Capability::CacheAndGenerate,
+            Generator::Transient => Capability::TemporarilyFailed,
+        }
+    }
+}
+pub struct Provider {
+    gnome: bool,
+    /// Explicit trusted metadata-only factory helper; never a decoder executable.
+    factory: Option<PathBuf>,
+    generator: Mutex<Generator>,
+    busy: AtomicBool,
+    eligible: AtomicBool,
+}
+impl Provider {
+    pub fn new(gnome: bool, factory: Option<PathBuf>) -> Self {
+        Self {
+            gnome,
+            factory,
+            generator: Mutex::new(Generator::Absent),
+            busy: AtomicBool::new(false),
+            eligible: AtomicBool::new(false),
+        }
+    }
+    pub fn discover(factory: Option<PathBuf>) -> Self {
+        let desktop = std::env::var("XDG_CURRENT_DESKTOP").unwrap_or_default();
+        Self::new(
+            desktop.split(':').any(|s| s.eq_ignore_ascii_case("GNOME")),
+            factory,
+        )
+    }
+    pub fn capability(&self) -> Capability {
+        capability(self.gnome, *self.generator.lock().unwrap())
+    }
+    pub fn generation_eligible(&self) -> bool {
+        self.capability() == Capability::CacheAndGenerate && self.eligible.load(Ordering::Acquire)
+    }
+    /// UI-facing entry point: reuse GIO's blocking worker pool; no GTK mutation.
+    pub async fn query_on_worker(
+        self: std::sync::Arc<Self>,
+        path: PathBuf,
+        cancel: gio::Cancellable,
+    ) -> Outcome {
+        gio::spawn_blocking(move || self.query(&path, &cancel))
+            .await
+            .unwrap_or_else(|_| Outcome::Invalid("thumbnail metadata worker failed".into()))
+    }
+    /// One request, no pending queue; worker-only. Factory probe bounded to one second.
+    pub fn query(&self, path: &Path, cancel: &gio::Cancellable) -> Outcome {
+        if !self.gnome {
+            return Outcome::UnsupportedDesktop;
+        }
+        if self.busy.swap(true, Ordering::AcqRel) {
+            return Outcome::Busy;
+        }
+        struct Release<'a>(&'a AtomicBool);
+        impl Drop for Release<'_> {
+            fn drop(&mut self) {
+                self.0.store(false, Ordering::Release);
+            }
+        }
+        let _release = Release(&self.busy);
+        self.eligible.store(false, Ordering::Release);
+        if cancel.is_cancelled() {
+            return Outcome::Cancelled;
+        }
+        let source = match FileKey::read(path) {
+            Ok(s) => s,
+            Err(e) => return Outcome::SourceUnavailable(e.to_string()),
+        };
+        let file = gio::File::for_path(path);
+        let uri = file.uri().to_string();
+        // GIO validates thumbnails even for a path-only query and memory-maps them.
+        // Preflight standard locations before invoking that native metadata parser.
+        if let Err(error) = cache_preflight(&uri) {
+            return Outcome::Invalid(error);
+        }
+
+        let info = match file.query_info(
+            "thumbnail::path,thumbnail::failed,thumbnail::is-valid,standard::content-type,time::modified",
+            gio::FileQueryInfoFlags::NONE,
+            Some(cancel),
+        ) {
+            Ok(i) => i,
+            Err(e) => {
+                return if cancel.is_cancelled() {
+                    Outcome::Cancelled
+                } else {
+                    Outcome::SourceUnavailable(e.to_string())
+                };
+            }
+        };
+        if let Some(helper) = &self.factory {
+            let mime = info
+                .content_type()
+                .and_then(|c| gio::content_type_get_mime_type(&c));
+            if let Some(mime) = mime {
+                let state = factory_probe(
+                    helper,
+                    &uri,
+                    &mime,
+                    info.attribute_uint64("time::modified"),
+                    cancel,
+                );
+                self.eligible
+                    .store(matches!(state, Ok(true)), Ordering::Release);
+                let mut previous = self.generator.lock().unwrap();
+                *previous = match state {
+                    Ok(true) => Generator::Available,
+                    Ok(false) if *previous == Generator::Available => Generator::Available,
+                    Ok(false) => Generator::Absent,
+                    Err(_)
+                        if *previous == Generator::Available
+                            || *previous == Generator::Transient =>
+                    {
+                        Generator::Transient
+                    }
+                    Err(_) => Generator::Absent,
+                };
+            }
+        }
+        if cancel.is_cancelled() {
+            return Outcome::Cancelled;
+        }
+        // Ask GIO for the byte-string as an OsString, preserving non-UTF8 paths.
+        let Some(cache) = info
+            .attribute_byte_string("thumbnail::path")
+            .map(|p| PathBuf::from(std::ffi::OsStr::from_bytes(p.as_bytes())))
+        else {
+            return if info.boolean("thumbnail::failed") && info.boolean("thumbnail::is-valid") {
+                Outcome::FailedCached
+            } else {
+                Outcome::Missing
+            };
+        };
+        use std::os::unix::ffi::OsStrExt;
+        let metadata = match fs::symlink_metadata(&cache) {
+            Ok(m) => m,
+            Err(_) => return Outcome::Stale,
+        };
+        if !metadata.is_file() || metadata.len() > MAX_CACHE {
+            return Outcome::Invalid("cache must be regular, <=2MiB".into());
+        }
+        let cache_key = match FileKey::read(&cache) {
+            Ok(k) => k,
+            Err(_) => return Outcome::Stale,
+        };
+        let mut bytes = Vec::new();
+        let result =
+            fs::File::open(&cache).and_then(|f| f.take(MAX_CACHE + 1).read_to_end(&mut bytes));
+        if result.is_err() || bytes.len() as u64 > MAX_CACHE {
+            return Outcome::Invalid("cache read bound/error".into());
+        }
+        if let Err(e) = png_container(&bytes, cancel) {
+            return if cancel.is_cancelled() {
+                Outcome::Cancelled
+            } else {
+                Outcome::Invalid(e)
+            };
+        }
+        // GIO is the standard authority for Thumb::URI/MTime/(optional)Size.
+        let valid = match file.query_info(
+            "thumbnail::is-valid,thumbnail::path",
+            gio::FileQueryInfoFlags::NONE,
+            Some(cancel),
+        ) {
+            Ok(i) => {
+                i.boolean("thumbnail::is-valid")
+                    && i.attribute_byte_string("thumbnail::path")
+                        .is_some_and(|p| p.as_bytes() == cache.as_os_str().as_bytes())
+            }
+            Err(_) => false,
+        };
+        if cancel.is_cancelled() {
+            return Outcome::Cancelled;
+        }
+        if !valid
+            || FileKey::read(path).ok().as_ref() != Some(&source)
+            || FileKey::read(&cache).ok().as_ref() != Some(&cache_key)
+        {
+            return Outcome::Stale;
+        }
+        // Reject same-path replacement even when seconds-resolution Thumb::MTime survives.
+        let src = match fs::metadata(path) {
+            Ok(m) => m,
+            Err(_) => return Outcome::Stale,
+        };
+        if (src.ctime(), src.ctime_nsec()) > (metadata.mtime(), metadata.mtime_nsec()) {
+            return Outcome::Stale;
+        }
+        Outcome::Hit(Candidate {
+            uri,
+            source,
+            thumbnail: cache_key,
+            png: bytes,
+        })
+    }
+}
+fn cache_preflight(uri: &str) -> Result<(), String> {
+    let mut hash =
+        gtk::glib::Checksum::new(gtk::glib::ChecksumType::Md5).ok_or("MD5 unavailable")?;
+    hash.update(uri.as_bytes());
+    let name = format!("{}.png", hash.string().ok_or("MD5 string")?);
+    let root = gtk::glib::user_cache_dir().join("thumbnails");
+    for size in [
+        "normal",
+        "large",
+        "x-large",
+        "xx-large",
+        "fail/gnome-thumbnail-factory",
+    ] {
+        match fs::symlink_metadata(root.join(size).join(&name)) {
+            Ok(m) if !m.is_file() || m.len() > MAX_CACHE => {
+                return Err("cache preflight: regular file <=2MiB required".into());
+            }
+            Ok(_) => {}
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound => {}
+            Err(e) => return Err(format!("cache preflight: {e}")),
+        }
+    }
+    Ok(())
+}
+fn factory_probe(
+    helper: &Path,
+    uri: &str,
+    mime: &str,
+    mtime: u64,
+    cancel: &gio::Cancellable,
+) -> Result<bool, String> {
+    if uri.len() > 16384 || mime.len() > 256 {
+        return Err("probe argument bound".into());
+    }
+    let mut child = Command::new(helper)
+        .args([uri, mime, &mtime.to_string()])
+        .stdin(Stdio::null())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::null())
+        .spawn()
+        .map_err(|e| e.to_string())?;
+    let end = Instant::now() + Duration::from_secs(1);
+    loop {
+        if cancel.is_cancelled() || Instant::now() >= end {
+            let _ = child.kill();
+            let _ = child.wait();
+            return Err("factory metadata probe cancelled/timed out".into());
+        }
+        match child.try_wait() {
+            Ok(Some(status)) => {
+                let mut output = String::new();
+                if let Some(stdout) = child.stdout.take() {
+                    stdout
+                        .take(32)
+                        .read_to_string(&mut output)
+                        .map_err(|e| e.to_string())?;
+                }
+                return if status.success() && output == "1\n" {
+                    Ok(true)
+                } else if status.success() && output == "0\n" {
+                    Ok(false)
+                } else {
+                    Err("factory probe failed".into())
+                };
+            }
+            Ok(None) => std::thread::sleep(Duration::from_millis(5)),
+            Err(e) => {
+                let _ = child.kill();
+                let _ = child.wait();
+                return Err(e.to_string());
+            }
+        }
+    }
+}
+/// Structural/CRC bounds, not a PNG decoder or replacement for GIO metadata validation.
+fn png_container(bytes: &[u8], cancel: &gio::Cancellable) -> Result<(), String> {
+    if !bytes.starts_with(b"\x89PNG\r\n\x1a\n") {
+        return Err("PNG signature".into());
+    }
+    let mut at = 8usize;
+    let mut idat = false;
+    let mut ihdr = false;
+    for _ in 0..2048 {
+        if cancel.is_cancelled() {
+            return Err("cancelled".into());
+        }
+        let header = bytes.get(at..at + 8).ok_or("truncated PNG chunk")?;
+        let n = u32::from_be_bytes(header[..4].try_into().unwrap()) as usize;
+        let end = at
+            .checked_add(n)
+            .and_then(|x| x.checked_add(12))
+            .ok_or("PNG overflow")?;
+        let chunk = bytes.get(at + 4..end - 4).ok_or("PNG chunk bounds")?;
+        let expected = bytes.get(end - 4..end).ok_or("PNG CRC bounds")?;
+        let mut crc = !0u32;
+        for b in chunk {
+            crc ^= u32::from(*b);
+            for _ in 0..8 {
+                crc = (crc >> 1) ^ (0xedb88320u32.wrapping_mul(crc & 1));
+            }
+        }
+        if (!crc).to_be_bytes().as_slice() != expected {
+            return Err("PNG CRC".into());
+        }
+        if !ihdr {
+            if &header[4..] != b"IHDR" || n != 13 {
+                return Err("PNG IHDR".into());
+            }
+            let w = u32::from_be_bytes(chunk[4..8].try_into().unwrap());
+            let h = u32::from_be_bytes(chunk[8..12].try_into().unwrap());
+            if w == 0 || h == 0 || w > 1024 || h > 1024 {
+                return Err("thumbnail edge bound".into());
+            }
+            ihdr = true;
+        } else if &header[4..] == b"IHDR" {
+            return Err("duplicate IHDR".into());
+        }
+        if &header[4..] == b"IDAT" {
+            idat = true;
+        }
+        if &header[4..] == b"IEND" {
+            return if n == 0 && idat && end == bytes.len() {
+                Ok(())
+            } else {
+                Err("PNG ending".into())
+            };
+        }
+        at = end;
+    }
+    Err("PNG chunk count".into())
+}
+#[cfg(test)]
+mod tests {
+    use super::*;
+    #[test]
+    fn four_capabilities_are_distinct() {
+        assert_eq!(
+            capability(false, Generator::Absent),
+            Capability::Unavailable
+        );
+        assert_eq!(capability(true, Generator::Absent), Capability::CacheOnly);
+        assert_eq!(
+            capability(true, Generator::Available),
+            Capability::CacheAndGenerate
+        );
+        assert_eq!(
+            capability(true, Generator::Transient),
+            Capability::TemporarilyFailed
+        );
+    }
+    #[test]
+    fn png_bounds_crc_corruption_and_cancel() {
+        let bytes = include_bytes!("../tests/fixtures/pixels-2x2.png");
+        let token = gio::Cancellable::new();
+        assert!(png_container(bytes, &token).is_ok());
+        for bad in [b"text".as_slice(), &bytes[..bytes.len() - 1]] {
+            assert!(png_container(bad, &token).is_err());
+        }
+        let mut bad = bytes.to_vec();
+        bad[30] ^= 1;
+        assert!(png_container(&bad, &token).is_err());
+        token.cancel();
+        assert!(png_container(bytes, &token).is_err());
+    }
+    #[test]
+    fn candidate_identity_catches_replace_rename_and_cache_delete() {
+        let d = tempfile::tempdir().unwrap();
+        let source = d.path().join("source.png");
+        let cache = d.path().join("cache.png");
+        fs::write(&source, b"original").unwrap();
+        fs::write(&cache, b"cached").unwrap();
+        let candidate = Candidate {
+            uri: gio::File::for_path(&source).uri().to_string(),
+            source: FileKey::read(&source).unwrap(),
+            thumbnail: FileKey::read(&cache).unwrap(),
+            png: vec![],
+        };
+        let token = gio::Cancellable::new();
+        assert!(candidate.still_current(&token));
+        let temp = d.path().join("save");
+        fs::write(&temp, b"original").unwrap();
+        fs::rename(&temp, &source).unwrap();
+        assert!(!candidate.still_current(&token));
+        fs::rename(&source, d.path().join("renamed")).unwrap();
+        assert!(!candidate.still_current(&token));
+        fs::remove_file(cache).unwrap();
+        assert!(!candidate.still_current(&token));
+    }
+    #[test]
+    fn factory_success_then_loss_is_transient_without_affecting_cache_query() {
+        use std::os::unix::fs::PermissionsExt;
+        let d = tempfile::tempdir().unwrap();
+        let source = d.path().join("input.png");
+        fs::write(&source, include_bytes!("../tests/fixtures/pixels-2x2.png")).unwrap();
+        let helper = d.path().join("factory-mock");
+        fs::write(&helper, b"#!/bin/sh\nprintf '1\\n'\n").unwrap();
+        fs::set_permissions(&helper, fs::Permissions::from_mode(0o700)).unwrap();
+        let provider = Provider::new(true, Some(helper.clone()));
+        let token = gio::Cancellable::new();
+        assert!(matches!(provider.query(&source, &token), Outcome::Missing));
+        assert_eq!(provider.capability(), Capability::CacheAndGenerate);
+        assert!(provider.generation_eligible());
+        fs::remove_file(helper).unwrap();
+        assert!(matches!(provider.query(&source, &token), Outcome::Missing));
+        assert_eq!(provider.capability(), Capability::TemporarilyFailed);
+        assert!(!provider.generation_eligible());
+    }
+    #[test]
+    fn no_queue_and_cancel_do_not_change_capability() {
+        let provider = Provider::new(true, None);
+        let token = gio::Cancellable::new();
+        provider.busy.store(true, Ordering::Release);
+        assert!(matches!(
+            provider.query(Path::new("unused"), &token),
+            Outcome::Busy
+        ));
+        provider.busy.store(false, Ordering::Release);
+        token.cancel();
+        assert!(matches!(
+            provider.query(Path::new("unused"), &token),
+            Outcome::Cancelled
+        ));
+        assert_eq!(provider.capability(), Capability::CacheOnly);
+    }
+}

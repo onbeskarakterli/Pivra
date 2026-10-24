@@ -232,3 +232,11 @@ GDK_BACKEND=wayland cargo run --locked -- "$PWD/tests/fixtures/images/wide.png"
 
 Paket komutu değişmedi: `bash tests/run_preview_pipeline_probe.sh`.
 Geçerli PNG/JPEG kullanıcı senaryosu doğrulanmadan bu açık hata kapanmaz.
+
+## Arch native ve manuel full-only kabul — 24.10.2026
+
+Kullanıcı güncel `dev` üzerinde `bash tests/run_preview_pipeline_probe.sh` çalıştırdı; **exit 0**. Normal uygulama girişinde wide.png, large.png, no-exif.jpg için path ve URI, gerçek secure texture/pixel sonuçları PASS. Preload/cache, Fit/Fill/Actual, Smooth/Nearest, zoom/pan, async A-B-A, iki pencere izolasyonu ve PIV-09 active secure decoder close/cleanup PASS. Hesaplanan cache bütçesi gerçek RSS/VRAM ölçümü değildir.
+
+İlk manuel denemelerde fixture klasörü gezinmesindeki bilerek geçersiz `text-content.jpg`, `broken.jpg` ve `broken.png` hata kayıtları görüldü; yeni hata teşhisi `text-content.jpg` için content-only MIME `text/plain` ve geçersiz imzayı gösterdi. Bu, ilk geçerli PNG'nin decoder tarafından hatalı çözüldüğü anlamına gelmez. Kullanıcı temiz klasörde geçerli fotoğrafların açıldığını ve Sol/Sağ gezinme, zoom, Fit/Fill kontrollerinin çalıştığını doğruladı. GDK frame-timing warning gözlendi; bu tek başına decoder hatası veya crash kanıtı değildir.
+
+**Kabul:** Native full-only fallback ve belirtilen manuel görüntüleme davranışları PASS. **Kapsam açığı:** gerçek erken preview sağlayıcısı, preview→full viewport sürekliliği ve preview sırasında full-loading UX henüz uygulanmadı; PIV-18 **TESTING**, DONE değil. PIV-19 başlatılmaz.

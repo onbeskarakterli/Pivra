@@ -141,3 +141,35 @@ Arch kullanıcı yeniden aynı komutu çalıştırmalı:
 `bash tests/run_preview_pipeline_probe.sh`.
 Önceki native FAIL kaydı korunur; yeni native sonuç **bekleniyor**, PIV-18
 **TESTING**. Early-preview/preview-full continuity sınırlamaları değişmedi.
+
+## İkinci native snapshot hatası — resampling — 24.10.2026
+
+Kullanıcı güncel dev için **FAIL / exit101** bildirdi:
+`examples/support/resampling_cases.rs:20`, `resampling render node`.
+Önceki mode düzeltmesiyle gerçek Fit/Fill/Actual ve iki pencere kontrollerinin
+PASS olduğu kullanıcı tarafından bildirildi; tüm native komut PASS değildir.
+
+Düzeltme SHA: `fcea3e8a4ac0f7cb87ca4eedf9eaec4a1140adb4`.
+Resampling `pixels()` hâlâ settle + geçici WidgetPaintable kullanıyordu. Önceki
+başarılı mode frame bariyeri `examples/support/render_frame.rs` ortak yardımcısına
+taşındı. Mode, resampling ve aynı açığı taşıyan zoom/pan snapshot çağrısı bu
+küçük ortak yardımcıyı kullanır. Widget referansları ve WidgetPaintable bütün
+bekleme boyunca canlıdır. Gerçek after-paint, mapped/nonzero allocation ve
+nonempty snapshot şartları korunur; 20s deadline başarısızsa tanılı FAIL verir.
+Tick/sinyal bağlantısı temizlenir. Action bulunmayan synthetic pencerede hata
+tanısı ayrıca panic üretmez. Sahte node, assertion kaldırma veya skip yoktur.
+Smooth/Nearest, gerçek GSK piksel örnekleri, clipping ve gradient kontrolleri
+aynen korunur. Üretim ImageView/decoder/cache/iş yaşam döngüsüne dokunulmadı.
+
+Önce hedefli **X11 synthetic resampling PASS**: Nearest palette/konum, Smooth
+bilinear, fractional/min/max/downscale, distinct output ve geometry. Ardından
+bir kez zorunlu core helper: **74 Rust +30 Python**, fmt/check/build/test ve
+all-targets Clippy -D warnings, fixture hash'leri PASS. Ek **3 Python rapor testi
+PASS**. X11 **48 mode snapshot**, X11 zoom/pan/controller/gradient ve Sway
+Wayland resampling PASS. Bunlar gerçek GTK/GSK üzerinde **synthetic texture**
+testleridir; secure decoder ve fiziksel GNOME kabulü değildir. Whitespace PASS.
+
+Bilinen Codex Bwrap engeli yeniden denenmedi. Yeni secure/native sonuç
+**NOT RUN**; kullanıcının Arch native FAIL kaydı düzeltme sonrasında yeniden
+çalıştırılmayı bekler. Aynı komut: `bash tests/run_preview_pipeline_probe.sh`.
+PIV-18 **TESTING**; PIV-19 başlamadı. Önceki erken-preview sınırlamaları sürer.

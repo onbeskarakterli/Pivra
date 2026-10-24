@@ -2023,3 +2023,16 @@ snapshot. Strict secure gate bir kez exit77: NOT RUN. Arch native **FAIL kaydı
 korunur / düzeltme sonrası yeniden test bekleniyor**. Komut değişmedi:
 `bash tests/run_preview_pipeline_probe.sh`. [Ayrıntı](PIV18_VALIDATION.md).
 PIV-18 TESTING; PIV-19 başlamadı. Main/üretim bağımlılıkları/sandbox değişmedi.
+
+### PIV-18 ikinci native snapshot düzeltmesi — TESTING
+
+`fcea3e8a4ac0f7cb87ca4eedf9eaec4a1140adb4`: doğrulanmış after-paint yardımcı
+ortak test modülüne taşındı; resampling ve zoom/pan geçici snapshot'ları buna
+bağlandı. Smooth/Nearest piksel/clipping assertion'ları aynı; ürün kodu değişmedi.
+Kullanıcı önceki gerçek mode/iki pencere testlerini PASS, yeni resampling aşamasını
+FAIL/exit101 bildirdi. Yeni Arch sonucu bekleniyor; native PASS ilan edilmedi.
+PASS: hedefli X11 resampling, sonra tek core (74 Rust/30 Python, zorunlu Rust
+kontrolleri/fixture), 3 Python rapor testi; X11 48 mode snapshot ve zoom/pan,
+Sway resampling. Synthetic veri ile gerçek decoder ayrımı korunur. Secure kapı
+NOT RUN; bilinen Bwrap engeli tekrar denenmedi. [Ayrıntı](PIV18_VALIDATION.md).
+Native komut: `bash tests/run_preview_pipeline_probe.sh`. PIV-18 TESTING.

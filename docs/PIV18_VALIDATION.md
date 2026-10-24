@@ -3,8 +3,9 @@
 24.10.2026 · dev. Başlangıç `07f47b5fb21200d8337933893128b700e5b8329d`;
 origin/dev fetch ve fast-forward kontrolü: zaten güncel, çalışma dizini temizdi.
 PIV-01–17 DONE, son kullanıcının görev talimatındaki durum beyanına göre korunur.
-Depoda PIV-17 TESTING yazıyordu; yeni native log/ölçüm sağlanmadı. Bu durum
-Codex tarafından yeni native test yapılmış gibi kaydedilmez.
+İlk yerel tracking ref PIV-17 TESTING gösteriyordu. Push öncesi explicit dev
+fetch ile `5046419` dahil PIV-17 kullanıcı native/manuel kabul kayıtları ve kenar
+navigasyon tasarımı normal merge ile korundu. Bunlar Codex native sonucu değildir.
 
 ## API kanıtı ve uygulanabilir yol
 
@@ -102,3 +103,5 @@ korunur; PIV-19 başlamadı.
 
 - `99d49ddbdfb73c88d1c638f5d1d0d07ae4c85c3d`: kalite yaşam döngüsü, full-only ImageView entegrasyonu.
 - `29059174e800ed067414651c99b02c2e2a9c779e`: phase assertion'ları, tek native komut/JSON ve rapor testleri.
+
+Uzak belge değişiklikleri kodu değiştirmedi; kod testleri tekrar edilmedi.

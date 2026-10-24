@@ -1,6 +1,6 @@
 # PIV-17 — ön yükleme ve sınırlı RAM önbelleği
 
-24.10.2026 · dev · **TESTING**. PIV-01–16 DONE korunur; PIV-18 başlamadı.
+24.10.2026 · dev · **DONE**. PIV-01–16 DONE korunur; PIV-18 başlamadı.
 Başlangıç: `e67bebf5e5aef7ffa64b12d997596d489e6ad241`.
 Uygulama: `e2f7504c19f5b49d405e9f45c36d954e84e301a3`.
 Probe/test: `a4fd9e083176ce885b9557db10860db5f513608e`.
@@ -124,3 +124,8 @@ hızlı Sol/Sağ, sıcak komşu, dosya değiştir/Yenile ve iki pencere sırası
 hata/spinner olmaması ayrıca manuel kabul bekler. Native sonuç gelmeden DONE
 verilmez. Faz 0 temiz native kurulum INCOMPLETE, DESKTOP-06 Nautilus NOT RUN,
 PIV-39 tr/en planı açık kalır.
+
+
+## PIV-17 Arch native ve manuel kabul kapanışı — 24.10.2026 — DONE
+
+Kullanıcı `07f47b5fb21200d8337933893128b700e5b8329d` üzerinde `bash tests/run_preload_probe.sh` çalıştırdı, **exit 0**. Gerçek secure JPEG/PNG/EXIF baseline, cache hit/texture reuse/Fit/filter, next-before-previous preload, LRU eviction, atomic replace/delete identity, hesaplanan bellek bütçesi, injected memory pressure, source integrity, worker-entry promotion ve foreground priority, window close/drain **PASS**. Örnek: hits=3, misses=6, evictions=5; enabled başlangıcı foreground=1/background=2; disabled foreground=2. Native secure secondary probe promoted=1, cancelled=2, started=completed=4, cache entries/bytes=0 after drain. PIV-09 gerçek active decoder memfd/pidfd/mapping/sandbox close checkpoint, job join, survivor pixels, children cleanup PASS. `Cleanup SIGCONT unavailable` hedef PID zaten çıkmışken fatal değildi. Kullanıcı gerçek GNOME arayüzünde hızlı Sol/Sağ gezinmenin sorunsuz olduğunu bildirdi; ayrı gerçek RSS/VRAM/FPS/hız kazanımı, OS gerçek memory-pressure sinyali ve decoder overlap **NOT MEASURED/NOT RUN**. **PIV-17 DONE; PIV-18 TODO.** Faz 0 temiz kurulum INCOMPLETE, DESKTOP-06 Nautilus NOT RUN, PIV-39 i18n açık.

@@ -1,6 +1,6 @@
 # Pivra — Geliştirme Yol Haritası
 
-**Durum:** PIV-01–08 DONE (giriş, keşif ve doğal sıra); PIV-09 DONE (Arch gerçek JPEG/PNG/EXIF, geometri ve aktif-decode kapanış/temizlik PASS); PIV-10 DONE (native gerçek secure piksel/Fit ve fiziksel sol/sağ gezinme PASS); PIV-11 DONE (Arch native ve GNOME Yenile PASS); PIV-12 DONE (24.10.2026 native + manuel kabul); PIV-13 DONE (24.10.2026 Arch native ve manuel kabul); PIV-14 DONE (24.10.2026 Arch native + gerçek fare kabulü); PIV-15 DONE (24.10.2026 Arch native ve manuel Smooth/Nearest kabulü); PIV-16 DONE (24.10.2026 Arch native + manuel kabul); PIV-17 DONE (kullanıcının yeni görev durum beyanı); PIV-18 TESTING; PIV-19–60 TODO. Faz 0 INCOMPLETE: temiz native kurulumun bağımsız yeniden üretimi NOT RUN; temiz Cargo target derlemesi ve headless regresyonlar geçti. [PIV-05 kanıtı ve ayrı faz kapısı](PIVRA_TECHNICAL_CAPABILITIES.md#102-piv-05-ve-faz-0-kapanışını-ayrı-değerlendirme).
+**Durum:** PIV-01–08 DONE (giriş, keşif ve doğal sıra); PIV-09 DONE (Arch gerçek JPEG/PNG/EXIF, geometri ve aktif-decode kapanış/temizlik PASS); PIV-10 DONE (native gerçek secure piksel/Fit ve fiziksel sol/sağ gezinme PASS); PIV-11 DONE (Arch native ve GNOME Yenile PASS); PIV-12 DONE (24.10.2026 native + manuel kabul); PIV-13 DONE (24.10.2026 Arch native ve manuel kabul); PIV-14 DONE (24.10.2026 Arch native + gerçek fare kabulü); PIV-15 DONE (24.10.2026 Arch native ve manuel Smooth/Nearest kabulü); PIV-16 DONE (24.10.2026 Arch native + manuel kabul); PIV-17 DONE (Arch native + manuel kabul); PIV-18 TESTING; PIV-19–60 TODO. Faz 0 INCOMPLETE: temiz native kurulumun bağımsız yeniden üretimi NOT RUN; temiz Cargo target derlemesi ve headless regresyonlar geçti. [PIV-05 kanıtı ve ayrı faz kapısı](PIVRA_TECHNICAL_CAPABILITIES.md#102-piv-05-ve-faz-0-kapanışını-ayrı-değerlendirme).
 **Başlangıç branch:** `dev` · **Kararlı sürümler:** `main`  
 **Kaynak şartname:** [PIVRA_FEATURE_SPEC_TR.md](PIVRA_FEATURE_SPEC_TR.md)  
 **Görev ve commit takibi:** [PIVRA_COMMIT_TRACKER.md](PIVRA_COMMIT_TRACKER.md)
@@ -375,3 +375,17 @@ kalite yaşam döngüsü korundu. Preview/full model testleri gerçek preview su
 değildir. [Kanıt, sınırlamalar ve native komut](PIV18_VALIDATION.md). PIV-17 DONE
 kullanıcının görev talimatındaki durum beyanıdır; yeni native log iddiası yoktur.
 PIV-19 başlamadı; Faz 0/DESKTOP-06 açık.
+
+
+## PIV-17 Arch native ve manuel kabul kapanışı — 24.10.2026 — DONE
+
+Kullanıcı `07f47b5fb21200d8337933893128b700e5b8329d` üzerinde `bash tests/run_preload_probe.sh` çalıştırdı, **exit 0**. Gerçek secure JPEG/PNG/EXIF baseline, cache hit/texture reuse/Fit/filter, next-before-previous preload, LRU eviction, atomic replace/delete identity, hesaplanan bellek bütçesi, injected memory pressure, source integrity, worker-entry promotion ve foreground priority, window close/drain **PASS**. Örnek: hits=3, misses=6, evictions=5; enabled başlangıcı foreground=1/background=2; disabled foreground=2. Native secure secondary probe promoted=1, cancelled=2, started=completed=4, cache entries/bytes=0 after drain. PIV-09 gerçek active decoder memfd/pidfd/mapping/sandbox close checkpoint, job join, survivor pixels, children cleanup PASS. `Cleanup SIGCONT unavailable` hedef PID zaten çıkmışken fatal değildi. Kullanıcı gerçek GNOME arayüzünde hızlı Sol/Sağ gezinmenin sorunsuz olduğunu bildirdi; ayrı gerçek RSS/VRAM/FPS/hız kazanımı, OS gerçek memory-pressure sinyali ve decoder overlap **NOT MEASURED/NOT RUN**. **PIV-17 DONE; PIV-18 TODO.** Faz 0 temiz kurulum INCOMPLETE, DESKTOP-06 Nautilus NOT RUN, PIV-39 i18n açık.
+
+
+## GUI tasarım kararı — uyarlanabilir kenar gezinmesi (24.10.2026)
+
+**KARARLAŞTIRILDI / uygulama henüz TODO:** Fotoğraf alanının en sol ve en sağ kenarında, yalnız ok ikonuna değil ilgili **geniş kenar bölgesinin tamamına** tıklanarak önceki/sonraki medyaya gidilir. GtkOverlay benzeri yerleşimle görüntünün üstünde kalır; orta alan görüntüleme, zoom ve pan için korunur. Her bölgenin genişliği pencere boyutuna orantılı olmakla birlikte erişilebilir minimum ve görseli kaplamayan maksimum sınırlarla kısıtlanır; dar pencere ve HiDPI durumlarında ikon/boşluk ve görünürlük uyarlanır. Kesin yüzde/piksel eşikleri uygulama ve gerçek GNOME manuel kabulü sırasında belirlenecek, henüz sabit değer kararlaştırılmadı.
+
+Görünüm hafif ve yarı saydamdır; fare kenara geldiğinde belirginleşen ince ok/hover tepkisi önerilen varsayılandır. Sürekli opak panel ve büyük açıklama metni gösterilmez. Kenar bölgesinin tamamı tıklanabilir; ilk/son öğede döngü kapalıysa ilgili bölge pasif olur. Klavye Sol/Sağ ile **aynı navigasyon eylemi** kullanılır, yeni ayrı gezinme mantığı yazılmaz. Büyütülmüş fotoğrafı pan etmeyle çakışan pointer/touch olaylarında yanlışlıkla medya atlanmasını engelleyen jest/olay önceliği ve erişilebilirlik testleri zorunludur. Tam ekran davranışı ve düşük hareket tercihleri ayrıca doğrulanır.
+
+**Planlama:** PIV-18 performans/preview işine dahil edilmez; ilgili gelecekteki GUI aşamasında ayrı kabul maddesi veya küçük bağımsız görev olarak uygulanır. Mevcut PIV-01–17 DONE kayıtları değişmez, yeni PIV numarası verilmez.

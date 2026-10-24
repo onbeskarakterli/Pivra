@@ -208,3 +208,12 @@
 - **71. madde — KARARLAŞTIRILDI (20.10.2026):** Tüm hedef Linux dağıtımları için dağıtıma özgü yerel paketleme; Flatpak tercih edilmez. Güncel sistem kütüphaneleri ve medya motorları kullanılır; fiili paket kapsamı desteklenen dağıtım/sürüm matrisi ile doğrulanır.
 
 - **72. madde — KARARLAŞTIRILDI (20.10.2026):** Önce fotoğraf görüntüleme ve video oynatma; görüntüleme arayüzü sade kalacak. Fotoğraf düzenleme yalnız Edit seçeneği ile açılan bağımsız modda yer alacak ve en son geliştirilecek.
+
+
+## GUI tasarım kararı — uyarlanabilir kenar gezinmesi (24.10.2026)
+
+**KARARLAŞTIRILDI / uygulama henüz TODO:** Fotoğraf alanının en sol ve en sağ kenarında, yalnız ok ikonuna değil ilgili **geniş kenar bölgesinin tamamına** tıklanarak önceki/sonraki medyaya gidilir. GtkOverlay benzeri yerleşimle görüntünün üstünde kalır; orta alan görüntüleme, zoom ve pan için korunur. Her bölgenin genişliği pencere boyutuna orantılı olmakla birlikte erişilebilir minimum ve görseli kaplamayan maksimum sınırlarla kısıtlanır; dar pencere ve HiDPI durumlarında ikon/boşluk ve görünürlük uyarlanır. Kesin yüzde/piksel eşikleri uygulama ve gerçek GNOME manuel kabulü sırasında belirlenecek, henüz sabit değer kararlaştırılmadı.
+
+Görünüm hafif ve yarı saydamdır; fare kenara geldiğinde belirginleşen ince ok/hover tepkisi önerilen varsayılandır. Sürekli opak panel ve büyük açıklama metni gösterilmez. Kenar bölgesinin tamamı tıklanabilir; ilk/son öğede döngü kapalıysa ilgili bölge pasif olur. Klavye Sol/Sağ ile **aynı navigasyon eylemi** kullanılır, yeni ayrı gezinme mantığı yazılmaz. Büyütülmüş fotoğrafı pan etmeyle çakışan pointer/touch olaylarında yanlışlıkla medya atlanmasını engelleyen jest/olay önceliği ve erişilebilirlik testleri zorunludur. Tam ekran davranışı ve düşük hareket tercihleri ayrıca doğrulanır.
+
+**Planlama:** PIV-18 performans/preview işine dahil edilmez; ilgili gelecekteki GUI aşamasında ayrı kabul maddesi veya küçük bağımsız görev olarak uygulanır. Mevcut PIV-01–17 DONE kayıtları değişmez, yeni PIV numarası verilmez.

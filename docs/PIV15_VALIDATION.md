@@ -1,6 +1,6 @@
 # PIV-15 — Smooth / Nearest resampling
 
-24.10.2026 · `dev` · **TESTING**, gerçek Arch/GNOME kabulü bekleniyor.
+24.10.2026 · `dev` · **DONE**, gerçek Arch/GNOME kabulü tamamlandı.
 Başlangıç: `28505e4d377759f1550b20d8b199841ce6aa80dd`.
 Güncel origin/dev fast-forward ile alındı. PIV-01–14 DONE ve kullanıcı kaynaklı
 native kanıtlar korunur; bu görevdeki yeni native kabul yerine kullanılmaz.
@@ -181,3 +181,8 @@ NOT RUN ve PIV-39 tr/en planı korunur.
 |---|---|
 | `5fec698673ea331eb6bf43922381349e26b2cd09` | Pencereye özel resampling state/action, GSK Linear/Nearest, mevcut texture/geometry koruması ve menü bölümü; eski zoom probuna yeni tercih argümanı |
 | `fd36f560203f7de6830ef3c3a256c33df53a91f9` | Gerçek piksel/CPU referans/snapshot ve preference lifecycle kapıları, exact-color PNG/manifest üretimi, tek native giriş |
+
+
+## PIV-15 Arch native ve GNOME manuel kabul kapanışı — 24.10.2026 — DONE
+
+Kullanıcı `3313113246baca8b2e19073b0ed20c64f569a50c` üzerinde `bash tests/run_resampling_probe.sh` çalıştırdı: **exit 0**, gerçek Glycin JPEG/PNG/EXIF 1–8, secure PNG checker Nearest palette ve Smooth interpolasyon, aynı decoded texture/paintable, yeni fotoğrafta tercih, iki pencere izolasyonu, kaynak bütünlüğü PASS. Beklenen bozuk PNG hata logları test verisindendi. Kullanıcı normal Pivra'da küçük checker görselinde Smooth/Nearest arasında görünür piksel farkını ve değiştirirken zoom/konumun korunduğunu **manuel PASS** olarak onayladı. Fill görüntüyü alanı dolduracak şekilde ölçeklediğinden bu davranış doğrudur; %100 hatası doğrulanmadı. Çok küçük test görsellerinde %3200 manuel zoom sınırı yetersiz hissedilebilir; mevcut PIV-14 sınırı korunur, artırma önerisi ayrı değerlendirmedir, PIV-15 kabulünü engellemez. Gerçek GPU/HiDPI eşlemesi, FPS/RSS ölçümü ve decoder overlap **NOT MEASURED**; Codex exit77 kayıtları geriye dönük PASS sayılmaz. **PIV-15 DONE, PIV-16 TODO.** Faz 0 bağımsız temiz native kurulum INCOMPLETE, DESKTOP-06 Nautilus NOT RUN ve PIV-39 i18n planı açık kalır.

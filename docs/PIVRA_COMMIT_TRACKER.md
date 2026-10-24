@@ -2141,3 +2141,18 @@ seçildi,4 derlenmezse3.0 seçildi; compiler/factory stub gerçek GNOME değildi
 Codex'te gerçek GNOME factory bulunmadı: native module compile/çalışma NOT RUN.
 [Teşhis/tek Arch komutu](TH01_THUMBNAIL_VALIDATION.md). TH-01 TESTING;
 TH-02/PIV-19 başlamadı. Glycin/preload/viewport ve görüntüleme kodu korunur.
+
+
+### TH-01 GNOME native link/SIGXFSZ düzeltmesi — TESTING
+
+`ccced8089f425a07d6580c70570e725ac2296e14`: seçilen tek GNOME pkg-config
+module'ünün yanında doğrudan GObject bağımlılığı, source sonrası library link
+sırası; GNOME ABI flag'leri karıştırılmaz. FSIZE0→dosya başına1MiB; bellek/CPU/
+parent timeout/cancel/child cleanup aynı. Eski0 limit gerçek memfd ftruncate
+stub testinde SIGXFSZ25 verdi; native GNOME'da tetikleyen dosya trace edilmedi.
+PASS:5 Rust provider +22 Python hedefli regresyon (5 C/helper+6 module driver+
+11 GIO cache), fmt/shell/whitespace. C testlerinde gerçek GObject, stub GNOME API;
+bu native GNOME başarı iddiası değildir. Gerçek GNOME compile/init/can_thumbnail
+NOT RUN; kullanıcı Arch testi beklenir. Gerçek true/false/Failed korunur,
+Missing tek başına hata değildir. [Kanıt/komut](TH01_THUMBNAIL_VALIDATION.md).
+Üretim görüntüleyici/Glycin/preload/UI değişmedi. TH-01 TESTING; TH-02 yok.

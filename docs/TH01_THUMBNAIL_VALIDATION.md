@@ -105,7 +105,7 @@ ve yerel cache backend'ine güvenilir. Source metadata I/O hard realtime değild
 
 Factory helper güvenilir, açıkça verilmiş executable'dır; dosya yolu/URI shell'e
 interpole edilmez, ayrı argv kullanılır.≤16KiB URI/256 byte MIME,1s parent timeout,
-child256MiB address space/1s CPU/sıfır regular-file output bütçesi vardır.
+child256MiB address space/1s CPU/dosya başına1MiB regular-file büyüme bütçesi vardır.
 Helper stdout yalnız32 byte okunur; cancellation/timeout metadata child'ını
 kill/wait eder, Pivra/Glycin decoder süreçlerine dokunmaz. GNOME factory kendi
 failed cache doğrulamasında native GdkPixbuf kullanabilir; bu **Glycin Bwrap
@@ -230,3 +230,63 @@ sonrasında capability, generation_eligible, factory observation ve outcome.
 Gerçek4 derlenemezse tanıdan sonra3.0 seçilebilir; ikisi de yoksa kontrollü
 fallback. Factory=Failed ise hata/exit, Ineligible ise MIME ile birlikte raporlanır.
 **TH-01 TESTING**, native kullanıcı kabulü beklenir; TH-02 başlamadı.
+
+
+## GNOME native link ve SIGXFSZ düzeltmesi — 25.10.2026 — TESTING
+
+Kullanıcı Arch'ta gnome-desktop-4 ile doğrudan `g_object_unref` link hatası,
+helper'da SIGXFSZ25 bildirdi. Düzeltme:
+`ccced8089f425a07d6580c70570e725ac2296e14`.
+
+### Bağımlılık/API uyumluluğu
+
+Güncel gerçek GNOME header'daki factory_new/can_thumbnail imzaları ve
+[GNOME meson pkg-config tanımı](https://github.com/GNOME/gnome-desktop/blob/master/libgnome-desktop/meson.build)
+incelendi: gnome-desktop-4 public requires listesi GSettings schemas içerir;
+helper'ın doğrudan kullandığı GObject sembolünün link satırında bulunacağı
+varsayılamaz. Doğrudan bağımlılık **gobject-2.0** aynı kurulu pkg-config sistemi
+üzerinden seçilen tek GNOME module ile birlikte sorgulanır. Compiler komutunda
+source/object önce, seçilen GNOME library ve GObject/GLib library bayrakları
+sonradır; transitive DSO bağımlılığına güvenilmez. GNOME3 ve4 flag'leri birleştirilmez.
+Gerçek kurulu header ile gerçek helper derlenir; diğer ABI'den header/library
+ödünç alınmaz. İlk derlenebilir tek aday politikası ve pipefail korunur.
+
+### Dosya sınırı ve kanıtın sınırı
+
+Eski RLIMIT_FSIZE=0 herhangi bir regular-file/memfd büyümesini engelliyordu.
+GNOME factory constructor GSettings başlatır ve thumbnailer yapılandırmasını
+okur; runtime/IPC küçük dosya veya shared-memory fd gerektirebilir. Bağımsız
+stub factory'de gerçek memfd+ftruncate(4096) ile eski0 ceiling altında kernel
+SIGXFSZ25 tekrar üretildi. **Bu, kullanıcının GNOME sürecinde hangi dosyanın
+sinyali tetiklediğinin syscall trace'i değildir**; o ayrıntı NOT RUN kalır.
+
+Current/hard FSIZE **1MiB per-file**: küçük metadata/IPC için pay, sınırsız
+write değil. Bu toplam filesystem kotası değildir. SIGXFSZ ignore edilmedi;
+limiti aşan gerçek işlem yine Failed olabilir. Generation/save çağrısı yoktur.
+AS256MiB, CPU1s, parent timeout1s, cancellable ve child kill/wait korumaları
+aynı. Factory helper'ın güvenliği hâlâ Glycin Bwrap ile eşdeğer sayılmaz.
+Gerçek runtime1MiB'tan fazlasını gerektirirse failure gizlenmez; ek native
+kanıt olmadan limit tekrar artırılmaz.
+
+### Test sonuçları
+
+- **PASS:**5 gerçek C/helper testi. Sistem GObject ile Werror compile/link;
+  yalnız GNOME API fonksiyonları stub. Sıfır limit→SIGXFSZ yeniden üretimi;
+  mevcut limitler altında4KiB memfd başarılı ve kaynak limitleri korunmuş;
+  stdout1/0 korunur; factory_new NULL→exit2; gerçek provider helper exit2'yi
+  FactoryObservation::Failed olarak tutar, Missing ve CacheOnly ile dönebilir.
+- **PASS:**6 module-driver testi; tek4 seçimi, compile fail→3.0, link satırında
+  source sonrası GObject/GLib sırası, controlled fallback ve false sonucunun
+  korunması. pkg-config/compiler mock'ları gerçek GNOME ABI testi değildir.
+- **PASS:**11 GIO cache entegrasyon,5 Rust provider unit, fmt --check, shell
+  syntax ve git diff --check. Toplam **5 Rust +22 Python** hedefli regresyon.
+  Üretim Rust/viewer değişmediğinden büyük core/GUI paketleri tekrar koşulmadı.
+- **NOT RUN:** gerçek Arch GNOME factory library compile/run, signal-free
+  initialization ve gerçek can_thumbnail sonucu. Codex'te library yoktur;
+  buradaki stub başarıları native kabul yerine geçmez. Bwrap denenmedi.
+
+Tek Arch komutu değişmedi:
+`bash tests/run_thumbnail_provider_probe.sh "$PWD/tests/fixtures/images/large.png"`.
+Beklenen: tek uyumlu module ve gerçek factory=Eligible veya Ineligible.
+Gerçek hatada Failed korunur; Missing cache boşluğudur, tek başına hata değildir.
+**TH-01 TESTING; kullanıcı native kabulü beklenir. TH-02 başlamadı.**

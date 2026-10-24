@@ -10,9 +10,9 @@ Yalnız TH-02 uygulanmıştır. TH-03–TH-06 ve PIV-19 başlamadı.
 `src/thumbnail_overlay.rs` mevcut ImageView GtkOverlay'ine ölçüme katılmayan,
 viewport içinde clip edilen alt dock ekler. Panel ScrolledWindow ile yatay
 kaydırılır. Hücre dış sınırı96×80 GTK mantıksal piksel; içerik ayrı non-measuring
-Overlay içinde clip edilir. Border seçili/seçili değilken aynı2px alanı ayırır,
-selected class accent çerçevesini etkinleştirir. CSS arka planında
-alpha(window_bg_color,0.84) kullanılır; panel veya hücre opacity azaltılmaz.
+Overlay içinde clip edilir. Görünür hücre çerçevesi/arka planı yoktur; selected class yalnız altta1px
+accent vurgu çizgisi çizer (inset shadow, layout alanı ayırmaz). CSS arka planında
+alpha(window_bg_color,0.25) kullanılır; panel veya hücre opacity azaltılmaz.
 Tema renkleri ve GTK logical ölçüleri kullanılır. Stylesheet GTK thread'inde
 bir kez kaydedilir; pencere başına provider biriktirilmez.
 
@@ -71,7 +71,7 @@ Tüm örneklerin locked/offline derlemesi, shell syntax ve whitespace PASS.
 
 NOT RUN — yeni kodda gerçek secure decode/native fotoğraf paketi; bilinen Bwrap
 engeli tekrar denenmedi. Native GNOME CSS görünümü, arka planın yarı saydamlığı,
-görsellerin opaklığı/çerçevesi ve fiziksel mouse/trackpad davranışı kullanıcı
+görsellerin opaklığı/alt vurgu çizgisi ve fiziksel mouse/trackpad davranışı kullanıcı
 kabulü bekler. CSS alpha/class/opacity testi bu görsel kabulün yerine geçmez.
 Ölçülmüş hız/RSS/VRAM kazanımı iddiası yoktur.
 
@@ -88,7 +88,7 @@ GNOME factory veya Glycin bypass çağırmaz. Test ana görüntüsü gradient, t
 hücreleri renkli TEST placeholder'lardır; gerçek fotoğraf gösterimi değildir.
 
 Manuel kabulde düğmeye tıklama/ikon, alt-orta konum, arka plan saydamlığı,
-seçili çerçeve/thumbnail opaklığı, yatay kaydırma, dar pencere/HiDPI ve iki pencere
+seçili ince alt çizgi/thumbnail opaklığı, yatay kaydırma, dar pencere/HiDPI ve iki pencere
 bağımsızlığını kontrol et. Normal Pivra'da bu aşamada boş şerit beklenir.
 Seçili ana fotoğraf ile placeholder'ın eşleştirilmesi beklenmez (TH-04 işi).
 Otomatik gizleme/T/kalıcı tercih beklenmez (TH-03 işi).
@@ -100,3 +100,42 @@ PIV-18 TESTING; PIV-19 başlamadı.
 
 - `604b5761904c195a2f0bdf55f08f4a5d377ed59c`: non-measuring overlay component + ImageView kurulumu.
 - `b1bb6f41573fd41148a066d7de878e867b8b3b52`: synthetic UI/GSK/counter/isolation probe ve native betik.
+
+
+## Görsel geri bildirim düzeltmesi — 25.10.2026 — TESTING
+
+Kullanıcının Arch GNOME geri bildirimi: test penceresinde standart başlık/close
+kontrolleri yoktu, panel fazla opaktı ve hücre çerçeveleri istenmiyordu.
+Düzeltme SHA `bd5d6b77f801015c26c3dac11e6218307a88ae79`.
+
+- Panel ve düğme arka planı %84→**%25** opacity. Widget opacity1 kalır;
+  thumbnail/test görselleri soluklaştırılmaz.
+- Hücre background/border kaldırıldı. Selected durumda yalnız alt1px tema
+  accent çizgisi (inset shadow) var; normal/selected allocation aynı96×80.
+  Mevcut8px hücre aralığı ve yatay scroller korunur.
+- Probe, normal `window.rs` kalıbıyla dikey content + standart **adw::HeaderBar**
+  ve **adw::WindowTitle** kullanır. Start/end title buttons etkin, header mapped
+  ve title widget mevcut olması sınanır. Başlık Pivra — TEST, subtitle açıkça
+  synthetic/test; iki manuel pencere ve close/isolation testi korunur.
+- Yeni auto-hide, fareye göre görünürlük, T veya kalıcı ayar yok. TH-03 için
+  mevcut dock/strip/toggle widget kimlikleri ve yerleşim korunur.
+
+PASS: gerçek GSK snapshot'ta panel padding bölgesinin alfa değeri60–68/255
+(yaklaşık %25), thumbnail iç örneği255/255, seçili hücrenin üst/yan örnekleri0
+(çerçeve/background yok), altta çizgi var. Normal durumda alt örnek0; iki stil
+aynı texture/render allocation'a sahip. Bunlar synthetic texture testleridir.
+Header title/button ayarları, önceki Fit/Fill/Actual/zoom/pan byte sürekliliği,
+scroll, gizli panel pick-through, iki pencere ve ek load olmaması korunur.
+
+PASS: X11 açık tema; X11 **scale2+koyu tema**; Wayland/Sway; eski controlled
+async/preload/window-failure-race — toplam6 scoped grafik çağrısı. Tek zorunlu
+core80 Rust/30 Python observer, fmt/check/build/test/all-target Clippy -D warnings
+ve fixture hash; tüm örneklerin locked/offline build'i, whitespace PASS.
+Native GNOME görsel/physical input kabulü **NOT RUN**, kullanıcı yeniden test
+edecek. Glycin/factory/preload/cache/ImageView production koduna dokunulmadı;
+Bwrap/decode denemesi tekrarlanmadı. TH-02 TESTING; TH-03'e geçilmedi.
+
+Tek native komut aynı: `bash tests/run_thumbnail_overlay_probe.sh`.
+İki TEST penceresinde standart başlık/close kontrollerini, daha saydam paneli,
+çerçevesiz opak test görsellerini ve yalnız alttaki seçili vurgu çizgisini incele.
+Fareyle otomatik göster/gizle bu kabulde beklenmez; TH-03 işidir.

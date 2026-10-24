@@ -2186,3 +2186,16 @@ input kabulü NOT RUN. Bilinen Bwrap engeli tekrarlanmadı.
 thumbnail değil. Normal app boş strip gösterir. Factory/generation/selection/T/
 kalıcı ayar/auto-hide yok. Üretim Glycin/preload/request/cache/settings ve
 Cargo bağımlılıkları korundu. **TH-02 TESTING; PIV-18 TESTING; PIV-19 yok.**
+
+
+### TH-02 görsel düzeltme — 25.10.2026 — TESTING
+
+`bd5d6b77f801015c26c3dac11e6218307a88ae79`: panel/düğme arka planı%25,
+çerçevesiz hücre ve yalnız1px selected underline; probe'a normal Pivra kalıbında
+adw HeaderBar/WindowTitle ve standart close kontrolleri. TEST etiketleri ve iki
+pencere korunur. GTK/GSK alfa/opaque/çerçeve-yok/alt-çizgi ve sabit allocation
+assertion'ları eklendi. Üretim Glycin/factory/preload/cache değişmedi.
+PASS:80 Rust/30 Python, zorunlu Rust/fixture kontrolleri, örnek build'leri;
+X11 light, X11 dark+scale2, Sway ve3 eski controlled regresyon (toplam6 GUI çağrısı).
+Gerçek GNOME görsel kabulü NOT RUN. [Ayrıntı/aynı native komut](TH02_THUMBNAIL_OVERLAY_VALIDATION.md).
+TH-02 TESTING; auto-hide/T/kalıcı ayarlar yok, TH-03'e geçilmedi.

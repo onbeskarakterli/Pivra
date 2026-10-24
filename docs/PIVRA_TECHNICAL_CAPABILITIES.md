@@ -1,6 +1,6 @@
 # Pivra — Teknik Yetenekler ve Faz 0 Kararları
 
-**Tarih:** 21.10.2026 · **Dal:** dev · **Güncel durum:** PIV-01–12 DONE, PIV-13 TESTING; aşağıdaki ilk kayıt yalnız PIV-05 tarihçesidir.
+**Tarih:** 21.10.2026 · **Dal:** dev · **Güncel durum:** PIV-01–13 DONE, PIV-14 TESTING; aşağıdaki ilk kayıt yalnız PIV-05 tarihçesidir.
 Başlangıç commit'i: `8b3947215c54dfd2515df61a50dd05c080eccf31`.
 PIV-06 uygulanmadı. Production kaynakları, Cargo.toml ve Cargo.lock değiştirilmedi;
 görüntü decoder'ı veya video oynatıcı yazılmadı. Proje lisansı seçilmedi.
@@ -729,3 +729,14 @@ zoom/pan eklenmedi. %100 HiDPI'da fiziksel piksel 1:1 garantisi değildir.
 Sekiz gerçek secure kapı exit77/NOT RUN; gerçek native mod/EXIF pozitif yolu
 bekleniyor. Önceki PIV-01–12 kullanıcı kabul kayıtları korunur. Bwrap, native
 kurulum, bağımlılıklar ve önceki dağıtım/Faz 0/DESKTOP-06/i18n kapıları değişmedi.
+
+
+## PIV-14 — manuel dönüşüm, yeni decoder yok
+
+[Doğrulama matrisi](PIV14_VALIDATION.md): pencereye özel Transform ile imleç
+ankrajlı %10–3200 ve bounded drag/resize; %100 kaynak piksel/GTK mantıksal birimi
+anlamında kalır. Aynı decoded texture/manuel paintable kullanılır, yeni decode
+veya cache sistemi yoktur. 63 Rust + 30 Python, 24 scoped GUI/helper ve toplam
+360 sentetik snapshot PASS. Dokuz gerçek secure kapı exit77/NOT RUN; fiziksel
+GNOME mouse/akıcılık kabulü bekleniyor. Eski kullanıcı native kabulü korunur.
+Bwrap, bağımlılıklar, kurulum ve bağımsız açık Faz 0/DESKTOP-06/i18n işleri değişmedi.

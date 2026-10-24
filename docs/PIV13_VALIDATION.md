@@ -1,6 +1,6 @@
 # PIV-13 — Fit, Fill ve %100
 
-24.10.2026 · `dev` · **TESTING**, gerçek Arch/GNOME kabulü bekleniyor.
+24.10.2026 · `dev` · **DONE**, gerçek Arch/GNOME kabulü tamamlandı.
 Başlangıç: `f9d7157cb4da22bc763b7fc2bf4f0607923f4df8`.
 PIV-01–12 DONE ve kullanıcı tarafından yapılan native kabul kayıtları korunur;
 bunlar aşağıdaki yeni native kontrollerin Codex'te PASS olduğu anlamına gelmez.
@@ -144,3 +144,8 @@ loader, kaynak fixture'lar, CI ve lisans değiştirilmedi.
 |---|---|
 | `b576c35f30e0fb42b1e971c8162afe9fa7f37873` | Mode/geometri modeli, mantıksal %100 paintable, texture üzerinden mod sunumu, pencere menüsü ve F6/F7/F8 |
 | `5ad7b98bf0f020c8fa7bb21c54165a2148b662f7` | Snapshot/native gate, mod/worker/klavye izolasyon regresyonları, tek native giriş ve Sway sentetik argümanı |
+
+
+## PIV-13 native kabul ve kapanış — 24.10.2026 — DONE
+
+Kullanıcı Arch Linux / GNOME Wayland üzerinde `d60c33078c08720524413d204f7131b34df2ff5b` ile `bash tests/run_view_modes_probe.sh` çalıştırdı: **exit0/PASS**; gerçek Glycin JPEG/PNG/EXIF 1–8 decode ve Fit/Fill/Actual render geometrisi, kırpma, merkez, resize, iki bağımsız pencere, yeni medyada Fit sıfırlama, bozuk medyadan toparlanma ve kaynak bütünlüğü doğrulandı. Kullanıcı normal GNOME uygulamasında modları manuel kontrol ettiğini bildirdi. %100 modunda büyük fotoğrafın sadece kesitinin görünmesini ve fareyle sürükleyerek gezinemediğini gözledi; ilki Actual davranışı, ikincisi henüz uygulanmamış **PIV-14 pan** kapsamıdır, PIV-13 hatası değildir. Gerçek HiDPI fiziksel 1:1 ölçek testi NOT RUN; Actual = bir kaynak piksel / GTK mantıksal birimi. Önceki Codex ortamı exit77 sonuçları geriye dönük PASS değildir. **PIV-13 DONE; PIV-14 TODO**. Faz 0 temiz native kurulum INCOMPLETE, DESKTOP-06 Nautilus NOT RUN, PIV-39 i18n planı açık.

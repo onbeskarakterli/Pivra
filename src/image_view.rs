@@ -196,6 +196,9 @@ impl ImageView {
     pub(super) fn on_thumbnail_select(&self, callback: impl Fn(usize) + 'static) {
         self.thumbnail_strip.on_select(callback);
     }
+    pub(super) fn clear_thumbnail_select(&self) {
+        self.thumbnail_strip.clear_on_select();
+    }
     pub(super) fn widget(&self) -> &gtk::Overlay {
         &self.overlay
     }

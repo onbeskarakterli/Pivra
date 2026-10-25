@@ -26,7 +26,7 @@ fn text_chunk(kind: &str, value: &str, out: &mut Vec<u8>) {
     }
     out.extend_from_slice(&(!crc).to_be_bytes());
 }
-fn cache(path: &Path) {
+pub(super) fn cache(path: &Path) {
     let png = include_bytes!("../../tests/fixtures/images/wide.png");
     let mut bytes = png[..33].to_vec();
     text_chunk(

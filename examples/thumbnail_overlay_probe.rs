@@ -1,6 +1,8 @@
 //! TH-02 only: synthetic main image + explicitly labelled TEST PLACEHOLDERS.
 #[path = "support/thumbnail_catalog.rs"]
 mod catalog_probe;
+#[path = "support/fullscreen_cases.rs"]
+mod fullscreen_probe;
 #[path = "../src/image_view.rs"]
 mod image_view;
 #[path = "../src/input.rs"]
@@ -99,6 +101,11 @@ mod image_loader {
             return native_image_loader::load(path, cancel)
                 .await
                 .map(LoadedFrame::Native);
+        }
+        if std::env::args().any(|s| s == "--fullscreen-regression")
+            && path.file_stem().is_some_and(|s| s == "broken")
+        {
+            return Err("controlled broken image (not native decoder evidence)".into());
         }
         Ok(LoadedFrame::Synthetic(
             path.starts_with(glib::user_cache_dir().join("thumbnails")),
@@ -225,6 +232,9 @@ fn open(app: &adw::Application) -> (adw::ApplicationWindow, image_view::ImageVie
         .downcast::<gtk::Picture>()
         .unwrap();
     wait(|| p.paintable().is_some());
+    if std::env::args().any(|s| s == "--fullscreen-regression") {
+        window::fullscreen::install(&w, &p, &[header.clone().upcast()]);
+    }
     let row: gtk::Box = find(view.widget().upcast_ref(), "thumbnail-items");
     while let Some(child) = row.first_child() {
         row.remove(&child);
@@ -400,6 +410,10 @@ fn main() {
         .flags(gio::ApplicationFlags::NON_UNIQUE)
         .build();
     app.register(None::<&gio::Cancellable>).unwrap();
+    if std::env::args().any(|s| s == "--fullscreen-regression") {
+        fullscreen_probe::run(&app);
+        return;
+    }
     if std::env::args().any(|s| s == "--retention-regression") {
         catalog_probe::retention(&app);
         return;
@@ -566,8 +580,8 @@ fn main() {
                 "toggle must float above panel"
             );
             assert!(
-                (bounds.y() - center.y() - center.height() - 4.).abs() <= 1.,
-                "toggle gap must follow actual allocated panel edge: panel={bounds:?} button={center:?}"
+                (bounds.y() - center.y() - center.height()).abs() <= 1.,
+                "toggle must attach flush to actual allocated panel edge: panel={bounds:?} button={center:?}"
             );
             assert!(strip.is_overlay_scrolling());
             let bar = strip.hscrollbar();

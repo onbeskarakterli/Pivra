@@ -81,8 +81,9 @@ def main():
         runtime = Path(env["XDG_RUNTIME_DIR"])
         config = root / "sway.conf"
         config.write_text(
-            "xwayland disable\n"
-            "output HEADLESS-1 mode 1280x1024\n"
+            "xwayland disable\n" +
+            ("output HEADLESS-1 mode 2560x2048 scale 2\n" if "--output-scale=2" in sys.argv
+             else "output HEADLESS-1 mode 1280x1024\n") +
             "default_border none\n"
             "default_floating_border none\n"
             f'for_window [app_id="{APP_ID}"] floating enable\n', encoding="utf-8"
@@ -131,6 +132,10 @@ def main():
                         args.append("--retention-regression")
                     if "--catalog-cancel-race" in sys.argv[2:]:
                         args.append("--catalog-cancel-race")
+                    if "--fullscreen-regression" in sys.argv[2:]:
+                        args.append("--fullscreen-regression")
+                        if "--output-scale=2" in sys.argv[2:]:
+                            args.append("--expect-scale=2")
                     if "--dark" in sys.argv[2:]:
                         args.append("--dark")
                     result = subprocess.run(args, env={**env, "G_DEBUG": "fatal-criticals"},

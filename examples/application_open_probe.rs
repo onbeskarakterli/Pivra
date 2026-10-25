@@ -57,10 +57,22 @@ fn main() {
             assert_eq!(opened.file.path().as_ref(), Some(&path));
             let result = Rc::new(Cell::new(None));
             let observed = result.clone();
+            let polls = Rc::new(Cell::new(0_u32));
+            let had_default_app = Rc::new(Cell::new(false));
+            let max_windows = Rc::new(Cell::new(0_usize));
+            let main_pictures = Rc::new(Cell::new(0_usize));
+            let poll_counter = polls.clone();
+            let default_seen = had_default_app.clone();
+            let window_counter = max_windows.clone();
+            let main_counter = main_pictures.clone();
+            eprintln!("APP_OPEN_BEGIN name={name} uri={uri} path={}", path.display());
             let end = Instant::now() + Duration::from_secs(30);
             glib::timeout_add_local(Duration::from_millis(10), move || {
+                poll_counter.set(poll_counter.get() + 1);
                 let application = gio::Application::default().and_downcast::<adw::Application>();
                 if let Some(application) = application {
+                    default_seen.set(true);
+                    window_counter.set(window_counter.get().max(application.windows().len()));
                     for w in application.windows() {
                         for widget in descendants(w.upcast_ref()) {
                             if let Ok(p) = widget.downcast::<gtk::Picture>() {
@@ -75,6 +87,7 @@ fn main() {
                                 if !is_main {
                                     continue;
                                 }
+                                main_counter.set(main_counter.get() + 1);
                                 if let Some(texture) = p.paintable().and_downcast::<gdk::Texture>()
                                 {
                                     assert_eq!((texture.width(), texture.height()), size);
@@ -108,6 +121,7 @@ fn main() {
                 glib::ControlFlow::Continue
             });
             let status = app::launch(Some(opened));
+            eprintln!("APP_OPEN_END name={name} uri={uri} exit={status:?} polls={} default_app_seen={} max_windows={} main_picture_hits={} observed={:?}", polls.get(), had_default_app.get(), max_windows.get(), main_pictures.get(), result.get());
             assert_eq!(status, glib::ExitCode::SUCCESS);
             let code = result
                 .get()

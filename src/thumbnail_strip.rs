@@ -67,6 +67,7 @@ struct Inner {
     closed: Cell<bool>,
     frames: RefCell<Option<(gdk::FrameClock, glib::SignalHandlerId)>>,
     validation: RefCell<Option<gio::Cancellable>>,
+    warming: RefCell<Option<gio::Cancellable>>,
 }
 #[derive(Debug, Default)]
 pub(crate) struct ThumbnailStats {
@@ -104,6 +105,7 @@ impl ThumbnailStrip {
             closed: Cell::new(false),
             frames: RefCell::new(None),
             validation: RefCell::new(None),
+            warming: RefCell::new(None),
         });
         let weak = Rc::downgrade(&inner);
         inner.scroller.connect_map(move |strip| {
@@ -190,6 +192,7 @@ impl ThumbnailStrip {
             self.0.initial.set(selected);
             self.0.restore.set(None);
             self.0.scroller.queue_draw();
+            if !self.0.scroller.is_mapped() { self.0.warm_hidden(); }
         }
     }
     pub(crate) fn on_select(&self, callback: impl Fn(usize) + 'static) {
@@ -199,6 +202,7 @@ impl ThumbnailStrip {
         self.0.select.borrow_mut().take();
         self.0.closed.set(true);
         self.0.pause();
+        if let Some(token) = self.0.warming.borrow_mut().take() { token.cancel(); }
         self.0.disconnect();
         if let Some(id) = self.0.building.borrow_mut().take() {
             id.remove();
@@ -226,6 +230,7 @@ impl ThumbnailStrip {
             i.last_visible.set(None);
             i.epoch.set(i.epoch.get().wrapping_add(1));
             i.pause();
+            if let Some(token) = i.warming.borrow_mut().take() { token.cancel(); }
             let first = i.entries.borrow().is_empty();
             let offset = i.scroller.hadjustment().value();
             let mut old: HashMap<_, _> = i
@@ -287,6 +292,7 @@ impl ThumbnailStrip {
             }
         }
         i.scroller.queue_draw();
+        if i.initialized.get() && !i.scroller.is_mapped() { i.warm_hidden(); }
     }
     /// Called on a real source-folder rescan, not on photo selection.
     pub(crate) fn invalidate(&self) {
@@ -294,6 +300,41 @@ impl ThumbnailStrip {
     }
 }
 impl Inner {
+    // Prime GNOME/Freedesktop disk caches after folder discovery even when
+    // the overlay is hidden. Bound to a small initial batch and one worker;
+    // visible-cell decoding remains owned by the normal viewport scheduler.
+    fn warm_hidden(self: &Rc<Self>) {
+        if self.closed.get() || self.scroller.is_mapped() || self.warming.borrow().is_some() { return; }
+        let entries = self.entries.borrow();
+        let selected = entries.iter().position(|e| Some(e.index.get()) == self.selected.get());
+        let mut paths = Vec::new();
+        if let Some(n) = selected { paths.push(entries[n].path.clone()); }
+        for e in entries.iter().take(24) {
+            if !paths.contains(&e.path) { paths.push(e.path.clone()); }
+        }
+        drop(entries);
+        if paths.is_empty() { return; }
+        let token = gio::Cancellable::new();
+        self.warming.replace(Some(token.clone()));
+        let worker_token = token.clone();
+        let job = gio::spawn_blocking(move || {
+            for path in paths {
+                if worker_token.is_cancelled() { break; }
+                // Resolving validates and generates disk thumbnails without
+                // installing any textures into a hidden GTK widget.
+                let _ = Manager::session().resolve(&path, &worker_token);
+            }
+        });
+        let weak = Rc::downgrade(self);
+        glib::MainContext::default().spawn_local(async move {
+            let _ = job.await;
+            if let Some(i) = weak.upgrade() {
+                if i.warming.borrow().as_ref().is_some_and(|current| current == &token) {
+                    i.warming.borrow_mut().take();
+                }
+            }
+        });
+    }
     fn revalidate(self: &Rc<Self>, retry_failures: bool) {
         self.epoch.set(self.epoch.get().wrapping_add(1));
         let epoch = self.epoch.get();

@@ -300,9 +300,27 @@ pub(super) fn build(app: &adw::Application, settings: &Settings, file: Option<Op
         header.pack_end(&mode_button);
         // Wheel mode is per-window; the lens is visibly active only for zoom.
         let zoom_toggle = gtk::ToggleButton::builder()
-            .icon_name("zoom-in-symbolic")
             .tooltip_text("Wheel zoom (off: wheel changes photos; hold left mouse button to zoom)")
             .build();
+        // Draw a literal magnifying glass instead of relying on a theme glyph
+        // which can appear as a plus sign.
+        let lens = gtk::DrawingArea::new();
+        lens.set_content_width(22);
+        lens.set_content_height(22);
+        lens.set_can_target(false);
+        lens.set_draw_func(|_, cr, width, height| {
+            let cx = f64::from(width) * 0.44;
+            let cy = f64::from(height) * 0.42;
+            let radius = f64::from(width.min(height)) * 0.24;
+            cr.set_source_rgba(1.0, 1.0, 1.0, 0.94);
+            cr.set_line_width(2.1);
+            cr.arc(cx, cy, radius, 0.0, std::f64::consts::TAU);
+            let _ = cr.stroke();
+            cr.move_to(cx + radius * 0.72, cy + radius * 0.72);
+            cr.line_to(cx + radius * 1.65, cy + radius * 1.65);
+            let _ = cr.stroke();
+        });
+        zoom_toggle.set_child(Some(&lens));
         zoom_toggle.set_active(false);
         header.pack_end(&zoom_toggle);
         let zoom_view = view.clone();

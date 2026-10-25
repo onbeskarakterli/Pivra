@@ -38,10 +38,10 @@
 
 | ID | Planlı commit başlığı | Kabul / test kontrolü | Durum | SHA |
 |---|---|---|---|---|
-| PIV-13 | `feat: implement fit fill and actual size` | 59 Rust + 30 Python, 21 scoped GUI/helper ve 144 sentetik snapshot PASS; secure native mod kabulü NOT RUN | **TESTING** | `b576c35`, `5ad7b98`; tam SHA aşağıda |
-| PIV-14 | `feat: implement cursor anchored zoom and pan` | 63 Rust + 30 Python, 24 scoped GTK/GIO ve 360 sentetik snapshot PASS; native zoom/pan kabulü NOT RUN | **TESTING** | `0bacddb`, `e1d9771`; tam SHA aşağıda |
-| PIV-15 | `feat: add image resampling choices` | 64 Rust + 30 Python, 27 scoped GTK/GIO ve 462 sentetik snapshot PASS; native secure resampling NOT RUN | **TESTING** | `5fec698`, `fd36f56`; tam SHA aşağıda |
-| PIV-16 | `feat: add cancellable async image loading` | 67 Rust + 30 Python, 33 scoped GTK/GIO PASS; 3+1 bound / stale success/error / reentrancy / rename; secure native NOT RUN | **TESTING** | `636498c`, `d9c93eb`; tam SHA aşağıda |
+| PIV-13 | `feat: implement fit fill and actual size` | Tarihsel ilk Codex kaydı: 59 Rust + 30 Python, 21 scoped GUI/helper ve 144 sentetik snapshot PASS; secure native mod kabulü NOT RUN; son kullanıcı native/manuel kabulü [PIV-13](PIV13_VALIDATION.md) ile DONE | **DONE — kullanıcı native/manuel kabulü** | `b576c35`, `5ad7b98`; tam SHA aşağıda |
+| PIV-14 | `feat: implement cursor anchored zoom and pan` | Tarihsel ilk Codex kaydı: 63 Rust + 30 Python, 24 scoped GTK/GIO ve 360 sentetik snapshot PASS; native zoom/pan kabulü NOT RUN; son kullanıcı native/manuel kabulü [PIV-14](PIV14_VALIDATION.md) ile DONE | **DONE — kullanıcı native/manuel kabulü** | `0bacddb`, `e1d9771`; tam SHA aşağıda |
+| PIV-15 | `feat: add image resampling choices` | Tarihsel ilk Codex kaydı: 64 Rust + 30 Python, 27 scoped GTK/GIO ve 462 sentetik snapshot PASS; native secure resampling NOT RUN; son kullanıcı native/manuel kabulü [PIV-15](PIV15_VALIDATION.md) ile DONE | **DONE — kullanıcı native/manuel kabulü** | `5fec698`, `fd36f56`; tam SHA aşağıda |
+| PIV-16 | `feat: add cancellable async image loading` | Tarihsel ilk Codex kaydı: 67 Rust + 30 Python, 33 scoped GTK/GIO PASS; 3+1 bound / stale success/error / reentrancy / rename; secure native NOT RUN; son kullanıcı native/manuel kabulü [PIV-16](PIV16_VALIDATION.md) ile DONE | **DONE — kullanıcı native/manuel kabulü** | `636498c`, `d9c93eb`; tam SHA aşağıda |
 | PIV-17 | `perf: preload neighbors with bounded memory` | Öncelik mevcut medya; RAM baskısında önbellek azalır | DONE (kullanıcı native/manuel kabul kaydı) | `e2f7504`, `a4fd9e0`; 72 Rust/30 Python/20 GUI PASS, secure native NOT RUN; [kanıt](PIV17_VALIDATION.md) |
 | PIV-18 | `perf: preview and full resolution image pipeline` | RAW/TIFF önizleme, yükleme göstergesi ve viewport sürekliliği | TESTING | `99d49dd`, `2905917`; full-only fallback, erken preview/upgrade NOT RUN; [kanıt](PIV18_VALIDATION.md) |
 
@@ -2167,7 +2167,7 @@ Missing tek başına hata değildir. [Kanıt/komut](TH01_THUMBNAIL_VALIDATION.md
 | TH-04 | DONE | DONE — kullanıcı Arch GNOME kabulü, 1b11074 |
 | TH-05 | DONE | DONE — kullanıcı Arch GNOME kabulü, 1b11074 |
 | TH-06 | DONE — kullanıcı native kabulü, 25.10.2026 | Thumbnail genel kabul ve optimizasyon |
-| TH-07 | TESTING — native GNOME kabulü bekleniyor | Native fullscreen uygulandı; [doğrulama](TH07_FULLSCREEN_VALIDATION.md), kullanıcı kabulü açık |
+| TH-07 | DONE — kullanıcı Arch/GNOME fiziksel kabulü, 25.10.2026 | [Native kabul](TH07_FULLSCREEN_VALIDATION.md); Codex NOT RUN geçmişi korunur |
 
 TH-02 başlangıç `e503e8fec645ddf79b2b73b4b34b9c03573f8eec`, temiz/güncel dev.
 
@@ -2442,3 +2442,19 @@ fullscreen ve iki özel TEST üretim penceresi. Kullanıcı native kabulüne kad
 **TH-07 TESTING**. PIV-18 TESTING; PIV-19/sonraki işler başlamadı. Faz0 ve
 DESKTOP-06 açık kalır. Main ve fotoğraf/thumbnail decoder/cache/preload kaynakları
 korundu; yeni dependency/decoder/CI/paket kurulmadı.
+
+
+## TH-07 native kapanış / Faz2 kapsam denetimi — 25.10.2026
+
+Kullanıcı TH-07 native Arch/GNOME Wayland ve fiziksel klavye/fare kabulünü açıkça
+başarılı bildirdi: secure JPEG/PNG/EXIF, fullscreen F/Esc/double-click,
+Fit/Fill/Actual/zoom/pan/resampling, thumbnail/gezinme, izolasyon ve HiDPI2 PASS;
+manuel kontrol sıkıntısız. TH-07 DONE. Ayrı yeni log/çalıştırma SHA'sı verilmedi;
+Codex native deneyi değildir. Kaynak denetimi: `0d13d24449047e3d23a0e15133c47e2ca44ca86b`.
+
+PIV-13–16 üst tablosundaki eski TESTING etiketleri kendi validation dosyalarında
+zaten bulunan kullanıcı native/manuel DONE kayıtlarıyla eşitlendi; tarihsel
+Codex sayıları/NOT RUN sonuçları silinmedi. PIV-01–17 DONE korunur.
+TH-01/02/04/05/06/07 DONE; TH-03 bağımsız TESTING (native restart/persistence
+kabulü açık). PIV-18 TESTING, Faz2 kapanışı kapsam/ürün kararı bekler; full-only
+fallback gerçek erken preview değildir. PIV-19 ve sonrası başlatılmadı.

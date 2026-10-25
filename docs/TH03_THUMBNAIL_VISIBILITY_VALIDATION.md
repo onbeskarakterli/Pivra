@@ -128,3 +128,20 @@ gezinirken etkin fakat gizli şeridin açılmadığını ayrıca kontrol et. Bu 
 pencerelerinde gerçek katalog/thumbnail seçim bağlantısı veya üretim yoktur.
 
 TH-03 TESTING. TH-04/TH-05/TH-07 kodlanmadı; PIV-18 TESTING, PIV-19 başlamadı.
+
+
+## Faz2 kabul kanıtı değerlendirmesi — 25.10.2026
+
+TH-06 ve TH-07 kullanıcı kabulü thumbnail gezinmesi/T/fullscreen bütünleşmesini
+ve manuel kullanımın sorunsuzluğunu destekler. Ancak bu son beyan native uygulamayı
+yeniden başlattıktan sonra Enabled tercihini doğruladığını ayrıca söylemez.
+Codex bu denetimde gerçek ayrı süreçlerde false→true→false reload testini ve
+GTK görünürlük/timer/resize kontrollerini tekrar PASS doğruladı; bu fiziksel
+Arch kabulü değildir. **TH-03 TESTING** korunur, kalan dar kabul native restart/
+kalıcılık ve belirtilen fare görünürlük listesine açık kullanıcı onayıdır.
+
+Mevcut `bash tests/run_thumbnail_visibility_probe.sh` komutunda otomatik prefix
+özel config kullanır; son manuel iki pencere normal kullanıcının thumbnail
+tercihini okuyup yazabilir. Manuel tercih değişiminden sonra pencereleri kapatıp
+aynı komutu yeniden açarak başlangıç değerini doğrula. Önceki native NOT RUN
+kayıtları silinmez. [Ayrı kabul ve Faz2 raporu](PHASE2_RELEASE_READINESS.md).

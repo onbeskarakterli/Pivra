@@ -1,8 +1,23 @@
-# PIV-18 / TH-07 — Fullscreen — TESTING
+# PIV-18 / TH-07 — Fullscreen — DONE (kullanıcı native kabulü)
 
 25.10.2026 · dev · başlangıç `0571986fc956309e37a35e4c0a42221d5cce5c42`.
-TH-06 kullanıcı tarafından kabul edildi; TH-07 native GNOME kabulü ayrı ve açık.
+TH-06 ve TH-07 kullanıcı native kabulüyle DONE. PIV-18 kapanışı ayrı kapsam kararıdır.
 PIV-18 TESTING; TH-03'ün bağımsız önceki kabul durumu değiştirilmedi.
+
+## Güncel TH-07 kabulü — 25.10.2026
+
+Kullanıcı Faz2 kapanış talimatında gerçek Arch Linux / GNOME Wayland native test
+ve fiziksel klavye/fare kabulünü başarılı bildirdi: güvenli JPEG/PNG/EXIF,
+F/Esc/double-click, Fit/Fill/Actual/zoom/pan/resampling, thumbnail/klavye gezinmesi,
+pencere izolasyonu, HiDPI scale2 PASS; manuel kontrol sıkıntısız. **TH-07 DONE**.
+Ayrı yeni ham log veya native çalıştırmanın tam SHA'sı verilmedi; bu açık kullanıcı
+kabulüdür, Codex'in bağımsız native çalıştırması değildir. Denetlenen repo kaynak
+snapshot'ı `0d13d24449047e3d23a0e15133c47e2ca44ca86b`.
+
+Aşağıdaki TESTING/NOT RUN/FAIL ifadeleri önceki geliştirme testlerinin tarihsel
+kayıtlarıdır ve silinmedi. Özellikle Codex secure gate engeli geriye dönük PASS
+olmaz. TH-03'ün bağımsız kalıcılık kabulü ve PIV-18'in gerçek erken preview kapsamı
+bu fullscreen kabulüyle kapanmaz. [Faz2/yayın hazırlığı](PHASE2_RELEASE_READINESS.md).
 
 ## TH-06 kapanış kanıtı
 

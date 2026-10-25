@@ -404,7 +404,7 @@ mevcut PIV-18'e bağlı alt görevdir. PIV-01–60 numaraları korunur.
 | TH-04 | Thumbnail gezinme senkronizasyonu | DONE — kullanıcı Arch GNOME kabulü, 1b11074 |
 | TH-05 | Sistem thumbnail üretimi | DONE — kullanıcı Arch GNOME kabulü, 1b11074 |
 | TH-06 | Thumbnail genel kabul ve optimizasyon | DONE — kullanıcı native kabulü, 25.10.2026 |
-| TH-07 | Tam ekran fotoğraf görüntüleme | TESTING — native GNOME kabulü bekleniyor |
+| TH-07 | Tam ekran fotoğraf görüntüleme | DONE — kullanıcı Arch/GNOME fiziksel kabulü, 25.10.2026 |
 
 TH-07: ana fotoğrafta çift tıklama veya `F` ile fullscreen aç/kapa, `Esc` ile çıkış;
 başlık/menü/pencere kontrolleri gizli, oran korunarak tüm ekran kullanılır.

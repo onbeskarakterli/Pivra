@@ -1,6 +1,6 @@
 # PIV-18 — Thumbnail ve fullscreen alt görev planı
 
-25.10.2026 · dev · **TH-07 uygulanıyor — TESTING; kullanıcı talimatıyla yetkili geliştirme.**
+25.10.2026 · dev · **TH-07 DONE — kullanıcı native kabulü. PIV-18 TESTING.**
 TH aşamaları mevcut PIV-18 kapsamına bağlı alt görevlerdir; yeni PIV aşaması
 oluşturulmaz, PIV numaraları ve diğer aşamaların sırası değiştirilmez.
 PIV-18 TESTING; PIV-19 başlamadı.
@@ -15,12 +15,12 @@ PIV-18 TESTING; PIV-19 başlamadı.
 | TH-04 | Thumbnail gezinme senkronizasyonu | DONE — kullanıcı Arch GNOME kabulü, 1b11074 |
 | TH-05 | Sistem thumbnail üretimi | DONE — kullanıcı Arch GNOME kabulü, 1b11074 |
 | TH-06 | Thumbnail genel kabul ve optimizasyon | DONE — kullanıcı native kabulü, 25.10.2026 |
-| TH-07 | Tam ekran fotoğraf görüntüleme | TESTING — native GNOME kabulü bekleniyor |
+| TH-07 | Tam ekran fotoğraf görüntüleme | DONE — kullanıcı Arch/GNOME fiziksel kabulü, 25.10.2026 |
 
 TH-02 [kullanıcı native kabulüyle DONE](TH02_THUMBNAIL_OVERLAY_VALIDATION.md).
 TH-03 [ayrı native kabul bekler](TH03_THUMBNAIL_VISIBILITY_VALIDATION.md).
 TH-04/TH-05 [kullanıcı native kabulüyle DONE](TH05_THUMBNAIL_SYSTEM_VALIDATION.md).
-TH-06 kullanıcı native kabulüyle DONE. TH-07 uygulandı; [doğrulama/native kapı](TH07_FULLSCREEN_VALIDATION.md) TESTING.
+TH-06 kullanıcı native kabulüyle DONE. TH-07 [kullanıcı native kabulüyle DONE](TH07_FULLSCREEN_VALIDATION.md). TH-03 bağımsız TESTING; PIV-18 kapsam kararı açık.
 
 ## TH-07 — Tam Ekran Fotoğraf Görüntüleme
 
@@ -60,3 +60,14 @@ TH-06 kabulünden sonra uygulandı; TH-03 görünürlük ve kısayol kurallarıy
 
 Mevcut secure Glycin, asenkron yükleme, cancellation, cache ve preload korunur.
 İlk planlama kaydından sonra kullanıcı talimatıyla üretim fullscreen ve testler eklendi; native kabul henüz yapılmadı.
+
+
+## Faz2 denetimi — 25.10.2026
+
+TH-07 kullanıcı native/fiziksel kabulüyle DONE. TH-03 otomatik sinyal/timer ve
+ayrı-süreç persistence testleri Codex'te PASS olsa da native yeniden başlatma/
+Enabled kalıcılığına ayrı açık kabul verilmedi; TESTING korunur. TH-07'nin T ve
+thumbnail gezinmesi kabulü o bağımsız maddeye otomatik taşınmaz.
+PIV-18/Faz2 kapanışı için gerçek erken preview ve foreground durum göstergesi
+kapsamları karara bağlanmalı. Full-only başarı PIV-18 DONE değildir.
+[Faz2 ve0.1.0 raporu](PHASE2_RELEASE_READINESS.md).

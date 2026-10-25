@@ -436,6 +436,14 @@ fn generate(
         return Err("cancelled".into());
     }
     let scratch = FactoryScratch::new()?;
+    let diagnostic = std::env::var_os("PIVRA_TRACE_GNOME_THUMB").is_some();
+    // Write to a private file instead of a pipe to avoid child stderr backpressure.
+    let stderr_path = scratch.0.join("factory-stderr.log");
+    let stderr = if diagnostic {
+        Stdio::from(fs::File::create(&stderr_path).map_err(|e| e.to_string())?)
+    } else {
+        Stdio::null()
+    };
     let mut child = Command::new(helper)
         .env("TMPDIR", &scratch.0)
         .args([
@@ -446,7 +454,7 @@ fn generate(
         ])
         .stdin(Stdio::null())
         .stdout(Stdio::piped())
-        .stderr(Stdio::null())
+        .stderr(stderr)
         .process_group(0)
         .spawn()
         .map_err(|e| e.to_string())?;
@@ -476,7 +484,18 @@ fn generate(
                 return if status.success() && matches!(text.as_str(), "cached\n" | "generated\n") {
                     Ok(())
                 } else {
-                    Err(format!("GNOME factory exit={status}: {text}"))
+                    let details = if diagnostic {
+                        fs::File::open(&stderr_path)
+                            .and_then(|file| {
+                                let mut bytes = Vec::new();
+                                file.take(4096).read_to_end(&mut bytes)?;
+                                Ok(String::from_utf8_lossy(&bytes).into_owned())
+                            })
+                            .unwrap_or_default()
+                    } else {
+                        String::new()
+                    };
+                    Err(format!("GNOME factory exit={status}: {text}; stderr={details}"))
                 };
             }
             Ok(None) => std::thread::sleep(Duration::from_millis(10)),

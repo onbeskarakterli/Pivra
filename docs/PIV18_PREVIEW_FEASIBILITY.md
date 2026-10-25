@@ -137,3 +137,14 @@ Kullanıcı `807b67a402d19f81e6b2814fa6d3d644830e2786` sürümünde `bash tests/
 - `no-exif.jpg`: source 64×32; request 16×8; returned 64×32 (**REDUCED_FRAME=false**), frame_ready 658µs, fresh full baseline 541µs; same-image `next_frame` NoMoreFrames.
 
 **Karar:** Bu runtime JPEG/PNG scale isteğini küçültülmüş çözümleme olarak uygulamıyor. Aynı Image üzerinden ikinci still frame elde edilemiyor. Ölçümler küçük fixture ve seri warm-pool etkileriyle genel performans kıyası değildir. Tam decode→resize üretim erken preview seçeneği olarak reddedilir. O tarihte önerilen ayrı JPEG embedded-thumbnail/reduced-IDCT deneyi PIV-18C olarak yapıldı; 25.10.2026 kullanıcı kararıyla reddedildi ve kaldırıldı. Bu prototip için aktif test veya entegrasyon beklentisi yoktur. PIV-18 TESTING.
+
+
+## Faz 2 son denetimi — 25.10.2026
+
+Mevcut API/native ölçüm sonucu değişmedi: gerçek erken preview NOT PROVEN,
+üretim full-only. Reddedilen PIV-18C kaynak dosyalarının yokluğu yeniden kontrol
+edildi; yöntemler veya yeni decoder tekrar eklenmedi. Thumbnail şeridinin secure
+decode sonrası küçültülmüş texture'ı ve sistem cache thumbnail'ı ana görüntü
+preview sağlayıcısı sayılmaz. TH-07 native kabulü bu boşluğu kapatmaz.
+PIV-18 TESTING.0.1.0 için erteleme resmî kullanıcı kapsam kararı gerektirir;
+[son rapor](PHASE2_RELEASE_READINESS.md) bunu açık karar olarak bırakır.

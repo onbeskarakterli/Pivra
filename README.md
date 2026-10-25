@@ -900,7 +900,8 @@ TH-07 adds native fullscreen to the current photo window: **F** or a double-clic
 on the main photo toggles fullscreen; **Esc** exits. Header controls hide in
 fullscreen. Thumbnail/T/navigation and viewing preferences remain available;
 fullscreen itself does not reload the main photo. TH-03 keeps its separate
-acceptance status; TH-07 and PIV-18 remain TESTING.
+acceptance status. TH-07 is now DONE by user-reported Arch GNOME native and
+physical acceptance (2026-10-25); PIV-18 remains TESTING.
 
 Arch GNOME Wayland acceptance (private TEST media/config/cache, secure decoder
 gate, automatic checks, then two normal production windows for physical review):
@@ -910,3 +911,17 @@ bash tests/run_fullscreen_probe.sh
 ```
 
 [Fullscreen implementation, tested evidence and remaining native checks](docs/TH07_FULLSCREEN_VALIDATION.md).
+
+
+Phase 2 closure audit (2026-10-25): **PIV-18 TESTING; Phase 2 is not closed**.
+The full-only path works, but real early preview is unimplemented and foreground
+loading has no dedicated indicator. Deferring these requires an explicit scope
+decision; rejected JPEG prototypes were not restored. TH-07 is DONE by user
+native acceptance; TH-03 restart/persistence acceptance remains separate.
+
+[Phase 2 and0.1.0 readiness report](docs/PHASE2_RELEASE_READINESS.md) separates
+88 Rust/62 Python and controlled GTK/compositor PASS results from native user
+reports and remaining gates. Clean native installation, real Nautilus acceptance
+and release packaging remain open. The confirmed release plan is one AUR
+package `pivra` from an approved main tag, with `yay -S pivra`/`yay -Syu` after
+publication; no `pivra-git`, merge, tag, release or package was created here.

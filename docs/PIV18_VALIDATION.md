@@ -7,6 +7,29 @@ PIV-01–17 DONE, son kullanıcının görev talimatındaki durum beyanına gör
 fetch ile `5046419` dahil PIV-17 kullanıcı native/manuel kabul kayıtları ve kenar
 navigasyon tasarımı normal merge ile korundu. Bunlar Codex native sonucu değildir.
 
+## Güncel kapanış denetimi — 25.10.2026
+
+**PIV-18 TESTING; Faz 2 kapanışı henüz onaylanmadı.** TH-07 kullanıcı native
+ve fiziksel kabulüyle DONE; TH-03 bağımsız native restart/kalıcılık kabulü açık.
+Full-only yolunun native başarısı gerçek erken preview'yi tamamlamaz. Reddedilen
+PIV-18C yöntemleri geri getirilmedi. Erken preview'nin sonraki sürüme ertelenmesi
+hâlâ kullanıcı kapsam kararı gerektirir; bu rapor erteleme onayı değildir.
+
+Madde10 için ayrıca somut güncel bulgu: load_request status metnini boşaltıp
+hidden yapıyor; FullLoading yalnız model state'i, spinner'lar thumbnail içindir.
+Başlık+retained eski fotoğraf ve dosya adlı hata mesajı var, aktif ana-fotoğraf
+yükleme göstergesi yok. TH-06'da kaldırılan Loading yazısı geri getirilmedi.
+Aşağıdaki24.10 tarihli “loading mesajı korunur” cümlesi tarihsel ilk uygulamadır;
+güncel source davranışı bu denetim kaydıyla ayrılır. Gereksinimi tamamlanmış
+saymak için gösterge tasarımı veya mevcut davranışın açık kabulü gerekir.
+
+Kaynak snapshot `0d13d24449047e3d23a0e15133c47e2ca44ca86b`: Codex88 Rust,
+62 Python, fixture bütünlüğü ve12 kontrollü GTK/compositor probe PASS. Tüm Rust
+hedefleri de21 harness/274 test icrası ile PASS (ortak modül tekrarları dahil). Yeni
+Codex secure decode testi NOT RUN; aynı kaynağın bilinen ortam engeli tekrar
+çalıştırılmadı. Kullanıcı Arch kabulü ve Codex kontrollü sonuçları ayrı tutulur.
+[Faz 2 / 0.1.0 ayrıntılı hazırlık ve açık kararlar](PHASE2_RELEASE_READINESS.md).
+
 ## API kanıtı ve uygulanabilir yol
 
 İncelenen client: Cargo registry **glycin-3.0.8/src/api_loader.rs**:

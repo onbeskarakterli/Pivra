@@ -5,6 +5,23 @@
 **Kaynak şartname:** [PIVRA_FEATURE_SPEC_TR.md](PIVRA_FEATURE_SPEC_TR.md)  
 **Görev ve commit takibi:** [PIVRA_COMMIT_TRACKER.md](PIVRA_COMMIT_TRACKER.md)
 
+## Güncel Faz 2 / 0.1.0 kapısı — 25.10.2026
+
+TH-07 kullanıcı Arch/GNOME native ve fiziksel kabulüyle DONE. TH-03 bağımsız
+TESTING korunur; restart/Enabled kalıcılığına ayrı native kabul beklenir.
+**PIV-18 TESTING, Faz 2 kapanışa hazır değil:** gerçek erken preview ve aktif
+foreground yükleme göstergesi kapsamları karara bağlanmalı. Full-only başarıyla
+kapsam sessizce daraltılmaz, reddedilen decoder deneyleri canlandırılmaz.
+
+Ayrı ilk yayın kapıları: Faz 0 clean native kurulum, DESKTOP-06 gerçek Nautilus,
+lisans/desktop-ikon/helper kurulumu ve clean release paketleme. Bunlar PIV-18'e
+yeni geliştirme işi olarak eklenmedi. [Test matrisi ve kararlar](PHASE2_RELEASE_READINESS.md).
+
+Kullanıcı yayın stratejisi: dev geliştirme/test; main onaylı kararlı kaynak;
+tek AUR paketi `pivra`, main sürüm etiketi kaynaklı. `pivra-git` yok; yayın sonrası
+`yay -S pivra` ve `yay -Syu`. Bu görev main merge/tag/Release/AUR yayını yapmadı.
+PIV-19 ve sonraki aşamalar başlamadı.
+
 ## Temel kurallar
 
 1. Ana dil Rust; GTK4 + libadwaita. Görüntüde Glycin, videoda GStreamer/gstreamer-rs, düzenlemede libvips **aday**. Gerçek uygunluk prototiplerle doğrulanır.

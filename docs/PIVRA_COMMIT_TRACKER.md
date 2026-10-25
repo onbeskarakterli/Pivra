@@ -2458,3 +2458,41 @@ Codex sayıları/NOT RUN sonuçları silinmedi. PIV-01–17 DONE korunur.
 TH-01/02/04/05/06/07 DONE; TH-03 bağımsız TESTING (native restart/persistence
 kabulü açık). PIV-18 TESTING, Faz2 kapanışı kapsam/ürün kararı bekler; full-only
 fallback gerçek erken preview değildir. PIV-19 ve sonrası başlatılmadı.
+
+
+## Faz 2 / PIV-18 son denetim ve0.1.0 hazırlığı — 25.10.2026
+
+Kaynak/test snapshot `0d13d24449047e3d23a0e15133c47e2ca44ca86b`; kabul/status
+belgesi `2ca8b7a895ec4a8289b3f3276c16b8f88e0c173f`. Üretim kodu ve bağımlılık
+bu denetimde değiştirilmedi. TH-07 kullanıcı native/fiziksel kabulüyle DONE;
+TH-03 native restart/kalıcılık kabulü ayrı TESTING kalır.
+
+Bizzat Codex PASS:fmt/check/build/Clippy -D warnings;88 Rust,62 Python;
+fixture/hash;48 mode snapshot + zoom/pan/filter; async/stale/cancel/preload/LRU/
+pressure/GIO races;81/120 thumbnail retention,120 tekil katalog ve stable seçim;
+özel config'te ayrı-süreç false→true→false persistence; Xfwm/XTest fullscreen ve
+Sway gerçek output2x fullscreen. Toplam12 GUI probe çağrısı. Grafik decode
+verileri kontrollüdür; yeni secure Glycin/GNOME generation veya fiziksel GNOME
+başarısı sayılmaz. Source desktop-file-validate PASS; DESKTOP-06 değildir.
+Çalıştırılmış FAIL yok. Codex native secure ve native factory, önceki ortam
+exit77 kayıtları nedeniyle tekrar NOT RUN; clean native/kurulu paket/Nautilus/
+release build NOT RUN. Resmî Arch metadata lookup proxy403 ile BLOCKED.
+
+**PIV-18 TESTING / Faz 2 KAPANIŞ BEKLİYOR.** Gerçek erken preview yok; önceki
+libjpeg/embedded prototipler geri getirilmedi. Madde10'da foreground status
+hidden; başlık+retention var ama aktif yükleme göstergesi yok. Bunları ertelemek
+veya mevcut davranışla kabul etmek kullanıcı kapsam kararıdır. Full-only PASS
+kendiliğinden DONE yapmaz. [Hazırlık raporu ve native komutlar](PHASE2_RELEASE_READINESS.md).
+
+0.1.0 bugün yayınlanmaya hazır değil: kapsam/TH-03/final native kapıları; ayrı
+Faz 0 ve DESKTOP-06; lisans, helper/ikon/desktop ve clean paketleme eksikleri.
+Yeni crash/decoder kod hatası bu denetimde üretilmedi. Yayın stratejisi tek AUR
+`pivra`, kaynak onaylı main etiketi; `pivra-git` yok. Main, tag, GitHub Release,
+AUR paketi veya sonraki özellikler bu görevde oluşturulmadı.
+
+
+Tüm Rust hedefleri ek kontrolü: `cargo test --locked --offline --all-targets -j2`
+PASS;21 harness /274 test icrası. Bu sayıya88 ana test ve farklı örneklerde
+yeniden derlenen ortak modül testleri dahildir;274 benzersiz özellik diye sayılmaz.
+Üretim kaynakları değiştirilmediğinden dokümantasyon sonrası grafik/native
+paketleri gereksiz yere tekrar çalıştırılmadı.

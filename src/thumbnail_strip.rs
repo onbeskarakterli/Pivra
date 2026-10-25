@@ -218,14 +218,18 @@ impl ThumbnailStrip {
             id.remove();
         }
     }
-    /// Selection-only calls never rebuild, cancel a worker, focus or realign.
+    /// Keep keyboard navigation's selection inside the strip viewport without
+    /// revealing a hidden strip or disturbing already-visible thumbnails.
     pub(crate) fn set_catalog(&self, photos: &[(usize, PathBuf)], selected: Option<usize>) {
         let i = &self.0;
-        if i.selected.replace(selected) != selected {
+        let changed = i.selected.replace(selected) != selected;
+        if changed {
             i.last_visible.set(None);
         }
-        // An unconsumed first-reveal anchor follows catalog index changes.
-        if i.initial.get().is_some() {
+        // The same measured, after-paint alignment handles both initial reveal
+        // and subsequent Left/Right navigation. While unmapped, retain the
+        // target until the strip is shown again; never force it open.
+        if i.initial.get().is_some() || (changed && i.initialized.get()) {
             i.initial.set(selected);
         }
         let same = {

@@ -84,7 +84,7 @@ fn update_navigation_actions(window: &adw::ApplicationWindow, context: &FileCont
 fn install_navigation_arrows(overlay: &gtk::Overlay) {
     let css = gtk::CssProvider::new();
     css.load_from_string(
-        ".pivra-navigation-glass { background-image: none; background-color: alpha(@window_bg_color, 0.18); border: 0; border-radius: 0; box-shadow: none; padding: 0; min-width: 112px; min-height: 0; color: @window_fg_color; } .pivra-navigation-glass image { -gtk-icon-size: 48px; } .pivra-navigation-glass:hover { background-color: alpha(@window_bg_color, 0.24); }"
+        ".pivra-navigation-glass { background-image: none; background-color: alpha(@window_bg_color, 0.50); border: 0; border-radius: 0; box-shadow: none; padding: 0; min-width: 112px; min-height: 0; color: @window_fg_color; } .pivra-navigation-glass image { -gtk-icon-size: 48px; } .pivra-navigation-glass:hover { background-color: alpha(@window_bg_color, 0.56); }"
     );
     gtk::style_context_add_provider_for_display(
         &overlay.display(), &css, gtk::STYLE_PROVIDER_PRIORITY_APPLICATION

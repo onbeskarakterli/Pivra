@@ -14,7 +14,7 @@ fn install_css(display: &gtk::gdk::Display) {
         if installed.replace(true) { return; }
         let css=gtk::CssProvider::new();
         css.load_from_string("\
-            .pivra-thumbnail-panel { background-color: alpha(@window_bg_color, 0.25); border-radius: 12px; padding: 8px; }\n\
+            .pivra-thumbnail-panel { background-color: alpha(@window_bg_color, 0.25); border-radius: 12px 12px 0 0; padding: 8px; }\n\
             .pivra-thumbnail-toggle { background-image: none; background-color: alpha(@window_bg_color, 0.25); border-radius: 16px; padding: 4px; min-width: 24px; min-height: 24px; }\n\
             .pivra-thumbnail-cell { background-image: none; background-color: transparent; padding: 0; min-width: 0; min-height: 0; border: none; border-radius: 0; box-shadow: none; }\n\
             .pivra-thumbnail-cell.selected { box-shadow: inset 0 0 0 2px @accent_color; }\n");
@@ -61,8 +61,8 @@ pub(crate) fn install(
         .build();
     strip.set_widget_name("thumbnail-strip");
     strip.add_css_class("pivra-thumbnail-panel");
-    strip.set_margin_start(8);
-    strip.set_margin_end(8);
+    strip.set_margin_start(0);
+    strip.set_margin_end(0);
     strip.set_visible(false);
     strip.set_min_content_width(0);
     let button = gtk::ToggleButton::builder()
@@ -78,8 +78,8 @@ pub(crate) fn install(
     button.set_margin_bottom(4);
     button.set_visible(available);
     strip.set_valign(gtk::Align::End);
-    // Reserve only overlay spacing, never space in the image's allocation.
-    strip.set_margin_bottom(button.measure(gtk::Orientation::Vertical, -1).1 + 8);
+    // The panel touches the image viewport edge; neither sibling is measured.
+    strip.set_margin_bottom(0);
     for widget in [strip.upcast_ref::<gtk::Widget>(), button.upcast_ref()] {
         overlay.add_overlay(widget);
         overlay.set_measure_overlay(widget, false);
@@ -256,6 +256,13 @@ impl Visibility {
             } else {
                 "Enable thumbnail strip"
             }));
+            // Above the visible panel; otherwise only the small bottom trigger.
+            let panel_height = self
+                .strip
+                .upgrade()
+                .filter(|s| s.is_visible())
+                .map(|s| s.measure(gtk::Orientation::Vertical, -1).1);
+            button.set_margin_bottom(panel_height.map_or(4, |height| height + 4));
             button.set_visible(show);
         }
     }

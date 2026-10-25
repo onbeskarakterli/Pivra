@@ -522,14 +522,22 @@ fn main() {
             assert!(!contains(v.widget().upcast_ref(), "thumbnail-controls"));
             let center = button.compute_bounds(v.widget()).unwrap();
             assert!(
-                bounds.y() + bounds.height() <= center.y(),
-                "floating items overlap"
+                center.y() + center.height() <= bounds.y(),
+                "toggle must float above panel"
             );
-            // Real composed overlay pixels below the panel must equal the
+            assert!(
+                (bounds.y() + bounds.height() - p.height() as f32).abs() <= 1.,
+                "panel must touch bottom"
+            );
+            assert!(
+                bounds.x().abs() <= 1. && (bounds.width() - p.width() as f32).abs() <= 1.,
+                "panel must span viewport width"
+            );
+            // Real composed overlay pixels alongside the button must equal the
             // picture outside the button, both visually and for pointer picks.
             let composed = widget_pixels(&w, &p, v.widget());
             let picture = image_bytes(&w, &p);
-            for y in (bounds.y() + bounds.height()).ceil() as usize..composed.1 {
+            for y in center.y().ceil() as usize..(center.y() + center.height()).floor() as usize {
                 for x in 0..composed.0 {
                     if x as f32 >= center.x() && (x as f32) < center.x() + center.width() {
                         continue;
@@ -545,7 +553,11 @@ fn main() {
             for x in [8., p.width() as f64 - 8.] {
                 let hit = v
                     .widget()
-                    .pick(x, p.height() as f64 - 8., gtk::PickFlags::DEFAULT)
+                    .pick(
+                        x,
+                        f64::from(center.y() + center.height() / 2.),
+                        gtk::PickFlags::DEFAULT,
+                    )
                     .unwrap();
                 assert_eq!(
                     hit,
@@ -654,7 +666,7 @@ fn main() {
     pause(550);
     assert_eq!(stable, image_bytes(&other, &op));
     println!(
-        "PASS TH-02 synthetic UI: overlay allocation/unchanged Fit-Fill-Actual pixels, zoom/pan preservation, horizontal scroll, icons, 25% panel alpha/opaque cells/borderless underline/header controls, TH-03 motion/T/shared preference/timer cancellation/unavailable/text focus, narrow resize, no bottom-band pixels/open-and-closed pick-through, two-window close/isolation, zero toggle-induced decoder jobs. scale_factor={}",
+        "PASS TH-02 synthetic UI: overlay allocation/unchanged Fit-Fill-Actual pixels, zoom/pan preservation, horizontal scroll, icons, 25% panel alpha/opaque cells/borderless underline/header controls, TH-03 motion/T/shared preference/timer cancellation/unavailable/text focus, narrow resize, bottom-attached panel/upper floating toggle/no button-row band/open-and-closed pick-through, two-window close/isolation, zero toggle-induced decoder jobs. scale_factor={}",
         op.scale_factor()
     );
     other.close();

@@ -403,7 +403,7 @@ mevcut PIV-18'e bağlı alt görevdir. PIV-01–60 numaraları korunur.
 | TH-03 | Otomatik gizlenme, `T`, kalıcı ayar | TESTING — native kabul bekleniyor |
 | TH-04 | Thumbnail gezinme senkronizasyonu | DONE — kullanıcı Arch GNOME kabulü, 1b11074 |
 | TH-05 | Sistem thumbnail üretimi | DONE — kullanıcı Arch GNOME kabulü, 1b11074 |
-| TH-06 | Thumbnail genel kabul ve optimizasyon | TODO |
+| TH-06 | Thumbnail genel kabul ve optimizasyon | TESTING — TH-06.1/06.2, native kabul bekleniyor |
 | TH-07 | Tam ekran fotoğraf görüntüleme | TODO — yalnız planlama |
 
 TH-07: ana fotoğrafta çift tıklama veya `F` ile fullscreen aç/kapa, `Esc` ile çıkış;

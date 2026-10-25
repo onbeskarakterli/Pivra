@@ -2164,9 +2164,9 @@ Missing tek başına hata değildir. [Kanıt/komut](TH01_THUMBNAIL_VALIDATION.md
 | TH-01 provider | DONE — NATIVE ACCEPTED | Kullanıcı TH-02 talimatında native kabul başarılı bildirdi; yeni ayrıntılı log/SHA verilmedi, Codex testi sayılmaz |
 | TH-02 overlay | DONE | Kullanıcı TH-03 talimatında native kabulü bildirdi; yeni ayrıntılı log/SHA verilmedi |
 | TH-03 | TESTING | Otomatik gizlenme, `T`, kalıcı ayar; ayrı native kabul bekleniyor |
-| TH-04 | TESTING | DONE — kullanıcı Arch GNOME kabulü, 1b11074 |
-| TH-05 | TESTING | DONE — kullanıcı Arch GNOME kabulü, 1b11074 |
-| TH-06 | TODO | Thumbnail genel kabul ve optimizasyon |
+| TH-04 | DONE | DONE — kullanıcı Arch GNOME kabulü, 1b11074 |
+| TH-05 | DONE | DONE — kullanıcı Arch GNOME kabulü, 1b11074 |
+| TH-06 | TESTING — TH-06.1/06.2, native kabul bekleniyor | Thumbnail genel kabul ve optimizasyon |
 | TH-07 | TODO | Tam ekran fotoğraf görüntüleme; PIV-18 alt görevi, yalnız planlandı |
 
 TH-02 başlangıç `e503e8fec645ddf79b2b73b4b34b9c03573f8eec`, temiz/güncel dev.
@@ -2318,3 +2318,14 @@ hizalama/scroll/pencere bağımsızlığı koşullarını da karşıladığında
 [Native kabul kaydı](TH05_THUMBNAIL_SYSTEM_VALIDATION.md). PIV-18 TESTING;
 TH-06 yetkili yeni kapsam, native kabul gelmeden DONE değil; TH-07 TODO.
 Faz0/DESKTOP-06 ve diğer PIV kapıları bu kapanışla değişmedi.
+
+
+### TH-06.1 — 25.10.2026 — TESTING
+
+Şerit alt/start/end margin0 ile viewport alt kenarında; görünür panelde düğme
+natural panel yüksekliği+4 ile üst ortada, kapalı panelde bottom4px. Bağımsız
+non-measuring overlay ve%25/opaque/selected-frame tasarımı korunur.
+PASS:86 Rust, fmt/check/all-target Clippy; X11/Sway geometri ve gerçek GSK
+Photo snapshot sürekliliği; koyu tema+scale2 altında120 kayıt TH-05 regresyonu.
+Native GNOME fiziksel kabul NOT RUN. [Kayıt/komut](TH06_VALIDATION.md).
+TH-06 TESTING, TH-07 TODO; PIV-18 genel kapanışı yapılmadı.

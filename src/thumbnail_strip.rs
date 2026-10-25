@@ -572,7 +572,7 @@ impl Inner {
                 let icon = gtk::Image::from_icon_name("image-x-generic-symbolic");
                 icon.set_halign(gtk::Align::Center);
                 icon.set_valign(gtk::Align::Center);
-                icon.set_visible(entry.phase == Phase::Failed || entry.phase == Phase::Evicted);
+                icon.set_visible(entry.phase != Phase::Ready);
                 for child in [
                     picture.upcast_ref::<gtk::Widget>(),
                     icon.upcast_ref(),

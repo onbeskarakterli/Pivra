@@ -33,6 +33,7 @@ pub(super) struct ImageView {
     texture: Rc<RefCell<Option<gtk::gdk::Texture>>>,
     transform: Rc<RefCell<Transform>>,
     filter: Rc<Cell<Resampling>>,
+    zoom_wheel: Rc<Cell<bool>>,
     requested: Rc<RefCell<Option<PathBuf>>>,
     prefetch: Rc<RefCell<preload::State>>,
     phase: Rc<Cell<Phase>>,
@@ -116,12 +117,14 @@ impl ImageView {
         });
         let transform = Rc::new(RefCell::new(Transform::default()));
         let filter = Rc::new(Cell::new(Resampling::default()));
+        let zoom_wheel = Rc::new(Cell::new(false));
         install_interaction(
             &picture,
             texture.clone(),
             transform.clone(),
             &mode_action,
             filter.clone(),
+            zoom_wheel.clone(),
         );
         let mode_transform = transform.clone();
         let weak_picture = picture.downgrade();
@@ -184,6 +187,7 @@ impl ImageView {
             phase,
             requested: Rc::default(),
             filter,
+            zoom_wheel,
             transform,
             texture,
             overlay,
@@ -197,6 +201,10 @@ impl ImageView {
 
     /// Bounded queue diagnostics for native/controlled probes; no product UI.
     #[allow(dead_code)]
+    pub(super) fn set_zoom_wheel_enabled(&self, enabled: bool) {
+        self.zoom_wheel.set(enabled);
+    }
+
     pub(super) fn load_stats(&self) -> image_requests::LoadStats {
         self.slot.stats()
     }
@@ -582,6 +590,7 @@ pub(super) fn install_interaction(
     transform: Rc<RefCell<Transform>>,
     action: &gio::SimpleAction,
     filter: Rc<Cell<Resampling>>,
+    zoom_wheel: Rc<Cell<bool>>,
 ) {
     let pointer = Rc::new(Cell::new((0., 0.)));
     let motion = gtk::EventControllerMotion::new();
@@ -596,7 +605,20 @@ pub(super) fn install_interaction(
     let state = transform.clone();
     let mode_action = action.clone();
     let scroll_filter = filter.clone();
-    scroll.connect_scroll(move |_, _, dy| {
+    scroll.connect_scroll(move |controller, _, dy| {
+        let zoom = zoom_wheel.get()
+            || controller.current_event_state().contains(gtk::gdk::ModifierType::BUTTON1_MASK);
+        if !zoom {
+            if let Some(picture) = weak.upgrade() {
+                if let Some(window) = picture.root().and_downcast::<gtk::Window>() {
+                    let action = if dy > 0.0 { "next-media" } else { "previous-media" };
+                    if dy != 0.0 {
+                        gio::prelude::ActionGroupExt::activate_action(&window, action, None);
+                    }
+                }
+            }
+            return glib::Propagation::Stop;
+        }
         let Some(picture) = weak.upgrade() else {
             return glib::Propagation::Proceed;
         };

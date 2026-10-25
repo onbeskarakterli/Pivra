@@ -610,7 +610,7 @@ pub(super) fn install_interaction(
             || controller.current_event_state().contains(gtk::gdk::ModifierType::BUTTON1_MASK);
         if !zoom {
             if let Some(picture) = weak.upgrade() {
-                if let Some(window) = picture.root().and_downcast::<gtk::Window>() {
+                if let Some(window) = picture.root().and_downcast::<adw::ApplicationWindow>() {
                     let action = if dy > 0.0 { "next-media" } else { "previous-media" };
                     if dy != 0.0 {
                         gio::prelude::ActionGroupExt::activate_action(&window, action, None);

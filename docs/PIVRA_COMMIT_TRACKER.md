@@ -2545,3 +2545,18 @@ Native birleşik `bash tests/run_preview_pipeline_probe.sh` **exit 0** (Takip 04
 - Gerçek GNOME/Freedesktop native kabul ve aktif decode sırasında pencere kapanışı
   bekleniyor. FD-06 DONE değildir; FD-07 başlamadı.
 - Mimari, sınırlar ve komutlar: [FD06_PROVIDER_MANAGER_INTEGRATION.md](FD06_PROVIDER_MANAGER_INTEGRATION.md).
+
+#### FD-06 native T/overlay düzeltmesi — TESTING
+
+- Kullanıcı GNOME native regresyonu: PASS / exit 0 (kullanıcı bildirimi).
+- Kullanıcı FD native: T ile şerit açılamadı; iki Ctrl-C / exit 130. Üretim PASS değil.
+- Kök neden: ImageView UI kapısı yalnız GNOME capability'sini okuyordu; seçilmiş
+  Freedesktop'a rağmen T handler'ı available=false ile geri dönüyordu.
+- `2e5759a261f7589e4ff9a16d4cb2e3117f5c46ce`: session provider uyumlu UI kapısı,
+  GNOME dalı korunarak düzeltildi; native decode öncesi gerçek mapped-strip/T
+  assertion'ları ve aşama yönergeleri eklendi.
+- Codex: 185 Rust, 37 thumbnail Python, 4 gözlemci PASS; X11/Sway T/mapping ve
+  GNOME kontrollü katalog PASS. Native secure decode tek denemede NOT RUN / 77
+  (Bwrap). fmt --check önceki kapsam dışı farklar nedeniyle FAIL.
+- Tek native komut ve kabul adımları: [FD06_PROVIDER_MANAGER_INTEGRATION.md](FD06_PROVIDER_MANAGER_INTEGRATION.md).
+  Gerçek FD üretim ve aktif kapanış native kabulü bekleniyor. FD-07 başlamadı.

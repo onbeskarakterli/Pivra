@@ -94,3 +94,57 @@ native kabul gelmeden DONE olmayacak. FD-07 kapsamı başlatılmadı.
 
 GNOME native girişinin önkoşulu ayrıca exit 77 verdi: bu ortamda API kontrolünden
 geçmiş GNOME generation sidecar yok. Bu sonuç Bwrap engelinden ayrı NOT RUN'dır.
+
+## Native T/şerit hatası — 2026-10-26
+
+Kullanıcı Arch GNOME native referansının exit 0 ile geçtiğini bildirdi.
+Freedesktop denemeleri yalnız session-selection mesajından sonra ilerlemedi;
+kullanıcı T ile şeridi açamadı ve iki denemeyi Ctrl-C ile bitirdi (exit 130).
+Bunlar Freedesktop üretim başarısı veya decoder hatası kanıtı değildir.
+
+**Kök neden üretim UI admission kontrolüdür**, yalnız test stub'ı değildir.
+`ImageView::new` eski `thumbnail::Provider::discover(None)` GNOME capability
+kontrolünü kullanıyordu. FD native girişinin process-only desktop kimliğinde bu
+Unavailable döner. `thumbnail_overlay::install` T handler'ını kurar, ancak
+`available=false` nedeniyle tuşu işlemeden geri döner; fare/düğme de aynı kapıya
+takılır. Buna karşılık strip worker doğru biçimde Freedesktop Manager'a bağlıydı.
+Manager'ın session seçimi başarılı olduğu halde UI hiç iş başlatamıyordu.
+
+Düzeltme `2e5759a261f7589e4ff9a16d4cb2e3117f5c46ce`: UI kullanılabilirliği
+session provider'ına göre belirlenir. GNOME dalındaki eski capability kontrolü
+aynen korunur; Freedesktop GNOME bulunmasını gerektirmez. Factory, Glycin,
+preload/cache/bellek sınırları veya görünürlük politikası değiştirilmedi.
+
+`--require-freedesktop` şimdi decode öncesi üretim ImageView/overlay üzerinde T
+kontrolünü de çalıştırır: kapalı başlangıç, işlenen T, gerçekten mapped strip,
+tekrar kapatma, ikinci pencereye bağımsız reveal, aynı ana görüntü pikseli ve
+viewport ölçüleri. Bu kısa bölüm TEST pikselleridir; generation PASS değildir.
+Native gerçek cache-piksel kontrolü ayrıca mapped strip zorunluluğu taşır.
+`--fd06-overlay-regression` yalnız bu kısa bölüm için test girişidir.
+
+Düzeltme sonrası Codex sonuçları:
+
+- Xvfb/X11 ve izole headless Sway/Wayland T/overlay regresyonu: PASS.
+  Gerçek GTK controller sinyali ve widget mapping; fiziksel klavye testi değil.
+- GNOME kontrollü katalog/iki üretim penceresi regresyonu: PASS; 120 benzersiz
+  başarılı cache işi, sıfır iptal; gerçek decoder iddiası yok.
+- cargo check, example build, cargo test (185), Clippy all-targets: PASS.
+- Thumbnail Python 37 ve gözlemci Python 4: PASS; shell syntax/diff-check PASS.
+- fmt --check: önceki kapsam dışı üç dosyanın biçim farkları nedeniyle FAIL.
+  Yeni değişikliklere ait format farkı yok.
+- Secure native gate: tek denemede Bwrap loader exit 1 / probe exit 77:
+  NOT RUN. Yeni T kontrolü bu denemede PASS; Freedesktop üretimi ve aktif decode
+  kapanışı native kabulü henüz yok. Güvenlik gevşetilmedi.
+
+Kullanıcının tek yeniden doğrulama komutu:
+
+```sh
+bash tests/run_fd06_freedesktop_probe.sh; printf 'FREEDESKTOP EXIT CODE: %s\n' "$?"
+```
+
+Önce otomatik T/overlay ve katalog adımları çalışır; bu sırada test pencerelerini
+kapatmayın. `MANUAL TH-05` mesajını bekleyin. Ardından iki üretim penceresinde fareyi
+alta götürün, T ile kapatıp/açın, thumbnail piksellerini, kaydırma/tıklama ve
+Sol/Sağ gezinmesini kontrol edin. İki manuel pencereyi kapatınca otomatik aktif
+decode kapanış testi başlar. Nihai exit 0 ve gerçek piksel/aktif kapanış çıktıları
+olmadan Freedesktop native kabulü verilmez. FD-06 TESTING; FD-07 başlamadı.

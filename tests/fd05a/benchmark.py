@@ -59,6 +59,11 @@ def cgroup_peak():
     try:return {'bytes':int(Path('/sys/fs/cgroup/memory.peak').read_text()),'scope':'existing shared cgroup, not isolated job peak; not reset'}
     except (OSError,ValueError):return 'NOT MEASURED'
 
+def window_protocol_complete(certificate,finished):
+    return bool(certificate and certificate.get('partial_after_stop')
+                and certificate.get('cancel_acknowledged')
+                and certificate.get('loader_exited_while_other_window_alive') and finished)
+
 def job(binary,path,w,h,cancel,extra=()):
     samples=[];handles={};certificate=None;errors=0;peak_before=cgroup_peak();window_protocol='--fd06-active-close' in extra;finished=False;window_deadline=None
     with tempfile.TemporaryFile(mode='w+') as out,tempfile.TemporaryFile(mode='w+') as err:
@@ -91,7 +96,9 @@ def job(binary,path,w,h,cancel,extra=()):
                                     deadline=time.monotonic()+3
                                     while time.monotonic()<deadline:
                                         out.flush();out.seek(0)
-                                        if 'CANCEL_ISSUED' in out.read():break
+                                        if 'CANCEL_ISSUED' in out.read():
+                                            certificate['cancel_acknowledged']=True
+                                            break
                                         time.sleep(.001)
                                     else:raise RuntimeError('cancel acknowledgement absent')
                             finally:
@@ -122,8 +129,16 @@ def job(binary,path,w,h,cancel,extra=()):
                 time.sleep(.02)
             else:cleanup=False
             if not cleanup:code=1
+            if window_protocol and certificate and not window_protocol_complete(certificate,finished):code=1
             if cancel and (certificate is None or 'PASS CANCELLED' not in stdout or not cleanup):code=(77 if p.returncode in (0,77) else p.returncode) if certificate is None else 1
-            return {'parent_pid':p.pid,'parent_starttime':parent_identity[1]if parent_identity else'NOT MEASURED','size':[w,h],'format':path.suffix,'cancel':cancel,'exit':code,'stdout':stdout,'stderr':stderr,'certificate':certificate,'cleanup':cleanup,'tracked_descendants':[{'pid':pid,'starttime':start}for pid,start in handles],'proc_errors':errors,'samples':samples,'child_rss':'MEASURED'if any(('Rss' in v or 'VmRSS' in v)for s in samples for v in s['loaders'].values())else'NOT MEASURED','child_pss':'MEASURED'if any('Pss' in v for s in samples for v in s['loaders'].values())else'NOT MEASURED','cancel_stage':('certified_partial_frame'if certificate else'NOT RUN partial_frame_checkpoint')if cancel else'not_requested','max_observed_loader_processes':max((len(s['loaders']) for s in samples),default=0),'cgroup_peak_before':peak_before,'cgroup_peak_after':cgroup_peak()}
+            return {'parent_pid':p.pid,'parent_starttime':parent_identity[1]if parent_identity else'NOT MEASURED','size':[w,h],'format':path.suffix,'cancel':cancel,'exit':code,'stdout':stdout,'stderr':stderr,'certificate':certificate,'cleanup':cleanup,'window_finish_sent':finished if window_protocol else None,'window_lifecycle':[line for line in stdout.splitlines() if line.startswith(('CLOSE_EVENT','CLOSE_STATE','WINDOW_CLOSED'))],'tracked_descendants':[{'pid':pid,'starttime':start}for pid,start in handles],'proc_errors':errors,'samples':samples,'child_rss':'MEASURED'if any(('Rss' in v or 'VmRSS' in v)for s in samples for v in s['loaders'].values())else'NOT MEASURED','child_pss':'MEASURED'if any('Pss' in v for s in samples for v in s['loaders'].values())else'NOT MEASURED','cancel_stage':('certified_partial_frame'if certificate else'NOT RUN partial_frame_checkpoint')if cancel else'not_requested','max_observed_loader_processes':max((len(s['loaders']) for s in samples),default=0),'cgroup_peak_before':peak_before,'cgroup_peak_after':cgroup_peak()}
+        except RuntimeError as error:
+            # Preserve protocol evidence even when the observer itself times out.
+            # This result can never certify cleanup or an active-close PASS.
+            out.seek(0);err.seek(0)
+            return {'exit':1,'observer_failure':str(error),'stdout':out.read(),'stderr':err.read(),
+                    'certificate':certificate,'window_finish_sent':finished,
+                    'cleanup':'NOT VERIFIED','samples':samples,'proc_errors':errors}
         finally:
             if p.poll() is None:
                 p.terminate()

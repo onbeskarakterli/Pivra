@@ -420,6 +420,10 @@ fn main() {
         catalog_probe::retention(&app);
         return;
     }
+    if std::env::args().any(|s| s == "--fd06-close-harness-regression") {
+        fd06_close::harness_regression(&app);
+        return;
+    }
     if std::env::args().any(|s| s == "--fd06-active-close") {
         fd06_close::run(&app);
         return;

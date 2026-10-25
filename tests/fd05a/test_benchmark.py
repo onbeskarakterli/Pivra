@@ -23,6 +23,14 @@ class Observer(unittest.TestCase):
                 m[:12]=bytes.fromhex('1153bf')*4
             self.assertFalse(b.partial(os.getpid(),96),'closed writable mapping is not active evidence')
         finally:os.close(fd)
+    def test_window_pass_requires_certificate_ack_loader_exit_and_finish(self):
+        cert={'partial_after_stop':True,'cancel_acknowledged':True,'loader_exited_while_other_window_alive':True}
+        self.assertTrue(b.window_protocol_complete(cert,True))
+        self.assertFalse(b.window_protocol_complete(None,True))
+        self.assertFalse(b.window_protocol_complete(cert,False))
+        for key in cert:
+            incomplete={**cert,key:False}
+            self.assertFalse(b.window_protocol_complete(incomplete,True),key)
     def test_streamed_fixture_has_exact_header(self):
         with tempfile.TemporaryDirectory() as d:
             path=Path(d)/'source.png';b.fixture(path,64,32);data=path.read_bytes()

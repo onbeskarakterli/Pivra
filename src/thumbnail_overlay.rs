@@ -90,7 +90,7 @@ impl ThumbnailStrip {
                 }
             });
             self.items.append(&button);
-            cells.push((*index, button));
+            cells.push((index, button));
         }
         self.load_visible_cache(photos, selected, cells);
         if !self.manually_scrolled.get() {

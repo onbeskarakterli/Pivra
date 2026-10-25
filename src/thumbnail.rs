@@ -317,10 +317,32 @@ pub fn generation_helper() -> Option<PathBuf> {
 /// invalidation; no implicit retries and no persistent failure marker on sandbox errors.
 pub fn query_or_generate(provider: &Provider, path: &Path, cancel: &gio::Cancellable) -> Outcome {
     let outcome = provider.query(path, cancel);
-    if !matches!(outcome, Outcome::Missing | Outcome::Stale) {
+    // Corrupt PNG caches are recoverable via the GNOME factory. Do not
+    // regenerate for unrelated validation failures (unsafe path, oversized
+    // cache, unavailable source, etc.).
+    let corrupt_png = matches!(&outcome, Outcome::Invalid(error) if
+        matches!(error.as_str(),
+            "PNG signature" | "truncated PNG chunk" | "PNG chunk bounds" |
+            "PNG CRC bounds" | "PNG CRC" | "PNG IHDR" | "thumbnail edge bound" |
+            "duplicate IHDR" | "PNG ending" | "PNG chunk count" | "PNG overflow"));
+    if !matches!(outcome, Outcome::Missing | Outcome::Stale) && !corrupt_png {
         return outcome;
     }
-    let force = matches!(outcome, Outcome::Stale);
+    // GIO may classify malformed existing normal-cache PNGs as Missing.
+    // Force regeneration rather than letting GNOME's cached lookup short-circuit.
+    let existing_normal = {
+        let uri = gio::File::for_path(path).uri();
+        gtk::glib::Checksum::new(gtk::glib::ChecksumType::Md5)
+            .and_then(|mut hash| {
+                hash.update(uri.as_bytes());
+                hash.string().map(|digest| {
+                    gtk::glib::user_cache_dir().join("thumbnails/normal")
+                        .join(format!("{digest}.png")).is_file()
+                })
+            })
+            .unwrap_or(false)
+    };
+    let force = matches!(outcome, Outcome::Stale) || corrupt_png || existing_normal;
     let Some(helper) = generation_helper() else {
         return outcome;
     };

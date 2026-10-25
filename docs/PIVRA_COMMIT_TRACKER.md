@@ -2379,3 +2379,30 @@ visibility, mode/zoom/pan, scrollbar bounds ve iki pencere X11 1x/koyu2x/Sway PA
 TH-06.2 controlled transition ve preload PASS. Önceki ara UI timeout nihai
 allocation sertifikası testinde giderildi. Yeni secure decode ve fiziksel GNOME
 kabulü NOT RUN; TH-06 TESTING. Yerleşim commit SHA'sı teslim raporunda verilir.
+
+
+### TH-06 native katalog122/120 sayımı — 25.10.2026 — TESTING
+
+Başlangıç `95452ec479640b0b1be8b30f18d850baed328cca`: kullanıcı81/120 native
+retention PASS, ardından native katalog122/120 FAIL bildirdi. Kaynak isimleri
+bu raporda yok; native iki dosyanın kimliği/kesin nedeni Codex'te bilinmiyor.
+
+`a409a5ffdb79f4ae962d4dddb514489db1ee73ef` — per-file cache/decode/cancellable
+sayımı, optional admission/cancel/evict/rehydration trace; kontrollü iki priority
+iptaliyle aynı122/120 FAIL yeniden üretildi (`photo1.jpg`, `photo116.png`).
+Bu dosyalar yalnız kontrollü fixture koşusuna aittir. Yeni assertion her120 dosya
+başına tam1 iptalsiz başarılı decode ve toplam120+kanıtlı iptal ister. İptalsiz
+tekrar veya gerçek decoder hatası kabul edilmez. Running tanısı retry/build ve
+mapped pending admission'ı kapsayarak erken stable-count örneklemesini giderir.
+64 texture/16 MiB, selected/visible koruması ve secure Glycin/cache/UI korunur.
+
+PASS:88 ana Rust testi, fmt/check/all-target Clippy;22 örnek unit testi (iki yeni
+pozitif/negatif audit testi dahil); X11 ardışık81/120 retention+normal katalog;
+X11/Sway controlled katalog122 girişim/2 iptal/120 tekil başarı, kalan source/
+cache/close/two-window kontrolleri. Native secure katalog ve fiziksel GNOME yeni
+kabul NOT RUN; bilinen Bwrap engeli yeniden denenmedi.
+
+Native: `PIVRA_TRACE_THUMBNAILS=1 bash tests/run_thumbnail_system_probe.sh`.
+Tekrarlanan dosya adları/cache URI/token/result ve priority/epoch/eviction izleri
+raporlanır; gerçek iptalsiz tekrar varsa test FAIL kalır. [Detay](TH06_VALIDATION.md).
+TH-06 TESTING, TH-04/TH-05 DONE, TH-07 TODO; PIV-18 TESTING.

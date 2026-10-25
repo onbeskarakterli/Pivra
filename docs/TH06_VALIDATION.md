@@ -263,3 +263,95 @@ Bellek düzeltmesi commit'i: `ec469201ae46e780063fc97f1d4e8c0d14239315`.
 Yerleşim/test/nihai kayıt bu belgenin son commit'indedir; kesin SHA teslim
 raporunda ve `git log --oneline -- docs/TH06_VALIDATION.md` ile doğrulanabilir.
 **TH-04 DONE, TH-05 DONE, TH-06 TESTING, TH-07 TODO; PIV-18 TESTING.**
+
+
+## Native katalog sayımı / iptal girişimleri — 25.10.2026 — TESTING
+
+Kullanıcı `95452ec` Arch GNOME üzerinde yeni81/120 retention testinin PASS,
+sonraki native katalog testinin122/120 total-call assertion'ında FAIL olduğunu
+bildirdi. Bu yeni native kabul değildir. Kullanıcı çıktısı hangi dosyaların
+tekrarlandığını veya token durumlarını içermiyordu; Arch'taki iki dosyanın adı
+ve kesin tetikleyici bu Codex oturumunda bağımsız olarak belirlenemedi.
+
+### Ölçülen kontrollü yeniden üretim
+
+`--catalog-regression --catalog-cancel-race` yalnız test worker'ına60ms gecikme
+ve iki açık viewport değişimi uygular; üretim decoder'ı yavaşlatılmaz. Eski
+assertion bu koşuda aynı **left122/right120** ile FAIL verdi. Kaynak/cache URI
+haritası, girişim sırası, sonuç ve gerçek GIO cancellable durumu kaydedildi:
+
+- `photo1.jpg`: görünür bölge değişince arka plan işi iptal edildi; girişim10
+  cancelled=true, girişim13 cancelled=false.
+- `photo116.png`: ikinci görünür bölge değişiminde iptal edildi; girişim11
+  cancelled=true, girişim119 cancelled=false.
+- Toplam122, iptal2; her120 dosya için tam bir iptalsiz başarılı sonuç.
+
+Bunlar sentetik fixture/worker sonuçlarıdır; aynı dosyaların kullanıcı native
+koşusunda tekrarlandığı iddia edilmez. `cancel-visible-priority` ve stale-discard
+izleri bu kontrollü iki tekrarın seçili hücre koruması/LRU kaynaklı başarılı
+tekrarlar olmadığını gösterir: tamamlanmadan iptal edilen iş yeniden kabul edilir.
+Sabit görünümdeki gereksiz tekrar hâlâ hata kabul edilir.
+
+### Kesin test sözleşmesi
+
+Eski “toplam çağrı her zaman120” varsayımı kaldırılıp daha ayrıntılı bir
+assertion kondu: her beklenen cache dosyası için **tam1 iptalsiz başarılı decode**;
+ek girişimlerin **tamamı gerçek cancelled token** ile açıklanmalı. Toplamın
+`120 + cancelled` eşitliği de ayrıca kontrol edilir. İptalsiz çift başarı,
+eksik dosya, iptalsiz decoder hatası, tamamlanmamış girişim veya katalog dışı
+cache dosyası FAIL'dir. Sırf122 geldi diye tolerans/sabit122/`>=120` eklenmedi.
+Bu ilk sabit katalog aşamasında LRU kaynaklı çift başarılı decode da kabul edilmez;
+normal scroll sonrası zorunlu rehydration ayrı retention testinde kalır.
+
+İkinci ölçülen senkronizasyon hatası: `stats.running` yalnız active/validation'a
+bakıyordu. Retry timer veya frame sonrası pending admission varken false olabiliyor,
+“stable selection” sayımını erken başlatıyordu. Kontrollü yavaş X11 koşusu bu
+eski beklemeyle stable-selection assertion'ında FAIL verdi. Running artık mapped
+ve açık şeritte retry/build/Pending/Loading'i de kapsar. Gizli/kapalı şeritte
+ertelenmiş pending hücreler boşta beklemeyi engellemez; gerçek active worker'ın
+join beklemesi korunur. Scheduler/decode/cache eviction politikası değiştirilmedi.
+
+### Tanı / native komut
+
+Tekrarlanan dosyalarda `DECODE source=... index=... cache=... attempt=...
+completed=... cancelled=...` ve özet `unique-successes` yazdırılır. İsteğe bağlı
+`PIVRA_TRACE_THUMBNAILS=1` admission selected/visible/background, priority/pause
+iptali, stale discard, eviction ve rehydration nedenlerini kaynak adıyla gösterir.
+Üretimde varsayılan kapalıdır; sınırsız uygulama içi olay listesi eklenmedi.
+GIO token referanslı girişim listesi yalnız örnek test programındadır.
+
+```bash
+PIVRA_TRACE_THUMBNAILS=1 bash tests/run_thumbnail_system_probe.sh
+```
+
+Mevcut giriş önce81/120 sentetik retention, ardından gerçek secure cache/native
+katalog ve manuel TEST pencerelerini çalıştırır. `--catalog-cancel-race` native
+kanıt gibi kullanılmaz, yalnız kontrollü otomatik testtir. Yeni native koşuda
+iptalsiz tekrar varsa test FAIL kalır; kaynak/cache ve trace çıktısı nedenini
+ayırt etmek için kaydedilmelidir. Güvenli Glycin/Bwrap gevşetilmedi;64 texture /
+16 MiB ve visible/selected koruması, ImageView/zoom/preload değişmedi. Bilinen
+Codex namespace engeli tekrar denenmedi. Yeni native secure katalog ve fiziksel
+GNOME kabulü **NOT RUN**. TH-06 TESTING, TH-07 TODO, TH-04/05 DONE, PIV-18 TESTING.
+
+
+Kod/test commit'i: `a409a5ffdb79f4ae962d4dddb514489db1ee73ef`.
+
+Son Codex sonuçları (aynı mevcut SDK; offline/-j2):
+
+| Kontrol | Sonuç |
+| --- | --- |
+| fmt/check/all-target Clippy -D warnings | PASS |
+| cargo test --locked | PASS:88 |
+| cargo test --locked --example thumbnail_overlay_probe | PASS:22 (iki yeni audit testi dahil) |
+| X11 ardışık81/120 retention + normal katalog | PASS; normal katalog120 girişim,0 iptal |
+| X11 kontrollü cancellation-race katalog | PASS;122 girişim,2 iptal,120 tekil başarılı dosya |
+| Sway/Wayland controlled cancellation-race katalog | PASS;122 girişim,2 iptal,120 tekil başarılı dosya |
+| Invalid cache/source/selected/cancel/close/iki üretim test penceresi | PASS, yukarıdaki kontrollü katalog kapsamında |
+| Yeni native secure katalog + fiziksel Arch GNOME kabulü | NOT RUN |
+
+Negatif audit birim testleri iptalsiz çift başarıyı, eksik başarıyı, iptalsiz hatayı,
+tamamlanmamış girişimi ve bilinmeyen cache dosyasını reddeder; yalnız token ile
+kanıtlı iptal girişimlerine izin verir. Ana88 teste22 örnek testinin mevcut bazı
+kaynak modül testleri de dahildir; bunlar110 benzersiz senaryo iddiası değildir.
+Native sonuç gelmeden kullanıcıdaki iki tekrarın kesin nedenine veya katalog
+PASS olduğuna karar verilmez. **TH-06 TESTING.**

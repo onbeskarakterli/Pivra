@@ -83,7 +83,7 @@ pub(crate) fn install(
     button.set_margin_bottom(0);
     button.set_visible(available);
     let pin = gtk::ToggleButton::builder()
-        .icon_name("view-pin-symbolic")
+        .icon_name("bookmark-new-symbolic")
         .tooltip_text("Keep thumbnail strip visible")
         .build();
     pin.add_css_class("pivra-thumbnail-pin");
@@ -151,7 +151,7 @@ pub(crate) fn install(
         }
         if let Some(pin) = pin_click.pin.upgrade() {
             pin.set_active(pinned);
-            pin.set_icon_name(if pinned { "object-locked-symbolic" } else { "view-pin-symbolic" });
+            pin.set_icon_name(if pinned { "bookmark-remove-symbolic" } else { "bookmark-new-symbolic" });
             if pinned { pin.add_css_class("pivra-pinned"); } else { pin.remove_css_class("pivra-pinned"); }
             pin.set_tooltip_text(Some(if pinned {
                 "Unpin thumbnail strip"

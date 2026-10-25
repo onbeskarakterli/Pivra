@@ -279,9 +279,13 @@ pub(super) fn run(app: &adw::Application) {
         if !second.is_visible() || !second.is_mapped() || second.title() != title {
             return Err((1, "other window visibility/title changed".to_owned()));
         }
+        println!(
+            "PASS other window visible/mapped/title unchanged after loader-exit acknowledgement"
+        );
         if image_bytes(&second, &second_photo) != second_pixels {
             return Err((1, "other window render pixels changed".to_owned()));
         }
+        println!("PASS other window render pixels unchanged");
         if pivra::image_cache::FileKey::read(&big).ok().as_ref() != Some(&key) {
             return Err((1, "large source identity changed".to_owned()));
         }
@@ -293,6 +297,9 @@ pub(super) fn run(app: &adw::Application) {
                 "resources reacquired after cleanup acknowledgement".to_owned(),
             ));
         }
+        println!(
+            "PASS source identity and zero workers/reservations after final render verification"
+        );
         Ok(())
     });
     second.close();

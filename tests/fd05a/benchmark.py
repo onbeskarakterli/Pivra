@@ -59,13 +59,36 @@ def cgroup_peak():
     try:return {'bytes':int(Path('/sys/fs/cgroup/memory.peak').read_text()),'scope':'existing shared cgroup, not isolated job peak; not reset'}
     except (OSError,ValueError):return 'NOT MEASURED'
 
+# glycin =3.0.8 pool.rs: PoolConfig::default retains unused loaders for 30s.
+# Preserve the existing 5s process-exit grace AFTER that documented retention.
+# This never substitutes idle/RSS/worker counters for an actual readable pidfd.
+GLYCIN_POOL_RETENTION_SECONDS = 30
+LOADER_EXIT_GRACE_SECONDS = 5
+
+def loader_exit_progress(exited,elapsed):
+    if exited:return 'exited'
+    if elapsed >= GLYCIN_POOL_RETENTION_SECONDS + LOADER_EXIT_GRACE_SECONDS:
+        raise RuntimeError('loader still alive while other window open: '
+                           f'elapsed={elapsed:.3f}s, Glycin 3.0.8 pool retention=30s, exit grace=5s')
+    return 'pool_retention' if elapsed < GLYCIN_POOL_RETENTION_SECONDS else 'exit_grace'
+
+def failure_message(result):
+    if result['exit'] == 0:return None
+    reason=result.get('observer_failure')
+    if not reason:
+        reason=next((line for line in reversed(result.get('stderr','').splitlines())
+                     if line.startswith(('FAIL ','NOT RUN '))),None)
+    if not reason:
+        reason=f"exit={result['exit']}; cleanup={result.get('cleanup','NOT VERIFIED')}; finish_sent={result.get('window_finish_sent','NOT VERIFIED')}"
+    return f"{'NOT RUN' if result['exit']==77 else 'FAIL'} FD06 active close: {reason}"
+
 def window_protocol_complete(certificate,finished):
     return bool(certificate and certificate.get('partial_after_stop')
                 and certificate.get('cancel_acknowledged')
                 and certificate.get('loader_exited_while_other_window_alive') and finished)
 
 def job(binary,path,w,h,cancel,extra=()):
-    samples=[];handles={};certificate=None;errors=0;peak_before=cgroup_peak();window_protocol='--fd06-active-close' in extra;finished=False;window_deadline=None
+    samples=[];handles={};certificate=None;errors=0;peak_before=cgroup_peak();exit_phase=None;window_protocol='--fd06-active-close' in extra;finished=False;window_deadline=None
     with tempfile.TemporaryFile(mode='w+') as out,tempfile.TemporaryFile(mode='w+') as err:
         p=subprocess.Popen([binary,*extra,str(path)]+(['--cancel-active']if cancel else []),stdin=subprocess.PIPE,stdout=out,stderr=err,text=True,env={**os.environ,'PIVRA_TRACE_FD05A':'1'})
         parent_identity=processes().get(p.pid)
@@ -109,12 +132,16 @@ def job(binary,path,w,h,cancel,extra=()):
                     out.seek(0);text=out.read()
                     if 'WINDOW_CLOSED_OTHER_ALIVE' in text:
                         target=handles[(certificate['pid'],certificate['starttime'])]
-                        if select.select([target],[],[],0)[0]:
+                        if window_deadline is None:window_deadline=time.monotonic()
+                        elapsed=time.monotonic()-window_deadline
+                        phase=loader_exit_progress(bool(select.select([target],[],[],0)[0]),elapsed)
+                        if phase != exit_phase:
+                            print(f"LOADER_EXIT phase={phase} pid={certificate['pid']} starttime={certificate['starttime']} elapsed={elapsed:.3f}s pool_retention=30s exit_grace=5s",flush=True)
+                            exit_phase=phase
+                        if phase == 'exited':
                             certificate['loader_exited_while_other_window_alive']=True
+                            certificate['loader_exit_wait_seconds']=elapsed
                             p.stdin.write('finish\n');p.stdin.flush();finished=True
-                        else:
-                            if window_deadline is None:window_deadline=time.monotonic()+5
-                            if time.monotonic()>window_deadline:raise RuntimeError('loader still alive while other window open')
                 samples.append(row)
                 if cancel and certificate is None and time.monotonic()>limit-90:
                     p.stdin.close() # Finished/too-fast decode is NOT active-decode evidence.
@@ -136,7 +163,7 @@ def job(binary,path,w,h,cancel,extra=()):
             # Preserve protocol evidence even when the observer itself times out.
             # This result can never certify cleanup or an active-close PASS.
             out.seek(0);err.seek(0)
-            return {'exit':1,'observer_failure':str(error),'stdout':out.read(),'stderr':err.read(),
+            return {'exit':1,'observer_failure':str(error),'loader_exit_phase':exit_phase,'loader_exit_wait_seconds':time.monotonic()-window_deadline if window_deadline is not None else None,'loader_exit_policy':{'glycin_version':'3.0.8','retention_seconds':30,'exit_grace_seconds':5},'stdout':out.read(),'stderr':err.read(),
                     'certificate':certificate,'window_finish_sent':finished,
                     'cleanup':'NOT VERIFIED','samples':samples,'proc_errors':errors}
         finally:

@@ -31,6 +31,35 @@ class Observer(unittest.TestCase):
         for key in cert:
             incomplete={**cert,key:False}
             self.assertFalse(b.window_protocol_complete(incomplete,True),key)
+    def test_real_exit_required_after_documented_pool_retention(self):
+        self.assertEqual(b.loader_exit_progress(False,5),'pool_retention')
+        self.assertEqual(b.loader_exit_progress(False,29.999),'pool_retention')
+        self.assertEqual(b.loader_exit_progress(False,30),'exit_grace')
+        self.assertEqual(b.loader_exit_progress(False,34.999),'exit_grace')
+        with self.assertRaisesRegex(RuntimeError,'loader still alive'):
+            b.loader_exit_progress(False,35)
+        self.assertEqual(b.loader_exit_progress(True,35),'exited')
+        cert={'partial_after_stop':True,'cancel_acknowledged':True}
+        self.assertFalse(b.window_protocol_complete(cert,False),'pool waiting is never PASS')
+    def test_real_pidfd_must_signal_process_exit(self):
+        import select,subprocess,sys
+        child=subprocess.Popen([sys.executable,'-c','import sys;sys.stdin.read()'],stdin=subprocess.PIPE)
+        fd=os.pidfd_open(child.pid)
+        try:
+            self.assertFalse(select.select([fd],[],[],0)[0])
+            self.assertNotEqual(b.loader_exit_progress(False,5),'exited')
+            child.stdin.close();child.wait(timeout=5)
+            self.assertTrue(select.select([fd],[],[],0)[0])
+            self.assertEqual(b.loader_exit_progress(True,0),'exited')
+        finally:
+            if child.poll() is None:child.kill();child.wait()
+            os.close(fd)
+    def test_observer_failure_is_visible_in_terminal_message(self):
+        r={'exit':1,'observer_failure':'loader still alive while other window open'}
+        self.assertEqual(b.failure_message(r),'FAIL FD06 active close: loader still alive while other window open')
+        self.assertIsNone(b.failure_message({'exit':0}))
+        self.assertIn('NOT RUN',b.failure_message({'exit':77,'stderr':'NOT RUN checkpoint absent'}))
+        self.assertIn('other window render pixels changed',b.failure_message({'exit':1,'stderr':'FAIL FD06 active close: other window render pixels changed'}))
     def test_streamed_fixture_has_exact_header(self):
         with tempfile.TemporaryDirectory() as d:
             path=Path(d)/'source.png';b.fixture(path,64,32);data=path.read_bytes()

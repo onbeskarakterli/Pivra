@@ -100,21 +100,23 @@ fn install_navigation_arrows(overlay: &gtk::Overlay) {
             "Sonraki fotoğraf"
         }));
         let arrow = gtk::DrawingArea::new();
-        arrow.set_content_width(72);
-        arrow.set_content_height(100);
+        arrow.set_content_width(48);
+        arrow.set_content_height(72);
         arrow.set_can_target(false);
         arrow.set_draw_func(move |_, cr, width, height| {
-            let w = f64::from(width);
-            let h = f64::from(height);
+            // DrawingArea can be allocated the full-height navigation panel.
+            // Keep the chevron a fixed physical size, centered in that panel.
+            let cx = f64::from(width) / 2.0;
+            let cy = f64::from(height) / 2.0;
+            let tip_x = if left { cx - 18.0 } else { cx + 18.0 };
+            let ends_x = if left { cx + 18.0 } else { cx - 18.0 };
             cr.set_source_rgba(1.0, 1.0, 1.0, 0.94);
-            cr.set_line_width(5.0);
+            cr.set_line_width(4.0);
             cr.set_line_cap(gtk::cairo::LineCap::Round);
             cr.set_line_join(gtk::cairo::LineJoin::Round);
-            let tip = if left { w * 0.19 } else { w * 0.81 };
-            let ends = if left { w * 0.81 } else { w * 0.19 };
-            cr.move_to(ends, h * 0.08);
-            cr.line_to(tip, h * 0.50);
-            cr.line_to(ends, h * 0.92);
+            cr.move_to(ends_x, cy - 30.0);
+            cr.line_to(tip_x, cy);
+            cr.line_to(ends_x, cy + 30.0);
             let _ = cr.stroke();
         });
         button.set_child(Some(&arrow));

@@ -326,6 +326,9 @@ pub fn query_or_generate(provider: &Provider, path: &Path, cancel: &gio::Cancell
             "PNG CRC bounds" | "PNG CRC" | "PNG IHDR" | "thumbnail edge bound" |
             "duplicate IHDR" | "PNG ending" | "PNG chunk count" | "PNG overflow"));
     if !matches!(outcome, Outcome::Missing | Outcome::Stale) && !corrupt_png {
+        if std::env::var_os("PIVRA_TRACE_GNOME_THUMB").is_some() {
+            eprintln!("PIVRA_GNOME_THUMB skip generation: {outcome:?}");
+        }
         return outcome;
     }
     // GIO may classify malformed existing normal-cache PNGs as Missing.
@@ -346,8 +349,14 @@ pub fn query_or_generate(provider: &Provider, path: &Path, cancel: &gio::Cancell
     };
     let force = matches!(outcome, Outcome::Stale) || corrupt_png || existing_normal;
     let Some(helper) = generation_helper() else {
+        if std::env::var_os("PIVRA_TRACE_GNOME_THUMB").is_some() {
+            eprintln!("PIVRA_GNOME_THUMB missing GNOME helper; outcome={outcome:?}");
+        }
         return outcome;
     };
+    if std::env::var_os("PIVRA_TRACE_GNOME_THUMB").is_some() {
+        eprintln!("PIVRA_GNOME_THUMB invoke helper={} force={force} outcome={outcome:?}", helper.display());
+    }
     let source = match FileKey::read(path) {
         Ok(key) => key,
         Err(e) => return Outcome::SourceUnavailable(e.to_string()),
@@ -383,7 +392,12 @@ pub fn query_or_generate(provider: &Provider, path: &Path, cancel: &gio::Cancell
         }
         Ok(()) => Outcome::Stale,
         Err(_) if cancel.is_cancelled() => Outcome::Cancelled,
-        Err(error) => Outcome::Invalid(error),
+        Err(error) => {
+            if std::env::var_os("PIVRA_TRACE_GNOME_THUMB").is_some() {
+                eprintln!("PIVRA_GNOME_THUMB helper failed: {error}");
+            }
+            Outcome::Invalid(error)
+        }
     }
 }
 struct FactoryScratch(PathBuf);

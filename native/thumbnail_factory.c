@@ -21,7 +21,10 @@ int main(int argc, char **argv) {
     if (argc!=5 || strlen(argv[1])>16384 || strlen(argv[2])>256) return 2;
     if (strcmp(argv[4],"missing") && strcmp(argv[4],"stale")) return 2;
     struct rlimit memory={1024UL*1024*1024,1024UL*1024*1024};
-    struct rlimit cpu={15,15}, output={4UL*1024*1024,4UL*1024*1024};
+    /* Glycin uses memfd_create for decoded RGBA frames, which count toward
+     * RLIMIT_FSIZE. Keep a bounded allowance for supported <=64MiB inputs
+     * and their expanded image frames (the previous 4MiB killed 33MiB frames). */
+    struct rlimit cpu={15,15}, output={256UL*1024*1024,256UL*1024*1024};
     if (setrlimit(RLIMIT_AS,&memory) || setrlimit(RLIMIT_CPU,&cpu) || setrlimit(RLIMIT_FSIZE,&output)) return 2;
     (void)nice(10);
     errno=0; char *end=NULL;

@@ -68,6 +68,7 @@ struct Inner {
     frames: RefCell<Option<(gdk::FrameClock, glib::SignalHandlerId)>>,
     validation: RefCell<Option<gio::Cancellable>>,
     warming: RefCell<Option<gio::Cancellable>>,
+    warm_again: Cell<bool>,
     cell_size: Cell<(i32, i32)>,
 }
 #[derive(Debug, Default)]
@@ -107,6 +108,7 @@ impl ThumbnailStrip {
             frames: RefCell::new(None),
             validation: RefCell::new(None),
             warming: RefCell::new(None),
+            warm_again: Cell::new(false),
             cell_size: Cell::new((CELL_WIDTH, CELL_HEIGHT)),
         });
         let weak = Rc::downgrade(&inner);
@@ -187,6 +189,11 @@ impl ThumbnailStrip {
         });
         inner.scroller.add_controller(drag);
         Self(inner)
+    }
+    pub(crate) fn refresh_hidden(&self) {
+        if self.0.initialized.get() && !self.0.scroller.is_mapped() {
+            self.0.warm_hidden();
+        }
     }
     pub(crate) fn resize_cells(&self, panel_height: i32) {
         let height = (panel_height - 34).max(CELL_HEIGHT);
@@ -356,7 +363,11 @@ impl Inner {
     // the overlay is hidden. Bound to a small initial batch and one worker;
     // visible-cell decoding remains owned by the normal viewport scheduler.
     fn warm_hidden(self: &Rc<Self>) {
-        if self.closed.get() || self.scroller.is_mapped() || self.warming.borrow().is_some() { return; }
+        if self.closed.get() || self.scroller.is_mapped() { return; }
+        if self.warming.borrow().is_some() {
+            self.warm_again.set(true);
+            return;
+        }
         let entries = self.entries.borrow();
         let selected = entries.iter().position(|e| Some(e.index.get()) == self.selected.get());
         // Match the initial strip alignment: selected item stays visible,
@@ -370,7 +381,8 @@ impl Inner {
             .map(|window| window.width())
             .filter(|&width| width > 0)
             .unwrap_or(960);
-        let slots = (((viewport_width - 16).max(CELL_WIDTH) / (CELL_WIDTH + 8)).max(1) as usize)
+        let pitch = self.cell_size.get().0 + 8;
+        let slots = (((viewport_width - 16).max(pitch) / pitch).max(1) as usize)
             .min(24)
             .min(entries.len());
         let start = selected
@@ -380,9 +392,13 @@ impl Inner {
         let mut paths = Vec::with_capacity(slots);
         // Prioritize the selected image, then the neighbors actually expected
         // in the initial viewport, not unrelated images at the folder start.
-        if let Some(n) = selected { paths.push(entries[n].path.clone()); }
+        if let Some(n) = selected {
+            if entries[n].phase == Phase::Pending { paths.push(entries[n].path.clone()); }
+        }
         for e in &entries[start..end] {
-            if !paths.contains(&e.path) { paths.push(e.path.clone()); }
+            if e.phase == Phase::Pending && !paths.contains(&e.path) {
+                paths.push(e.path.clone());
+            }
         }
         drop(entries);
         if paths.is_empty() { return; }
@@ -473,6 +489,9 @@ impl Inner {
                 }
                 drop(entries);
                 i.scroller.queue_draw();
+                if i.warm_again.replace(false) && !i.scroller.is_mapped() {
+                    i.warm_hidden();
+                }
             }
         });
     }

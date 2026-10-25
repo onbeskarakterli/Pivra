@@ -49,6 +49,8 @@ pub(crate) struct ThumbnailStrip {
     manually_scrolled: Rc<Cell<bool>>,
     pending_selection: Rc<Cell<Option<usize>>>,
     cache_token: Rc<RefCell<Option<gtk::gio::Cancellable>>>,
+    catalog: Rc<RefCell<Vec<(usize, PathBuf)>>>,
+    cells: Rc<RefCell<Vec<(usize, gtk::Button)>>>,
 }
 impl ThumbnailStrip {
     pub(crate) fn on_select(&self, callback: impl Fn(usize) + 'static) {
@@ -61,8 +63,26 @@ impl ThumbnailStrip {
         }
     }
     pub(crate) fn set_catalog(&self, photos: &[(usize, PathBuf)], selected: Option<usize>) {
-        // Reconcile the small placeholder strip on the GTK main thread. Real
-        // thumbnail decoding is intentionally deferred to TH-05.
+        // Keep the existing GTK cells, textures and horizontal position when
+        // only the selected image changes. Rebuilding resets the scroll offset.
+        if *self.catalog.borrow() == photos {
+            for (index, button) in self.cells.borrow().iter() {
+                if selected == Some(*index) {
+                    button.add_css_class("selected");
+                } else {
+                    button.remove_css_class("selected");
+                }
+            }
+            self.load_visible_cache(photos, selected, self.cells.borrow().clone());
+            if !self.manually_scrolled.get() {
+                self.pending_selection.set(
+                    photos.iter().position(|(index, _)| Some(*index) == selected)
+                );
+                align_selection(&self.scroller.hadjustment(), &self.pending_selection);
+            }
+            return;
+        }
+        self.catalog.replace(photos.to_vec());
         while let Some(child) = self.items.first_child() {
             self.items.remove(&child);
         }
@@ -92,6 +112,7 @@ impl ThumbnailStrip {
             self.items.append(&button);
             cells.push((index, button));
         }
+        self.cells.replace(cells.clone());
         self.load_visible_cache(photos, selected, cells);
         if !self.manually_scrolled.get() {
             self.pending_selection.set(
@@ -354,7 +375,7 @@ pub(crate) fn install(window: &impl IsA<gtk::Window>, overlay: &gtk::Overlay, av
         unmap.cancel();
         unmap.render(false);
     });
-    ThumbnailStrip { items, scroller: strip, on_select: Rc::default(), manually_scrolled, pending_selection, cache_token: Rc::default() }
+    ThumbnailStrip { items, scroller: strip, on_select: Rc::default(), manually_scrolled, pending_selection, cache_token: Rc::default(), catalog: Rc::default(), cells: Rc::default() }
 }
 type PreferenceListener = Rc<dyn Fn(bool)>;
 struct Visibility {

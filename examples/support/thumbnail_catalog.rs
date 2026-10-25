@@ -125,9 +125,50 @@ fn real_pixels(row: &gtk::Box, index: usize, dimensions: Option<(i32, i32)>, che
         );
     }
 }
+// Exercises production ImageView/overlay key admission without any decoder.
+// TEST cells and main pixels are synthetic; this is not generation evidence.
+pub(super) fn overlay_shortcut(app: &adw::Application) {
+    pivra::settings::thumbnail_preference().set_enabled(false);
+    let (first, view, picture) = open(app);
+    let (other, other_view, _) = open(app);
+    let strip: gtk::ScrolledWindow = find(view.widget().upcast_ref(), "thumbnail-strip");
+    let other_strip: gtk::ScrolledWindow =
+        find(other_view.widget().upcast_ref(), "thumbnail-strip");
+    assert!(!strip.is_visible() && !other_strip.is_visible());
+    let before = image_bytes(&first, &picture);
+    let size = (picture.width(), picture.height());
+    assert!(
+        key(&first, gdk::ModifierType::empty()),
+        "Freedesktop T key was rejected"
+    );
+    until(|| strip.is_mapped());
+    assert!(pivra::settings::thumbnail_preference().enabled());
+    assert!(!other_strip.is_visible(), "reveal must remain window-local");
+    assert_eq!((picture.width(), picture.height()), size);
+    assert_eq!(
+        image_bytes(&first, &picture),
+        before,
+        "T changed main pixels"
+    );
+    assert!(key(&first, gdk::ModifierType::empty()));
+    assert!(!strip.is_visible() && !other_strip.is_visible());
+    assert!(!pivra::settings::thumbnail_preference().enabled());
+    assert!(key(&other, gdk::ModifierType::empty()));
+    until(|| other_strip.is_mapped());
+    assert!(!strip.is_visible());
+    assert!(key(&other, gdk::ModifierType::empty()));
+    first.close();
+    other.close();
+    println!(
+        "PASS Freedesktop T opens mapped strip, toggles off, independent window reveal; TEST pixels only, no generation claim"
+    );
+}
+
 pub(super) fn run(app: &adw::Application) {
     let native = std::env::args().any(|s| s == "--native-thumbnails");
+    println!("STAGE catalog: automated checks; windows are test-driven until MANUAL instructions");
     if native {
+        println!("STAGE secure decoder prerequisite (one attempt)");
         // One secure prerequisite; failure is NOT RUN, not 120 failed retries.
         let gate = gio::spawn_blocking(|| {
             glib::MainContext::new().block_on(native_image_loader::load(
@@ -272,6 +313,7 @@ pub(super) fn run(app: &adw::Application) {
         assert!(stats.textures <= 64 && stats.bytes <= 16 * 1024 * 1024);
         assert_eq!(stats.total, 120);
         if native {
+            assert!(strip.is_mapped(), "native pixels require a mapped strip");
             real_pixels(&row, 79, Some((64, 32)), true);
         }
         let initial_offset = strip.hadjustment().value();

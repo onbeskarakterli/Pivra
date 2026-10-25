@@ -64,12 +64,16 @@ impl ImageView {
         loading_spinner.set_visible(false);
         overlay.add_overlay(&loading_spinner);
         overlay.set_measure_overlay(&loading_spinner, false);
-        let thumbnails = pivra::thumbnail::Provider::discover(None);
-        let thumbnail_strip = thumbnail_overlay::install(
-            window,
-            &overlay,
-            thumbnails.capability() != pivra::thumbnail::Capability::Unavailable,
-        );
+        // UI admission follows the same session provider as the strip worker.
+        // Preserve GNOME's capability gate; Freedesktop does not require GNOME.
+        let thumbnails_available = match pivra::thumbnail_manager::Manager::session().id() {
+            pivra::thumbnail_provider::ProviderId::Gnome => {
+                pivra::thumbnail::Provider::discover(None).capability()
+                    != pivra::thumbnail::Capability::Unavailable
+            }
+            pivra::thumbnail_provider::ProviderId::Freedesktop => true,
+        };
+        let thumbnail_strip = thumbnail_overlay::install(window, &overlay, thumbnails_available);
         let phase = Rc::new(Cell::new(Phase::Requested));
         let closing_phase = phase.clone();
         window.connect_close_request(move |_| {

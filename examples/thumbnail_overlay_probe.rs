@@ -430,6 +430,11 @@ fn main() {
             pivra::thumbnail_provider::ProviderId::Freedesktop
         );
         println!("PASS Freedesktop session selection; pixels require native gate");
+        catalog_probe::overlay_shortcut(&app);
+    }
+    if std::env::args().any(|s| s == "--fd06-overlay-regression") {
+        assert!(std::env::args().any(|s| s == "--require-freedesktop"));
+        return;
     }
     if std::env::args().any(|s| s == "--catalog-regression") {
         catalog_probe::run(&app);

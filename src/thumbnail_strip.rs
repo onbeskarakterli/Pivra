@@ -308,9 +308,22 @@ impl Inner {
         if self.closed.get() || self.scroller.is_mapped() || self.warming.borrow().is_some() { return; }
         let entries = self.entries.borrow();
         let selected = entries.iter().position(|e| Some(e.index.get()) == self.selected.get());
-        let mut paths = Vec::new();
+        // Match the initial strip alignment: selected item stays visible,
+        // scrolling just enough to reveal it. Hidden widgets have no measured
+        // viewport, so estimate the cell pitch from the fixed width + spacing.
+        let viewport_width = self.scroller.parent().map_or(960, |p| p.width().max(1));
+        let slots = ((viewport_width / (CELL_WIDTH + 8)).max(1) as usize)
+            .min(24)
+            .min(entries.len());
+        let start = selected
+            .map(|n| n.saturating_add(1).saturating_sub(slots))
+            .unwrap_or(0);
+        let end = (start + slots).min(entries.len());
+        let mut paths = Vec::with_capacity(slots);
+        // Prioritize the selected image, then the neighbors actually expected
+        // in the initial viewport, not unrelated images at the folder start.
         if let Some(n) = selected { paths.push(entries[n].path.clone()); }
-        for e in entries.iter().take(24) {
+        for e in &entries[start..end] {
             if !paths.contains(&e.path) { paths.push(e.path.clone()); }
         }
         drop(entries);

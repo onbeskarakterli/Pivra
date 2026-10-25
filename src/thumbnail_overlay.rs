@@ -78,7 +78,11 @@ impl ThumbnailStrip {
                 self.pending_selection.set(
                     photos.iter().position(|(index, _)| Some(*index) == selected)
                 );
+                if self.scroller.is_visible() {
+                    if self.scroller.is_visible() {
                 align_selection(&self.scroller.hadjustment(), &self.pending_selection);
+            }
+                }
             }
             return;
         }
@@ -93,7 +97,15 @@ impl ThumbnailStrip {
             label.set_ellipsize(gtk::pango::EllipsizeMode::Middle);
             label.set_max_width_chars(12);
             let button = gtk::Button::new();
-            button.set_child(Some(&label));
+            // Fixed layout independent of caption or decoded image size.
+            let fixed = gtk::Overlay::new();
+            let base = gtk::Box::new(gtk::Orientation::Horizontal, 0);
+            base.set_size_request(CELL_WIDTH, CELL_HEIGHT);
+            fixed.set_child(Some(&base));
+            fixed.add_overlay(&label);
+            fixed.set_measure_overlay(&label, false);
+            fixed.set_clip_overlay(&label, true);
+            button.set_child(Some(&fixed));
             button.set_size_request(CELL_WIDTH, CELL_HEIGHT);
             button.add_css_class("pivra-thumbnail-cell");
             if selected == Some(*index) {
@@ -169,7 +181,16 @@ impl ThumbnailStrip {
                 if let Some((_, button)) = cells.iter().find(|(id, _)| *id == index) {
                     let picture = gtk::Picture::for_paintable(&frame.texture());
                     picture.set_content_fit(gtk::ContentFit::Contain);
-                    button.set_child(Some(&picture));
+                    picture.set_can_shrink(true);
+                    if let Some(fixed) = button.child().and_then(|c| c.downcast::<gtk::Overlay>().ok()) {
+                        // The last child is the previous overlay (label or picture).
+                        if let Some(old) = fixed.last_child() {
+                            fixed.remove_overlay(&old);
+                        }
+                        fixed.add_overlay(&picture);
+                        fixed.set_measure_overlay(&picture, false);
+                        fixed.set_clip_overlay(&picture, true);
+                    }
                 }
             }
         });
@@ -205,8 +226,11 @@ pub(crate) fn install(window: &impl IsA<gtk::Window>, overlay: &gtk::Overlay, av
     let manually_scrolled = Rc::new(Cell::new(false));
     let pending_selection = Rc::new(Cell::new(None));
     let pending_on_measure = pending_selection.clone();
+    let weak_strip = strip.downgrade();
     strip.hadjustment().connect_changed(move |adj| {
-        align_selection(adj, &pending_on_measure);
+        if weak_strip.upgrade().is_some_and(|strip| strip.is_visible()) {
+            align_selection(adj, &pending_on_measure);
+        }
     });
     let wheel = gtk::EventControllerScroll::new(
         gtk::EventControllerScrollFlags::VERTICAL

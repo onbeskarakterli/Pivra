@@ -23,14 +23,17 @@ class Observer(unittest.TestCase):
                 m[:12]=bytes.fromhex('1153bf')*4
             self.assertFalse(b.partial(os.getpid(),96),'closed writable mapping is not active evidence')
         finally:os.close(fd)
-    def test_window_pass_requires_certificate_ack_loader_exit_and_finish(self):
-        cert={'partial_after_stop':True,'cancel_acknowledged':True,'loader_exited_while_other_window_alive':True,'other_window_verified':True}
+    def test_window_pass_requires_active_checkpoint_ack_other_window_and_finish(self):
+        cert={'partial_after_stop':True,'cancel_acknowledged':True,'other_window_verified':True}
         self.assertTrue(b.window_protocol_complete(cert,True))
         self.assertFalse(b.window_protocol_complete(None,True))
         self.assertFalse(b.window_protocol_complete(cert,False))
         for key in cert:
-            incomplete={**cert,key:False}
-            self.assertFalse(b.window_protocol_complete(incomplete,True),key)
+            self.assertFalse(b.window_protocol_complete({**cert,key:False},True),key)
+        # The idle Glycin pool is shared by both windows. Requiring its PID
+        # to exit while the surviving window stays open is a false gate.
+        self.assertTrue(b.window_protocol_complete(
+            {**cert,'loader_exited_while_other_window_alive':False},True))
     def test_pool_observation_cutoff_does_not_classify_pid_as_failure(self):
         self.assertEqual(b.loader_exit_progress(False,5),'observing_pool_ownership')
         self.assertEqual(b.loader_exit_progress(False,29.999),'observing_pool_ownership')

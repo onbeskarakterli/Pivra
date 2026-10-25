@@ -49,8 +49,6 @@ pub(crate) struct ThumbnailStrip {
     manually_scrolled: Rc<Cell<bool>>,
     pending_selection: Rc<Cell<Option<usize>>>,
     cache_token: Rc<RefCell<Option<gtk::gio::Cancellable>>>,
-    catalog: Rc<RefCell<Vec<(usize, PathBuf)>>>,
-    cells: Rc<RefCell<Vec<(usize, gtk::Button)>>>,
 }
 impl ThumbnailStrip {
     pub(crate) fn on_select(&self, callback: impl Fn(usize) + 'static) {
@@ -63,34 +61,8 @@ impl ThumbnailStrip {
         }
     }
     pub(crate) fn set_catalog(&self, photos: &[(usize, PathBuf)], selected: Option<usize>) {
-        if std::env::var_os("PIVRA_THUMB_DEBUG").is_some() {
-            let a = self.scroller.hadjustment();
-            eprintln!("TH-CATALOG count={} selected={selected:?} same={} manual={} pending={:?} visible={} value={} upper={} page={}",
-                photos.len(), *self.catalog.borrow() == photos, self.manually_scrolled.get(),
-                self.pending_selection.get(), self.scroller.is_visible(), a.value(), a.upper(), a.page_size());
-        }
-        // Keep the existing GTK cells, textures and horizontal position when
-        // only the selected image changes. Rebuilding resets the scroll offset.
-        if *self.catalog.borrow() == photos {
-            for (index, button) in self.cells.borrow().iter() {
-                if selected == Some(*index) {
-                    button.add_css_class("selected");
-                } else {
-                    button.remove_css_class("selected");
-                }
-            }
-            self.load_visible_cache(photos, selected, self.cells.borrow().clone());
-            if !self.manually_scrolled.get() {
-                self.pending_selection.set(
-                    photos.iter().position(|(index, _)| Some(*index) == selected)
-                );
-                if self.scroller.is_visible() {
-                    align_selection(&self.scroller.hadjustment(), &self.pending_selection);
-                }
-            }
-            return;
-        }
-        self.catalog.replace(photos.to_vec());
+        // Reconcile the small placeholder strip on the GTK main thread. Real
+        // thumbnail decoding is intentionally deferred to TH-05.
         while let Some(child) = self.items.first_child() {
             self.items.remove(&child);
         }
@@ -101,17 +73,7 @@ impl ThumbnailStrip {
             label.set_ellipsize(gtk::pango::EllipsizeMode::Middle);
             label.set_max_width_chars(12);
             let button = gtk::Button::new();
-            // GTK can scroll focused buttons into view; selection is managed by Pivra.
-            button.set_focusable(false);
-            // Fixed layout independent of caption or decoded image size.
-            let fixed = gtk::Overlay::new();
-            let base = gtk::Box::new(gtk::Orientation::Horizontal, 0);
-            base.set_size_request(CELL_WIDTH, CELL_HEIGHT);
-            fixed.set_child(Some(&base));
-            fixed.add_overlay(&label);
-            fixed.set_measure_overlay(&label, false);
-            fixed.set_clip_overlay(&label, true);
-            button.set_child(Some(&fixed));
+            button.set_child(Some(&label));
             button.set_size_request(CELL_WIDTH, CELL_HEIGHT);
             button.add_css_class("pivra-thumbnail-cell");
             if selected == Some(*index) {
@@ -122,7 +84,7 @@ impl ThumbnailStrip {
             let index = *index;
             let manually_scrolled = self.manually_scrolled.clone();
             button.connect_clicked(move |_| {
-                manually_scrolled.set(true);
+                manually_scrolled.set(false);
                 if let Some(callback) = on_select.borrow().as_ref() {
                     callback(index);
                 }
@@ -130,15 +92,12 @@ impl ThumbnailStrip {
             self.items.append(&button);
             cells.push((index, button));
         }
-        self.cells.replace(cells.clone());
         self.load_visible_cache(photos, selected, cells);
         if !self.manually_scrolled.get() {
             self.pending_selection.set(
                 photos.iter().position(|(index, _)| Some(*index) == selected)
             );
-            if self.scroller.is_visible() {
-                align_selection(&self.scroller.hadjustment(), &self.pending_selection);
-            }
+            align_selection(&self.scroller.hadjustment(), &self.pending_selection);
         }
 
     }
@@ -154,8 +113,8 @@ impl ThumbnailStrip {
         let Some(center) = photos.iter().position(|(index, _)| Some(*index) == selected) else {
             return;
         };
-        let first = center.saturating_sub(12);
-        let last = (center + 13).min(photos.len());
+        let first = center.saturating_sub(3);
+        let last = (center + 4).min(photos.len());
         let paths: Vec<_> = photos[first..last].to_vec();
         let token = gtk::gio::Cancellable::new();
         self.cache_token.replace(Some(token.clone()));
@@ -189,16 +148,7 @@ impl ThumbnailStrip {
                 if let Some((_, button)) = cells.iter().find(|(id, _)| *id == index) {
                     let picture = gtk::Picture::for_paintable(&frame.texture());
                     picture.set_content_fit(gtk::ContentFit::Contain);
-                    picture.set_can_shrink(true);
-                    if let Some(fixed) = button.child().and_then(|c| c.downcast::<gtk::Overlay>().ok()) {
-                        // The last child is the previous overlay (label or picture).
-                        if let Some(old) = fixed.last_child() {
-                            fixed.remove_overlay(&old);
-                        }
-                        fixed.add_overlay(&picture);
-                        fixed.set_measure_overlay(&picture, false);
-                        fixed.set_clip_overlay(&picture, true);
-                    }
+                    button.set_child(Some(&picture));
                 }
             }
         });
@@ -234,26 +184,9 @@ pub(crate) fn install(window: &impl IsA<gtk::Window>, overlay: &gtk::Overlay, av
     let manually_scrolled = Rc::new(Cell::new(false));
     let pending_selection = Rc::new(Cell::new(None));
     let pending_on_measure = pending_selection.clone();
-    let weak_strip = strip.downgrade();
     strip.hadjustment().connect_changed(move |adj| {
-        if weak_strip.upgrade().is_some_and(|strip| strip.is_visible()) {
-            align_selection(adj, &pending_on_measure);
-        }
+        align_selection(adj, &pending_on_measure);
     });
-    // Temporary diagnostics for the native GNOME thumbnail scroll regression.
-    // Enabled only when PIVRA_THUMB_DEBUG=1.
-    let debug = std::env::var_os("PIVRA_THUMB_DEBUG").is_some();
-    if debug {
-        let adjustment = strip.hadjustment();
-        adjustment.connect_value_changed(|a| {
-            eprintln!("TH-SCROLL value={} upper={} page={}", a.value(), a.upper(), a.page_size());
-        });
-        strip.connect_notify_local(Some("visible"), |w, _| {
-            let a = w.hadjustment();
-            eprintln!("TH-VISIBLE visible={} value={} upper={} page={}",
-                w.is_visible(), a.value(), a.upper(), a.page_size());
-        });
-    }
     let wheel = gtk::EventControllerScroll::new(
         gtk::EventControllerScrollFlags::VERTICAL
             | gtk::EventControllerScrollFlags::HORIZONTAL,
@@ -276,32 +209,11 @@ pub(crate) fn install(window: &impl IsA<gtk::Window>, overlay: &gtk::Overlay, av
         }
     });
     strip.add_controller(wheel);
-    strip.set_halign(gtk::Align::Fill);
-    strip.set_hexpand(true);
     strip.set_widget_name("thumbnail-strip");
     strip.add_css_class("pivra-thumbnail-panel");
     strip.set_margin_start(8);
     strip.set_margin_end(8);
     strip.set_visible(false);
-    // Retry pending initial alignment after GTK has allocated a real viewport.
-    // A hidden overlay can report an unusable adjustment range at catalog time.
-    let pending_on_frame = pending_selection.clone();
-    strip.add_tick_callback(move |strip, _clock| {
-        if strip.is_visible() && pending_on_frame.get().is_some() {
-            align_selection(&strip.hadjustment(), &pending_on_frame);
-        }
-        glib::ControlFlow::Continue
-    });
-    let pending_on_show = pending_selection.clone();
-    strip.connect_notify_local(Some("visible"), move |strip, _| {
-        if strip.is_visible() {
-            let pending = pending_on_show.clone();
-            let adjustment = strip.hadjustment();
-            glib::idle_add_local_once(move || {
-                align_selection(&adjustment, &pending);
-            });
-        }
-    });
     let button = gtk::ToggleButton::builder()
         .icon_name("pan-up-symbolic")
         .tooltip_text("Show thumbnail strip")
@@ -442,7 +354,7 @@ pub(crate) fn install(window: &impl IsA<gtk::Window>, overlay: &gtk::Overlay, av
         unmap.cancel();
         unmap.render(false);
     });
-    ThumbnailStrip { items, scroller: strip, on_select: Rc::default(), manually_scrolled, pending_selection, cache_token: Rc::default(), catalog: Rc::default(), cells: Rc::default() }
+    ThumbnailStrip { items, scroller: strip, on_select: Rc::default(), manually_scrolled, pending_selection, cache_token: Rc::default() }
 }
 type PreferenceListener = Rc<dyn Fn(bool)>;
 struct Visibility {

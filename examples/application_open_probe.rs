@@ -88,12 +88,26 @@ fn main() {
                                     continue;
                                 }
                                 main_counter.set(main_counter.get() + 1);
-                                if let Some(texture) = p.paintable().and_downcast::<gdk::Texture>()
-                                {
-                                    assert_eq!((texture.width(), texture.height()), size);
-                                    let mut pixels = vec![0; (size.0 * size.1 * 4) as usize];
-                                    texture.download(&mut pixels, size.0 as usize * 4);
-                                    assert!(pixels.chunks_exact(4).any(|p| p[3] != 0));
+                                if let Some(paintable) = p.paintable() {
+                                    // Actual mode wraps the decoded GDK texture in
+                                    // ActualPaintable. Inspect the main paintable,
+                                    // not only the direct Texture implementation.
+                                    assert_eq!(
+                                        (paintable.intrinsic_width(), paintable.intrinsic_height()),
+                                        size,
+                                    );
+                                    let snapshot = gtk::Snapshot::new();
+                                    paintable.snapshot(
+                                        &snapshot,
+                                        size.0 as f64,
+                                        size.1 as f64,
+                                    );
+                                    assert!(snapshot.to_node().is_some(), "no rendered image node");
+                                    if let Ok(texture) = paintable.downcast::<gdk::Texture>() {
+                                        let mut pixels = vec![0; (size.0 * size.1 * 4) as usize];
+                                        texture.download(&mut pixels, size.0 as usize * 4);
+                                        assert!(pixels.chunks_exact(4).any(|p| p[3] != 0));
+                                    }
                                     observed.set(Some(0));
                                     w.close();
                                     return glib::ControlFlow::Break;

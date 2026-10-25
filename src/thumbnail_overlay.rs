@@ -48,6 +48,7 @@ pub(crate) struct ThumbnailStrip {
     on_select: Rc<RefCell<Option<Box<dyn Fn(usize)>>>>,
     manually_scrolled: Rc<Cell<bool>>,
     pending_selection: Rc<Cell<Option<usize>>>,
+    cache_token: Rc<RefCell<Option<gtk::gio::Cancellable>>>,
 }
 impl ThumbnailStrip {
     pub(crate) fn on_select(&self, callback: impl Fn(usize) + 'static) {
@@ -55,6 +56,9 @@ impl ThumbnailStrip {
     }
     pub(crate) fn clear_on_select(&self) {
         self.on_select.borrow_mut().take();
+        if let Some(token) = self.cache_token.borrow_mut().take() {
+            token.cancel();
+        }
     }
     pub(crate) fn set_catalog(&self, photos: &[(usize, PathBuf)], selected: Option<usize>) {
         // Reconcile the small placeholder strip on the GTK main thread. Real
@@ -62,6 +66,7 @@ impl ThumbnailStrip {
         while let Some(child) = self.items.first_child() {
             self.items.remove(&child);
         }
+        let mut cells = Vec::new();
         for (index, path) in photos {
             let name = path.file_name().unwrap_or_default().to_string_lossy();
             let label = gtk::Label::new(Some(&name));
@@ -85,7 +90,9 @@ impl ThumbnailStrip {
                 }
             });
             self.items.append(&button);
+            cells.push((*index, button));
         }
+        self.load_visible_cache(photos, selected, cells);
         if !self.manually_scrolled.get() {
             self.pending_selection.set(
                 photos.iter().position(|(index, _)| Some(*index) == selected)
@@ -93,6 +100,58 @@ impl ThumbnailStrip {
             align_selection(&self.scroller.hadjustment(), &self.pending_selection);
         }
 
+    }
+    fn load_visible_cache(
+        &self,
+        photos: &[(usize, PathBuf)],
+        selected: Option<usize>,
+        cells: Vec<(usize, gtk::Button)>,
+    ) {
+        if let Some(previous) = self.cache_token.borrow_mut().take() {
+            previous.cancel();
+        }
+        let Some(center) = photos.iter().position(|(index, _)| Some(*index) == selected) else {
+            return;
+        };
+        let first = center.saturating_sub(3);
+        let last = (center + 4).min(photos.len());
+        let paths: Vec<_> = photos[first..last].to_vec();
+        let token = gtk::gio::Cancellable::new();
+        self.cache_token.replace(Some(token.clone()));
+        let job = gtk::gio::spawn_blocking(move || {
+            let provider = pivra::thumbnail::Provider::discover(None);
+            let mut frames = Vec::new();
+            for (index, path) in paths {
+                if token.is_cancelled() { break; }
+                if let pivra::thumbnail::Outcome::Hit(candidate) = provider.query(&path, &token) {
+                    if !candidate.still_current(&token) { continue; }
+                    let frame = gtk::glib::MainContext::new().block_on(
+                        crate::image_loader::load(&candidate.thumbnail.path, &token)
+                    );
+                    if let Ok(frame) = frame {
+                        if candidate.still_current(&token) {
+                            frames.push((index, frame));
+                        }
+                    }
+                }
+            }
+            (token, frames)
+        });
+        let active = self.cache_token.clone();
+        gtk::glib::MainContext::default().spawn_local(async move {
+            let Ok((token, frames)) = job.await else { return; };
+            if token.is_cancelled() { return; }
+            if !active.borrow().as_ref().is_some_and(|current| current == &token) {
+                return;
+            }
+            for (index, frame) in frames {
+                if let Some((_, button)) = cells.iter().find(|(id, _)| *id == index) {
+                    let picture = gtk::Picture::for_paintable(&frame.texture());
+                    picture.set_content_fit(gtk::ContentFit::Contain);
+                    button.set_child(Some(&picture));
+                }
+            }
+        });
     }
 }
 /// Wait until GTK measures the strip; on the first catalog update the horizontal
@@ -295,7 +354,7 @@ pub(crate) fn install(window: &impl IsA<gtk::Window>, overlay: &gtk::Overlay, av
         unmap.cancel();
         unmap.render(false);
     });
-    ThumbnailStrip { items, scroller: strip, on_select: Rc::default(), manually_scrolled, pending_selection }
+    ThumbnailStrip { items, scroller: strip, on_select: Rc::default(), manually_scrolled, pending_selection, cache_token: Rc::default() }
 }
 type PreferenceListener = Rc<dyn Fn(bool)>;
 struct Visibility {

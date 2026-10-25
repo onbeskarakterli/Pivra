@@ -16,6 +16,7 @@ fn install_css(display: &gtk::gdk::Display) {
         css.load_from_string("\
             .pivra-thumbnail-panel { background-color: alpha(@window_bg_color, 0.50); border-radius: 0; border-top: 1px solid alpha(white, 0.22); padding: 8px; }\n\
             .pivra-thumbnail-toggle { background-image: none; background-color: alpha(@window_bg_color, 0.50); border-radius: 10px 10px 0 0; border: 1px solid alpha(white, 0.22); border-bottom: 0; box-shadow: none; padding: 3px 16px; min-width: 112px; min-height: 24px; }\n\
+            .pivra-thumbnail-pin { background-image: none; background-color: alpha(@window_bg_color, 0.50); border-radius: 10px 10px 0 0; border: 1px solid alpha(white, 0.22); border-bottom: 0; box-shadow: none; padding: 3px 8px; min-height: 24px; }\n\
             .pivra-thumbnail-cell { background-image: none; background-color: transparent; padding: 0; min-width: 0; min-height: 0; border: none; border-radius: 0; box-shadow: none; }\n\
             .pivra-thumbnail-cell.selected { box-shadow: none; }\n\
             .pivra-thumbnail-selection { background: transparent; border: 0; padding: 0; box-shadow: none; }\n\
@@ -80,10 +81,22 @@ pub(crate) fn install(
     button.set_valign(gtk::Align::End);
     button.set_margin_bottom(0);
     button.set_visible(available);
+    let pin = gtk::ToggleButton::builder()
+        .icon_name("view-pin-symbolic")
+        .tooltip_text("Keep thumbnail strip visible")
+        .build();
+    pin.add_css_class("pivra-thumbnail-pin");
+    pin.set_active(false);
+    let controls = gtk::Box::new(gtk::Orientation::Horizontal, 0);
+    controls.set_halign(gtk::Align::Center);
+    controls.set_valign(gtk::Align::End);
+    controls.append(&button);
+    controls.append(&pin);
+    controls.set_visible(available);
     strip.set_valign(gtk::Align::End);
     // The panel touches the image viewport edge; neither sibling is measured.
     strip.set_margin_bottom(0);
-    for widget in [strip.upcast_ref::<gtk::Widget>(), button.upcast_ref()] {
+    for widget in [strip.upcast_ref::<gtk::Widget>(), controls.upcast_ref()] {
         overlay.add_overlay(widget);
         overlay.set_measure_overlay(widget, false);
         overlay.set_clip_overlay(widget, true);
@@ -94,6 +107,9 @@ pub(crate) fn install(
         preference: preference.clone(),
         strip: strip.downgrade(),
         button: button.downgrade(),
+        pin: pin.downgrade(),
+        controls: controls.downgrade(),
+        pinned: Cell::new(false),
         overlay: overlay.downgrade(),
         near: Cell::new(false),
         pointer_y: Cell::new(None),
@@ -108,7 +124,7 @@ pub(crate) fn install(
     let listener: Rc<dyn Fn(bool)> = Rc::new(move |_| {
         if let Some(state) = weak.upgrade() {
             state.cancel();
-            state.render(state.near.get());
+            state.render(state.pinned.get() || state.near.get());
             // Enabled also changes the height of the interaction region.
             if let Some(y) = state.pointer_y.get() {
                 state.motion(y);
@@ -123,6 +139,21 @@ pub(crate) fn install(
         if click.available {
             click.preference.set_enabled(!click.preference.enabled());
         }
+    });
+    let pin_click = state.clone();
+    pin.connect_clicked(move |_| {
+        let pinned = !pin_click.pinned.get();
+        pin_click.pinned.set(pinned);
+        pin_click.cancel();
+        if let Some(pin) = pin_click.pin.upgrade() {
+            pin.set_active(pinned);
+            pin.set_tooltip_text(Some(if pinned {
+                "Unpin thumbnail strip"
+            } else {
+                "Keep thumbnail strip visible"
+            }));
+        }
+        pin_click.render(pinned || pin_click.near.get());
     });
     let motion = gtk::EventControllerMotion::new();
     motion.set_propagation_phase(gtk::PropagationPhase::Capture);
@@ -167,7 +198,7 @@ pub(crate) fn install(
         if key_state.preference.enabled() {
             key_state.render(true);
             if !key_state.near.get() {
-                key_state.schedule(1000);
+                key_state.schedule(5000);
             }
         }
         glib::Propagation::Stop
@@ -217,6 +248,9 @@ struct Visibility {
     preference: Rc<pivra::settings::ThumbnailPreference>,
     strip: glib::WeakRef<gtk::ScrolledWindow>,
     button: glib::WeakRef<gtk::ToggleButton>,
+    pin: glib::WeakRef<gtk::ToggleButton>,
+    controls: glib::WeakRef<gtk::Box>,
+    pinned: Cell<bool>,
     overlay: glib::WeakRef<gtk::Overlay>,
     near: Cell<bool>,
     pointer_y: Cell<Option<f64>>,
@@ -239,7 +273,7 @@ impl Visibility {
         }
     }
     fn render(&self, show: bool) {
-        let show = show && self.available && !self.closed.get();
+        let show = (show || self.pinned.get()) && self.available && !self.closed.get();
         self.shown.set(show);
         if let Some(strip) = self.strip.upgrade() {
             strip.set_visible(show && self.preference.enabled());
@@ -263,12 +297,15 @@ impl Visibility {
             // Above the visible panel; otherwise only the small bottom trigger.
             button.set_visible(show);
         }
+        if let Some(controls) = self.controls.upgrade() {
+            controls.set_visible(show);
+        }
         self.place_toggle();
     }
     fn place_toggle(&self) {
         let (Some(panel), Some(button), Some(overlay)) = (
             self.strip.upgrade(),
-            self.button.upgrade(),
+            self.controls.upgrade(),
             self.overlay.upgrade(),
         ) else {
             return;
@@ -319,8 +356,8 @@ impl Visibility {
     }
     fn away(self: &Rc<Self>) {
         self.near.set(false);
-        if self.shown.get() && self.timeout.borrow().is_none() {
-            self.schedule(500);
+        if self.shown.get() && !self.pinned.get() && self.timeout.borrow().is_none() {
+            self.schedule(5000);
         }
     }
     fn schedule(self: &Rc<Self>, milliseconds: u64) {
@@ -329,7 +366,7 @@ impl Visibility {
         let id = glib::timeout_add_local_once(Duration::from_millis(milliseconds), move || {
             if let Some(state) = weak.upgrade() {
                 state.timeout.borrow_mut().take();
-                if !state.near.get() {
+                if !state.near.get() && !state.pinned.get() {
                     state.render(false);
                 }
             }

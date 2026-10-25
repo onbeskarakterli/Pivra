@@ -210,3 +210,56 @@ kısıtı tekrar denenmedi. Kullanıcı aynı iki komutu kullanır:
 bash tests/run_thumbnail_system_probe.sh
 bash tests/run_image_transition_probe.sh
 ```
+
+
+### Yerleşim / scrollbar düzeltmesi
+
+Şerit Automatic yatay scrollbar politikasını ve fare tekerleğini korur;
+overlay_scrolling açıkça etkinleştirilir. Scrollbar panelin içinde GTK'nin kendi
+hover/erişilebilirlik davranışını kullanır; ayrı dock eklenmez, scrollbar widget'ı
+kaldırılmaz. %25 panel, opak resimler ve tema rengi seçim çerçevesi korunur.
+Düğme önce natural request ile yerleştirilir, gerçek after-paint sonrasında
+panelin alt kenarının viewport altıyla eşleştiği allocation sertifikasıyla4px
+üstüne hizalanır. İlk mapped durum tek başına geçerli allocation sayılmaz.
+
+Düzeltmenin ilk denemesinde provisional bounds kullanımı555px margin oluşturup
+GUI gizleme testini timeout'a düşürdü. Bu deneme teslim edilen davranış değildir:
+bottom certificate ve geçersiz sınırda natural fallback ile giderildi. Fare
+bölgesi hesabında düğmenin dış margin'ini tekrar yüksekliğe katmak da kaldırıldı;
+ölçülen düğme yüksekliği kullanılır. İkinci test penceresi motion verilmeden önce
+gerçek frame ile allocate edilir. İlk başarısız GUI sonucu bu kayıtla çözülür;
+assertion kaldırılmadı. Yeni assert'ler düğme-panel arasını4±1px, scrollbar'ın
+panel bounds içinde kalmasını ve panelin alt/tam genişlik sınırlarını doğrular.
+
+Sonuçlar aşağıdaki nihai test kaydında; native fiziksel kullanıcı görünümü hâlâ
+NOT RUN. Önceki fotoğraf texture'ını tutan TH-06.2 ImageView/ActualPaintable,
+Fit/Fill/Actual/zoom/pan/resampling, secure decoder, photo cache ve preload
+implementasyonları bu regresyon düzeltmesinde değiştirilmedi.
+
+
+### Nihai Codex test matrisi — 25.10.2026
+
+| Kontrol | Sonuç |
+| --- | --- |
+| cargo fmt --check / check --locked / all-target Clippy -D warnings | PASS |
+| cargo test --locked (offline SDK, -j2) | PASS:88,0 failed |
+| Tüm examples build | PASS |
+| 81/120 büyük-cache retention X11 ve Sway/Wayland | PASS, sentetik decoded pikseller |
+| Koyu tema+2x retention | PASS:64 texture,13.107.200 bayt bütçe hesabı |
+| 120 kayıt TH-05 cache/source/cancel/production-window X11 ve Sway | PASS, kontrollü thumbnail/main pikseller |
+| Genel overlay/visibility GTK X11 1x, koyu2x, Sway 1x | PASS, son allocation sertifikasıyla |
+| TH-06.2 async transition/zoom/pan/error recovery ve preload X11 | PASS, kontrollü worker/pikseller |
+| Yeni gerçek Glycin/GNOME factory/native fiziksel kullanıcı kabulü | NOT RUN |
+
+Genel UI testinde önceki timeout nihai testlerde giderildi. Decode hızlandırması,
+RSS/VRAM benchmark'ı veya secure decoder zamansal çakışması iddia edilmez.
+Bunlar kullanıcı sisteminde tekrar native komutlar + normal81 fotoğraflı klasörde
+manuel incelemeyle kabul edilecek. Şeridi açınca mevcut görünür ve selected
+resimler yükleme sonrasında dolu kalmalı; baş/son/geri scroll, resize, T/hover ve
+iki pencere sınanmalı. Görsel ana fotoğraf Fit/Zoom farkı için ölçekleme motoru
+bu görevde değiştirilmedi; otomatik tam-frame/mode/zoom/pan pikselleri korundu.
+
+Bellek düzeltmesi commit'i: `ec469201ae46e780063fc97f1d4e8c0d14239315`.
+Yerleşim/test/nihai kayıt bu belgenin son commit'indedir; kesin SHA teslim
+raporunda ve `git log --oneline -- docs/TH06_VALIDATION.md` ile doğrulanabilir.
+**TH-04 DONE, TH-05 DONE, TH-06 TESTING, TH-07 TODO; PIV-18 TESTING.**

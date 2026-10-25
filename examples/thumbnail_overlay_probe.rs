@@ -486,6 +486,8 @@ fn main() {
     wait(|| !strip.is_visible() && !button.is_visible());
     assert!(pivra::settings::thumbnail_preference().enabled());
     // Other windows can be visible independently; global preference changes sync.
+    // Complete the other window's real frame before using its height for motion.
+    image_bytes(&other, &op);
     point(&ov, true);
     assert!(other_button.is_visible() && !button.is_visible());
     point(&ov, false);
@@ -541,6 +543,20 @@ fn main() {
                 center.y() + center.height() <= bounds.y(),
                 "toggle must float above panel"
             );
+            assert!(
+                (bounds.y() - center.y() - center.height() - 4.).abs() <= 1.,
+                "toggle gap must follow actual allocated panel edge: panel={bounds:?} button={center:?}"
+            );
+            assert!(strip.is_overlay_scrolling());
+            let bar = strip.hscrollbar();
+            if bar.is_mapped() {
+                let b = bar.compute_bounds(v.widget()).unwrap();
+                assert!(
+                    b.y() >= bounds.y() - 1.
+                        && b.y() + b.height() <= bounds.y() + bounds.height() + 1.,
+                    "scrollbar escaped panel allocation"
+                );
+            }
             assert!(
                 (bounds.y() + bounds.height() - p.height() as f32).abs() <= 1.,
                 "panel must touch bottom"

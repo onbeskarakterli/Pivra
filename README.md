@@ -885,3 +885,11 @@ See [TH-06 evidence and manual checks](docs/TH06_VALIDATION.md). Arch GNOME:
 bash tests/run_thumbnail_system_probe.sh
 bash tests/run_image_transition_probe.sh
 ```
+
+
+TH-06 regression follow-up: visible/selected thumbnails now have residency
+priority, and sandbox-decoded cache pixels are retained as bounded RGBA8 cell
+textures. The 64-texture/16 MiB limits remain; main-photo cache accounting and
+secure loading are unchanged. The native thumbnail command above now runs an
+explicit synthetic 81/120 large-cache retention test before real secure/native
+acceptance. Physical GNOME acceptance of this fix is pending; TH-06 stays TESTING.

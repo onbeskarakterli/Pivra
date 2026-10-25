@@ -54,6 +54,7 @@ pub(crate) fn install(
     items.append(&gtk::Label::new(Some("No thumbnails available")));
     let strip = gtk::ScrolledWindow::builder()
         .hscrollbar_policy(gtk::PolicyType::Automatic)
+        .overlay_scrolling(true)
         .vscrollbar_policy(gtk::PolicyType::Never)
         .propagate_natural_width(false)
         .height_request(112)
@@ -176,6 +177,7 @@ pub(crate) fn install(
             let weak = Rc::downgrade(&mapped);
             let handler = clock.connect_after_paint(move |_| {
                 if let Some(state) = weak.upgrade() {
+                    state.place_toggle();
                     if let Some(overlay) = state.overlay.upgrade() {
                         let height = overlay.height();
                         if state.allocated_height.replace(height) != height {
@@ -257,13 +259,37 @@ impl Visibility {
                 "Enable thumbnail strip"
             }));
             // Above the visible panel; otherwise only the small bottom trigger.
-            let panel_height = self
-                .strip
-                .upgrade()
-                .filter(|s| s.is_visible())
-                .map(|s| s.measure(gtk::Orientation::Vertical, -1).1);
-            button.set_margin_bottom(panel_height.map_or(4, |height| height + 4));
             button.set_visible(show);
+        }
+        self.place_toggle();
+    }
+    fn place_toggle(&self) {
+        let (Some(panel), Some(button), Some(overlay)) = (
+            self.strip.upgrade(),
+            self.button.upgrade(),
+            self.overlay.upgrade(),
+        ) else {
+            return;
+        };
+        let margin = if panel.is_visible() {
+            let height = if panel.is_mapped() {
+                panel
+                    .compute_bounds(&overlay)
+                    .filter(|b| {
+                        b.height() > 0.
+                            && b.y() >= 0.
+                            && (b.y() + b.height() - overlay.height() as f32).abs() <= 1.
+                    })
+                    .map(|b| (overlay.height() as f32 - b.y()).ceil() as i32)
+            } else {
+                None
+            };
+            height.unwrap_or_else(|| panel.measure(gtk::Orientation::Vertical, -1).1) + 4
+        } else {
+            4
+        };
+        if button.margin_bottom() != margin {
+            button.set_margin_bottom(margin);
         }
     }
     fn motion(self: &Rc<Self>, y: f64) {
@@ -271,10 +297,7 @@ impl Visibility {
         let Some(overlay) = self.overlay.upgrade() else {
             return;
         };
-        let button_height = self
-            .button
-            .upgrade()
-            .map_or(32, |b| b.measure(gtk::Orientation::Vertical, -1).1.max(32));
+        let button_height = self.button.upgrade().map_or(32, |b| b.height().max(32));
         let panel_height = self
             .strip
             .upgrade()

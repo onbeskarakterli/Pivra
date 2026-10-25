@@ -2350,3 +2350,32 @@ Gerçek commit'ler: `0b50b7a8a0e514b2ea7743b7ff81c983b7a12acc` TH-04/05 kapanı�
 `8c077954bd14a0d41b716ad71d8095cb44c5247d` TH-06.1 geometri. TH-06.2 kod/test/kayıt
 bu bölümün eklendiği commit'tedir (`git log --oneline -- docs/TH06_VALIDATION.md`);
 kendi SHA'sı teslim raporunda belirtilir. TH-06 TESTING, TH-07 TODO, PIV-18 TESTING.
+
+
+### TH-06 kullanıcı regresyonu — 25.10.2026 — TESTING
+
+Kullanıcı `b7eeba3` native komutlarının PASS olduğunu, ancak normal81 fotoğraflı
+klasörde thumbnail'lerin kaybolduğunu bildirdi. Otomatik native PASS, normal
+uygulama görsel kabulü yerine sayılmadı. TH-04/TH-05 DONE kalır, TH-06 TESTING.
+
+`ec469201ae46e780063fc97f1d4e8c0d14239315` — yeniden üreten81/120 GTK testi,
+measured visible allocation, selected önceliği, bounded normalize edilmiş RGBA8
+thumbnail texture ve eviction/rehydration düzeltmesi. Negatif:81 complete,
+failed0,2 texture/16 MiB ve görünür selected boş. Pozitif:64 texture/3,125 MiB
+(1x),64 texture/12,5 MiB (2x). Ana fotoğraf32 bayt/piksel hesabı korunur;
+thumbnail RGBA8+upload8 bayt/piksel hesabıyla16 MiB/64 sınırı korunur.
+
+Sonraki yerleşim commit'i natural→sertifikalı gerçek bounds ile düğmeyi4px üstte
+hizalar, scrollbar'ı GTK overlay scrolling içinde tutar ve dış margin'in fare
+bölgesinde iki kez sayılmasını giderir. [Kök neden, test ve native kabul](TH06_VALIDATION.md).
+Native helper/secure/fiziksel GNOME bu oturumda NOT RUN; Bwrap engeli tekrar
+denenmedi. TH-06.2 main image transition yolu korunur. TH-07 TODO; PIV-18 TESTING.
+
+
+Nihai regresyon doğrulaması:88 Rust PASS; fmt/check/Clippy -D warnings PASS;
+81/120 retention X11/Sway ve koyu2x PASS (64 texture,2x12,5 MiB bütçe hesabı);
+TH-05 120 kayıt/katalog/üretim pencere testleri X11/Sway PASS; gerçek GTK overlay,
+visibility, mode/zoom/pan, scrollbar bounds ve iki pencere X11 1x/koyu2x/Sway PASS.
+TH-06.2 controlled transition ve preload PASS. Önceki ara UI timeout nihai
+allocation sertifikası testinde giderildi. Yeni secure decode ve fiziksel GNOME
+kabulü NOT RUN; TH-06 TESTING. Yerleşim commit SHA'sı teslim raporunda verilir.

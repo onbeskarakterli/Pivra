@@ -104,18 +104,22 @@ fn install_navigation_arrows(overlay: &gtk::Overlay) {
         arrow.set_content_height(72);
         arrow.set_can_target(false);
         arrow.set_draw_func(move |_, cr, width, height| {
-            // Draw an enlarged chevron within the full-height panel without stretching edge to edge.
+            // Preserve the 4K/fullscreen silhouette; scale only down in a
+            // smaller viewport, including the chevron stroke and wing length.
+            let scale = (f64::from(width) / 112.0)
+                .min(f64::from(height) / 900.0)
+                .clamp(0.35, 1.0);
             let cx = f64::from(width) / 2.0;
             let cy = f64::from(height) / 2.0;
-            let tip_x = if left { cx - 32.0 } else { cx + 32.0 };
-            let ends_x = if left { cx + 32.0 } else { cx - 32.0 };
+            let tip_x = if left { cx - 32.0 * scale } else { cx + 32.0 * scale };
+            let ends_x = if left { cx + 32.0 * scale } else { cx - 32.0 * scale };
             cr.set_source_rgba(1.0, 1.0, 1.0, 0.94);
-            cr.set_line_width(5.0);
+            cr.set_line_width(5.0 * scale);
             cr.set_line_cap(gtk::cairo::LineCap::Round);
             cr.set_line_join(gtk::cairo::LineJoin::Round);
-            cr.move_to(ends_x, cy - 105.0);
+            cr.move_to(ends_x, cy - 105.0 * scale);
             cr.line_to(tip_x, cy);
-            cr.line_to(ends_x, cy + 105.0);
+            cr.line_to(ends_x, cy + 105.0 * scale);
             let _ = cr.stroke();
         });
         button.set_child(Some(&arrow));
@@ -132,6 +136,25 @@ fn install_navigation_arrows(overlay: &gtk::Overlay) {
     };
     let previous = make_arrow(true, "win.previous-media", gtk::Align::Start);
     let next = make_arrow(false, "win.next-media", gtk::Align::End);
+    // GTK reports logical viewport size after allocation (including HiDPI).
+    // Resize the glass panels as one piece with their arrows; no increase
+    // beyond the approved 112px fullscreen width.
+    let prev_size = previous.downgrade();
+    let next_size = next.downgrade();
+    let resize = move |viewport: &gtk::Overlay| {
+        let scale = (f64::from(viewport.width()) / 1600.0)
+            .min(f64::from(viewport.height()) / 900.0)
+            .clamp(0.5, 1.0);
+        let panel_width = (112.0 * scale).round() as i32;
+        for panel in [&prev_size, &next_size] {
+            if let Some(panel) = panel.upgrade() {
+                if panel.width_request() != panel_width {
+                    panel.set_width_request(panel_width);
+                }
+            }
+        }
+    };
+    overlay.connect_notify_local(Some("width"), move |viewport, _| resize(viewport));
     let motion = gtk::EventControllerMotion::new();
     let left = previous.downgrade();
     let right = next.downgrade();
@@ -139,10 +162,12 @@ fn install_navigation_arrows(overlay: &gtk::Overlay) {
         let Some(widget) = controller.widget() else { return; };
         let width = widget.width() as f64;
         if let Some(button) = left.upgrade() {
-            button.set_visible(x <= 156.0 && button.is_sensitive());
+            let edge = f64::from(button.width_request()) + 44.0;
+            button.set_visible(x <= edge && button.is_sensitive());
         }
         if let Some(button) = right.upgrade() {
-            button.set_visible(x >= width - 156.0 && button.is_sensitive());
+            let edge = f64::from(button.width_request()) + 44.0;
+            button.set_visible(x >= width - edge && button.is_sensitive());
         }
     });
     motion.connect_leave(move |_| {

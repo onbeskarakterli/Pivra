@@ -215,3 +215,63 @@ FD-06 TESTING kalır; FD-07 başlamadı.
 
 Kapanış harness/observer düzeltme commit'i:
 `84b9b4d5c621555bf2782213bf65f4b2a260f47a`.
+
+## Son native JSON incelemesi — loader pool çıkış aşaması
+
+Kullanıcının yüklediği `pivra-fd06-close-report-_jj25n_c.json` gerçekten okundu.
+Kesin hata Rust render/title assertion'ı değildir:
+`observer_failure = "loader still alive while other window open"`, exit 1.
+`window_finish_sent=false`, `cleanup=NOT VERIFIED`. Dış observer, pencere/worker
+hazır bildiriminden sonra hedef pidfd'nin 5 saniyede çıkmasını bekleyip durmuştur.
+Dolayısıyla Rust'ın son başlık/render/kaynak kontrolüne bu native koşuda
+**ulaşılmadı**; onlara PASS verilmez.
+
+Rapordaki gerçek kanıtlar:
+
+- PID 282739, starttime 18110476, 150000000 byte frame;
+  `partial_after_stop=true`, `cancel_acknowledged=true`: aktif large decode
+  checkpoint'i ve iptal komutu onayı vardır. `/proc` errors 0.
+- close-request/unmap/destroy, native surface destroyed, pencere artık referanssız;
+  workers=0, reserved=0, large=false, WINDOW_CLOSED_OTHER_ALIVE görülmüştür.
+- Bunlar decode await'inin/iş kabul kapsamının bırakıldığını destekler: generator
+  decode await'inden çıktıktan sonra permit ve rezervasyon bırakılır. Ancak
+  Glycin Image::drop içindeki ayrı async done/pool temizliği ve loader process
+  çıkışı bunlarla eşdeğer değildir. O process'in çıktığı **doğrulanmadı**.
+- Son örnekte hedef loader RSS yaklaşık 8.7 MB'a düşmüştür; düşük RSS veya boş
+  permit bir process-exit kanıtı değildir.
+- photo_referenced=true tek başına aktif decoder veya sızıntı sertifikası değildir.
+  GTK nesnesinin sahip referansı bu JSON'dan bulunamaz; kalıcı referans sızıntısı
+  olmadığı da iddia edilmez. Pencere/yüzey kapanışı ayrı olarak kanıtlanmıştır.
+
+Glycin **sabitlenmiş 3.0.8** kaynakları incelendi: `pool.rs` PoolConfig::default
+loader_retention_time=30s; UsageTracker::drop bu gecikmeyle clean_loaders planlar;
+clean_loaders ancak kullanıcı sayısı sıfır ve idle>30s ise girdiyi bırakır.
+`api_loader.rs` iptal işleminde process'i doğrudan öldürmek yerine image-path
+`done` isteği gönderir; Image::drop da async done sonrası usage tracker'ı bırakır.
+Bu nedenle önceki 5s process-exit beklentisi bağımlılığın idle pool politikasıyla
+uyumsuzdur. Bu kaynak kanıtı, native PID'nin daha sonra mutlaka çıkacağını
+kanıtlamaz; yeni native koşu bunu ölçmelidir.
+
+`344c2ebc7a32d0721c8cb3d43be55239fef837c9` düzeltmesi yalnız probe/test tarafındadır:
+
+- Belgeli 30s pool bekleme aşaması + mevcut 5s gerçek exit grace aşaması.
+  Üst native 95s / observer 100s sınırları korunur. Rastgele timeout seçilmedi.
+- Aynı PID/starttime'a ait gerçek pidfd çıkışı görülmeden finish gönderilmez.
+  35s sonunda hâlâ canlıysa açık FAIL; RSS/idle/permit sayısı exit yerine geçmez.
+- LOADER_EXIT fazı, PID/starttime ve ölçülen süre terminale yazılır.
+- Observer hatası artık terminalde `FAIL FD06 active close: <neden>` olarak çıkar;
+  JSON hata ayrıntıları korunur. Rust son title/render/source kontrolleri ayrı
+  başarı mesajları verir; assertion ve güvenlik kontrolleri kaldırılmadı.
+
+Codex: 8 observer testi PASS (pool/grace sınırları, eksik sertifika/ack/exit/finish,
+canlı gerçek child ve sonrasında gerçek pidfd exit dahil); thumbnail Python 37
+PASS; Rust check/test (185)/example build/Clippy PASS. Kontrollü GNOME X11 katalog,
+120 tekil cache işi ve iki pencere regresyonu PASS; secure decoder başarısı değildir.
+Python compile ve diff-check PASS. Önceki fmt farkları kapsam dışı kalır.
+Yeni native decode/loader exit ve son render kabulü **NOT RUN**; bilinen Codex
+sandbox engelinde tekrar deneme yapılmadı. Önceki native FAIL kaydı korunur.
+
+Tek komut: `bash tests/run_fd06_freedesktop_probe.sh; printf 'EXIT CODE: %s\n' "$?"`.
+Son otomatik decode pencerelerini elle kapatmayın. Loader retention aşaması
+loglandığında bekleyin; gerçek PID çıkışı ve tüm final kontrolleri olmadan
+kabul verilmez. **FD-06 TESTING; FD-07 başlamadı.**

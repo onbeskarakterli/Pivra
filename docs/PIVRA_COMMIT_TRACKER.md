@@ -2577,3 +2577,17 @@ Native birleşik `bash tests/run_preview_pipeline_probe.sh` **exit 0** (Takip 04
   Yeni native aktif kapanış NOT RUN; bilinen Codex Bwrap kısıtı. Üretim kodu
   değiştirilmedi. FD-06 TESTING, FD-07 başlamadı.
 - Komut/kanıt ayrımı: [FD06_PROVIDER_MANAGER_INTEGRATION.md](FD06_PROVIDER_MANAGER_INTEGRATION.md).
+
+#### FD-06 son native JSON — pool/exit teşhisi — TESTING
+
+- `_jj25n_c.json` okundu: kesin observer hatası `loader still alive while other
+  window open`; finish_sent=false, cleanup=NOT VERIFIED. Son render/title
+  doğrulamaları çalışmadı. Aktif 150 MB partial-after-STOP sertifikası ve cancel
+  ack mevcut; pencere/surface kapalı, worker/rezervasyon sıfır. Loader exit PASS değil.
+- `344c2ebc7a32d0721c8cb3d43be55239fef837c9`: Glycin 3.0.8 pool.rs belgeli
+  30s retention + mevcut 5s exit grace; gerçek pidfd exit zorunlu, üst job
+  deadline'ları aynı. Açık terminal FAIL ve ayrı son doğrulama mesajları.
+- Üretim/GNOME/security kodu değişmedi. 8 observer, 37 thumbnail Python,
+  185 Rust PASS; check/build/Clippy ve kontrollü GNOME X11 katalog PASS.
+- Yeni native sonuç NOT RUN; FD-06 TESTING, FD-07 başlamadı. Kanıt ve sınırlamalar:
+  [FD06_PROVIDER_MANAGER_INTEGRATION.md](FD06_PROVIDER_MANAGER_INTEGRATION.md).

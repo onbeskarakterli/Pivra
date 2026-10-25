@@ -145,6 +145,9 @@ pub(crate) fn install(
         let pinned = !pin_click.pinned.get();
         pin_click.pinned.set(pinned);
         pin_click.cancel();
+        if pinned && !pin_click.preference.enabled() {
+            pin_click.preference.set_enabled(true);
+        }
         if let Some(pin) = pin_click.pin.upgrade() {
             pin.set_active(pinned);
             pin.set_tooltip_text(Some(if pinned {
@@ -153,7 +156,10 @@ pub(crate) fn install(
                 "Keep thumbnail strip visible"
             }));
         }
-        pin_click.render(pinned || pin_click.near.get());
+        pin_click.render(pinned || pin_click.near.get() || pin_click.shown.get());
+        if !pinned && !pin_click.near.get() {
+            pin_click.schedule(5000);
+        }
     });
     let motion = gtk::EventControllerMotion::new();
     motion.set_propagation_phase(gtk::PropagationPhase::Capture);

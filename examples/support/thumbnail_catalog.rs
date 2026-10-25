@@ -173,6 +173,10 @@ pub(super) fn run(app: &adw::Application) {
     }
     // Initially hidden, then first measured reveal: first/middle/last selections.
     for selected in [0, 79, 119] {
+        // Enabled is a shared persisted preference. A preceding case enables it;
+        // reset explicitly before opening the next window so hidden-start
+        // assertions do not depend on iteration order or prior user settings.
+        pivra::settings::thumbnail_preference().set_enabled(false);
         let calls_before = THUMB_LOADS.load(Ordering::SeqCst);
         let attempts_before = THUMB_ATTEMPTS.lock().unwrap().len();
         let mut order_before = THUMB_ORDER.lock().unwrap().len();

@@ -17,6 +17,7 @@ fn install_css(display: &gtk::gdk::Display) {
             .pivra-thumbnail-panel { background-color: alpha(@window_bg_color, 0.50); border-radius: 0; border-top: 1px solid alpha(white, 0.22); padding: 8px; }\n\
             .pivra-thumbnail-toggle { background-image: none; background-color: alpha(@window_bg_color, 0.50); border-radius: 10px 10px 0 0; border: 1px solid alpha(white, 0.22); border-bottom: 0; box-shadow: none; padding: 3px 16px; min-width: 112px; min-height: 24px; }\n\
             .pivra-thumbnail-pin { background-image: none; background-color: alpha(@window_bg_color, 0.50); border-radius: 10px 10px 0 0; border: 1px solid alpha(white, 0.22); border-bottom: 0; box-shadow: none; padding: 3px 8px; min-height: 24px; }\n\
+            .pivra-thumbnail-pin.pivra-pinned { background-color: alpha(@accent_bg_color, 0.85); color: @accent_fg_color; border-color: alpha(@accent_color, 0.95); }\n\
             .pivra-thumbnail-cell { background-image: none; background-color: transparent; padding: 0; min-width: 0; min-height: 0; border: none; border-radius: 0; box-shadow: none; }\n\
             .pivra-thumbnail-cell.selected { box-shadow: none; }\n\
             .pivra-thumbnail-selection { background: transparent; border: 0; padding: 0; box-shadow: none; }\n\
@@ -150,6 +151,8 @@ pub(crate) fn install(
         }
         if let Some(pin) = pin_click.pin.upgrade() {
             pin.set_active(pinned);
+            pin.set_icon_name(if pinned { "object-locked-symbolic" } else { "view-pin-symbolic" });
+            if pinned { pin.add_css_class("pivra-pinned"); } else { pin.remove_css_class("pivra-pinned"); }
             pin.set_tooltip_text(Some(if pinned {
                 "Unpin thumbnail strip"
             } else {

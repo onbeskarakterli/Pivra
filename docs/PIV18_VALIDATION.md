@@ -375,3 +375,11 @@ bash tests/run_preview_pipeline_probe.sh
 Çalıştırılan SHA ve JSON/exit sonucu kaydedilmeli. Başarı bile yalnız full-only
 paketi doğrular; erken-preview/foreground gösterge kapsam kararları ayrı kalır.
 **PIV-18 TESTING**; main ve sonraki görevler değiştirilmedi.
+
+## Son kullanıcı native kabulü — 25.10.2026 — GÜNCEL
+
+**PIV-18 DONE, 0.1.0 full-only onaylı kapsam:** Kullanıcı erken preview'yi sonraki sürüme açıkça erteledi. Ana yükleme sırasında önceki fotoğrafı koruyan spinner `c811e5c` ile eklendi; ilk boş açılışta spinner yok, tam fotoğraf teslimi/hata ile kapanıyor. Kullanıcı normal fotoğraf gezinmesini kabul etti, gecikmeli görsel simülasyon istemedi; spinner'ın fiziksel geç görünmesi ayrıca doğrulanmadı.
+
+**Native kullanıcı kanıtı:** `bash tests/run_preview_pipeline_probe.sh; echo "EXIT CODE: $?"` çıktısında **EXIT CODE: 0**, `PIV09 PASS active_decode_close`, gerçek secure Glycin JPEG/PNG/EXIF ve bozuk görsel reddi, GIO path/URI, Fit/Fill/Actual, resampling, preload/cache, async navigation, iki pencere izolasyonu ve decoder lifecycle PASS. Bu, önceki native FAIL/NOT RUN kayıtlarını güncel kabulde geçersiz kılar; eski loglar geçmiş çalışmalara aittir.
+
+Thumbnail ortak Enabled tercihi test izolasyonu `02a36ef`; kullanıcı gerçek seçim/görseller PASS ve `bash tests/run_thumbnail_system_probe.sh` native **exit 0**. TH-03'ün ayrı kalıcı Enabled ayarı yeniden başlatma manuel testi henüz bağımsız biçimde doğrulanmadı. Ürün kodu değiştirmeden eski test beklentileri `3c08a6c`, `eef9910`, `30dcb81`, `932fe44` ile düzeltildi. Faz 2 kapsam kabulü, paketin 0.1.0 olarak yayınlandığı anlamına gelmez. `main` değişmedi.

@@ -655,6 +655,7 @@ pub(super) fn install_interaction(
     picture.add_controller(scroll);
     let drag = gtk::GestureDrag::new();
     drag.set_button(1);
+    drag.set_propagation_phase(gtk::PropagationPhase::Capture);
     let last = Rc::new(Cell::new(None::<(f64, f64)>));
     let start = last.clone();
     let source = texture.clone();
@@ -674,7 +675,10 @@ pub(super) fn install_interaction(
     let mode_action = action.clone();
     drag.connect_drag_update(move |_, x, y| {
         if drag_generation.get() != state.borrow().generation() {
-            offsets.set(None);
+            // Zoom while holding the left button changes the transform
+            // generation; rebase the drag instead of disabling it permanently.
+            drag_generation.set(state.borrow().generation());
+            offsets.set(Some((x, y)));
             return;
         }
         let Some(previous) = offsets.get() else {

@@ -298,6 +298,22 @@ pub(super) fn build(app: &adw::Application, settings: &Settings, file: Option<Op
             .menu_model(&menu)
             .build();
         header.pack_end(&mode_button);
+        // Wheel mode is per-window; the lens is visibly active only for zoom.
+        let zoom_toggle = gtk::ToggleButton::builder()
+            .icon_name("zoom-in-symbolic")
+            .tooltip_text("Wheel zoom (off: wheel changes photos; hold left mouse button to zoom)")
+            .build();
+        zoom_toggle.set_active(false);
+        header.pack_end(&zoom_toggle);
+        let zoom_view = view.clone();
+        zoom_toggle.connect_toggled(move |button| {
+            zoom_view.set_zoom_wheel_enabled(button.is_active());
+            button.set_tooltip_text(Some(if button.is_active() {
+                "Wheel zoom enabled"
+            } else {
+                "Wheel changes photos; hold left mouse button to zoom"
+            }));
+        });
         let weak_button = mode_button.downgrade();
         let action = window
             .lookup_action("image-mode")

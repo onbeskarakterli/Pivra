@@ -73,6 +73,7 @@ struct Inner {
     epoch: Cell<u64>,
     clock: Cell<u64>,
     started: Cell<u64>,
+    decoded_max: Cell<usize>,
     last_visible: Cell<Option<(usize, usize)>>,
     active: RefCell<Option<Active>>,
     building: RefCell<Option<glib::SourceId>>,
@@ -90,6 +91,8 @@ pub(crate) struct ThumbnailStats {
     pub bytes: usize,
     pub running: bool,
     pub started: u64,
+    pub decoded_max: usize,
+    pub largest_texture: usize,
 }
 #[derive(Clone)]
 pub(crate) struct ThumbnailStrip(Rc<Inner>);
@@ -107,6 +110,7 @@ impl ThumbnailStrip {
             epoch: Cell::new(0),
             clock: Cell::new(0),
             started: Cell::new(0),
+            decoded_max: Cell::new(0),
             last_visible: Cell::new(None),
             active: RefCell::new(None),
             building: RefCell::new(None),
@@ -180,6 +184,8 @@ impl ThumbnailStrip {
             bytes: e.iter().map(|e| e.cost).sum(),
             running: self.0.active.borrow().is_some() || self.0.validation.borrow().is_some(),
             started: self.0.started.get(),
+            decoded_max: self.0.decoded_max.get(),
+            largest_texture: e.iter().map(|e| e.cost).max().unwrap_or(0),
         }
     }
     pub(crate) fn finish_initial_catalog(&self, selected: Option<usize>) {
@@ -206,7 +212,9 @@ impl ThumbnailStrip {
     /// Selection-only calls never rebuild, cancel a worker, focus or realign.
     pub(crate) fn set_catalog(&self, photos: &[(usize, PathBuf)], selected: Option<usize>) {
         let i = &self.0;
-        i.selected.set(selected);
+        if i.selected.replace(selected) != selected {
+            i.last_visible.set(None);
+        }
         // An unconsumed first-reveal anchor follows catalog index changes.
         if i.initial.get().is_some() {
             i.initial.set(selected);
@@ -511,12 +519,21 @@ impl Inner {
     }
     fn visible(&self, entries: &[Entry]) -> std::ops::Range<usize> {
         let adj = self.scroller.hadjustment();
-        let first = (adj.value() / f64::from(CELL_WIDTH + 8)).floor().max(0.) as usize;
-        let last = ((adj.value() + adj.page_size()) / f64::from(CELL_WIDTH + 8))
-            .ceil()
-            .max(0.) as usize;
-        first.min(entries.len())..last.min(entries.len())
+        // Actual allocations include theme padding and fractional HiDPI layout;
+        // a guessed fixed pitch can omit a still-visible edge cell.
+        let mut shown = entries.iter().enumerate().filter_map(|(n, e)| {
+            let b = e.widgets.as_ref()?.button.compute_bounds(&self.items)?;
+            (f64::from(b.x()) < adj.value() + adj.page_size()
+                && f64::from(b.x() + b.width()) > adj.value())
+            .then_some(n)
+        });
+        let Some(first) = shown.next() else {
+            return 0..0;
+        };
+        let last = shown.last().unwrap_or(first);
+        first..last + 1
     }
+
     fn drive(self: &Rc<Self>) {
         if self.closed.get()
             || !self.scroller.is_mapped()
@@ -529,7 +546,10 @@ impl Inner {
         }
         let mut entries = self.entries.borrow_mut();
         let visible = self.visible(&entries);
-        reconsider_evicted(&mut entries, &visible, &self.last_visible);
+        let selected = entries
+            .iter()
+            .position(|e| Some(e.index.get()) == self.selected.get());
+        reconsider_evicted(&mut entries, &visible, &self.last_visible, selected);
         let near = visible.start.saturating_sub(2)..(visible.end + 2).min(entries.len());
         self.clock.set(self.clock.get().wrapping_add(1));
         for (n, e) in entries.iter_mut().enumerate() {
@@ -545,9 +565,13 @@ impl Inner {
                 }
             }
         }
-        let next = visible
-            .clone()
-            .find(|&n| entries[n].phase == Phase::Pending)
+        let next = selected
+            .filter(|&n| entries[n].phase == Phase::Pending)
+            .or_else(|| {
+                visible
+                    .clone()
+                    .find(|&n| entries[n].phase == Phase::Pending)
+            })
             .or_else(|| near.clone().find(|&n| entries[n].phase == Phase::Pending))
             .or_else(|| entries.iter().position(|e| e.phase == Phase::Pending));
         if let Some(active) = self.active.borrow().as_ref() {
@@ -577,6 +601,7 @@ impl Inner {
             token: token.clone(),
             epoch,
         }));
+        let scale = self.scroller.scale_factor().clamp(1, 2);
         let worker_path = path.clone();
         let worker_token = token.clone();
         let job = gio::spawn_blocking(move || {
@@ -603,7 +628,23 @@ impl Inner {
                     ));
                     match frame {
                         Ok(frame) if candidate.still_current(&worker_token) => {
-                            Work::Hit(frame, candidate.source, candidate.thumbnail)
+                            if worker_token.is_cancelled() {
+                                return Work::Cancelled;
+                            }
+                            let texture = frame.texture();
+                            let decoded_cost =
+                                texture_cost(texture.width() as u32, texture.height() as u32)
+                                    .unwrap_or(usize::MAX);
+                            match display_texture(&texture, scale) {
+                                Ok(texture) if !worker_token.is_cancelled() => Work::Hit(
+                                    texture,
+                                    candidate.source,
+                                    candidate.thumbnail,
+                                    decoded_cost,
+                                ),
+                                Ok(_) => Work::Cancelled,
+                                Err(error) => Work::Failed(error),
+                            }
                         }
                         Ok(_) if worker_token.is_cancelled() => Work::Cancelled,
                         Ok(_) => Work::Failed("thumbnail identity changed during decode".into()),
@@ -640,12 +681,12 @@ impl Inner {
                 entry.phase = Phase::Failed;
                 match result {
                     _ if stale => entry.phase = Phase::Pending,
-                    Work::Hit(frame, source, cache) => {
+                    Work::Hit(texture, source, cache, decoded_cost) => {
+                        i.decoded_max.set(i.decoded_max.get().max(decoded_cost));
                         // Identity was verified on the worker before publication;
                         // source rescans invalidate the window epoch as well.
-                        let texture = frame.texture();
-                        let cost = texture_cost(texture.width() as u32, texture.height() as u32)
-                            .unwrap_or(usize::MAX);
+                        let cost =
+                            display_cost(texture.width(), texture.height()).unwrap_or(usize::MAX);
                         if cost <= BUDGET {
                             entry.cost = cost;
                             entry.texture = Some(texture.clone());
@@ -681,7 +722,13 @@ impl Inner {
                     .iter()
                     .enumerate()
                     .filter(|(_, e)| e.texture.is_some())
-                    .min_by_key(|(n, e)| (visible.contains(n), e.used))
+                    .min_by_key(|(n, e)| {
+                        (
+                            Some(e.index.get()) == i.selected.get(),
+                            visible.contains(n),
+                            e.used,
+                        )
+                    })
                     .map(|(n, _)| n);
                 let Some(n) = victim else {
                     break;
@@ -716,18 +763,71 @@ fn reconsider_evicted(
     entries: &mut [Entry],
     visible: &std::ops::Range<usize>,
     last: &Cell<Option<(usize, usize)>>,
+    selected: Option<usize>,
 ) {
     let range = Some((visible.start, visible.end));
     if last.replace(range) != range {
-        for e in entries.iter_mut().take(visible.end).skip(visible.start) {
-            if e.phase == Phase::Evicted {
+        for (n, e) in entries.iter_mut().enumerate() {
+            if (visible.contains(&n) || Some(n) == selected) && e.phase == Phase::Evicted {
                 e.phase = Phase::Pending;
             }
         }
     }
 }
+// Only resample already sandbox-decoded pixels. No file parsing or new decoder.
+// Normalize to RGBA8 and at most 2x cell density. Charge 8 bytes/pixel:
+// owned RGBA8 pixels + a renderer upload. 64 * 192*160*8 < 16 MiB.
+// The main photo's conservative 32-byte estimate remains unchanged.
+fn display_texture(texture: &gdk::Texture, scale: i32) -> Result<gdk::Texture, String> {
+    let (width, height) = display_size(texture.width(), texture.height(), scale);
+    let mut download = gdk::TextureDownloader::new(texture);
+    download.set_format(gdk::MemoryFormat::R8g8b8a8);
+    let (bytes, stride) = download.download_bytes();
+    if (width, height) == (texture.width(), texture.height()) {
+        return Ok(gdk::MemoryTexture::new(
+            width,
+            height,
+            gdk::MemoryFormat::R8g8b8a8,
+            &bytes,
+            stride,
+        )
+        .upcast());
+    }
+    let stride = i32::try_from(stride).map_err(|_| "Thumbnail stride exceeds limit")?;
+    let pixels = gdk::gdk_pixbuf::Pixbuf::from_bytes(
+        &bytes,
+        gdk::gdk_pixbuf::Colorspace::Rgb,
+        true,
+        8,
+        texture.width(),
+        texture.height(),
+        stride,
+    );
+    let small = pixels
+        .scale_simple(width, height, gdk::gdk_pixbuf::InterpType::Bilinear)
+        .ok_or("Cannot scale decoded thumbnail pixels")?;
+    Ok(gdk::Texture::for_pixbuf(&small))
+}
+fn display_cost(width: i32, height: i32) -> Option<usize> {
+    usize::try_from(width)
+        .ok()?
+        .checked_mul(usize::try_from(height).ok()?)?
+        .checked_mul(8)
+}
+
+fn display_size(width: i32, height: i32, scale: i32) -> (i32, i32) {
+    let scale = scale.clamp(1, 2);
+    let ratio = (f64::from(CELL_WIDTH * scale) / f64::from(width))
+        .min(f64::from(CELL_HEIGHT * scale) / f64::from(height))
+        .min(1.);
+    (
+        (f64::from(width) * ratio).floor().max(1.) as i32,
+        (f64::from(height) * ratio).floor().max(1.) as i32,
+    )
+}
+
 enum Work {
-    Hit(crate::image_loader::LoadedFrame, FileKey, FileKey),
+    Hit(gdk::Texture, FileKey, FileKey, usize),
     Failed(String),
     Cancelled,
     Busy,
@@ -760,16 +860,51 @@ mod tests {
             })
             .collect();
         let last = Cell::new(None);
-        reconsider_evicted(&mut entries, &(0..64), &last);
+        reconsider_evicted(&mut entries, &(0..64), &last, None);
         assert!(entries[..64].iter().all(|e| e.phase == Phase::Pending));
         for e in &mut entries[..64] {
             e.phase = Phase::Evicted;
         } // RAM eviction after admission
-        reconsider_evicted(&mut entries, &(0..64), &last);
+        reconsider_evicted(&mut entries, &(0..64), &last, None);
         assert!(entries[..64].iter().all(|e| e.phase == Phase::Evicted));
-        reconsider_evicted(&mut entries, &(1..65), &last);
+        reconsider_evicted(&mut entries, &(1..65), &last, None);
         assert!(entries[1..].iter().all(|e| e.phase == Phase::Pending));
         assert!(entries[0].phase == Phase::Evicted);
+    }
+    #[test]
+    fn rgba8_density_and_conservative_upload_charge_fit_both_caps() {
+        for scale in 1..=4 {
+            for (w, h) in [(512, 512), (4096, 3072), (64, 32), (1, 32768)] {
+                let (width, height) = display_size(w, h, scale);
+                assert!(width > 0 && height > 0 && width <= w && height <= h);
+                assert!(width <= CELL_WIDTH * 2 && height <= CELL_HEIGHT * 2);
+                assert!(display_cost(width, height).unwrap() * LIMIT <= BUDGET);
+            }
+        }
+        assert_eq!(texture_cost(512, 512), Some(8 * 1024 * 1024));
+        assert_eq!(display_cost(160, 160), Some(204800));
+    }
+    #[test]
+    fn evicted_offscreen_selection_is_reconsidered_without_paint_retry_loop() {
+        let mut entries: Vec<_> = (0..5)
+            .map(|index| Entry {
+                index: Rc::new(Cell::new(index)),
+                path: PathBuf::new(),
+                widgets: None,
+                phase: Phase::Evicted,
+                texture: None,
+                keys: None,
+                cost: 0,
+                used: 0,
+            })
+            .collect();
+        let last = Cell::new(None);
+        reconsider_evicted(&mut entries, &(0..1), &last, Some(4));
+        assert!(entries[0].phase == Phase::Pending && entries[4].phase == Phase::Pending);
+        assert!(entries[1..4].iter().all(|e| e.phase == Phase::Evicted));
+        entries[4].phase = Phase::Evicted;
+        reconsider_evicted(&mut entries, &(0..1), &last, Some(4));
+        assert!(entries[4].phase == Phase::Evicted);
     }
     #[test]
     fn global_worker_bound_deduplicates_and_releases_paths() {

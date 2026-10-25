@@ -129,3 +129,84 @@ Tamamlanınca iki TEST penceresini kapat. Bu manuel kabul henüz yapılmadı.
 
 **TH-05 DONE; TH-06 TESTING; TH-07 TODO; PIV-18 TESTING.** Faz0 bağımsız temiz
 kurulum/DESKTOP-06 ve diğer PIV kapıları açık kalır.
+
+
+## TH-06 regresyon düzeltmesi — 25.10.2026 — TESTING
+
+Kullanıcı `b7eeba3` üzerinde iki native komutun başarıyla tamamlandığını bildirdi:
+120/120 thumbnail, failed0, secure Glycin, transition/cancel/cache/preload PASS.
+Bunlar kullanıcı Arch GNOME sonuçlarıdır. Aynı kullanıcı normal uygulamada81
+fotoğraflı klasörde thumbnail'lerin yüklenip boşalmasını bildirdi; otomatik
+paketin geçmesi bu gerçek kullanıcı hatasını geçersiz kılmaz. TH-06 TESTING.
+Ekran görüntüsü dosyaları bu çalışmaya verilmedi; kopyalanmadı/fixture yapılmadı.
+Yalnız sentetik, güvenli TEST pikselleri kullanıldı.
+
+### Ölçülen kök neden / negatif regresyon
+
+Yeni `thumbnail_overlay_probe --retention-regression`81/120 kaynak için sentetik
+512×512 RGBA8 cache frame'leri sağlar. Eski kodla81 tamamlandı/failed0 iken
+resident textures2, bütçe16.777.216 bayt oldu; görünür/seçili0. hücrenin
+paintable'ı None olduğu için test exit101 verdi. Disk cache/decoder hatası değil,
+RAM tahliyesinin widget paintable'ını da temizlemesi yeniden üretildi.
+
+Ortak `image_cache::texture_cost()` **32 bayt/piksel** muhafazakâr ana fotoğraf
+hesabı kullanır:512² için8 MiB; gerçek RGBA8 piksel tamponu1 MiB'dir. Eski
+thumbnail LRU bu tam cache-frame hesabıyla görünürleri yalnız son sıraya
+bırakıyordu, bütçe dolunca onları da tahliye ediyordu. Seçili öğe ayrıca
+korunmuyordu. Sabit104px pitch ile görünür aralık tahmini tema/kenar allocation
+ile de ayrışabilirdi. Bütçe tahliyesi phase::Evicted+Picture(None)+icon(true)
+yapar; aynı viewport'ta tekrar yükleme özellikle bastırıldığı için boşluk kalır.
+Gerçek kullanıcı dosyalarının boyutları/RSS ölçülmedi; bu mekanizmanın yeniden
+üretimi kullanıcı klasöründeki her cache dosyasının aynı boyutta olduğunu kanıtlamaz.
+
+### Sınırlı çözüm
+
+- Görünür aralık gerçek GTK button→items allocation kesişiminden hesaplanır.
+- Seçili öğe önce yüklenir, tahliyede görünürlerden de daha öncelikli korunur;
+  ardından görünür hücreler, sonra ekran dışı LRU. Seçim değişimi evicted seçili
+  öğenin yeniden değerlendirilmesini sağlar. Ekran dışı selected hücre de tutulur.
+- Secure Glycin/Bwrap ile çözülmüş cache pikselleri thumbnail worker'ında RGBA8'e
+  normalize edilir ve yalnız şeritte tutulan texture en fazla192×160 olur
+  (1x/2x hücre yoğunluğu,2x üstü ekranlarda2x kalite sınırı). Yeni decoder/dosya
+  parser'ı yok; GDK TextureDownloader ve mevcut GdkPixbuf yalnız çözülmüş
+  pikselleri ölçekler. Bu full-decode-sonrası şerit resmi; erken preview değildir.
+- Thumbnail'a özel maliyet RGBA8 CPU tamponu+renderer upload için8 bayt/piksel
+  hesaplanır. Ana fotoğrafın32 bayt hesabı değişmez.64×192×160×8 =15 MiB,
+  dolayısıyla hem **16 MiB** hem **64 texture** sınırı korunur. GTK Picture'da
+  ikinci gizli tahliye edilmemiş referans tutulmaz. RSS/VRAM'in tamamı bu sayaca
+  eşit değildir; decoder/normalizasyon ve renderer geçici maliyetleri ayrıdır.
+- Decode admission için eski16 MiB konservatif sınır, tek iş/pencere ve en çok
+  iki global thumbnail işi, cancellation ve foreground mimarisi korunur.
+  Worker içinde token normalize etmeden önce/sonra kontrol edilir.
+- Aşırı geniş viewport64'ten fazla hücre gösterirse seçili öncelikli en fazla64
+  resident texture kalır; kalanlar kontrollü placeholder olur. Sınır artırılmaz.
+  Evicted hücreler viewport/catalog/selection değişiminde değerlendirilir;
+  aynı sabit görünümde sonsuz decode döngüsü kurulmaz. Bu aşırı geniş durum için
+  fiziksel ekran kabulü henüz yok; sınır unit testlerinde korunur.
+
+Negatif test ve düzeltme aynı sentetik cache girişini kullanır. Yeni test gerçek
+widget Picture sahipliğini, görünür/selected paintable'ları,81/120 tamamlanmayı,
+64/16 MiB sınırını, baş/son/ortaya gidip tahliye edilmiş hücreyi yeniden yüklemeyi,
+sabit scroll'da decode artmamasını, resize/hide ve iki pencereyi kontrol eder.
+Gerçek secure cache/generation iddiası yalnız native test için yapılabilir.
+
+
+Bellek düzeltmesi Codex sonuçları: fmt/check/all-target Clippy -D warnings,
+**88 Rust testi PASS (64 unit+24 integration)**; examples build PASS. X11 ve
+izole headless Sway/Wayland81/120 sentetik512² testi PASS: failed0,64 texture,
+3.276.800 bayt resident bütçe hesabı (RGBA8+upload), kaynak için en büyük eski
+konservatif hesap8.388.608 bayt. Seçili/görünür pikseller korunur; tahliye edilmiş
+bölgeye gidince yeni işler artar, yerleşik halde artmaz. X11 eski120 öğeli katalog,
+source/cache invalidation, close/iki production-window regresyonları PASS.
+GTK UI genel testinde diğer pencere gizleme beklemesi henüz FAIL/timeout;
+yerleşim adımında ayrıca teşhis edilir, bu noktada PASS sayılmadı.
+
+Yeni sentetik retention kontrolü mevcut native script'e eklendi; bunu izleyen
+`--native-thumbnails` testi hâlâ gerçek Glycin/generation zorunludur. Bu oturumda
+native helper/secure decode/fiziksel GNOME **NOT RUN**; bilinen Codex Bwrap
+kısıtı tekrar denenmedi. Kullanıcı aynı iki komutu kullanır:
+
+```bash
+bash tests/run_thumbnail_system_probe.sh
+bash tests/run_image_transition_probe.sh
+```

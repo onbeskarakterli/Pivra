@@ -127,6 +127,8 @@ def main():
                         args.append("--synthetic")
                     if "--thumbnail-catalog" in sys.argv[2:]:
                         args.append("--catalog-regression")
+                    if "--thumbnail-retention" in sys.argv[2:]:
+                        args.append("--retention-regression")
                     if "--dark" in sys.argv[2:]:
                         args.append("--dark")
                     result = subprocess.run(args, env={**env, "G_DEBUG": "fatal-criticals"},

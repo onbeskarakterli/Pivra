@@ -567,3 +567,166 @@ fn production_windows(app: &adw::Application, photos: &[(usize, PathBuf)]) {
         loop_.run();
     }
 }
+
+// Large cache frames expose the 16 MiB limit long before the 64-entry cap.
+// Synthetic decoded pixels only; this does not claim secure decoder evidence.
+pub(super) fn retention(app: &adw::Application) {
+    let root = tempfile::tempdir().unwrap();
+    let mut survivors = Vec::new();
+    for total in [81, 120] {
+        let photos: Vec<_> = (0..total)
+            .map(|index| {
+                let path = root.path().join(format!("{total}-{index}.png"));
+                std::fs::write(
+                    &path,
+                    include_bytes!("../../tests/fixtures/images/wide.png"),
+                )
+                .unwrap();
+                cache(&path);
+                (index, path)
+            })
+            .collect();
+        let (window, view, picture) = open(app);
+        view.set_thumbnail_catalog(&photos, Some(0));
+        view.finish_initial_thumbnail_catalog(Some(0));
+        image_bytes(&window, &picture);
+        set_enabled(&view, true);
+        let row: gtk::Box = find(view.widget().upcast_ref(), "thumbnail-items");
+        let strip: gtk::ScrolledWindow = find(view.widget().upcast_ref(), "thumbnail-strip");
+        let cell_deadline = Instant::now() + Duration::from_secs(5);
+        while count(&row) != total {
+            assert!(
+                Instant::now() < cell_deadline,
+                "cells={} total={total} mapped={} visible={} {:?}",
+                count(&row),
+                strip.is_mapped(),
+                strip.is_visible(),
+                view.thumbnail_stats()
+            );
+            pump();
+        }
+        image_bytes(&window, &picture);
+        point(&view, true);
+        let deadline = Instant::now() + Duration::from_secs(25);
+        while view.thumbnail_stats().completed != total || view.thumbnail_stats().running {
+            assert!(
+                Instant::now() < deadline,
+                "retention deadline: {:?}, mapped={} page={} scroll={}",
+                view.thumbnail_stats(),
+                strip.is_mapped(),
+                strip.hadjustment().page_size(),
+                strip.hadjustment().value()
+            );
+            pump();
+        }
+        let visible_ready = || {
+            let adj = strip.hadjustment();
+            (0..total).all(|n| {
+                let b = button(&row, n);
+                let bounds = b.compute_bounds(&row).unwrap();
+                f64::from(bounds.x()) >= adj.value() + adj.page_size()
+                    || f64::from(bounds.x() + bounds.width()) <= adj.value()
+                    || thumb_picture(&b).paintable().is_some()
+            })
+        };
+        let verify = || {
+            let adj = strip.hadjustment();
+            let mut visible = 0;
+            for n in 0..total {
+                let b = button(&row, n);
+                let bounds = b.compute_bounds(&row).unwrap();
+                if f64::from(bounds.x()) < adj.value() + adj.page_size()
+                    && f64::from(bounds.x() + bounds.width()) > adj.value()
+                {
+                    visible += 1;
+                    assert!(
+                        thumb_picture(&b).paintable().is_some(),
+                        "visible thumbnail {n}/{total} evicted after background load: {:?}",
+                        view.thumbnail_stats()
+                    );
+                }
+            }
+            assert!(visible > 0);
+            assert!(
+                thumb_picture(&button(&row, 0)).paintable().is_some(),
+                "selected thumbnail evicted"
+            );
+            let texture = thumb_picture(&button(&row, 0))
+                .paintable()
+                .unwrap()
+                .downcast::<gdk::Texture>()
+                .unwrap();
+            let mut download = gdk::TextureDownloader::new(&texture);
+            download.set_format(gdk::MemoryFormat::R8g8b8a8);
+            let (bytes, _) = download.download_bytes();
+            assert_eq!(
+                &bytes[..4],
+                &[180, 80, 40, 255],
+                "normalized thumbnail pixels changed"
+            );
+            let stats = view.thumbnail_stats();
+            assert_eq!(stats.failed, 0);
+            assert!(stats.textures <= 64 && stats.bytes <= 16 * 1024 * 1024);
+            println!("MEASURE total={total} visible={visible} {stats:?}");
+        };
+        verify();
+        let first = thumb_picture(&button(&row, 0)).paintable();
+        let started = view.thumbnail_stats().started;
+        pause(180);
+        assert_eq!(
+            view.thumbnail_stats().started,
+            started,
+            "stable viewport decode loop"
+        );
+        assert_eq!(thumb_picture(&button(&row, 0)).paintable(), first);
+        let evicted = (0..total)
+            .find(|&n| thumb_picture(&button(&row, n)).paintable().is_none())
+            .expect("capacity bound must evict offscreen cells");
+        for target in [total - 1, evicted, 0] {
+            let bounds = button(&row, target).compute_bounds(&row).unwrap();
+            strip.hadjustment().set_value(f64::from(bounds.x()));
+            until(|| visible_ready() && !view.thumbnail_stats().running);
+            verify();
+            let admissions = view.thumbnail_stats().started;
+            pause(100);
+            assert_eq!(
+                view.thumbnail_stats().started,
+                admissions,
+                "scroll settled into decode loop"
+            );
+        }
+        assert!(
+            view.thumbnail_stats().started > total as u64,
+            "scroll did not rehydrate evicted cells"
+        );
+        resize_until(&window, &picture, 320, 320, || picture.width() < 400);
+        point(&view, true);
+        pause(100);
+        verify();
+        set_enabled(&view, false);
+        set_enabled(&view, true);
+        until(|| !view.thumbnail_stats().running);
+        verify();
+        // Keep the first independent texture set alive while testing the second.
+        survivors.push((window, view));
+    }
+    for (w, v) in survivors {
+        v.clear_thumbnail_select();
+        w.close();
+    }
+    pause(100);
+    println!(
+        "PASS 81/120 large-cache retention, selected and visible pixels, bounded RAM/count, scroll-return, stable decode, resize/hide and independent windows; synthetic pixels only"
+    );
+}
+fn thumb_picture(button: &gtk::Button) -> gtk::Picture {
+    let content = button.child().unwrap();
+    let mut child = content.first_child();
+    while let Some(w) = child {
+        if let Ok(p) = w.clone().downcast::<gtk::Picture>() {
+            return p;
+        }
+        child = w.next_sibling();
+    }
+    panic!("missing thumbnail picture");
+}

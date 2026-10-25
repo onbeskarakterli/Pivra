@@ -39,6 +39,18 @@ mod image_loader {
         pub fn texture(&self) -> gdk::Texture {
             match self {
                 Self::Native(frame) => return frame.texture(),
+                Self::Synthetic(true)
+                    if std::env::args().any(|a| a == "--retention-regression") =>
+                {
+                    return gdk::MemoryTexture::new(
+                        512,
+                        512,
+                        gdk::MemoryFormat::R8g8b8a8,
+                        &glib::Bytes::from_owned([180, 80, 40, 255].repeat(512 * 512)),
+                        2048,
+                    )
+                    .upcast();
+                }
                 Self::Synthetic(true) => {
                     return gdk::MemoryTexture::new(
                         64,
@@ -366,6 +378,10 @@ fn main() {
         .flags(gio::ApplicationFlags::NON_UNIQUE)
         .build();
     app.register(None::<&gio::Cancellable>).unwrap();
+    if std::env::args().any(|s| s == "--retention-regression") {
+        catalog_probe::retention(&app);
+        return;
+    }
     if std::env::args().any(|s| s == "--catalog-regression") {
         catalog_probe::run(&app);
         return;

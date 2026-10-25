@@ -104,26 +104,25 @@ fn install_navigation_arrows(overlay: &gtk::Overlay) {
         arrow.set_content_height(72);
         arrow.set_can_target(false);
         arrow.set_draw_func(move |_, cr, width, height| {
-            // Keep the wide chevron centered in the shorter navigation panel.
+            // Draw an enlarged chevron within the full-height panel without stretching edge to edge.
             let cx = f64::from(width) / 2.0;
             let cy = f64::from(height) / 2.0;
-            let tip_x = if left { cx - 18.0 } else { cx + 18.0 };
-            let ends_x = if left { cx + 18.0 } else { cx - 18.0 };
+            let tip_x = if left { cx - 32.0 } else { cx + 32.0 };
+            let ends_x = if left { cx + 32.0 } else { cx - 32.0 };
             cr.set_source_rgba(1.0, 1.0, 1.0, 0.94);
-            cr.set_line_width(4.0);
+            cr.set_line_width(5.0);
             cr.set_line_cap(gtk::cairo::LineCap::Round);
             cr.set_line_join(gtk::cairo::LineJoin::Round);
-            cr.move_to(ends_x, cy - 30.0);
+            cr.move_to(ends_x, cy - 105.0);
             cr.line_to(tip_x, cy);
-            cr.line_to(ends_x, cy + 30.0);
+            cr.line_to(ends_x, cy + 105.0);
             let _ = cr.stroke();
         });
         button.set_child(Some(&arrow));
         button.set_action_name(Some(action));
         button.set_halign(align);
-        button.set_valign(gtk::Align::Center);
-        // A tall side strip, but no longer full-height; leave space above and below.
-        button.set_size_request(112, 340);
+        button.set_valign(gtk::Align::Fill);
+        button.set_size_request(112, -1);
         button.set_focus_on_click(false);
         button.set_visible(false);
         overlay.add_overlay(&button);

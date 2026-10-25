@@ -122,6 +122,29 @@ pub fn save_thumbnail_height(height: i32) {
     }
 }
 
+/// Pin state is distinct from the thumbnail enabled preference.
+pub fn load_thumbnail_pinned() -> bool {
+    let path = glib::user_config_dir().join("pivra/thumbnail-pinned.conf");
+    std::fs::read(path).ok().as_deref() == Some(b"true\n")
+}
+
+pub fn save_thumbnail_pinned(pinned: bool) {
+    let dir = glib::user_config_dir().join("pivra");
+    let result = (|| -> Result<(), Box<dyn std::error::Error>> {
+        std::fs::create_dir_all(&dir)?;
+        let bytes: &[u8] = if pinned { b"true\n" } else { b"false\n" };
+        gio::File::for_path(dir.join("thumbnail-pinned.conf")).replace_contents(
+            bytes, None, false,
+            gio::FileCreateFlags::PRIVATE | gio::FileCreateFlags::REPLACE_DESTINATION,
+            None::<&gio::Cancellable>,
+        )?;
+        Ok(())
+    })();
+    if let Err(error) = result {
+        eprintln!("Pivra: could not save thumbnail pin state: {error}");
+    }
+}
+
 /// Remember the last chosen Fit / Fill / 100% preset between launches.
 pub fn load_view_mode() -> crate::viewing::ViewMode {
     use std::io::Read;

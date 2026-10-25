@@ -7,8 +7,8 @@ use std::{
     time::Duration,
 };
 thread_local! { static CSS_INSTALLED: Cell<bool> = const { Cell::new(false) }; }
-pub(crate) const CELL_WIDTH: i32 = 96;
-pub(crate) const CELL_HEIGHT: i32 = 80;
+pub(crate) const CELL_WIDTH: i32 = 112;
+pub(crate) const CELL_HEIGHT: i32 = 94;
 fn install_css(display: &gtk::gdk::Display) {
     CSS_INSTALLED.with(|installed| {
         if installed.replace(true) { return; }
@@ -61,7 +61,7 @@ pub(crate) fn install(
         .overlay_scrolling(true)
         .vscrollbar_policy(gtk::PolicyType::Never)
         .propagate_natural_width(false)
-        .height_request(112)
+        .height_request(128)
         .child(&items)
         .build();
     strip.set_widget_name("thumbnail-strip");

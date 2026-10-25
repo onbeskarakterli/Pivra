@@ -82,10 +82,16 @@ fn update_navigation_actions(window: &adw::ApplicationWindow, context: &FileCont
 }
 
 fn install_navigation_arrows(overlay: &gtk::Overlay) {
+    let css = gtk::CssProvider::new();
+    css.load_from_string(
+        ".pivra-navigation-glass { background-image: none; background-color: alpha(@window_bg_color, 0.18); border: 0; border-radius: 0; box-shadow: none; padding: 0; min-width: 56px; min-height: 0; color: @window_fg_color; } .pivra-navigation-glass:hover { background-color: alpha(@window_bg_color, 0.24); }"
+    );
+    gtk::style_context_add_provider_for_display(
+        &overlay.display(), &css, gtk::STYLE_PROVIDER_PRIORITY_APPLICATION
+    );
     let make_arrow = |icon: &str, action: &str, align: gtk::Align| {
         let button = gtk::Button::from_icon_name(icon);
-        button.add_css_class("circular");
-        button.add_css_class("osd");
+        button.add_css_class("pivra-navigation-glass");
         button.set_tooltip_text(Some(if align == gtk::Align::Start {
             "Önceki fotoğraf"
         } else {
@@ -93,12 +99,13 @@ fn install_navigation_arrows(overlay: &gtk::Overlay) {
         }));
         button.set_action_name(Some(action));
         button.set_halign(align);
-        button.set_valign(gtk::Align::Center);
-        button.set_margin_start(16);
-        button.set_margin_end(16);
+        button.set_valign(gtk::Align::Fill);
+        button.set_size_request(56, -1);
         button.set_focus_on_click(false);
         button.set_visible(false);
         overlay.add_overlay(&button);
+        overlay.set_measure_overlay(&button, false);
+        overlay.set_clip_overlay(&button, true);
         button
     };
     let previous = make_arrow("go-previous-symbolic", "win.previous-media", gtk::Align::Start);

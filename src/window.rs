@@ -26,6 +26,7 @@ struct FileContext {
 }
 
 fn update_title(window: &adw::ApplicationWindow, title: &adw::WindowTitle, context: &FileContext) {
+    update_navigation_actions(window, context);
     let Some(selected) = context.collection.current() else {
         window.set_title(Some("No media selected — Pivra"));
         title.set_title("No media selected");
@@ -60,6 +61,66 @@ fn update_title(window: &adw::ApplicationWindow, title: &adw::WindowTitle, conte
     } else {
         title.set_subtitle("Video playback is not available yet.");
     }
+}
+
+// Keep the on-image arrow buttons in sync with the same catalog actions as
+// the Left/Right keyboard shortcuts, including asynchronous folder updates.
+fn update_navigation_actions(window: &adw::ApplicationWindow, context: &FileContext) {
+    let selected = context.collection.selected_index();
+    let count = context.collection.items().len();
+    for (name, enabled) in [
+        ("previous-media", selected.is_some_and(|index| index > 0)),
+        ("next-media", selected.is_some_and(|index| index + 1 < count)),
+    ] {
+        if let Some(action) = window
+            .lookup_action(name)
+            .and_then(|action| action.downcast::<gio::SimpleAction>().ok())
+        {
+            action.set_enabled(enabled);
+        }
+    }
+}
+
+fn install_navigation_arrows(overlay: &gtk::Overlay) {
+    let make_arrow = |icon: &str, action: &str, align: gtk::Align| {
+        let button = gtk::Button::from_icon_name(icon);
+        button.add_css_class("circular");
+        button.add_css_class("osd");
+        button.set_tooltip_text(Some(if align == gtk::Align::Start {
+            "Önceki fotoğraf"
+        } else {
+            "Sonraki fotoğraf"
+        }));
+        button.set_action_name(Some(action));
+        button.set_halign(align);
+        button.set_valign(gtk::Align::Center);
+        button.set_margin_start(16);
+        button.set_margin_end(16);
+        button.set_focus_on_click(false);
+        button.set_visible(false);
+        overlay.add_overlay(&button);
+        button
+    };
+    let previous = make_arrow("go-previous-symbolic", "win.previous-media", gtk::Align::Start);
+    let next = make_arrow("go-next-symbolic", "win.next-media", gtk::Align::End);
+    let motion = gtk::EventControllerMotion::new();
+    let left = previous.downgrade();
+    let right = next.downgrade();
+    motion.connect_motion(move |controller, x, _| {
+        let Some(widget) = controller.widget() else { return; };
+        let width = widget.width() as f64;
+        if let Some(button) = left.upgrade() {
+            button.set_visible(x <= 100.0 && button.is_sensitive());
+        }
+        if let Some(button) = right.upgrade() {
+            button.set_visible(x >= width - 100.0 && button.is_sensitive());
+        }
+    });
+    motion.connect_leave(move |_| {
+        previous.set_visible(false);
+        next.set_visible(false);
+    });
+    overlay.add_controller(motion);
 }
 
 fn update_thumbnail_catalog(view: &ImageView, context: &FileContext) {
@@ -225,6 +286,7 @@ pub(super) fn build(app: &adw::Application, settings: &Settings, file: Option<Op
                 display_selected(&select_view, &context);
             }
         });
+        install_navigation_arrows(view.widget());
         viewport.prepend(view.widget());
         placeholder.set_vexpand(false);
         update_title(&window, &title, &context.borrow());
@@ -255,6 +317,7 @@ pub(super) fn build(app: &adw::Application, settings: &Settings, file: Option<Op
             });
             window.add_action(&action);
         }
+        update_navigation_actions(&window, &context.borrow());
         let keys = gtk::EventControllerKey::new();
         keys.set_propagation_phase(gtk::PropagationPhase::Capture);
         let weak_window = window.downgrade();

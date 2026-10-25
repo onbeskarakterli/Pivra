@@ -1,5 +1,5 @@
-//! TH-01 only: blocking GIO metadata/cache adapter, never image pixel decode or UI.
-//! Call `query` from a worker. No thumbnail generation/scheduling (TH-05).
+//! Worker-only GIO cache validation and a bounded native GNOME factory adapter.
+//! Cache pixels remain untrusted; callers must use secure Glycin decoding.
 use crate::image_cache::FileKey;
 use gtk::{gio, prelude::*};
 use std::{
@@ -296,6 +296,161 @@ impl Provider {
         })
     }
 }
+/// Build-time API-checked GNOME helper; an installed sidecar may be supplied by
+/// the native package. Never take a decoder executable from media metadata.
+pub fn generation_helper() -> Option<PathBuf> {
+    std::env::var_os("PIVRA_THUMBNAIL_GENERATOR")
+        .map(PathBuf::from)
+        .or_else(|| {
+            std::env::current_exe()
+                .ok()
+                .map(|p| p.with_file_name("pivra-thumbnail-factory"))
+                .filter(|p| p.is_file())
+        })
+        .or_else(|| {
+            option_env!("PIVRA_BUILT_THUMBNAIL_FACTORY")
+                .filter(|s| !s.is_empty())
+                .map(PathBuf::from)
+        })
+}
+/// Worker-only, cache first. A failed attempt is terminal until source/catalog
+/// invalidation; no implicit retries and no persistent failure marker on sandbox errors.
+pub fn query_or_generate(provider: &Provider, path: &Path, cancel: &gio::Cancellable) -> Outcome {
+    let outcome = provider.query(path, cancel);
+    if !matches!(outcome, Outcome::Missing | Outcome::Stale) {
+        return outcome;
+    }
+    let force = matches!(outcome, Outcome::Stale);
+    let Some(helper) = generation_helper() else {
+        return outcome;
+    };
+    let source = match FileKey::read(path) {
+        Ok(key) => key,
+        Err(e) => return Outcome::SourceUnavailable(e.to_string()),
+    };
+    let file = gio::File::for_path(path);
+    let info = match file.query_info(
+        "standard::content-type,time::modified,standard::size",
+        gio::FileQueryInfoFlags::NONE,
+        Some(cancel),
+    ) {
+        Ok(info) => info,
+        Err(e) => return Outcome::SourceUnavailable(e.to_string()),
+    };
+    if info.size() > 64 * 1024 * 1024 {
+        return Outcome::Invalid("source exceeds 64MiB".into());
+    }
+    let Some(mime) = info
+        .content_type()
+        .and_then(|t| gio::content_type_get_mime_type(&t))
+    else {
+        return Outcome::Missing;
+    };
+    match generate(
+        &helper,
+        file.uri().as_str(),
+        &mime,
+        info.attribute_uint64("time::modified"),
+        force,
+        cancel,
+    ) {
+        Ok(()) if FileKey::read(path).ok().as_ref() == Some(&source) => {
+            provider.query(path, cancel)
+        }
+        Ok(()) => Outcome::Stale,
+        Err(_) if cancel.is_cancelled() => Outcome::Cancelled,
+        Err(error) => Outcome::Invalid(error),
+    }
+}
+struct FactoryScratch(PathBuf);
+impl FactoryScratch {
+    fn new() -> Result<Self, String> {
+        use std::os::unix::fs::DirBuilderExt;
+        let path = std::env::temp_dir().join(format!(
+            "pivra-thumbnail-{}",
+            gtk::glib::uuid_string_random()
+        ));
+        fs::DirBuilder::new()
+            .mode(0o700)
+            .create(&path)
+            .map_err(|e| e.to_string())?;
+        Ok(Self(path))
+    }
+}
+impl Drop for FactoryScratch {
+    fn drop(&mut self) {
+        let _ = fs::remove_dir_all(&self.0);
+    }
+}
+fn generate(
+    helper: &Path,
+    uri: &str,
+    mime: &str,
+    mtime: u64,
+    force: bool,
+    cancel: &gio::Cancellable,
+) -> Result<(), String> {
+    use std::os::unix::process::CommandExt;
+    if uri.len() > 16384 || mime.len() > 256 {
+        return Err("factory argument bound".into());
+    }
+    if cancel.is_cancelled() {
+        return Err("cancelled".into());
+    }
+    let scratch = FactoryScratch::new()?;
+    let mut child = Command::new(helper)
+        .env("TMPDIR", &scratch.0)
+        .args([
+            uri,
+            mime,
+            &mtime.to_string(),
+            if force { "stale" } else { "missing" },
+        ])
+        .stdin(Stdio::null())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::null())
+        .process_group(0)
+        .spawn()
+        .map_err(|e| e.to_string())?;
+    let deadline = Instant::now() + Duration::from_secs(20);
+    loop {
+        if cancel.is_cancelled() || Instant::now() >= deadline {
+            // The unreaped direct child's PID reserves this group identity.
+            // GNOME bwrap also uses --die-with-parent. Kill/reap before returning.
+            let _ = Command::new("/bin/kill")
+                .args(["-KILL", "--", &format!("-{}", child.id())])
+                .stdout(Stdio::null())
+                .stderr(Stdio::null())
+                .status();
+            let _ = child.kill();
+            let _ = child.wait();
+            return Err("GNOME factory cancelled/timed out".into());
+        }
+        match child.try_wait() {
+            Ok(Some(status)) => {
+                let mut text = String::new();
+                if let Some(stdout) = child.stdout.take() {
+                    stdout
+                        .take(512)
+                        .read_to_string(&mut text)
+                        .map_err(|e| e.to_string())?;
+                }
+                return if status.success() && matches!(text.as_str(), "cached\n" | "generated\n") {
+                    Ok(())
+                } else {
+                    Err(format!("GNOME factory exit={status}: {text}"))
+                };
+            }
+            Ok(None) => std::thread::sleep(Duration::from_millis(10)),
+            Err(e) => {
+                let _ = child.kill();
+                let _ = child.wait();
+                return Err(e.to_string());
+            }
+        }
+    }
+}
+
 fn cache_preflight(uri: &str) -> Result<(), String> {
     let mut hash =
         gtk::glib::Checksum::new(gtk::glib::ChecksumType::Md5).ok_or("MD5 unavailable")?;
@@ -535,5 +690,63 @@ mod tests {
             Outcome::Cancelled
         ));
         assert_eq!(provider.capability(), Capability::CacheOnly);
+    }
+}
+
+#[cfg(test)]
+mod generation_tests {
+    use super::*;
+    use std::os::unix::fs::PermissionsExt;
+    #[test]
+    fn helper_protocol_failure_and_cancelled_process_group() {
+        let root = tempfile::tempdir().unwrap();
+        let helper = root.path().join("helper");
+        fs::write(&helper, b"#!/bin/sh\nprintf 'generated\\n'\n").unwrap();
+        fs::set_permissions(&helper, fs::Permissions::from_mode(0o700)).unwrap();
+        let token = gio::Cancellable::new();
+        assert!(generate(&helper, "file:///unused", "image/png", 0, false, &token).is_ok());
+        fs::write(&helper, b"#!/bin/sh\nprintf 'ineligible\\n'\nexit 3\n").unwrap();
+        assert!(generate(&helper, "file:///unused", "image/png", 0, false, &token).is_err());
+        let pidfile = root.path().join("child.pid");
+        let scratchfile = root.path().join("scratch.path");
+        fs::write(&helper,format!("#!/bin/sh\nprintf '%s' \"$TMPDIR\" > '{scratch}'\ntouch \"$TMPDIR/artifact\"\nsleep 30 &\nprintf '%s' \"$!\" > '{pid}.tmp'\nmv '{pid}.tmp' '{pid}'\nwait\n",scratch=scratchfile.display(),pid=pidfile.display())).unwrap();
+        let worker_token = token.clone();
+        let worker = std::thread::spawn(move || {
+            generate(
+                &helper,
+                "file:///unused",
+                "image/png",
+                0,
+                false,
+                &worker_token,
+            )
+        });
+        let deadline = Instant::now() + Duration::from_secs(3);
+        while !pidfile.exists() {
+            assert!(Instant::now() < deadline);
+            std::thread::sleep(Duration::from_millis(5));
+        }
+        let pid = fs::read_to_string(pidfile).unwrap();
+        token.cancel();
+        assert!(worker.join().unwrap().is_err());
+        let scratch = fs::read_to_string(scratchfile).unwrap();
+        assert!(
+            !Path::new(&scratch).exists(),
+            "cancelled factory left private scratch files"
+        );
+        let deadline = Instant::now() + Duration::from_secs(2);
+        loop {
+            let finished = fs::read_to_string(format!("/proc/{pid}/stat"))
+                .map(|s| s.split_once(") ").unwrap().1.starts_with(['Z', 'X']))
+                .unwrap_or(true);
+            if finished {
+                break;
+            }
+            assert!(
+                Instant::now() < deadline,
+                "factory descendant still running"
+            );
+            std::thread::sleep(Duration::from_millis(5));
+        }
     }
 }

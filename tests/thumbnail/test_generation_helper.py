@@ -1,0 +1,89 @@
+"""Real C sidecar + real GLib/GIO/GdkPixbuf, GNOME API stub only.
+This certifies IPC/limits/identity guards, NOT GNOME generation or source decode.
+"""
+import os
+from pathlib import Path
+import shlex
+import subprocess
+import tempfile
+import unittest
+
+ROOT=Path(__file__).resolve().parents[2]
+HEADER='''#include <gio/gio.h>
+#include <gdk-pixbuf/gdk-pixbuf.h>
+#include <time.h>
+typedef GObject GnomeDesktopThumbnailFactory;
+typedef enum { GNOME_DESKTOP_THUMBNAIL_SIZE_NORMAL } GnomeDesktopThumbnailSize;
+GnomeDesktopThumbnailFactory *gnome_desktop_thumbnail_factory_new(GnomeDesktopThumbnailSize s);
+char *gnome_desktop_thumbnail_path_for_uri(const char*,GnomeDesktopThumbnailSize);
+char *gnome_desktop_thumbnail_factory_lookup(GnomeDesktopThumbnailFactory*,const char*,time_t);
+gboolean gnome_desktop_thumbnail_factory_can_thumbnail(GnomeDesktopThumbnailFactory*,const char*,const char*,time_t);
+GdkPixbuf *gnome_desktop_thumbnail_factory_generate_thumbnail(GnomeDesktopThumbnailFactory*,const char*,const char*,GCancellable*,GError**);
+gboolean gnome_desktop_thumbnail_factory_save_thumbnail(GnomeDesktopThumbnailFactory*,GdkPixbuf*,const char*,time_t,GCancellable*,GError**);
+'''
+STUB='''#include <libgnome-desktop/gnome-desktop-thumbnail.h>
+#include <sys/resource.h>
+#include <stdlib.h>
+#include <unistd.h>
+GnomeDesktopThumbnailFactory *gnome_desktop_thumbnail_factory_new(GnomeDesktopThumbnailSize s) {
+ (void)s; struct rlimit r;
+ if(getrlimit(RLIMIT_AS,&r)||r.rlim_cur!=1024UL*1024*1024) _exit(20);
+ if(getrlimit(RLIMIT_CPU,&r)||r.rlim_cur!=15) _exit(21);
+ if(getrlimit(RLIMIT_FSIZE,&r)||r.rlim_cur!=4UL*1024*1024) _exit(22);
+ return g_object_new(G_TYPE_OBJECT,NULL);
+}
+char *gnome_desktop_thumbnail_path_for_uri(const char *u,GnomeDesktopThumbnailSize s) { (void)u;(void)s;return g_strdup(getenv("STAMP")); }
+char *gnome_desktop_thumbnail_factory_lookup(GnomeDesktopThumbnailFactory *f,const char *u,time_t t) {
+ (void)f;(void)u;(void)t; return getenv("CACHED")?g_strdup("cached.png"):NULL;
+}
+gboolean gnome_desktop_thumbnail_factory_can_thumbnail(GnomeDesktopThumbnailFactory *f,const char *u,const char *m,time_t t) {
+ (void)f;(void)u;(void)m;(void)t; return !getenv("INELIGIBLE");
+}
+GdkPixbuf *gnome_desktop_thumbnail_factory_generate_thumbnail(GnomeDesktopThumbnailFactory *f,const char *u,const char *m,GCancellable *c,GError **e) {
+ (void)f;(void)m;(void)c;
+ if(getenv("FAIL")) { g_set_error_literal(e,G_IO_ERROR,G_IO_ERROR_FAILED,"controlled error");return NULL; }
+ if(getenv("CHANGE")) {GFile *file=g_file_new_for_uri(u);char *path=g_file_get_path(file);g_file_set_contents(path,"replacement",-1,NULL);g_free(path);g_object_unref(file);}
+ return gdk_pixbuf_new(GDK_COLORSPACE_RGB,TRUE,8,64,32);
+}
+gboolean gnome_desktop_thumbnail_factory_save_thumbnail(GnomeDesktopThumbnailFactory *f,GdkPixbuf *p,const char *u,time_t t,GCancellable *c,GError **e) {
+ (void)f;(void)p;(void)u;(void)t;(void)c;
+ gboolean saved=g_file_set_contents(getenv("STAMP"),"saved",-1,e);
+ if(getenv("CHANGE_ON_SAVE")) {GFile *file=g_file_new_for_uri(u);char *path=g_file_get_path(file);g_file_set_contents(path,"late replacement",-1,NULL);g_free(path);g_object_unref(file);}
+ return saved;
+}
+'''
+class Generation(unittest.TestCase):
+ @classmethod
+ def setUpClass(cls):
+  cls.temp=tempfile.TemporaryDirectory(prefix='pivra-generation-api-')
+  cls.addClassCleanup(cls.temp.cleanup)
+  cls.root=Path(cls.temp.name)
+  header=cls.root/'libgnome-desktop/gnome-desktop-thumbnail.h';header.parent.mkdir();header.write_text(HEADER)
+  stub=cls.root/'stub.c';stub.write_text(STUB)
+  flags=shlex.split(subprocess.check_output(['pkg-config','--cflags','--libs','gio-2.0','gobject-2.0','gdk-pixbuf-2.0'],text=True))
+  cls.binary=cls.root/'helper'
+  subprocess.run(['cc','-O2','-Wall','-Wextra','-Werror',f'-I{cls.root}',str(ROOT/'native/thumbnail_factory.c'),str(stub),'-o',str(cls.binary),*flags],check=True)
+ def run_case(self,mode='missing',**extra):
+  with tempfile.TemporaryDirectory(dir=self.root) as tmp:
+   source=Path(tmp)/'source.png';source.write_bytes(b'synthetic API input; not decoded')
+   stamp=Path(tmp)/'saved'
+   result=subprocess.run([str(self.binary),source.as_uri(),'image/png',str(int(source.stat().st_mtime)),mode],env={**os.environ,**extra,'STAMP':str(stamp)},capture_output=True,text=True,timeout=5)
+   self.source_ctime=source.stat().st_ctime_ns
+   self.cache_mtime=stamp.stat().st_mtime_ns if stamp.exists() else 0
+   return result,stamp.exists()
+ def test_generate_limits_and_save(self):
+  p,saved=self.run_case();self.assertEqual((p.returncode,p.stdout,saved),(0,'generated\n',True))
+ def test_cache_hit_does_not_regenerate(self):
+  p,saved=self.run_case(CACHED='1');self.assertEqual((p.returncode,p.stdout,saved),(0,'cached\n',False))
+ def test_stale_forces_generation_despite_seconds_cache_match(self):
+  p,saved=self.run_case('stale',CACHED='1');self.assertEqual((p.returncode,p.stdout,saved),(0,'generated\n',True))
+ def test_ineligible_is_explicit(self):
+  p,saved=self.run_case(INELIGIBLE='1');self.assertEqual((p.returncode,saved),(3,False))
+ def test_generation_failure_does_not_save(self):
+  p,saved=self.run_case(FAIL='1');self.assertEqual((p.returncode,saved),(4,False));self.assertIn('controlled error',p.stdout)
+ def test_source_change_during_save_discards_own_cache_artifact(self):
+  p,saved=self.run_case(CHANGE_ON_SAVE='1');self.assertEqual((p.returncode,saved),(5,False))
+  self.assertIn('source changed during cache save',p.stdout)
+ def test_source_change_during_generation_prevents_save(self):
+  p,saved=self.run_case(CHANGE='1');self.assertEqual((p.returncode,saved),(5,False))
+if __name__=='__main__':unittest.main()

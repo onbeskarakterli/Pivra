@@ -311,8 +311,15 @@ impl Inner {
         // Match the initial strip alignment: selected item stays visible,
         // scrolling just enough to reveal it. Hidden widgets have no measured
         // viewport, so estimate the cell pitch from the fixed width + spacing.
-        let viewport_width = self.scroller.parent().map_or(960, |p| p.width().max(1));
-        let slots = ((viewport_width / (CELL_WIDTH + 8)).max(1) as usize)
+        // Hidden scrollers and their intermediate parents report width 0.
+        // Use the allocated window viewport rather than treating zero as one
+        // cell; otherwise only the selected image gets warmed on startup.
+        let viewport_width = self.scroller.root()
+            .and_then(|root| root.downcast::<gtk::Window>().ok())
+            .map(|window| window.width())
+            .filter(|&width| width > 0)
+            .unwrap_or(960);
+        let slots = (((viewport_width - 16).max(CELL_WIDTH) / (CELL_WIDTH + 8)).max(1) as usize)
             .min(24)
             .min(entries.len());
         let start = selected

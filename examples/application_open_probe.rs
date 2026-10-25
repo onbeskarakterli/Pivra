@@ -52,6 +52,17 @@ fn main() {
                     for w in application.windows() {
                         for widget in descendants(w.upcast_ref()) {
                             if let Ok(p) = widget.downcast::<gtk::Picture>() {
+                                // Thumbnail cells also contain Pictures. Only the
+                                // main image is the direct child of its Overlay;
+                                // never treat a 64x32 thumbnail as the opened file.
+                                let is_main = p
+                                    .parent()
+                                    .and_downcast::<gtk::Overlay>()
+                                    .and_then(|overlay| overlay.child())
+                                    .is_some_and(|child| child == p.clone().upcast::<gtk::Widget>());
+                                if !is_main {
+                                    continue;
+                                }
                                 if let Some(texture) = p.paintable().and_downcast::<gdk::Texture>()
                                 {
                                     assert_eq!((texture.width(), texture.height()), size);

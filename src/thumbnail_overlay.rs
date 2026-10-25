@@ -47,6 +47,7 @@ pub(crate) struct ThumbnailStrip {
     scroller: gtk::ScrolledWindow,
     on_select: Rc<RefCell<Option<Box<dyn Fn(usize)>>>>,
     manually_scrolled: Rc<Cell<bool>>,
+    pending_selection: Rc<Cell<Option<usize>>>,
 }
 impl ThumbnailStrip {
     pub(crate) fn on_select(&self, callback: impl Fn(usize) + 'static) {
@@ -86,25 +87,28 @@ impl ThumbnailStrip {
             self.items.append(&button);
         }
         if !self.manually_scrolled.get() {
-            if let Some(index) = photos.iter().position(|(index, _)| Some(*index) == selected) {
-                let scroller = self.scroller.clone();
-                glib::idle_add_local_once(move || {
-                    let adj = scroller.hadjustment();
-                    let x = index as f64 * f64::from(CELL_WIDTH + 8);
-                    let start = adj.value();
-                    let page = adj.page_size();
-                    let target = if x < start {
-                        x
-                    } else if x + f64::from(CELL_WIDTH) > start + page {
-                        x + f64::from(CELL_WIDTH) - page
-                    } else {
-                        start
-                    };
-                    adj.set_value(target.clamp(adj.lower(), (adj.upper() - page).max(adj.lower())));
-                });
-            }
+            self.pending_selection.set(
+                photos.iter().position(|(index, _)| Some(*index) == selected)
+            );
+            align_selection(&self.scroller.hadjustment(), &self.pending_selection);
         }
+
     }
+}
+/// Wait until GTK measures the strip; on the first catalog update the horizontal
+/// adjustment may still report upper == page_size (no scrollable range).
+fn align_selection(adj: &gtk::Adjustment, pending: &Cell<Option<usize>>) {
+    let Some(index) = pending.get() else { return; };
+    let page = adj.page_size();
+    if page <= 0.0 || adj.upper() <= page { return; }
+    let width = f64::from(CELL_WIDTH);
+    let x = index as f64 * (width + 8.0);
+    let start = adj.value();
+    let target = if x < start { x }
+        else if x + width > start + page { x + width - page }
+        else { start };
+    adj.set_value(target.clamp(adj.lower(), (adj.upper() - page).max(adj.lower())));
+    pending.set(None);
 }
 pub(crate) fn install(window: &impl IsA<gtk::Window>, overlay: &gtk::Overlay, available: bool) -> ThumbnailStrip {
     install_css(&overlay.display());
@@ -119,12 +123,18 @@ pub(crate) fn install(window: &impl IsA<gtk::Window>, overlay: &gtk::Overlay, av
         .child(&items)
         .build();
     let manually_scrolled = Rc::new(Cell::new(false));
+    let pending_selection = Rc::new(Cell::new(None));
+    let pending_on_measure = pending_selection.clone();
+    strip.hadjustment().connect_changed(move |adj| {
+        align_selection(adj, &pending_on_measure);
+    });
     let wheel = gtk::EventControllerScroll::new(
         gtk::EventControllerScrollFlags::VERTICAL
             | gtk::EventControllerScrollFlags::HORIZONTAL,
     );
     let wheel_strip = strip.clone();
     let wheel_flag = manually_scrolled.clone();
+    let pending_selection_for_wheel = pending_selection.clone();
     wheel.connect_scroll(move |_, dx, dy| {
         if dy.abs() > f64::EPSILON {
             let adj = wheel_strip.hadjustment();
@@ -133,6 +143,7 @@ pub(crate) fn install(window: &impl IsA<gtk::Window>, overlay: &gtk::Overlay, av
                 adj.lower(), (adj.upper() - adj.page_size()).max(adj.lower()),
             ));
             wheel_flag.set(true);
+            pending_selection_for_wheel.set(None);
             glib::Propagation::Stop
         } else {
             glib::Propagation::Proceed
@@ -284,7 +295,7 @@ pub(crate) fn install(window: &impl IsA<gtk::Window>, overlay: &gtk::Overlay, av
         unmap.cancel();
         unmap.render(false);
     });
-    ThumbnailStrip { items, scroller: strip, on_select: Rc::default(), manually_scrolled }
+    ThumbnailStrip { items, scroller: strip, on_select: Rc::default(), manually_scrolled, pending_selection }
 }
 type PreferenceListener = Rc<dyn Fn(bool)>;
 struct Visibility {

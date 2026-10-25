@@ -121,6 +121,12 @@ pub(crate) fn install(
     let saved_height = pivra::settings::load_thumbnail_height();
     strip.set_height_request(saved_height);
     thumbnails.resize_cells(saved_height);
+    // When the window is maximized/fullscreen, prewarm newly exposed cells
+    // even if the thumbnail strip has never been revealed.
+    let resize_preload = thumbnails.clone();
+    window.connect_notify_local(Some("width"), move |_, _| {
+        resize_preload.refresh_hidden();
+    });
     let preference = pivra::settings::thumbnail_preference();
     let saved_pinned = pivra::settings::load_thumbnail_pinned();
     if saved_pinned && !preference.enabled() {

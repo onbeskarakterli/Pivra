@@ -18,6 +18,7 @@ fn install_css(display: &gtk::gdk::Display) {
             .pivra-thumbnail-toggle { background-image: none; background-color: alpha(@window_bg_color, 0.50); border-radius: 10px 10px 0 0; border: 1px solid alpha(white, 0.22); border-bottom: 0; box-shadow: none; padding: 3px 16px; min-width: 112px; min-height: 24px; }\n\
             .pivra-thumbnail-pin { background-image: none; background-color: alpha(@window_bg_color, 0.50); border-radius: 10px 10px 0 0; border: 1px solid alpha(white, 0.22); border-bottom: 0; box-shadow: none; padding: 3px 8px; min-height: 24px; }\n\
             .pivra-thumbnail-pin.pivra-pinned { background-color: alpha(@accent_bg_color, 0.85); color: @accent_fg_color; border-color: alpha(@accent_color, 0.95); }\n\
+            .pivra-thumbnail-panel scrollbar.horizontal { opacity: 0; }\n\\
             .pivra-thumbnail-cell { background-image: none; background-color: transparent; padding: 0; min-width: 0; min-height: 0; border: none; border-radius: 0; box-shadow: none; }\n\
             .pivra-thumbnail-cell.selected { box-shadow: none; }\n\
             .pivra-thumbnail-selection { background: transparent; border: 0; padding: 0; box-shadow: none; }\n\
@@ -57,7 +58,7 @@ pub(crate) fn install(
     items.set_widget_name("thumbnail-items");
     items.append(&gtk::Label::new(Some("No thumbnails available")));
     let strip = gtk::ScrolledWindow::builder()
-        .hscrollbar_policy(gtk::PolicyType::Never)
+        .hscrollbar_policy(gtk::PolicyType::Automatic)
         .overlay_scrolling(true)
         .vscrollbar_policy(gtk::PolicyType::Never)
         .propagate_natural_width(false)

@@ -36,7 +36,13 @@ fn main() {
         // Keep each admission fixture in its own directory: the shared fixtures
         // include deliberately corrupt files that must not contaminate this
         // single-file open/URI test through catalog navigation or callbacks.
-        let isolated = tempfile::tempdir().unwrap();
+        // Keep the isolate under the same source tree whose GIO/Glycin
+        // admission is already native-proven. The filesystem boundary matters:
+        // an arbitrary system tempdir is not equivalent to the fixture mount.
+        let isolated = tempfile::Builder::new()
+            .prefix(".pivra-app-open-")
+            .tempdir_in(&root)
+            .unwrap();
         let path = isolated.path().join(name);
         std::fs::copy(root.join(name), &path).unwrap();
         let original = std::fs::read(&path).unwrap();

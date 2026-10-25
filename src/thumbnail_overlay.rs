@@ -80,9 +80,6 @@ pub(crate) fn install(
     resize_edge.set_height_request(10);
     resize_edge.set_visible(false);
     resize_edge.set_cursor_from_name(Some("ns-resize"));
-    overlay.add_overlay(&resize_edge);
-    overlay.set_measure_overlay(&resize_edge, false);
-    overlay.set_clip_overlay(&resize_edge, true);
     let button = gtk::ToggleButton::builder()
         .icon_name("pan-up-symbolic")
         .tooltip_text("Show thumbnail strip")
@@ -115,6 +112,10 @@ pub(crate) fn install(
         overlay.set_measure_overlay(widget, false);
         overlay.set_clip_overlay(widget, true);
     }
+    // Added last so the edge receives pointer events above the scroller.
+    overlay.add_overlay(&resize_edge);
+    overlay.set_measure_overlay(&resize_edge, false);
+    overlay.set_clip_overlay(&resize_edge, true);
     let preference = pivra::settings::thumbnail_preference();
     let state = Rc::new(Visibility {
         available,

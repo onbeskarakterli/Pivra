@@ -306,13 +306,21 @@ pub(crate) fn install(
     });
     window.as_ref().add_controller(keys);
     let mapped = state.clone();
+    let resize_preload = thumbnails.clone();
     overlay.connect_map(move |overlay| {
         if let Some(clock) = overlay.frame_clock() {
             let weak = Rc::downgrade(&mapped);
+            let preload = resize_preload.clone();
+            let previous_width = Rc::new(Cell::new(-1i32));
+            let width_state = previous_width.clone();
             let handler = clock.connect_after_paint(move |_| {
                 if let Some(state) = weak.upgrade() {
                     state.place_toggle();
                     if let Some(overlay) = state.overlay.upgrade() {
+                        let width = overlay.width();
+                        if width > 0 && width_state.replace(width) != width {
+                            preload.refresh_hidden();
+                        }
                         let height = overlay.height();
                         if state.allocated_height.replace(height) != height {
                             if let Some(y) = state.pointer_y.get() {

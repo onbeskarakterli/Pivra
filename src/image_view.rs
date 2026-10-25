@@ -26,6 +26,7 @@ pub(super) struct ImageView {
     thumbnail_strip: thumbnail_overlay::ThumbnailStrip,
     picture: gtk::Picture,
     status: gtk::Label,
+    loading_spinner: gtk::Spinner,
     slot: Rc<LoadSlot>,
     window: glib::WeakRef<adw::ApplicationWindow>,
     mode_action: gio::SimpleAction,
@@ -54,6 +55,15 @@ impl ImageView {
         overlay.set_vexpand(true);
         overlay.set_child(Some(&picture));
         overlay.add_overlay(&status);
+        let loading_spinner = gtk::Spinner::new();
+        loading_spinner.set_widget_name("photo-loading-spinner");
+        loading_spinner.set_halign(gtk::Align::Center);
+        loading_spinner.set_valign(gtk::Align::Center);
+        loading_spinner.set_can_target(false);
+        loading_spinner.set_spinning(true);
+        loading_spinner.set_visible(false);
+        overlay.add_overlay(&loading_spinner);
+        overlay.set_measure_overlay(&loading_spinner, false);
         let thumbnails = pivra::thumbnail::Provider::discover(None);
         let thumbnail_strip = thumbnail_overlay::install(
             window,
@@ -175,6 +185,7 @@ impl ImageView {
             overlay,
             picture,
             status,
+            loading_spinner,
             slot,
             window: window.downgrade(),
         }
@@ -239,6 +250,7 @@ impl ImageView {
         self.texture.borrow_mut().take();
         self.mode_action.set_state(&"fit".to_variant());
         self.picture.set_paintable(None::<&gtk::gdk::Paintable>);
+        self.loading_spinner.set_visible(false);
         self.picture.set_content_fit(gtk::ContentFit::ScaleDown);
         self.status.set_text(message);
         self.status.set_visible(!message.is_empty());
@@ -391,6 +403,10 @@ impl ImageView {
         // No loading text, blank placeholder or early geometry reset.
         self.status.set_text("");
         self.status.set_visible(false);
+        // Retain the last ready frame under a non-interactive loading indicator.
+        // Do not show a spinner on a blank first-load viewport.
+        self.loading_spinner
+            .set_visible(self.texture.borrow().is_some());
         self.phase.set(Phase::FullLoading);
         {
             let mut state = self.prefetch.borrow_mut();
@@ -403,6 +419,7 @@ impl ImageView {
         let window = self.window.clone();
         let picture = self.picture.downgrade();
         let status = self.status.downgrade();
+        let loading_spinner = self.loading_spinner.downgrade();
         let slot = self.slot.clone();
         let mode_action = self.mode_action.clone();
         let texture = self.texture.clone();
@@ -430,8 +447,8 @@ impl ImageView {
                     slot.suppress();
                     return;
                 }
-                let (Some(window), Some(picture), Some(status)) =
-                    (window.upgrade(), picture.upgrade(), status.upgrade())
+                let (Some(window), Some(picture), Some(status), Some(loading_spinner)) =
+                    (window.upgrade(), picture.upgrade(), status.upgrade(), loading_spinner.upgrade())
                 else {
                     return;
                 };
@@ -447,6 +464,7 @@ impl ImageView {
                     other => other,
                 };
                 let success = result.is_ok();
+                loading_spinner.set_visible(false);
                 phase.set(phase.get().full(success, false));
                 match result {
                     Ok(output) => {

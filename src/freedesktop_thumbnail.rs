@@ -17,7 +17,7 @@ use std::{
     time::Instant,
 };
 
-const MAX_FILE: u64 = 2 * 1024 * 1024;
+pub(crate) const MAX_FILE: u64 = 2 * 1024 * 1024;
 const MAX_TEXT: usize = 64 * 1024;
 const MAX_CHUNKS: usize = 2048;
 const MAX_FAILURE_APPS: usize = 64;
@@ -164,10 +164,10 @@ impl CacheReader {
     }
 }
 
-fn fd_path(file: &File) -> PathBuf {
+pub(crate) fn fd_path(file: &File) -> PathBuf {
     PathBuf::from(format!("/proc/self/fd/{}", file.as_raw_fd()))
 }
-fn open_component(path: &Path) -> io::Result<File> {
+pub(crate) fn open_component(path: &Path) -> io::Result<File> {
     if !cfg!(all(
         target_os = "linux",
         any(
@@ -188,7 +188,7 @@ fn open_component(path: &Path) -> io::Result<File> {
 }
 /// Walk from / using pinned directory descriptors; never traverse a cache symlink.
 /// /proc/self/fd is kernel-owned. If unavailable, fail closed (no unsafe fallback).
-fn open_directory(path: &Path) -> io::Result<File> {
+pub(crate) fn open_directory(path: &Path) -> io::Result<File> {
     if !absolute(path) {
         return Err(io::Error::new(
             io::ErrorKind::InvalidInput,
@@ -238,7 +238,7 @@ fn cache_io(e: io::Error) -> Result<CacheOutcome, Error> {
         Ok(CacheOutcome::Invalid(format!("cache read: {e}")))
     }
 }
-fn same(a: &Metadata, b: &Metadata) -> bool {
+pub(crate) fn same(a: &Metadata, b: &Metadata) -> bool {
     (
         a.dev(),
         a.ino(),

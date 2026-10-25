@@ -101,6 +101,8 @@ impl ThumbnailStrip {
             label.set_ellipsize(gtk::pango::EllipsizeMode::Middle);
             label.set_max_width_chars(12);
             let button = gtk::Button::new();
+            // GTK can scroll focused buttons into view; selection is managed by Pivra.
+            button.set_focusable(false);
             // Fixed layout independent of caption or decoded image size.
             let fixed = gtk::Overlay::new();
             let base = gtk::Box::new(gtk::Orientation::Horizontal, 0);
@@ -274,11 +276,22 @@ pub(crate) fn install(window: &impl IsA<gtk::Window>, overlay: &gtk::Overlay, av
         }
     });
     strip.add_controller(wheel);
+    strip.set_halign(gtk::Align::Fill);
+    strip.set_hexpand(true);
     strip.set_widget_name("thumbnail-strip");
     strip.add_css_class("pivra-thumbnail-panel");
     strip.set_margin_start(8);
     strip.set_margin_end(8);
     strip.set_visible(false);
+    // Retry pending initial alignment after GTK has allocated a real viewport.
+    // A hidden overlay can report an unusable adjustment range at catalog time.
+    let pending_on_frame = pending_selection.clone();
+    strip.add_tick_callback(move |strip, _clock| {
+        if strip.is_visible() && pending_on_frame.get().is_some() {
+            align_selection(&strip.hadjustment(), &pending_on_frame);
+        }
+        glib::ControlFlow::Continue
+    });
     let pending_on_show = pending_selection.clone();
     strip.connect_notify_local(Some("visible"), move |strip, _| {
         if strip.is_visible() {

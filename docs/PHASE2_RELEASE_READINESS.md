@@ -273,3 +273,9 @@ etiketi/paket artefaktı. Yeni kanıtlanmış bir crash veya secure decode kod h
 bu denetimde bulunmadı. İkon/metainfo eksikliği runtime crash diye, Codex sandbox
 kısıtı ise genel Arch uyumsuzluğu diye raporlanmaz. Önce açık kararlar ve ayrı
 yayın kapıları tamamlanmalı; hiçbir native kurulum, merge veya yayın yapılmadı.
+
+## Güncel karar — 25.10.2026: Faz 2 0.1.0 kapsam kabulü
+
+Önceki bölümlerdeki `PIV-18 TESTING`, eksik önizleme kapsam kararı ve native son test başarısızlığı ifadeleri **tarihsel snapshot'tır**, güncel kapanış kararı değildir. Kullanıcı erken preview'yi sonraki sürüme erteledi ve full-only 0.1.0 kapsamını kabul etti. Eski fotoğraf üzerinde spinner `c811e5c` ile eklendi; normal geçişi kullanıcı kabul etti, uzun yükleme görsel testi yapılmadı. Kullanıcının Arch/GNOME native `bash tests/run_preview_pipeline_probe.sh` birleşik testi **exit 0** ve `PIV09 PASS active_decode_close` verdi. Thumbnail native sistemi ayrı **exit 0**, gerçek uygulamada thumbnail görüntüsü ve seçimi kullanıcı PASS. Böylece **Faz 2 onaylanmış 0.1.0 full-only kapsamıyla DONE**; PIV-18 bu sürüm kapsamıyla DONE. Gerçek erken preview gelecek sürüme erteli.
+
+**Yayın hâlâ hazır değil:** TH-03 bağımsız Enabled tercihi kapat-aç/yeniden başlat manuel kalıcılık kabulü açık; Faz 0 temiz Arch kurulumu, DESKTOP-06 gerçek Nautilus, license, uygulama ikonu, kurulu GNOME factory helper ve AUR PKGBUILD/release testi ayrı yayım kapılarıdır. Bu testler yapılmış gibi gösterilmez. `main`, tag, release ve AUR yayımlanmadı. Önceki tablolar bunların tarihsel denetim anındaki durumudur.

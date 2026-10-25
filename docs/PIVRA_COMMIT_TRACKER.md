@@ -2529,3 +2529,19 @@ Kullanıcı erken preview'nin sonraki sürüme ertelenmesini açıkça kabul ett
 Native birleşik `bash tests/run_preview_pipeline_probe.sh` **exit 0** (Takip 04, kullanıcı Arch/GNOME Wayland): secure JPEG/PNG/EXIF, normal path/URI girişleri, Fit/Fill/Actual/filtre, preload/cache, async A-B-A, iki pencere, PIV09 active secure decode close/cleanup PASS. Yanlış test varsayımları üretim koduna dokunulmadan `ffe9ab5`, `3c08a6c`, `eef9910`, `30dcb81`, `932fe44` ile giderildi. Önceki FAIL kayıtları tarihsel, artık güncel engel değil.
 
 **PIV-18: DONE — yalnız kullanıcının onayladığı Pivra 0.1.0 full-only kapsamıyla. Faz 2 bu kapsamda kabul edildi.** Gerçek erken preview tamamlanmadı; sonraki sürüme ertelendi. TH-03 tercih kalıcılığının bağımsız manuel yeniden başlatma kabulü raporda açık kalır ve paket/yayın kapıları (Faz 0 temiz Arch, gerçek Nautilus, lisans, ikon/helper, AUR) **tamamlanmış sayılmaz**. `main` değiştirilmedi.
+
+### FD-06 — Provider Manager ve gerçek thumbnail entegrasyonu — TESTING
+
+- Başlangıç: `ffd72e31f9d1899b8a0f3d23f67436089f5774fb`.
+- Kod/kontrollü testler: `be3deadf1752126b606db15197696ba9211e732b`.
+- Native probe: `2c3c35842c489a55fed2e4b0829876a97f271cd6`.
+- Rust check/build/test/Clippy PASS (185 test); thumbnail Python 37 PASS,
+  gözlemci 4 PASS. X11 ve Sway kontrollü GTK/GIO katalog/izolasyon PASS;
+  bunlar gerçek decoder başarı kanıtı değildir.
+- Secure native önkoşul Bwrap loader exit 1 nedeniyle NOT RUN (probe 77).
+  GNOME generation sidecar önkoşulu da ayrı NOT RUN (77).
+- fmt --check FAIL: önceki image_view/active_decode_close_probe/application_open_probe
+  biçim farkları korunmuştur. diff --check PASS.
+- Gerçek GNOME/Freedesktop native kabul ve aktif decode sırasında pencere kapanışı
+  bekleniyor. FD-06 DONE değildir; FD-07 başlamadı.
+- Mimari, sınırlar ve komutlar: [FD06_PROVIDER_MANAGER_INTEGRATION.md](FD06_PROVIDER_MANAGER_INTEGRATION.md).

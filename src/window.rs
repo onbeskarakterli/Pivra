@@ -15,6 +15,9 @@ use std::{
     time::Duration,
 };
 
+#[path = "fullscreen.rs"]
+pub(super) mod fullscreen;
+
 struct FileContext {
     collection: MediaCollection,
     suffix: Option<String>,
@@ -101,6 +104,7 @@ fn display_selected(view: &ImageView, context: &FileContext) {
 
 pub(super) fn build(app: &adw::Application, settings: &Settings, file: Option<OpenedFile>) {
     let header = adw::HeaderBar::new();
+    header.set_widget_name("pivra-header");
     let title = adw::WindowTitle::new(APP_NAME, "");
     header.set_title_widget(Some(&title));
     let viewport = gtk::Box::new(gtk::Orientation::Vertical, 0);
@@ -143,6 +147,17 @@ pub(super) fn build(app: &adw::Application, settings: &Settings, file: Option<Op
         banner.set_child(Some(&notice));
         viewport.prepend(&banner);
         let view = ImageView::new(&window);
+        let picture = view
+            .widget()
+            .child()
+            .unwrap()
+            .downcast::<gtk::Picture>()
+            .unwrap();
+        fullscreen::install(
+            &window,
+            &picture,
+            &[header.clone().upcast(), banner.clone().upcast()],
+        );
         let menu = gio::Menu::new();
         for mode in pivra::viewing::ViewMode::ALL {
             let item = gio::MenuItem::new(Some(mode.label()), None);

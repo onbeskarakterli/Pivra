@@ -161,7 +161,7 @@ pub(crate) fn install(
         }
         pin_click.render(pinned || pin_click.near.get() || pin_click.shown.get());
         if !pinned && !pin_click.near.get() {
-            pin_click.schedule(5000);
+            pin_click.schedule(3000);
         }
     });
     let motion = gtk::EventControllerMotion::new();
@@ -207,7 +207,7 @@ pub(crate) fn install(
         if key_state.preference.enabled() {
             key_state.render(true);
             if !key_state.near.get() {
-                key_state.schedule(5000);
+                key_state.schedule(3000);
             }
         }
         glib::Propagation::Stop
@@ -366,7 +366,7 @@ impl Visibility {
     fn away(self: &Rc<Self>) {
         self.near.set(false);
         if self.shown.get() && !self.pinned.get() && self.timeout.borrow().is_none() {
-            self.schedule(5000);
+            self.schedule(3000);
         }
     }
     fn schedule(self: &Rc<Self>, milliseconds: u64) {

@@ -26,6 +26,7 @@ enum Phase {
 }
 struct CellWidgets {
     button: gtk::Button,
+    selection: gtk::Frame,
     picture: gtk::Picture,
     spinner: gtk::Spinner,
     icon: gtk::Image,
@@ -279,9 +280,9 @@ impl ThumbnailStrip {
                 w.button
                     .set_widget_name(&format!("thumbnail-cell-{}", entry.index.get()));
                 if Some(entry.index.get()) == selected {
-                    w.button.add_css_class("selected");
+                    w.selection.add_css_class("selected");
                 } else {
-                    w.button.remove_css_class("selected");
+                    w.selection.remove_css_class("selected");
                 }
             }
         }
@@ -408,13 +409,18 @@ impl Inner {
                 button.set_valign(gtk::Align::Center);
                 button.set_focus_on_click(false);
                 button.set_widget_name(&format!("thumbnail-cell-{}", entry.index.get()));
-                button.set_tooltip_text(Some(
-                    &entry.path.file_name().unwrap_or_default().to_string_lossy(),
-                ));
-                if Some(entry.index.get()) == i.selected.get() {
-                    button.add_css_class("selected");
-                }
+
+
                 let content = gtk::Overlay::new();
+                let selection = gtk::Frame::new(None);
+                selection.add_css_class("pivra-thumbnail-selection");
+                selection.set_halign(gtk::Align::Center);
+                selection.set_valign(gtk::Align::Center);
+                selection.set_can_target(false);
+                selection.set_size_request(CELL_WIDTH, CELL_HEIGHT);
+                if Some(entry.index.get()) == i.selected.get() {
+                    selection.add_css_class("selected");
+                }
                 let picture = gtk::Picture::new();
                 picture.set_content_fit(gtk::ContentFit::Contain);
                 picture.set_can_shrink(true);
@@ -433,6 +439,9 @@ impl Inner {
                     content.set_measure_overlay(child, false);
                     content.set_clip_overlay(child, true);
                 }
+                content.add_overlay(&selection);
+                content.set_measure_overlay(&selection, false);
+                content.set_clip_overlay(&selection, true);
                 button.set_child(Some(&content));
                 let weak = Rc::downgrade(&i);
                 let index = entry.index.clone();
@@ -446,6 +455,7 @@ impl Inner {
                 i.items.append(&button);
                 entry.widgets = Some(CellWidgets {
                     button,
+                    selection,
                     picture,
                     spinner,
                     icon,
@@ -697,6 +707,11 @@ impl Inner {
                             entry.phase = Phase::Ready;
                             entry.used = i.clock.get();
                             if let Some(w) = &entry.widgets {
+                                let ratio = (CELL_WIDTH as f64 / texture.width() as f64)
+                                    .min(CELL_HEIGHT as f64 / texture.height() as f64);
+                                let width = (texture.width() as f64 * ratio).round() as i32;
+                                let height = (texture.height() as f64 * ratio).round() as i32;
+                                w.selection.set_size_request(width.max(1), height.max(1));
                                 w.picture.set_paintable(Some(&texture));
                                 w.icon.set_visible(false);
                             }
@@ -707,8 +722,7 @@ impl Inner {
                     Work::Cancelled => entry.phase = Phase::Failed,
                     Work::Failed(error) => {
                         if let Some(w) = &entry.widgets {
-                            w.button
-                                .set_tooltip_text(Some(&format!("{}: {error}", path.display())));
+                            trace("thumbnail-failed", &path);
                         }
                     }
                 }

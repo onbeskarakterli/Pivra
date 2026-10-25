@@ -12,14 +12,14 @@ PIV-18 TESTING; PIV-19 başlamadı.
 | TH-01 | GNOME thumbnail altyapısı | DONE — kullanıcı native kabulü başarılı |
 | TH-02 | Thumbnail overlay | DONE — kullanıcı TH-03 talimatında native kabulü bildirdi |
 | TH-03 | Otomatik gizlenme, `T`, kalıcı ayar | TESTING — kod/otomatik testler; native kabul bekleniyor |
-| TH-04 | Thumbnail gezinme senkronizasyonu | TESTING — mevcut dev kodu/regresyon düzeltmeleri, native kabul bekleniyor |
-| TH-05 | Sistem thumbnail üretimi | TESTING — progresif katalog/cache ve GNOME adapter; native kabul bekleniyor |
+| TH-04 | Thumbnail gezinme senkronizasyonu | DONE — kullanıcı Arch GNOME kabulü, 1b11074 |
+| TH-05 | Sistem thumbnail üretimi | DONE — kullanıcı Arch GNOME kabulü, 1b11074 |
 | TH-06 | Thumbnail genel kabul ve optimizasyon | TODO |
 | TH-07 | Tam ekran fotoğraf görüntüleme | TODO — yalnız planlandı |
 
 TH-02 [kullanıcı native kabulüyle DONE](TH02_THUMBNAIL_OVERLAY_VALIDATION.md).
 TH-03 [ayrı native kabul bekler](TH03_THUMBNAIL_VISIBILITY_VALIDATION.md).
-TH-04 regresyonları ve TH-05 [ayrı native kabul bekler](TH05_THUMBNAIL_SYSTEM_VALIDATION.md).
+TH-04/TH-05 [kullanıcı native kabulüyle DONE](TH05_THUMBNAIL_SYSTEM_VALIDATION.md).
 TH-06/TH-07 yalnız plandır; geliştirmeleri başlamadı.
 
 ## TH-07 — Tam Ekran Fotoğraf Görüntüleme

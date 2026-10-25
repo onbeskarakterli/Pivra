@@ -866,3 +866,9 @@ Missing GNOME factory development API/helper returns77/NOT RUN; it is not a
 successful generation test. Normal cache-only viewing remains available. Native
 acceptance is still pending. See [root cause and validation](docs/TH05_THUMBNAIL_SYSTEM_VALIDATION.md)
 for the real SHAs, controlled/native evidence split and remaining limits.
+
+
+TH-04/TH-05 native closure (2026-10-25): the user reported successful Arch GNOME
+Wayland acceptance after `1b11074`,120/120 real secure thumbnails, failed0 and
+manual two-window acceptance. TH-04/TH-05 DONE; historical Codex NOT RUN records
+remain distinct. PIV-18 is still TESTING; TH-06 acceptance is separate.

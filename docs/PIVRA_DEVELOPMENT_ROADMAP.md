@@ -401,8 +401,8 @@ mevcut PIV-18'e bağlı alt görevdir. PIV-01–60 numaraları korunur.
 | TH-01 | GNOME thumbnail altyapısı | DONE — kullanıcı native kabulü |
 | TH-02 | Thumbnail overlay | DONE — kullanıcı TH-03 talimatında kabulü bildirdi |
 | TH-03 | Otomatik gizlenme, `T`, kalıcı ayar | TESTING — native kabul bekleniyor |
-| TH-04 | Thumbnail gezinme senkronizasyonu | TESTING — dev regresyonları giderildi, native kabul bekleniyor |
-| TH-05 | Sistem thumbnail üretimi | TESTING — tam katalog/progresif queue, GNOME gen adapter |
+| TH-04 | Thumbnail gezinme senkronizasyonu | DONE — kullanıcı Arch GNOME kabulü, 1b11074 |
+| TH-05 | Sistem thumbnail üretimi | DONE — kullanıcı Arch GNOME kabulü, 1b11074 |
 | TH-06 | Thumbnail genel kabul ve optimizasyon | TODO |
 | TH-07 | Tam ekran fotoğraf görüntüleme | TODO — yalnız planlama |
 
@@ -439,3 +439,12 @@ progresif yükleme ve cache-first native GNOME generation helper eklendi.
 Codex'te86 Rust/59 Python ve kontrollü X11/Sway regresyonları PASS; gerçek GNOME
 helper/secure thumbnail pixel/native fiziksel kabul NOT RUN. Native gate olmadan
 TH-05 DONE değildir. TH-06/TH-07 ve PIV-19 başlamadı; PIV-18 TESTING korunur.
+
+
+## TH-04 / TH-05 kullanıcı native kabulü — 25.10.2026 — DONE
+
+`1b11074` sonrası Arch GNOME Wayland'da120/120, failed0, gerçek thumbnail
+pikselleri, hizalama/scroll/seçim/iki pencere/kapanış ve manuel inceleme kullanıcı
+ tarafından PASS bildirildi. [Kapanış ve kanıt kaynağı](TH05_THUMBNAIL_SYSTEM_VALIDATION.md).
+TH-04/TH-05 DONE; PIV-18 TESTING kalır. TH-06 ayrı yeni geliştirme/native kabul
+kapısıdır; TH-07 fullscreen TODO olarak korunur.

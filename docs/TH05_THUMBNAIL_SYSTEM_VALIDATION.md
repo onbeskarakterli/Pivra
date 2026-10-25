@@ -1,4 +1,19 @@
-# PIV-18 / TH-04 regresyonları ve TH-05 — TESTING
+# PIV-18 / TH-04 regresyonları ve TH-05 — DONE
+
+**Güncel kapanış — 25.10.2026:** Kullanıcı gerçek Arch GNOME Wayland'da
+`1b11074e6ae6b00cdd79c0c6dae985cbb6ea6dce` düzeltmesi sonrası
+`bash tests/run_thumbnail_system_probe.sh` çalıştırdığını ve hatasız tamamlandığını
+bildirdi. GNOME helper gnome-desktop-4;120/120, failed0; gerçek secure thumbnail
+pikselleri,0/79/119 hizalama, scroll/click/hızlı seçim, stable hücre, gereksiz decode
+önleme, missing/cache/source replace-delete, iptal/kapanış ve iki pencere PASS.
+İki pencere manuel incelendi, sorun bildirilmedi ve ikisi kapanınca terminale
+hatasız dönüldü. Bunlar **kullanıcının native kabul sonuçlarıdır**, Codex tarafından
+bağımsız çalıştırılmış gibi sunulmaz. Ayrı yeni ayrıntılı log verilmedi.
+
+TH-05 DONE. TH-04'ün seçim/scroll/hizalama/iki pencere ön koşulları bu gerçek
+kabul ve manuel incelemeyle karşılandığından TH-04 de DONE. PIV-18 TESTING;
+TH-06 ayrı native kabul bekler, TH-07 TODO. Aşağıdaki eski TESTING/NOT RUN
+kayıtları tarihsel Codex sınırlarıdır, geriye dönük PASS yapılmaz.
 
 25.10.2026 · yalnız dev. Başlangıç `fe7b6f7b56671999aef2604f96333f4202767cfd`.
 Temiz çalışma ağacı, origin/dev'den 24 commit fast-forward ile güncellendi.

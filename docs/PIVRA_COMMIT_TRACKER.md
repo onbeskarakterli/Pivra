@@ -2164,8 +2164,8 @@ Missing tek başına hata değildir. [Kanıt/komut](TH01_THUMBNAIL_VALIDATION.md
 | TH-01 provider | DONE — NATIVE ACCEPTED | Kullanıcı TH-02 talimatında native kabul başarılı bildirdi; yeni ayrıntılı log/SHA verilmedi, Codex testi sayılmaz |
 | TH-02 overlay | DONE | Kullanıcı TH-03 talimatında native kabulü bildirdi; yeni ayrıntılı log/SHA verilmedi |
 | TH-03 | TESTING | Otomatik gizlenme, `T`, kalıcı ayar; ayrı native kabul bekleniyor |
-| TH-04 | TESTING | Mevcut dev senkronizasyonu, scroll/ilk açılış regresyonları düzeltildi; native kabul bekleniyor |
-| TH-05 | TESTING | Tam katalog progresif cache + native GNOME generation; gerçek native kabul bekleniyor |
+| TH-04 | TESTING | DONE — kullanıcı Arch GNOME kabulü, 1b11074 |
+| TH-05 | TESTING | DONE — kullanıcı Arch GNOME kabulü, 1b11074 |
 | TH-06 | TODO | Thumbnail genel kabul ve optimizasyon |
 | TH-07 | TODO | Tam ekran fotoğraf görüntüleme; PIV-18 alt görevi, yalnız planlandı |
 
@@ -2302,3 +2302,19 @@ config/cache, gerçek cache ve generation gate, ardından iki üretim TEST pence
 TH-04/TH-05 TESTING; TH-06/TH-07 ve PIV-19 başlamadı. PIV-18 TESTING, Faz0 temiz
 native kurulum ve DESKTOP-06 açık. Main ve üretim Glycin/preload/cache kaynakları
 korundu; yeni Rust decoder/dependency/CI eklenmedi.
+
+
+## TH-04 / TH-05 native kapanış — 25.10.2026 — DONE
+
+Kullanıcı `1b11074e6ae6b00cdd79c0c6dae985cbb6ea6dce` (malformed GNOME PNG cache
+regeneration düzeltmesi) sonrası `bash tests/run_thumbnail_system_probe.sh`
+çalıştırdı: gnome-desktop-4,120/120, failed0, gerçek secure pikseller;0/79/119
+initial alignment, scroll/click/hızlı seçim/stable cells/no redundant decode,
+missing/cache/source replace-delete, cancellation/close ve iki pencere PASS.
+Kullanıcı iki pencereyi manuel inceleyip sorun bildirmedi, ikisini kapattığında
+komut terminale hatasız döndü. Kullanıcı raporudur; Codex native çalıştırması
+değildir. Ayrı yeni detaylı log verilmedi. TH-05 DONE; bu kanıt TH-04 seçim/
+hizalama/scroll/pencere bağımsızlığı koşullarını da karşıladığından TH-04 DONE.
+[Native kabul kaydı](TH05_THUMBNAIL_SYSTEM_VALIDATION.md). PIV-18 TESTING;
+TH-06 yetkili yeni kapsam, native kabul gelmeden DONE değil; TH-07 TODO.
+Faz0/DESKTOP-06 ve diğer PIV kapıları bu kapanışla değişmedi.

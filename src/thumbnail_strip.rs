@@ -159,6 +159,31 @@ impl ThumbnailStrip {
             glib::Propagation::Proceed
         });
         inner.scroller.add_controller(wheel);
+        // Left-button horizontal drag works over thumbnail buttons as well.
+        // GTK's drag threshold preserves a short click for photo selection.
+        let drag = gtk::GestureDrag::new();
+        drag.set_button(1);
+        drag.set_propagation_phase(gtk::PropagationPhase::Capture);
+        let weak = Rc::downgrade(&inner);
+        let origin = Rc::new(Cell::new(0.0f64));
+        let start = origin.clone();
+        drag.connect_drag_begin(move |_, _, _| {
+            if let Some(i) = weak.upgrade() {
+                start.set(i.scroller.hadjustment().value());
+            }
+        });
+        let weak = Rc::downgrade(&inner);
+        drag.connect_drag_update(move |gesture, dx, _| {
+            if let Some(i) = weak.upgrade() {
+                if !dx.is_finite() { return; }
+                i.initial.set(None);
+                let adj = i.scroller.hadjustment();
+                let limit = (adj.upper() - adj.page_size()).max(adj.lower());
+                adj.set_value((origin.get() - dx).clamp(adj.lower(), limit));
+                gesture.set_state(gtk::EventSequenceState::Claimed);
+            }
+        });
+        inner.scroller.add_controller(drag);
         Self(inner)
     }
     pub(crate) fn stats(&self) -> ThumbnailStats {

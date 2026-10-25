@@ -57,7 +57,7 @@ pub(crate) fn install(
     items.set_widget_name("thumbnail-items");
     items.append(&gtk::Label::new(Some("No thumbnails available")));
     let strip = gtk::ScrolledWindow::builder()
-        .hscrollbar_policy(gtk::PolicyType::Automatic)
+        .hscrollbar_policy(gtk::PolicyType::Never)
         .overlay_scrolling(true)
         .vscrollbar_policy(gtk::PolicyType::Never)
         .propagate_natural_width(false)

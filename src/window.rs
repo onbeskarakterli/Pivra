@@ -89,14 +89,35 @@ fn install_navigation_arrows(overlay: &gtk::Overlay) {
     gtk::style_context_add_provider_for_display(
         &overlay.display(), &css, gtk::STYLE_PROVIDER_PRIORITY_APPLICATION
     );
-    let make_arrow = |icon: &str, action: &str, align: gtk::Align| {
-        let button = gtk::Button::from_icon_name(icon);
+    // Draw open-wing chevrons explicitly: GTK symbolic icons have a fixed,
+    // narrower silhouette regardless of their requested icon size.
+    let make_arrow = |left: bool, action: &str, align: gtk::Align| {
+        let button = gtk::Button::new();
         button.add_css_class("pivra-navigation-glass");
-        button.set_tooltip_text(Some(if align == gtk::Align::Start {
+        button.set_tooltip_text(Some(if left {
             "Önceki fotoğraf"
         } else {
             "Sonraki fotoğraf"
         }));
+        let arrow = gtk::DrawingArea::new();
+        arrow.set_content_width(72);
+        arrow.set_content_height(100);
+        arrow.set_can_target(false);
+        arrow.set_draw_func(move |_, cr, width, height| {
+            let w = f64::from(width);
+            let h = f64::from(height);
+            cr.set_source_rgba(1.0, 1.0, 1.0, 0.94);
+            cr.set_line_width(5.0);
+            cr.set_line_cap(gtk::cairo::LineCap::Round);
+            cr.set_line_join(gtk::cairo::LineJoin::Round);
+            let tip = if left { w * 0.19 } else { w * 0.81 };
+            let ends = if left { w * 0.81 } else { w * 0.19 };
+            cr.move_to(ends, h * 0.08);
+            cr.line_to(tip, h * 0.50);
+            cr.line_to(ends, h * 0.92);
+            let _ = cr.stroke();
+        });
+        button.set_child(Some(&arrow));
         button.set_action_name(Some(action));
         button.set_halign(align);
         button.set_valign(gtk::Align::Fill);
@@ -108,8 +129,8 @@ fn install_navigation_arrows(overlay: &gtk::Overlay) {
         overlay.set_clip_overlay(&button, true);
         button
     };
-    let previous = make_arrow("go-previous-symbolic", "win.previous-media", gtk::Align::Start);
-    let next = make_arrow("go-next-symbolic", "win.next-media", gtk::Align::End);
+    let previous = make_arrow(true, "win.previous-media", gtk::Align::Start);
+    let next = make_arrow(false, "win.next-media", gtk::Align::End);
     let motion = gtk::EventControllerMotion::new();
     let left = previous.downgrade();
     let right = next.downgrade();

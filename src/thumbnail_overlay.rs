@@ -63,6 +63,12 @@ impl ThumbnailStrip {
         }
     }
     pub(crate) fn set_catalog(&self, photos: &[(usize, PathBuf)], selected: Option<usize>) {
+        if std::env::var_os("PIVRA_THUMB_DEBUG").is_some() {
+            let a = self.scroller.hadjustment();
+            eprintln!("TH-CATALOG count={} selected={selected:?} same={} manual={} pending={:?} visible={} value={} upper={} page={}",
+                photos.len(), *self.catalog.borrow() == photos, self.manually_scrolled.get(),
+                self.pending_selection.get(), self.scroller.is_visible(), a.value(), a.upper(), a.page_size());
+        }
         // Keep the existing GTK cells, textures and horizontal position when
         // only the selected image changes. Rebuilding resets the scroll offset.
         if *self.catalog.borrow() == photos {
@@ -232,6 +238,20 @@ pub(crate) fn install(window: &impl IsA<gtk::Window>, overlay: &gtk::Overlay, av
             align_selection(adj, &pending_on_measure);
         }
     });
+    // Temporary diagnostics for the native GNOME thumbnail scroll regression.
+    // Enabled only when PIVRA_THUMB_DEBUG=1.
+    let debug = std::env::var_os("PIVRA_THUMB_DEBUG").is_some();
+    if debug {
+        let adjustment = strip.hadjustment();
+        adjustment.connect_value_changed(|a| {
+            eprintln!("TH-SCROLL value={} upper={} page={}", a.value(), a.upper(), a.page_size());
+        });
+        strip.connect_notify_local(Some("visible"), |w, _| {
+            let a = w.hadjustment();
+            eprintln!("TH-VISIBLE visible={} value={} upper={} page={}",
+                w.is_visible(), a.value(), a.upper(), a.page_size());
+        });
+    }
     let wheel = gtk::EventControllerScroll::new(
         gtk::EventControllerScrollFlags::VERTICAL
             | gtk::EventControllerScrollFlags::HORIZONTAL,

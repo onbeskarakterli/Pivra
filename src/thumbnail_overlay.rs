@@ -122,6 +122,15 @@ pub(crate) fn install(
     strip.set_height_request(saved_height);
     thumbnails.resize_cells(saved_height);
     let preference = pivra::settings::thumbnail_preference();
+    let saved_pinned = pivra::settings::load_thumbnail_pinned();
+    if saved_pinned && !preference.enabled() {
+        preference.set_enabled(true);
+    }
+    pin.set_active(saved_pinned);
+    if saved_pinned {
+        pin.add_css_class("pivra-pinned");
+        pin.set_tooltip_text(Some("Unpin thumbnail strip"));
+    }
     let state = Rc::new(Visibility {
         available,
         preference: preference.clone(),
@@ -131,7 +140,7 @@ pub(crate) fn install(
         button: button.downgrade(),
         pin: pin.downgrade(),
         controls: controls.downgrade(),
-        pinned: Cell::new(false),
+        pinned: Cell::new(saved_pinned),
         overlay: overlay.downgrade(),
         near: Cell::new(false),
         pointer_y: Cell::new(None),
@@ -155,7 +164,7 @@ pub(crate) fn install(
     });
     preference.subscribe(&listener);
     state.listener.replace(Some(listener));
-    state.render(false);
+    state.render(saved_pinned);
     let click = state.clone();
     button.connect_clicked(move |_| {
         if click.available {
@@ -166,6 +175,7 @@ pub(crate) fn install(
     pin.connect_clicked(move |_| {
         let pinned = !pin_click.pinned.get();
         pin_click.pinned.set(pinned);
+        pivra::settings::save_thumbnail_pinned(pinned);
         pin_click.cancel();
         if pinned && !pin_click.preference.enabled() {
             pin_click.preference.set_enabled(true);

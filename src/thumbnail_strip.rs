@@ -720,10 +720,8 @@ impl Inner {
                     }
                     Work::Busy => entry.phase = Phase::Pending,
                     Work::Cancelled => entry.phase = Phase::Failed,
-                    Work::Failed(error) => {
-                        if let Some(w) = &entry.widgets {
-                            trace("thumbnail-failed", &path);
-                        }
+                    Work::Failed(_error) => {
+                        trace("thumbnail-failed", &path);
                     }
                 }
                 if let Some(w) = &entry.widgets {

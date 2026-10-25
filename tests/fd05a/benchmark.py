@@ -49,7 +49,7 @@ def partial(pid,size):
             with fd.open('rb',buffering=0) as f:
                 m=os.fstat(f.fileno())
                 if m.st_size!=size:continue
-                if not any(len(parts:=line.split())>=5 and parts[4]==str(m.st_ino) and 'w' in parts[1] for line in maps.splitlines()):continue
+                if not any(len(parts:=line.split())>=5 and parts[4]==str(m.st_ino) and parts[3]==f'{os.major(m.st_dev):02x}:{os.minor(m.st_dev):02x}' and 'w' in parts[1] for line in maps.splitlines()):continue
                 prefix=f.read(12);f.seek(-12,2);tail=f.read(12)
                 if prefix==bytes.fromhex('1153bf')*4 and tail==bytes(12):return True
     except (OSError,ValueError):pass
@@ -59,10 +59,10 @@ def cgroup_peak():
     try:return {'bytes':int(Path('/sys/fs/cgroup/memory.peak').read_text()),'scope':'existing shared cgroup, not isolated job peak; not reset'}
     except (OSError,ValueError):return 'NOT MEASURED'
 
-def job(binary,path,w,h,cancel):
-    samples=[];handles={};certificate=None;errors=0;peak_before=cgroup_peak()
+def job(binary,path,w,h,cancel,extra=()):
+    samples=[];handles={};certificate=None;errors=0;peak_before=cgroup_peak();window_protocol='--fd06-active-close' in extra;finished=False;window_deadline=None
     with tempfile.TemporaryFile(mode='w+') as out,tempfile.TemporaryFile(mode='w+') as err:
-        p=subprocess.Popen([binary,str(path)]+(['--cancel-active']if cancel else []),stdin=subprocess.PIPE,stdout=out,stderr=err,text=True,env={**os.environ,'PIVRA_TRACE_FD05A':'1'})
+        p=subprocess.Popen([binary,*extra,str(path)]+(['--cancel-active']if cancel else []),stdin=subprocess.PIPE,stdout=out,stderr=err,text=True,env={**os.environ,'PIVRA_TRACE_FD05A':'1'})
         parent_identity=processes().get(p.pid)
         limit=time.monotonic()+100
         try:
@@ -98,6 +98,16 @@ def job(binary,path,w,h,cancel):
                                 try:signal.pidfd_send_signal(fd,signal.SIGCONT)
                                 except ProcessLookupError:pass
                     except (OSError,ValueError):errors+=1
+                if window_protocol and certificate and not finished:
+                    out.seek(0);text=out.read()
+                    if 'WINDOW_CLOSED_OTHER_ALIVE' in text:
+                        target=handles[(certificate['pid'],certificate['starttime'])]
+                        if select.select([target],[],[],0)[0]:
+                            certificate['loader_exited_while_other_window_alive']=True
+                            p.stdin.write('finish\n');p.stdin.flush();finished=True
+                        else:
+                            if window_deadline is None:window_deadline=time.monotonic()+5
+                            if time.monotonic()>window_deadline:raise RuntimeError('loader still alive while other window open')
                 samples.append(row)
                 if cancel and certificate is None and time.monotonic()>limit-90:
                     p.stdin.close() # Finished/too-fast decode is NOT active-decode evidence.

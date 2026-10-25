@@ -1,6 +1,8 @@
 //! TH-02 only: synthetic main image + explicitly labelled TEST PLACEHOLDERS.
 #[path = "support/thumbnail_catalog.rs"]
 mod catalog_probe;
+#[path = "support/fd06_close.rs"]
+mod fd06_close;
 #[path = "support/fullscreen_cases.rs"]
 mod fullscreen_probe;
 #[path = "../src/image_view.rs"]
@@ -417,6 +419,17 @@ fn main() {
     if std::env::args().any(|s| s == "--retention-regression") {
         catalog_probe::retention(&app);
         return;
+    }
+    if std::env::args().any(|s| s == "--fd06-active-close") {
+        fd06_close::run(&app);
+        return;
+    }
+    if std::env::args().any(|s| s == "--require-freedesktop") {
+        assert_eq!(
+            pivra::thumbnail_manager::Manager::session().id(),
+            pivra::thumbnail_provider::ProviderId::Freedesktop
+        );
+        println!("PASS Freedesktop session selection; pixels require native gate");
     }
     if std::env::args().any(|s| s == "--catalog-regression") {
         catalog_probe::run(&app);

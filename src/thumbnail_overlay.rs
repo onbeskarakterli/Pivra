@@ -71,6 +71,18 @@ pub(crate) fn install(
     strip.set_margin_end(0);
     strip.set_visible(false);
     strip.set_min_content_width(0);
+    // An invisible, full-width resize hit area covers the strip's top edge.
+    // It is a separate overlay so horizontal thumbnail gestures stay intact.
+    let resize_edge = gtk::Box::new(gtk::Orientation::Horizontal, 0);
+    resize_edge.set_hexpand(true);
+    resize_edge.set_halign(gtk::Align::Fill);
+    resize_edge.set_valign(gtk::Align::End);
+    resize_edge.set_height_request(10);
+    resize_edge.set_visible(false);
+    resize_edge.set_cursor_from_name(Some("ns-resize"));
+    overlay.add_overlay(&resize_edge);
+    overlay.set_measure_overlay(&resize_edge, false);
+    overlay.set_clip_overlay(&resize_edge, true);
     let button = gtk::ToggleButton::builder()
         .icon_name("pan-up-symbolic")
         .tooltip_text("Show thumbnail strip")
@@ -108,6 +120,8 @@ pub(crate) fn install(
         available,
         preference: preference.clone(),
         strip: strip.downgrade(),
+        resize_edge: resize_edge.downgrade(),
+        resizing: Cell::new(false),
         button: button.downgrade(),
         pin: pin.downgrade(),
         controls: controls.downgrade(),
@@ -165,6 +179,45 @@ pub(crate) fn install(
             pin_click.schedule(3000);
         }
     });
+    let resize = gtk::GestureDrag::new();
+    resize.set_button(1);
+    let start_height = Rc::new(Cell::new(128i32));
+    let begin_state = state.clone();
+    let begin_height = start_height.clone();
+    resize.connect_drag_begin(move |_, _, _| {
+        if !begin_state.shown.get() || !begin_state.preference.enabled() { return; }
+        if let Some(strip) = begin_state.strip.upgrade() {
+            begin_height.set(strip.height_request().max(128));
+            begin_state.resizing.set(true);
+            begin_state.cancel();
+        }
+    });
+    let drag_state = state.clone();
+    resize.connect_drag_update(move |gesture, _, delta_y| {
+        if !drag_state.resizing.get() || !delta_y.is_finite() { return; }
+        if let (Some(strip), Some(overlay)) = (drag_state.strip.upgrade(), drag_state.overlay.upgrade()) {
+            let ceiling = (overlay.height() - 48).clamp(128, 560);
+            let height = (f64::from(start_height.get()) - delta_y).round()
+                .clamp(128.0, f64::from(ceiling)) as i32;
+            if strip.height_request() != height {
+                strip.set_height_request(height);
+                drag_state.place_toggle();
+            }
+            gesture.set_state(gtk::EventSequenceState::Claimed);
+        }
+    });
+    let end_state = state.clone();
+    resize.connect_drag_end(move |_, _, _| {
+        end_state.resizing.set(false);
+        end_state.place_toggle();
+        if !end_state.pinned.get() && !end_state.near.get() { end_state.schedule(3000); }
+    });
+    let cancel_state = state.clone();
+    resize.connect_cancel(move |_, _| {
+        cancel_state.resizing.set(false);
+        if !cancel_state.pinned.get() && !cancel_state.near.get() { cancel_state.schedule(3000); }
+    });
+    resize_edge.add_controller(resize);
     let motion = gtk::EventControllerMotion::new();
     motion.set_propagation_phase(gtk::PropagationPhase::Capture);
     let enter = state.clone();
@@ -257,6 +310,8 @@ struct Visibility {
     available: bool,
     preference: Rc<pivra::settings::ThumbnailPreference>,
     strip: glib::WeakRef<gtk::ScrolledWindow>,
+    resize_edge: glib::WeakRef<gtk::Box>,
+    resizing: Cell<bool>,
     button: glib::WeakRef<gtk::ToggleButton>,
     pin: glib::WeakRef<gtk::ToggleButton>,
     controls: glib::WeakRef<gtk::Box>,
@@ -283,7 +338,7 @@ impl Visibility {
         }
     }
     fn render(&self, show: bool) {
-        let show = (show || self.pinned.get()) && self.available && !self.closed.get();
+        let show = (show || self.pinned.get() || self.resizing.get()) && self.available && !self.closed.get();
         self.shown.set(show);
         if let Some(strip) = self.strip.upgrade() {
             strip.set_visible(show && self.preference.enabled());
@@ -309,6 +364,9 @@ impl Visibility {
         }
         if let Some(controls) = self.controls.upgrade() {
             controls.set_visible(show);
+        }
+        if let Some(edge) = self.resize_edge.upgrade() {
+            edge.set_visible(show && self.preference.enabled());
         }
         self.place_toggle();
     }
@@ -340,6 +398,12 @@ impl Visibility {
         if button.margin_bottom() != margin {
             button.set_margin_bottom(margin);
         }
+        if let Some(edge) = self.resize_edge.upgrade() {
+            let edge_margin = (margin - 5).max(0);
+            if edge.margin_bottom() != edge_margin {
+                edge.set_margin_bottom(edge_margin);
+            }
+        }
     }
     fn motion(self: &Rc<Self>, y: f64) {
         self.pointer_y.set(Some(y));
@@ -365,6 +429,7 @@ impl Visibility {
         }
     }
     fn away(self: &Rc<Self>) {
+        if self.resizing.get() { return; }
         self.near.set(false);
         if self.shown.get() && !self.pinned.get() && self.timeout.borrow().is_none() {
             self.schedule(3000);

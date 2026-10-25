@@ -84,7 +84,7 @@ fn update_navigation_actions(window: &adw::ApplicationWindow, context: &FileCont
 fn install_navigation_arrows(overlay: &gtk::Overlay) {
     let css = gtk::CssProvider::new();
     css.load_from_string(
-        ".pivra-navigation-glass { background-image: none; background-color: alpha(@window_bg_color, 0.18); border: 0; border-radius: 0; box-shadow: none; padding: 0; min-width: 56px; min-height: 0; color: @window_fg_color; } .pivra-navigation-glass:hover { background-color: alpha(@window_bg_color, 0.24); }"
+        ".pivra-navigation-glass { background-image: none; background-color: alpha(@window_bg_color, 0.18); border: 0; border-radius: 0; box-shadow: none; padding: 0; min-width: 112px; min-height: 0; color: @window_fg_color; } .pivra-navigation-glass image { -gtk-icon-size: 48px; } .pivra-navigation-glass:hover { background-color: alpha(@window_bg_color, 0.24); }"
     );
     gtk::style_context_add_provider_for_display(
         &overlay.display(), &css, gtk::STYLE_PROVIDER_PRIORITY_APPLICATION
@@ -100,7 +100,7 @@ fn install_navigation_arrows(overlay: &gtk::Overlay) {
         button.set_action_name(Some(action));
         button.set_halign(align);
         button.set_valign(gtk::Align::Fill);
-        button.set_size_request(56, -1);
+        button.set_size_request(112, -1);
         button.set_focus_on_click(false);
         button.set_visible(false);
         overlay.add_overlay(&button);
@@ -117,10 +117,10 @@ fn install_navigation_arrows(overlay: &gtk::Overlay) {
         let Some(widget) = controller.widget() else { return; };
         let width = widget.width() as f64;
         if let Some(button) = left.upgrade() {
-            button.set_visible(x <= 100.0 && button.is_sensitive());
+            button.set_visible(x <= 156.0 && button.is_sensitive());
         }
         if let Some(button) = right.upgrade() {
-            button.set_visible(x >= width - 100.0 && button.is_sensitive());
+            button.set_visible(x >= width - 156.0 && button.is_sensitive());
         }
     });
     motion.connect_leave(move |_| {

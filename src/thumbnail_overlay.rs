@@ -104,7 +104,7 @@ impl ThumbnailStrip {
             let index = *index;
             let manually_scrolled = self.manually_scrolled.clone();
             button.connect_clicked(move |_| {
-                manually_scrolled.set(false);
+                manually_scrolled.set(true);
                 if let Some(callback) = on_select.borrow().as_ref() {
                     callback(index);
                 }
@@ -134,8 +134,8 @@ impl ThumbnailStrip {
         let Some(center) = photos.iter().position(|(index, _)| Some(*index) == selected) else {
             return;
         };
-        let first = center.saturating_sub(3);
-        let last = (center + 4).min(photos.len());
+        let first = center.saturating_sub(12);
+        let last = (center + 13).min(photos.len());
         let paths: Vec<_> = photos[first..last].to_vec();
         let token = gtk::gio::Cancellable::new();
         self.cache_token.replace(Some(token.clone()));
@@ -235,6 +235,16 @@ pub(crate) fn install(window: &impl IsA<gtk::Window>, overlay: &gtk::Overlay, av
     strip.set_margin_start(8);
     strip.set_margin_end(8);
     strip.set_visible(false);
+    let pending_on_show = pending_selection.clone();
+    strip.connect_notify_local(Some("visible"), move |strip, _| {
+        if strip.is_visible() {
+            let pending = pending_on_show.clone();
+            let adjustment = strip.hadjustment();
+            glib::idle_add_local_once(move || {
+                align_selection(&adjustment, &pending);
+            });
+        }
+    });
     let button = gtk::ToggleButton::builder()
         .icon_name("pan-up-symbolic")
         .tooltip_text("Show thumbnail strip")

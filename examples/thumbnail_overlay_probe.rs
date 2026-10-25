@@ -13,6 +13,8 @@ mod input;
 #[path = "../src/image_loader.rs"]
 #[allow(dead_code)]
 mod native_image_loader;
+#[path = "support/pool_trace.rs"]
+mod pool_trace;
 #[path = "support/render_frame.rs"]
 mod render_frame;
 #[path = "../src/window.rs"]
@@ -425,6 +427,7 @@ fn main() {
         return;
     }
     if std::env::args().any(|s| s == "--fd06-active-close") {
+        pool_trace::install();
         fd06_close::run(&app);
         return;
     }

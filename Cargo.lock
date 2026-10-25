@@ -1278,6 +1278,7 @@ dependencies = [
  "gtk4",
  "libadwaita",
  "tempfile",
+ "tracing",
 ]
 
 [[package]]

@@ -187,6 +187,9 @@ pub(super) fn run(app: &adw::Application) {
     let outcome = result.clone();
     let observer_window = second.clone();
     let mut first = Some(first);
+    let verify_requested = std::rc::Rc::new(std::cell::Cell::new(false));
+    let request_verification = verify_requested.clone();
+    let mut verification_sent = false;
     let mut ready = false;
     let mut last = None;
     let end = Instant::now() + Duration::from_secs(95);
@@ -235,7 +238,13 @@ pub(super) fn run(app: &adw::Application) {
                         completed = Some(Err((1, "duplicate cancel command".to_owned())));
                     }
                 }
-                "finish" if ready && state.clean() => completed = Some(Ok(())),
+                "verify" if ready && state.clean() && !verification_sent => {
+                    verification_sent = true;
+                    request_verification.set(true);
+                    quit.quit();
+                    return glib::ControlFlow::Continue;
+                }
+                "finish" if ready && state.clean() && verification_sent => completed = Some(Ok(())),
                 "finish" => {
                     completed = Some(Err((
                         1,
@@ -270,18 +279,11 @@ pub(super) fn run(app: &adw::Application) {
         }
         glib::ControlFlow::Continue
     });
-    loop_.run();
-    let outcome = result
-        .borrow_mut()
-        .take()
-        .unwrap_or_else(|| Err((1, "main loop ended without protocol result".to_owned())));
-    let outcome = outcome.and_then(|()| {
+    let verify_other = || -> Result<(), (i32, String)> {
         if !second.is_visible() || !second.is_mapped() || second.title() != title {
             return Err((1, "other window visibility/title changed".to_owned()));
         }
-        println!(
-            "PASS other window visible/mapped/title unchanged after loader-exit acknowledgement"
-        );
+        println!("PASS other window visible/mapped/title unchanged after close/worker cleanup");
         if image_bytes(&second, &second_photo) != second_pixels {
             return Err((1, "other window render pixels changed".to_owned()));
         }
@@ -301,7 +303,28 @@ pub(super) fn run(app: &adw::Application) {
             "PASS source identity and zero workers/reservations after final render verification"
         );
         Ok(())
-    });
+    };
+    loop {
+        loop_.run();
+        if verify_requested.replace(false) {
+            if let Err(error) = verify_other() {
+                *result.borrow_mut() = Some(Err(error));
+                break;
+            }
+            if result.borrow().is_some() {
+                break;
+            }
+            println!("OTHER_WINDOW_VERIFIED");
+            flush();
+        } else {
+            break;
+        }
+    }
+    let outcome = result
+        .borrow_mut()
+        .take()
+        .unwrap_or_else(|| Err((1, "main loop ended without protocol result".to_owned())));
+    let outcome = outcome.and_then(|()| verify_other());
     second.close();
     drop(other);
     match outcome {

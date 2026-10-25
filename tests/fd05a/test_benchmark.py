@@ -24,19 +24,19 @@ class Observer(unittest.TestCase):
             self.assertFalse(b.partial(os.getpid(),96),'closed writable mapping is not active evidence')
         finally:os.close(fd)
     def test_window_pass_requires_certificate_ack_loader_exit_and_finish(self):
-        cert={'partial_after_stop':True,'cancel_acknowledged':True,'loader_exited_while_other_window_alive':True}
+        cert={'partial_after_stop':True,'cancel_acknowledged':True,'loader_exited_while_other_window_alive':True,'other_window_verified':True}
         self.assertTrue(b.window_protocol_complete(cert,True))
         self.assertFalse(b.window_protocol_complete(None,True))
         self.assertFalse(b.window_protocol_complete(cert,False))
         for key in cert:
             incomplete={**cert,key:False}
             self.assertFalse(b.window_protocol_complete(incomplete,True),key)
-    def test_real_exit_required_after_documented_pool_retention(self):
-        self.assertEqual(b.loader_exit_progress(False,5),'pool_retention')
-        self.assertEqual(b.loader_exit_progress(False,29.999),'pool_retention')
-        self.assertEqual(b.loader_exit_progress(False,30),'exit_grace')
-        self.assertEqual(b.loader_exit_progress(False,34.999),'exit_grace')
-        with self.assertRaisesRegex(RuntimeError,'loader still alive'):
+    def test_pool_observation_cutoff_does_not_classify_pid_as_failure(self):
+        self.assertEqual(b.loader_exit_progress(False,5),'observing_pool_ownership')
+        self.assertEqual(b.loader_exit_progress(False,29.999),'observing_pool_ownership')
+        self.assertEqual(b.loader_exit_progress(False,30),'collecting_exit_diagnostics')
+        self.assertEqual(b.loader_exit_progress(False,34.999),'collecting_exit_diagnostics')
+        with self.assertRaisesRegex(b.PoolObservationIncomplete,'ownership unresolved'):
             b.loader_exit_progress(False,35)
         self.assertEqual(b.loader_exit_progress(True,35),'exited')
         cert={'partial_after_stop':True,'cancel_acknowledged':True}
@@ -60,6 +60,15 @@ class Observer(unittest.TestCase):
         self.assertIsNone(b.failure_message({'exit':0}))
         self.assertIn('NOT RUN',b.failure_message({'exit':77,'stderr':'NOT RUN checkpoint absent'}))
         self.assertIn('other window render pixels changed',b.failure_message({'exit':1,'stderr':'FAIL FD06 active close: other window render pixels changed'}))
+    def test_process_observation_checks_identity_and_keeps_idle_distinct(self):
+        pid=os.getpid();start=b.processes()[pid][1]
+        info=b.observe_loader(pid,start,123)
+        self.assertEqual(info['identity'],'matched')
+        self.assertIn('cpu_ticks',info)
+        self.assertFalse(info['partial_target_frame'])
+        self.assertEqual(b.observe_loader(pid,'wrong-starttime',123),{'identity':'exited_or_changed'})
+        message=b.failure_message({'exit':77,'observer_failure':'live pooled loader ownership unresolved'})
+        self.assertTrue(message.startswith('NOT RUN'))
     def test_streamed_fixture_has_exact_header(self):
         with tempfile.TemporaryDirectory() as d:
             path=Path(d)/'source.png';b.fixture(path,64,32);data=path.read_bytes()

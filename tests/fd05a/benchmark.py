@@ -62,15 +62,39 @@ def cgroup_peak():
 # glycin =3.0.8 pool.rs: PoolConfig::default retains unused loaders for 30s.
 # Preserve the existing 5s process-exit grace AFTER that documented retention.
 # This never substitutes idle/RSS/worker counters for an actual readable pidfd.
+# This is an observation window, NOT a deadline measured from last UsageTracker drop.
 GLYCIN_POOL_RETENTION_SECONDS = 30
 LOADER_EXIT_GRACE_SECONDS = 5
+
+class PoolObservationIncomplete(RuntimeError):
+    """Live PID alone cannot distinguish pooled ownership from ongoing work."""
+
+def observe_loader(pid,start,size):
+    table=processes()
+    if pid not in table or table[pid][1]!=start:return {'identity':'exited_or_changed'}
+    result={'identity':'matched','state':table[pid][2],'partial_target_frame':partial(pid,size),'frames':[]}
+    try:
+        fields=Path(f'/proc/{pid}/stat').read_text().rsplit(')',1)[1].split()
+        result['cpu_ticks']=int(fields[11])+int(fields[12])
+        result['wchan']=Path(f'/proc/{pid}/wchan').read_text().strip()
+        maps=Path(f'/proc/{pid}/maps').read_text()
+        for fd in Path(f'/proc/{pid}/fd').iterdir():
+            if len(result['frames'])>=16:break
+            try:
+                if 'memfd:glycin-frame' not in os.readlink(fd):continue
+                st=fd.stat()
+                mapped=any(len(parts:=line.split())>=5 and parts[4]==str(st.st_ino) and parts[3]==f'{os.major(st.st_dev):02x}:{os.minor(st.st_dev):02x}' for line in maps.splitlines())
+                result['frames'].append({'bytes':st.st_size,'inode':st.st_ino,'mapped':mapped})
+            except OSError:pass
+    except (OSError,ValueError,IndexError) as error:result['observation_error']=str(error)
+    return result
 
 def loader_exit_progress(exited,elapsed):
     if exited:return 'exited'
     if elapsed >= GLYCIN_POOL_RETENTION_SECONDS + LOADER_EXIT_GRACE_SECONDS:
-        raise RuntimeError('loader still alive while other window open: '
-                           f'elapsed={elapsed:.3f}s, Glycin 3.0.8 pool retention=30s, exit grace=5s')
-    return 'pool_retention' if elapsed < GLYCIN_POOL_RETENTION_SECONDS else 'exit_grace'
+        raise PoolObservationIncomplete('live pooled loader ownership unresolved while other window open: '
+                           f'observed={elapsed:.3f}s; last UsageTracker drop/done completion not measured')
+    return 'observing_pool_ownership' if elapsed < GLYCIN_POOL_RETENTION_SECONDS else 'collecting_exit_diagnostics'
 
 def failure_message(result):
     if result['exit'] == 0:return None
@@ -85,10 +109,11 @@ def failure_message(result):
 def window_protocol_complete(certificate,finished):
     return bool(certificate and certificate.get('partial_after_stop')
                 and certificate.get('cancel_acknowledged')
-                and certificate.get('loader_exited_while_other_window_alive') and finished)
+                and certificate.get('loader_exited_while_other_window_alive')
+                and certificate.get('other_window_verified') and finished)
 
 def job(binary,path,w,h,cancel,extra=()):
-    samples=[];handles={};certificate=None;errors=0;peak_before=cgroup_peak();exit_phase=None;window_protocol='--fd06-active-close' in extra;finished=False;window_deadline=None
+    samples=[];handles={};certificate=None;errors=0;peak_before=cgroup_peak();exit_phase=None;window_protocol='--fd06-active-close' in extra;finished=False;window_deadline=None;verify_sent=False;loader_before=None
     with tempfile.TemporaryFile(mode='w+') as out,tempfile.TemporaryFile(mode='w+') as err:
         p=subprocess.Popen([binary,*extra,str(path)]+(['--cancel-active']if cancel else []),stdin=subprocess.PIPE,stdout=out,stderr=err,text=True,env={**os.environ,'PIVRA_TRACE_FD05A':'1'})
         parent_identity=processes().get(p.pid)
@@ -132,13 +157,18 @@ def job(binary,path,w,h,cancel,extra=()):
                     out.seek(0);text=out.read()
                     if 'WINDOW_CLOSED_OTHER_ALIVE' in text:
                         target=handles[(certificate['pid'],certificate['starttime'])]
-                        if window_deadline is None:window_deadline=time.monotonic()
+                        if not verify_sent:
+                            p.stdin.write('verify\n');p.stdin.flush();verify_sent=True
+                        if 'OTHER_WINDOW_VERIFIED' in text:certificate['other_window_verified']=True
+                        if window_deadline is None:
+                            window_deadline=time.monotonic()
+                            loader_before=observe_loader(certificate['pid'],certificate['starttime'],w*h*3)
                         elapsed=time.monotonic()-window_deadline
                         phase=loader_exit_progress(bool(select.select([target],[],[],0)[0]),elapsed)
                         if phase != exit_phase:
-                            print(f"LOADER_EXIT phase={phase} pid={certificate['pid']} starttime={certificate['starttime']} elapsed={elapsed:.3f}s pool_retention=30s exit_grace=5s",flush=True)
+                            print(f"LOADER_EXIT phase={phase} pid={certificate['pid']} starttime={certificate['starttime']} observed={elapsed:.3f}s bounded_observation=35s retention_origin=unmeasured",flush=True)
                             exit_phase=phase
-                        if phase == 'exited':
+                        if phase == 'exited' and certificate.get('other_window_verified'):
                             certificate['loader_exited_while_other_window_alive']=True
                             certificate['loader_exit_wait_seconds']=elapsed
                             p.stdin.write('finish\n');p.stdin.flush();finished=True
@@ -158,12 +188,12 @@ def job(binary,path,w,h,cancel,extra=()):
             if not cleanup:code=1
             if window_protocol and certificate and not window_protocol_complete(certificate,finished):code=1
             if cancel and (certificate is None or 'PASS CANCELLED' not in stdout or not cleanup):code=(77 if p.returncode in (0,77) else p.returncode) if certificate is None else 1
-            return {'parent_pid':p.pid,'parent_starttime':parent_identity[1]if parent_identity else'NOT MEASURED','size':[w,h],'format':path.suffix,'cancel':cancel,'exit':code,'stdout':stdout,'stderr':stderr,'certificate':certificate,'cleanup':cleanup,'window_finish_sent':finished if window_protocol else None,'window_lifecycle':[line for line in stdout.splitlines() if line.startswith(('CLOSE_EVENT','CLOSE_STATE','WINDOW_CLOSED'))],'tracked_descendants':[{'pid':pid,'starttime':start}for pid,start in handles],'proc_errors':errors,'samples':samples,'child_rss':'MEASURED'if any(('Rss' in v or 'VmRSS' in v)for s in samples for v in s['loaders'].values())else'NOT MEASURED','child_pss':'MEASURED'if any('Pss' in v for s in samples for v in s['loaders'].values())else'NOT MEASURED','cancel_stage':('certified_partial_frame'if certificate else'NOT RUN partial_frame_checkpoint')if cancel else'not_requested','max_observed_loader_processes':max((len(s['loaders']) for s in samples),default=0),'cgroup_peak_before':peak_before,'cgroup_peak_after':cgroup_peak()}
+            return {'pool_events':[line for line in stderr.splitlines() if line.startswith('POOL_EVENT')],'loader_before':loader_before,'parent_pid':p.pid,'parent_starttime':parent_identity[1]if parent_identity else'NOT MEASURED','size':[w,h],'format':path.suffix,'cancel':cancel,'exit':code,'stdout':stdout,'stderr':stderr,'certificate':certificate,'cleanup':cleanup,'window_finish_sent':finished if window_protocol else None,'window_lifecycle':[line for line in stdout.splitlines() if line.startswith(('CLOSE_EVENT','CLOSE_STATE','WINDOW_CLOSED'))],'tracked_descendants':[{'pid':pid,'starttime':start}for pid,start in handles],'proc_errors':errors,'samples':samples,'child_rss':'MEASURED'if any(('Rss' in v or 'VmRSS' in v)for s in samples for v in s['loaders'].values())else'NOT MEASURED','child_pss':'MEASURED'if any('Pss' in v for s in samples for v in s['loaders'].values())else'NOT MEASURED','cancel_stage':('certified_partial_frame'if certificate else'NOT RUN partial_frame_checkpoint')if cancel else'not_requested','max_observed_loader_processes':max((len(s['loaders']) for s in samples),default=0),'cgroup_peak_before':peak_before,'cgroup_peak_after':cgroup_peak()}
         except RuntimeError as error:
             # Preserve protocol evidence even when the observer itself times out.
             # This result can never certify cleanup or an active-close PASS.
-            out.seek(0);err.seek(0)
-            return {'exit':1,'observer_failure':str(error),'loader_exit_phase':exit_phase,'loader_exit_wait_seconds':time.monotonic()-window_deadline if window_deadline is not None else None,'loader_exit_policy':{'glycin_version':'3.0.8','retention_seconds':30,'exit_grace_seconds':5},'stdout':out.read(),'stderr':err.read(),
+            out.seek(0);err.seek(0);stderr=err.read()
+            return {'exit':77 if isinstance(error,PoolObservationIncomplete) else 1,'observer_outcome':'INCONCLUSIVE' if isinstance(error,PoolObservationIncomplete) else 'FAIL','loader_before':loader_before,'loader_after':observe_loader(certificate['pid'],certificate['starttime'],w*h*3) if certificate else None,'pool_events':[line for line in stderr.splitlines() if line.startswith('POOL_EVENT')],'observer_failure':str(error),'loader_exit_phase':exit_phase,'loader_exit_wait_seconds':time.monotonic()-window_deadline if window_deadline is not None else None,'loader_exit_policy':{'glycin_version':'3.0.8','retention_seconds':30,'exit_grace_seconds':5,'measurement_origin':'WINDOW_CLOSED_OTHER_ALIVE, not last UsageTracker drop','scope':'observation window, not proof of idle expiry'},'stdout':out.read(),'stderr':stderr,
                     'certificate':certificate,'window_finish_sent':finished,
                     'cleanup':'NOT VERIFIED','samples':samples,'proc_errors':errors}
         finally:

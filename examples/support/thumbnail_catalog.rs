@@ -155,7 +155,11 @@ pub(super) fn overlay_shortcut(app: &adw::Application) {
     assert!(!pivra::settings::thumbnail_preference().enabled());
     assert!(key(&other, gdk::ModifierType::empty()));
     until(|| other_strip.is_mapped());
-    assert!(!strip.is_visible());
+    // Thumbnail preference is shared between windows. Re-enabling it from the
+    // second window may reveal the first strip if its pointer is still near
+    // the bottom; do not mistake that valid behavior for a routing failure.
+    assert!(first.is_mapped() && other.is_mapped());
+    assert!(other_strip.is_visible());
     assert!(key(&other, gdk::ModifierType::empty()));
     first.close();
     other.close();

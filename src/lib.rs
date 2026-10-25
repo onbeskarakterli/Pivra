@@ -13,3 +13,4 @@ pub const APP_NAME: &str = "Pivra";
 pub mod image_pipeline;
 
 pub mod thumbnail;
+pub mod thumbnail_provider;

@@ -2164,8 +2164,8 @@ Missing tek başına hata değildir. [Kanıt/komut](TH01_THUMBNAIL_VALIDATION.md
 | TH-01 provider | DONE — NATIVE ACCEPTED | Kullanıcı TH-02 talimatında native kabul başarılı bildirdi; yeni ayrıntılı log/SHA verilmedi, Codex testi sayılmaz |
 | TH-02 overlay | DONE | Kullanıcı TH-03 talimatında native kabulü bildirdi; yeni ayrıntılı log/SHA verilmedi |
 | TH-03 | TESTING | Otomatik gizlenme, `T`, kalıcı ayar; ayrı native kabul bekleniyor |
-| TH-04 | TODO | Thumbnail gezinme senkronizasyonu |
-| TH-05 | TODO | Sistem thumbnail üretimi |
+| TH-04 | TESTING | Mevcut dev senkronizasyonu, scroll/ilk açılış regresyonları düzeltildi; native kabul bekleniyor |
+| TH-05 | TESTING | Tam katalog progresif cache + native GNOME generation; gerçek native kabul bekleniyor |
 | TH-06 | TODO | Thumbnail genel kabul ve optimizasyon |
 | TH-07 | TODO | Tam ekran fotoğraf görüntüleme; PIV-18 alt görevi, yalnız planlandı |
 
@@ -2261,3 +2261,44 @@ Native tek komut: `bash tests/run_thumbnail_visibility_probe.sh`.
 yeniden çalıştırarak persistence, normal uygulamada gizli şeridi açmayan Sol/Sağ
 ayrıca kullanıcı tarafından kontrol edilecek. **TH-03 TESTING; TH-04/TH-05/TH-07
 kodlanmadı; PIV-18 TESTING, PIV-19 başlamadı.**
+
+
+## TH-04 kök neden / TH-05 tam thumbnail sistemi — 25.10.2026 — TESTING
+
+Başlangıç `fe7b6f7b56671999aef2604f96333f4202767cfd`; temiz dev,24 remote commit
+ff-only getirildi. Başarısız geçmiş yamalar yeniden uygulanmadı.
+
+| Gerçek SHA | Kapsam |
+|---|---|
+| `0f9db6232afccb3a7274805e1a71834db93ad053` | API-checked optional GNOME factory sidecar; cache-first generation, SourceFileKey/stat/save guard'ları, limit/kill/reap/scratch ve7 C API test senaryosu |
+| `f9283d59f0917cacf58f09cf3929748d125d10ff` | Stable hücreler/scroll, ilk tamamlanan scan anchor'ı, tüm katalog için viewport-priority queue, LRU/hidden-work/retry/epoch;120 JPEG/PNG ve gerçek window.rs callback testleri |
+
+Eski focused-cell rebuild kontrolünde scroll10400→~385 (150ms) gözlendi;
+eski regression hücre identity assertion'ı FAIL. Yeni kod seçimde hücreleri
+kaldırmaz, odak taşımaz; singleton→asenkron katalog ve gerçek allocation tek
+initial hizalama kapısıdır. Eski7-öğelik pencere yerine tüm pending katalog
+progresif işlenir. Son controlled testte120/120, failed0,64 texture/4MiB
+konservatif sahiplik; aynı stabil seçimde tekrar decode0.
+
+PASS:86 Rust (62 unit+24 integration), fmt/check/build/test/all-target Clippy
+-D warnings;30 Python observer +29 thumbnail Python testi (11 cache,6 modül,
+5 metadata helper,7 generation helper), fixture/hash ve shell/whitespace.
+C helper testleri gerçek C/GLib/GIO/GdkPixbuf + GNOME API stub'dır; gerçek
+GNOME generation diye sayılmaz. Current GUI: X11 light, X11 dark+scale2 ve
+Sway Wayland; legacy TH-02/03 UI, controlled PIV-16/PIV-17 PASS.
+Testte mevcut loading-text/preset kararlarıyla çelişen eski assertion'lar
+FullLoading/hidden text ve Actual korunması/aynı texture ile güncellendi;
+ürünün kabul edilmiş davranışı tersine çevrilmedi.
+
+NOT RUN: gerçek GNOME helper link/runtime, secure Glycin thumbnail pikselleri
+ve fiziksel Arch GNOME kabulü. Codex'te GNOME development modülü yok;
+`--require-generation-helper` exit77 verdi. Bilinen Bwrap uid-map engeli yeniden
+denenmedi. Rlimit sandbox olarak sunulmaz; source generation GNOME sistem
+politikasını, cache/main pixel decode zorunlu Glycin Bwrap'ı kullanır.
+
+Tek native komut: `bash tests/run_thumbnail_system_probe.sh` — private fixture/
+config/cache, gerçek cache ve generation gate, ardından iki üretim TEST penceresi.
+[Kök neden, sınırlar ve kabul adımları](TH05_THUMBNAIL_SYSTEM_VALIDATION.md).
+TH-04/TH-05 TESTING; TH-06/TH-07 ve PIV-19 başlamadı. PIV-18 TESTING, Faz0 temiz
+native kurulum ve DESKTOP-06 açık. Main ve üretim Glycin/preload/cache kaynakları
+korundu; yeni Rust decoder/dependency/CI eklenmedi.

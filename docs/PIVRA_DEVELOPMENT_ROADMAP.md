@@ -401,8 +401,8 @@ mevcut PIV-18'e bağlı alt görevdir. PIV-01–60 numaraları korunur.
 | TH-01 | GNOME thumbnail altyapısı | DONE — kullanıcı native kabulü |
 | TH-02 | Thumbnail overlay | DONE — kullanıcı TH-03 talimatında kabulü bildirdi |
 | TH-03 | Otomatik gizlenme, `T`, kalıcı ayar | TESTING — native kabul bekleniyor |
-| TH-04 | Thumbnail gezinme senkronizasyonu | TODO |
-| TH-05 | Sistem thumbnail üretimi | TODO |
+| TH-04 | Thumbnail gezinme senkronizasyonu | TESTING — dev regresyonları giderildi, native kabul bekleniyor |
+| TH-05 | Sistem thumbnail üretimi | TESTING — tam katalog/progresif queue, GNOME gen adapter |
 | TH-06 | Thumbnail genel kabul ve optimizasyon | TODO |
 | TH-07 | Tam ekran fotoğraf görüntüleme | TODO — yalnız planlama |
 
@@ -428,3 +428,14 @@ iptal edilebilir gizleme, `T` ve kalıcı kullanıcı tercihi eklendi.
 [Ayrı test kanıtı ve native komut](TH03_THUMBNAIL_VISIBILITY_VALIDATION.md).
 TH-04/TH-05/TH-07 kodlanmadı; PIV-18 TESTING, PIV-19 başlamadı.
 Önceki TH-07 yalnız planlama kaydı tarihsel olarak korunur.
+
+
+## TH-04 regresyonları / TH-05 — 25.10.2026 — TESTING
+
+Başlangıç fe7b6f7; önce eski scroll/initial scan/yedi-kayıt akışı analiz edildi.
+Stable hücre/scroll, ilk tamamlanan katalog için tek anchor, viewport öncelikli
+progresif yükleme ve cache-first native GNOME generation helper eklendi.
+[Gerçek SHA'lar, kök neden, test sınıfları ve tek native komut](TH05_THUMBNAIL_SYSTEM_VALIDATION.md).
+Codex'te86 Rust/59 Python ve kontrollü X11/Sway regresyonları PASS; gerçek GNOME
+helper/secure thumbnail pixel/native fiziksel kabul NOT RUN. Native gate olmadan
+TH-05 DONE değildir. TH-06/TH-07 ve PIV-19 başlamadı; PIV-18 TESTING korunur.

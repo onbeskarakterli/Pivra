@@ -844,3 +844,25 @@ Actual early-preview and upgrade viewport continuity remain unavailable, not PAS
 ## PIV-17 Arch native ve manuel kabul kapanışı — 24.10.2026 — DONE
 
 Kullanıcı `07f47b5fb21200d8337933893128b700e5b8329d` üzerinde `bash tests/run_preload_probe.sh` çalıştırdı, **exit 0**. Gerçek secure JPEG/PNG/EXIF baseline, cache hit/texture reuse/Fit/filter, next-before-previous preload, LRU eviction, atomic replace/delete identity, hesaplanan bellek bütçesi, injected memory pressure, source integrity, worker-entry promotion ve foreground priority, window close/drain **PASS**. Örnek: hits=3, misses=6, evictions=5; enabled başlangıcı foreground=1/background=2; disabled foreground=2. Native secure secondary probe promoted=1, cancelled=2, started=completed=4, cache entries/bytes=0 after drain. PIV-09 gerçek active decoder memfd/pidfd/mapping/sandbox close checkpoint, job join, survivor pixels, children cleanup PASS. `Cleanup SIGCONT unavailable` hedef PID zaten çıkmışken fatal değildi. Kullanıcı gerçek GNOME arayüzünde hızlı Sol/Sağ gezinmenin sorunsuz olduğunu bildirdi; ayrı gerçek RSS/VRAM/FPS/hız kazanımı, OS gerçek memory-pressure sinyali ve decoder overlap **NOT MEASURED/NOT RUN**. **PIV-17 DONE; PIV-18 TODO.** Faz 0 temiz kurulum INCOMPLETE, DESKTOP-06 Nautilus NOT RUN, PIV-39 i18n açık.
+
+
+## TH-04/TH-05 thumbnail system — TESTING (2026-10-25)
+
+Thumbnail selection keeps stable cells and horizontal scroll. The first completed
+folder scan aligns the selected item after real GTK allocation. Cache loading is
+progressive across the full photo catalog, prioritizes the viewport, and keeps a
+bounded per-window texture LRU. Missing thumbnails use an optional, API-checked
+native GNOME factory sidecar; cache pixels still require secure Glycin/Bwrap.
+No independent JPEG/PNG decoder or fullscreen feature was added.
+
+Arch GNOME Wayland acceptance (private TEST media/config/cache, then two real
+production windows; native decoder mode, not the controlled Codex stub):
+
+```bash
+bash tests/run_thumbnail_system_probe.sh
+```
+
+Missing GNOME factory development API/helper returns77/NOT RUN; it is not a
+successful generation test. Normal cache-only viewing remains available. Native
+acceptance is still pending. See [root cause and validation](docs/TH05_THUMBNAIL_SYSTEM_VALIDATION.md)
+for the real SHAs, controlled/native evidence split and remaining limits.

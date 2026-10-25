@@ -32,7 +32,13 @@ fn main() {
         ("large.png", (1600, 1200)),
         ("no-exif.jpg", (64, 32)),
     ] {
-        let path = root.join(name);
+        // The app scans the opened file's parent directory asynchronously.
+        // Keep each admission fixture in its own directory: the shared fixtures
+        // include deliberately corrupt files that must not contaminate this
+        // single-file open/URI test through catalog navigation or callbacks.
+        let isolated = tempfile::tempdir().unwrap();
+        let path = isolated.path().join(name);
+        std::fs::copy(root.join(name), &path).unwrap();
         let original = std::fs::read(&path).unwrap();
         // Exercise both the original fixture directory and URI admission.
         for uri in [false, true] {

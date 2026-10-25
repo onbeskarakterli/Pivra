@@ -2521,3 +2521,11 @@ secure baseline/path/preload ve çoğu render PASS, tüm paket PASS değil.
 
 [Ayrıntılı neden ve bariyer](PIV18_VALIDATION.md#native-view-mode-gezinme-regresyonu--25102026--testing).
 PIV-18 TESTING; başarılı native sonuç ve kapsam kararı gelmeden DONE yok.
+
+## 25.10.2026 — Takip 01–04, Faz 2 0.1.0 kapsam kabulü (güncel)
+
+Kullanıcı erken preview'nin sonraki sürüme ertelenmesini açıkça kabul etti (Takip 01). Önceki fotoğrafın üzerinde ana-yükleme spinner'ı `c811e5c` ile eklendi ve kullanıcı normal fotoğraf geçişlerini kabul etti (Takip 02); spinner'ın uzun yüklemede fiziksel görünmesi ayrıca ölçülmedi. Thumbnail testinin ortak Enabled tercihi nedeniyle bozulan başlangıç beklentisi `02a36ef` ile düzeltildi. Kullanıcı gerçek thumbnail yükleme/tıklama davranışını kabul etti; `bash tests/run_thumbnail_system_probe.sh` **exit 0** (Takip 03).
+
+Native birleşik `bash tests/run_preview_pipeline_probe.sh` **exit 0** (Takip 04, kullanıcı Arch/GNOME Wayland): secure JPEG/PNG/EXIF, normal path/URI girişleri, Fit/Fill/Actual/filtre, preload/cache, async A-B-A, iki pencere, PIV09 active secure decode close/cleanup PASS. Yanlış test varsayımları üretim koduna dokunulmadan `ffe9ab5`, `3c08a6c`, `eef9910`, `30dcb81`, `932fe44` ile giderildi. Önceki FAIL kayıtları tarihsel, artık güncel engel değil.
+
+**PIV-18: DONE — yalnız kullanıcının onayladığı Pivra 0.1.0 full-only kapsamıyla. Faz 2 bu kapsamda kabul edildi.** Gerçek erken preview tamamlanmadı; sonraki sürüme ertelendi. TH-03 tercih kalıcılığının bağımsız manuel yeniden başlatma kabulü raporda açık kalır ve paket/yayın kapıları (Faz 0 temiz Arch, gerçek Nautilus, lisans, ikon/helper, AUR) **tamamlanmış sayılmaz**. `main` değiştirilmedi.

@@ -68,6 +68,7 @@ struct Inner {
     frames: RefCell<Option<(gdk::FrameClock, glib::SignalHandlerId)>>,
     validation: RefCell<Option<gio::Cancellable>>,
     warming: RefCell<Option<gio::Cancellable>>,
+    cell_size: Cell<(i32, i32)>,
 }
 #[derive(Debug, Default)]
 pub(crate) struct ThumbnailStats {
@@ -106,6 +107,7 @@ impl ThumbnailStrip {
             frames: RefCell::new(None),
             validation: RefCell::new(None),
             warming: RefCell::new(None),
+            cell_size: Cell::new((CELL_WIDTH, CELL_HEIGHT)),
         });
         let weak = Rc::downgrade(&inner);
         inner.scroller.connect_map(move |strip| {
@@ -185,6 +187,29 @@ impl ThumbnailStrip {
         });
         inner.scroller.add_controller(drag);
         Self(inner)
+    }
+    pub(crate) fn resize_cells(&self, panel_height: i32) {
+        let height = (panel_height - 34).max(CELL_HEIGHT);
+        let width = (f64::from(CELL_WIDTH) * f64::from(height) / f64::from(CELL_HEIGHT))
+            .round() as i32;
+        let size = (width, height);
+        if self.0.cell_size.replace(size) == size { return; }
+        for entry in self.0.entries.borrow().iter() {
+            if let Some(w) = &entry.widgets {
+                w.button.set_size_request(width, height);
+                if let Some(texture) = entry.texture.as_ref() {
+                    let ratio = (width as f64 / texture.width() as f64)
+                        .min(height as f64 / texture.height() as f64);
+                    w.selection.set_size_request(
+                        (texture.width() as f64 * ratio).round().max(1.0) as i32,
+                        (texture.height() as f64 * ratio).round().max(1.0) as i32,
+                    );
+                } else {
+                    w.selection.set_size_request(width, height);
+                }
+            }
+        }
+        self.0.scroller.queue_draw();
     }
     pub(crate) fn stats(&self) -> ThumbnailStats {
         let e = self.0.entries.borrow();
@@ -415,8 +440,9 @@ impl Inner {
                         entry.keys = Some((source, cache));
                         entry.phase = Phase::Ready;
                         if let Some(w) = &entry.widgets {
-                            let ratio = (CELL_WIDTH as f64 / texture.width() as f64)
-                                .min(CELL_HEIGHT as f64 / texture.height() as f64);
+                            let (cell_width, cell_height) = i.cell_size.get();
+                            let ratio = (cell_width as f64 / texture.width() as f64)
+                                .min(cell_height as f64 / texture.height() as f64);
                             w.selection.set_size_request(
                                 ((texture.width() as f64 * ratio).round() as i32).max(1),
                                 ((texture.height() as f64 * ratio).round() as i32).max(1),
@@ -561,7 +587,8 @@ impl Inner {
             for entry in entries.iter_mut().filter(|e| e.widgets.is_none()).take(32) {
                 let button = gtk::Button::new();
                 button.add_css_class("pivra-thumbnail-cell");
-                button.set_size_request(CELL_WIDTH, CELL_HEIGHT);
+                let (cell_width, cell_height) = i.cell_size.get();
+                button.set_size_request(cell_width, cell_height);
                 button.set_valign(gtk::Align::Center);
                 button.set_focus_on_click(false);
                 button.set_widget_name(&format!("thumbnail-cell-{}", entry.index.get()));
@@ -573,7 +600,7 @@ impl Inner {
                 selection.set_halign(gtk::Align::Center);
                 selection.set_valign(gtk::Align::Center);
                 selection.set_can_target(false);
-                selection.set_size_request(CELL_WIDTH, CELL_HEIGHT);
+                selection.set_size_request(cell_width, cell_height);
                 if Some(entry.index.get()) == i.selected.get() {
                     selection.add_css_class("selected");
                 }
@@ -583,8 +610,8 @@ impl Inner {
                 // Hidden predecode can complete before a GTK cell exists.
                 // Hydrate new cells from their already-ready textures.
                 if let Some(texture) = entry.texture.as_ref() {
-                    let ratio = (CELL_WIDTH as f64 / texture.width() as f64)
-                        .min(CELL_HEIGHT as f64 / texture.height() as f64);
+                    let ratio = (cell_width as f64 / texture.width() as f64)
+                        .min(cell_height as f64 / texture.height() as f64);
                     selection.set_size_request(
                         ((texture.width() as f64 * ratio).round() as i32).max(1),
                         ((texture.height() as f64 * ratio).round() as i32).max(1),
@@ -875,8 +902,9 @@ impl Inner {
                             entry.phase = Phase::Ready;
                             entry.used = i.clock.get();
                             if let Some(w) = &entry.widgets {
-                                let ratio = (CELL_WIDTH as f64 / texture.width() as f64)
-                                    .min(CELL_HEIGHT as f64 / texture.height() as f64);
+                                let (cell_width, cell_height) = i.cell_size.get();
+                                let ratio = (cell_width as f64 / texture.width() as f64)
+                                    .min(cell_height as f64 / texture.height() as f64);
                                 let width = (texture.width() as f64 * ratio).round() as i32;
                                 let height = (texture.height() as f64 * ratio).round() as i32;
                                 w.selection.set_size_request(width.max(1), height.max(1));

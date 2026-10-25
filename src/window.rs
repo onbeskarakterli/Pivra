@@ -104,8 +104,7 @@ fn install_navigation_arrows(overlay: &gtk::Overlay) {
         arrow.set_content_height(72);
         arrow.set_can_target(false);
         arrow.set_draw_func(move |_, cr, width, height| {
-            // DrawingArea can be allocated the full-height navigation panel.
-            // Keep the chevron a fixed physical size, centered in that panel.
+            // Keep the wide chevron centered in the shorter navigation panel.
             let cx = f64::from(width) / 2.0;
             let cy = f64::from(height) / 2.0;
             let tip_x = if left { cx - 18.0 } else { cx + 18.0 };
@@ -122,8 +121,9 @@ fn install_navigation_arrows(overlay: &gtk::Overlay) {
         button.set_child(Some(&arrow));
         button.set_action_name(Some(action));
         button.set_halign(align);
-        button.set_valign(gtk::Align::Fill);
-        button.set_size_request(112, -1);
+        button.set_valign(gtk::Align::Center);
+        // A tall side strip, but no longer full-height; leave space above and below.
+        button.set_size_request(112, 340);
         button.set_focus_on_click(false);
         button.set_visible(false);
         overlay.add_overlay(&button);

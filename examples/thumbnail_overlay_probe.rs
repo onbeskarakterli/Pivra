@@ -17,6 +17,12 @@ static CORRUPT_DURING_LOAD: std::sync::atomic::AtomicBool =
     std::sync::atomic::AtomicBool::new(false);
 static THUMB_LOADS: AtomicUsize = AtomicUsize::new(0);
 static THUMB_ORDER: std::sync::Mutex<Vec<std::path::PathBuf>> = std::sync::Mutex::new(Vec::new());
+struct ThumbAttempt {
+    path: std::path::PathBuf,
+    token: gio::Cancellable,
+    completed: Option<bool>,
+}
+static THUMB_ATTEMPTS: std::sync::Mutex<Vec<ThumbAttempt>> = std::sync::Mutex::new(Vec::new());
 use adw::prelude::*;
 use gtk::{gdk, gio, glib};
 use std::{
@@ -105,17 +111,33 @@ mod image_loader {
     ) -> Result<LoadedFrame, String> {
         THUMB_LOADS.fetch_add(1, Ordering::SeqCst);
         THUMB_ORDER.lock().unwrap().push(p.to_owned());
-        if std::env::args().any(|s| s == "--native-thumbnails") {
+        let attempt = {
+            let mut attempts = THUMB_ATTEMPTS.lock().unwrap();
+            let index = attempts.len();
+            attempts.push(ThumbAttempt {
+                path: p.to_owned(),
+                token: c.clone(),
+                completed: None,
+            });
+            index
+        };
+        let result = if std::env::args().any(|s| s == "--native-thumbnails") {
             native_image_loader::preload(p, c, budget)
                 .await
                 .map(LoadedFrame::Native)
         } else {
+            // Test-only noncooperative worker, to measure priority cancellation.
+            if std::env::args().any(|s| s == "--catalog-cancel-race") {
+                std::thread::sleep(Duration::from_millis(60));
+            }
             let result = load(p, c).await;
             if CORRUPT_DURING_LOAD.swap(false, Ordering::SeqCst) {
                 std::fs::write(p, b"controlled cache race").unwrap();
             }
             result
-        }
+        };
+        THUMB_ATTEMPTS.lock().unwrap()[attempt].completed = Some(result.is_ok());
+        result
     }
 }
 fn pump() {

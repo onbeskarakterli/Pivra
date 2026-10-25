@@ -129,6 +129,8 @@ def main():
                         args.append("--catalog-regression")
                     if "--thumbnail-retention" in sys.argv[2:]:
                         args.append("--retention-regression")
+                    if "--catalog-cancel-race" in sys.argv[2:]:
+                        args.append("--catalog-cancel-race")
                     if "--dark" in sys.argv[2:]:
                         args.append("--dark")
                     result = subprocess.run(args, env={**env, "G_DEBUG": "fatal-criticals"},

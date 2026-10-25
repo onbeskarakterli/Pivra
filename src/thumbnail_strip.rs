@@ -182,7 +182,16 @@ impl ThumbnailStrip {
             failed: e.iter().filter(|e| e.phase == Phase::Failed).count(),
             textures: e.iter().filter(|e| e.texture.is_some()).count(),
             bytes: e.iter().map(|e| e.cost).sum(),
-            running: self.0.active.borrow().is_some() || self.0.validation.borrow().is_some(),
+            // An idle gap before the retry/after-paint admission is not a drain.
+            // Hidden/closed strips intentionally leave deferred entries pending.
+            running: self.0.active.borrow().is_some()
+                || self.0.validation.borrow().is_some()
+                || (!self.0.closed.get()
+                    && self.0.scroller.is_mapped()
+                    && (self.0.retry.borrow().is_some()
+                        || self.0.building.borrow().is_some()
+                        || e.iter()
+                            .any(|e| matches!(e.phase, Phase::Pending | Phase::Loading)))),
             started: self.0.started.get(),
             decoded_max: self.0.decoded_max.get(),
             largest_texture: e.iter().map(|e| e.cost).max().unwrap_or(0),
@@ -373,6 +382,7 @@ impl Inner {
             token.cancel();
         }
         if let Some(active) = self.active.borrow().as_ref() {
+            trace("cancel-pause-or-epoch", &active.path);
             active.token.cancel();
         }
         if let Some(id) = self.retry.borrow_mut().take() {
@@ -576,12 +586,14 @@ impl Inner {
             .or_else(|| entries.iter().position(|e| e.phase == Phase::Pending));
         if let Some(active) = self.active.borrow().as_ref() {
             if let Some(next) = next {
-                if visible.contains(&next)
+                if !active.token.is_cancelled()
+                    && visible.contains(&next)
                     && !entries
                         .iter()
                         .position(|e| e.path == active.path)
                         .is_some_and(|n| near.contains(&n))
                 {
+                    trace("cancel-visible-priority", &active.path);
                     active.token.cancel();
                 }
             }
@@ -591,6 +603,16 @@ impl Inner {
             return;
         };
         let path = entries[n].path.clone();
+        trace(
+            if Some(n) == selected {
+                "admit-selected"
+            } else if visible.contains(&n) {
+                "admit-visible"
+            } else {
+                "admit-background"
+            },
+            &path,
+        );
         entries[n].phase = Phase::Loading;
         drop(entries);
         let token = gio::Cancellable::new();
@@ -680,7 +702,10 @@ impl Inner {
                 let stale = token.is_cancelled() || epoch != i.epoch.get();
                 entry.phase = Phase::Failed;
                 match result {
-                    _ if stale => entry.phase = Phase::Pending,
+                    _ if stale => {
+                        trace("discard-stale-or-cancelled", &path);
+                        entry.phase = Phase::Pending;
+                    }
                     Work::Hit(texture, source, cache, decoded_cost) => {
                         i.decoded_max.set(i.decoded_max.get().max(decoded_cost));
                         // Identity was verified on the worker before publication;
@@ -734,6 +759,7 @@ impl Inner {
                     break;
                 };
                 let e = &mut entries[n];
+                trace("evict", &e.path);
                 e.texture = None;
                 e.cost = 0;
                 e.phase = Phase::Evicted;
@@ -769,6 +795,7 @@ fn reconsider_evicted(
     if last.replace(range) != range {
         for (n, e) in entries.iter_mut().enumerate() {
             if (visible.contains(&n) || Some(n) == selected) && e.phase == Phase::Evicted {
+                trace("rehydrate-after-viewport-or-selection", &e.path);
                 e.phase = Phase::Pending;
             }
         }
@@ -824,6 +851,13 @@ fn display_size(width: i32, height: i32, scale: i32) -> (i32, i32) {
         (f64::from(width) * ratio).floor().max(1.) as i32,
         (f64::from(height) * ratio).floor().max(1.) as i32,
     )
+}
+
+// Explicit opt-in diagnostics only; never an unbounded in-memory event history.
+fn trace(event: &str, path: &std::path::Path) {
+    if std::env::var_os("PIVRA_TRACE_THUMBNAILS").is_some_and(|v| v == "1") {
+        eprintln!("Pivra thumbnail {event}: {}", path.display());
+    }
 }
 
 enum Work {

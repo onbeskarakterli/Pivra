@@ -174,6 +174,7 @@ pub(super) fn run(app: &adw::Application) {
     // Initially hidden, then first measured reveal: first/middle/last selections.
     for selected in [0, 79, 119] {
         let calls_before = THUMB_LOADS.load(Ordering::SeqCst);
+        let attempts_before = THUMB_ATTEMPTS.lock().unwrap().len();
         let mut order_before = THUMB_ORDER.lock().unwrap().len();
         let (window, view, picture) = open(app);
         if selected == 79 {
@@ -225,12 +226,37 @@ pub(super) fn run(app: &adw::Application) {
             window.close();
             continue;
         }
+        if std::env::args().any(|s| s == "--catalog-cancel-race") {
+            assert!(
+                !native,
+                "controlled timing must not impersonate native decoder evidence"
+            );
+            // Interrupt an admitted background decode twice, then restore the
+            // original viewport. Workers deliberately ignore cancellation until return.
+            until(|| THUMB_LOADS.load(Ordering::SeqCst) >= calls_before + 10);
+            let original = strip.hadjustment().value();
+            let before = THUMB_LOADS.load(Ordering::SeqCst);
+            strip.hadjustment().set_value(strip.hadjustment().upper());
+            until(|| THUMB_LOADS.load(Ordering::SeqCst) > before);
+            let before_second = THUMB_LOADS.load(Ordering::SeqCst);
+            let middle = button(&row, 40).compute_bounds(&row).unwrap();
+            strip.hadjustment().set_value(f64::from(middle.x()));
+            until(|| THUMB_LOADS.load(Ordering::SeqCst) > before_second);
+            strip.hadjustment().set_value(original);
+        }
         until(|| view.thumbnail_stats().completed == 120 && !view.thumbnail_stats().running);
+        let cancelled = audit_attempts(&photos, attempts_before);
+        if std::env::args().any(|s| s == "--catalog-cancel-race") {
+            assert_eq!(
+                cancelled, 2,
+                "controlled case must exercise both priority cancellations"
+            );
+        }
         let stats = view.thumbnail_stats();
         assert_eq!(
             THUMB_LOADS.load(Ordering::SeqCst) - calls_before,
-            120,
-            "not exactly one decode per cached entry"
+            120 + cancelled,
+            "each extra decode must be accounted for by a cancelled attempt"
         );
         let first_visible = (strip.hadjustment().value() / 104.).floor() as usize;
         assert_eq!(
@@ -729,4 +755,124 @@ fn thumb_picture(button: &gtk::Button) -> gtk::Picture {
         child = w.next_sibling();
     }
     panic!("missing thumbnail picture");
+}
+
+fn audit_attempts(photos: &[(usize, PathBuf)], start: usize) -> usize {
+    let attempts = THUMB_ATTEMPTS.lock().unwrap();
+    let slice = &attempts[start..];
+    for (n, path) in photos {
+        let cached = cache_path(path);
+        let matching: Vec<_> = slice
+            .iter()
+            .enumerate()
+            .filter(|(_, a)| a.path == cached)
+            .collect();
+        if matching.is_empty() {
+            println!(
+                "DECODE missing source={} index={n} cache={}",
+                path.display(),
+                cached.display()
+            );
+        }
+        if matching.len() != 1 {
+            for (order, a) in &matching {
+                println!(
+                    "DECODE source={} index={n} cache={} attempt={} completed={:?} cancelled={}",
+                    path.display(),
+                    cached.display(),
+                    start + order,
+                    a.completed,
+                    a.token.is_cancelled()
+                );
+            }
+        }
+    }
+    let expected: Vec<_> = photos.iter().map(|(_, path)| cache_path(path)).collect();
+    let cancelled = validate_attempts(
+        &expected,
+        slice
+            .iter()
+            .map(|a| (a.path.as_path(), a.token.is_cancelled(), a.completed)),
+    )
+    .unwrap_or_else(|error| panic!("per-file decode audit failed: {error}"));
+    println!(
+        "DECODE audit total={} cancelled={} unique-successes={}",
+        slice.len(),
+        cancelled,
+        expected.len()
+    );
+    cancelled
+}
+
+// An aborted worker may have decoded pixels, but its result is not published.
+// Accept exactly one uncancelled successful decode per expected cache file;
+// never excuse an extra successful decode merely because totals are close.
+fn validate_attempts<'a>(
+    expected: &[PathBuf],
+    attempts: impl Iterator<Item = (&'a Path, bool, Option<bool>)>,
+) -> Result<usize, String> {
+    let mut successes: std::collections::HashMap<_, usize> =
+        expected.iter().map(|p| (p.as_path(), 0)).collect();
+    let mut cancelled_count = 0;
+    for (path, cancelled, completed) in attempts {
+        let count = successes
+            .get_mut(path)
+            .ok_or_else(|| format!("unknown cache input {}", path.display()))?;
+        let completed =
+            completed.ok_or_else(|| format!("unfinished attempt {}", path.display()))?;
+        if cancelled {
+            cancelled_count += 1;
+        } else if completed {
+            *count += 1;
+        } else {
+            return Err(format!("uncancelled decoder failure {}", path.display()));
+        }
+    }
+    for (path, count) in successes {
+        if count != 1 {
+            return Err(format!(
+                "{} has {count} uncancelled successful decodes, expected 1",
+                path.display()
+            ));
+        }
+    }
+    Ok(cancelled_count)
+}
+
+#[cfg(test)]
+mod attempt_tests {
+    use super::*;
+    #[test]
+    fn only_cancelled_extras_are_allowed() {
+        let paths = [PathBuf::from("a"), PathBuf::from("b")];
+        assert_eq!(
+            validate_attempts(
+                &paths,
+                [
+                    (paths[0].as_path(), true, Some(false)),
+                    (paths[1].as_path(), true, Some(true)),
+                    (paths[0].as_path(), false, Some(true)),
+                    (paths[1].as_path(), false, Some(true)),
+                ]
+                .into_iter()
+            ),
+            Ok(2)
+        );
+    }
+    #[test]
+    fn duplicate_success_missing_failure_unknown_and_unfinished_are_rejected() {
+        let paths = [PathBuf::from("a")];
+        let a = paths[0].as_path();
+        assert!(validate_attempts(&paths, [(a, false, Some(true)); 2].into_iter()).is_err());
+        assert!(validate_attempts(&paths, [(a, true, Some(true))].into_iter()).is_err());
+        assert!(validate_attempts(&paths, [(a, false, Some(false))].into_iter()).is_err());
+        assert!(validate_attempts(&paths, [(a, true, None)].into_iter()).is_err());
+        assert!(
+            validate_attempts(
+                &paths,
+                [(Path::new("other"), false, Some(true))].into_iter()
+            )
+            .is_err()
+        );
+    }
 }

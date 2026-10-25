@@ -4,7 +4,6 @@ use gtk::{gdk, glib};
 use std::{
     cell::{Cell, RefCell},
     rc::Rc,
-    path::PathBuf,
     time::Duration,
 };
 thread_local! { static CSS_INSTALLED: Cell<bool> = const { Cell::new(false) }; }
@@ -17,12 +16,12 @@ fn install_css(display: &gtk::gdk::Display) {
         css.load_from_string("\
             .pivra-thumbnail-panel { background-color: alpha(@window_bg_color, 0.25); border-radius: 12px; padding: 8px; }\n\
             .pivra-thumbnail-toggle { background-image: none; background-color: alpha(@window_bg_color, 0.25); border-radius: 16px; padding: 4px; min-width: 24px; min-height: 24px; }\n\
-            .pivra-thumbnail-cell { background-color: transparent; border: none; border-radius: 0; box-shadow: none; }\n\
+            .pivra-thumbnail-cell { background-image: none; background-color: transparent; padding: 0; min-width: 0; min-height: 0; border: none; border-radius: 0; box-shadow: none; }\n\
             .pivra-thumbnail-cell.selected { box-shadow: inset 0 0 0 2px @accent_color; }\n");
         gtk::style_context_add_provider_for_display(display,&css,gtk::STYLE_PROVIDER_PRIORITY_APPLICATION);
     });
 }
-/// Paint-only underline never changes selected/unselected allocation.
+/// Paint-only selection outline never changes selected/unselected allocation.
 #[allow(dead_code)] // Cell content is supplied only by the explicit TH-02 probe for now.
 pub(crate) fn cell(child: &impl IsA<gtk::Widget>, selected: bool) -> gtk::Frame {
     let frame = gtk::Frame::new(None);
@@ -40,136 +39,15 @@ pub(crate) fn cell(child: &impl IsA<gtk::Widget>, selected: bool) -> gtk::Frame 
     frame.set_child(Some(&content));
     frame
 }
-/// TH-04 interaction model. TH-05 will replace the text placeholders with images.
-#[derive(Clone)]
-pub(crate) struct ThumbnailStrip {
-    items: gtk::Box,
-    scroller: gtk::ScrolledWindow,
-    on_select: Rc<RefCell<Option<Box<dyn Fn(usize)>>>>,
-    manually_scrolled: Rc<Cell<bool>>,
-    pending_selection: Rc<Cell<Option<usize>>>,
-    cache_token: Rc<RefCell<Option<gtk::gio::Cancellable>>>,
-}
-impl ThumbnailStrip {
-    pub(crate) fn on_select(&self, callback: impl Fn(usize) + 'static) {
-        self.on_select.replace(Some(Box::new(callback)));
-    }
-    pub(crate) fn clear_on_select(&self) {
-        self.on_select.borrow_mut().take();
-        if let Some(token) = self.cache_token.borrow_mut().take() {
-            token.cancel();
-        }
-    }
-    pub(crate) fn set_catalog(&self, photos: &[(usize, PathBuf)], selected: Option<usize>) {
-        // Reconcile the small placeholder strip on the GTK main thread. Real
-        // thumbnail decoding is intentionally deferred to TH-05.
-        while let Some(child) = self.items.first_child() {
-            self.items.remove(&child);
-        }
-        let mut cells = Vec::new();
-        for (index, path) in photos {
-            let name = path.file_name().unwrap_or_default().to_string_lossy();
-            let label = gtk::Label::new(Some(&name));
-            label.set_ellipsize(gtk::pango::EllipsizeMode::Middle);
-            label.set_max_width_chars(12);
-            let button = gtk::Button::new();
-            button.set_child(Some(&label));
-            button.set_size_request(CELL_WIDTH, CELL_HEIGHT);
-            button.add_css_class("pivra-thumbnail-cell");
-            if selected == Some(*index) {
-                button.add_css_class("selected");
-            }
-            button.set_tooltip_text(Some(&name));
-            let on_select = self.on_select.clone();
-            let index = *index;
-            let manually_scrolled = self.manually_scrolled.clone();
-            button.connect_clicked(move |_| {
-                manually_scrolled.set(false);
-                if let Some(callback) = on_select.borrow().as_ref() {
-                    callback(index);
-                }
-            });
-            self.items.append(&button);
-            cells.push((index, button));
-        }
-        self.load_visible_cache(photos, selected, cells);
-        if !self.manually_scrolled.get() {
-            self.pending_selection.set(
-                photos.iter().position(|(index, _)| Some(*index) == selected)
-            );
-            align_selection(&self.scroller.hadjustment(), &self.pending_selection);
-        }
-
-    }
-    fn load_visible_cache(
-        &self,
-        photos: &[(usize, PathBuf)],
-        selected: Option<usize>,
-        cells: Vec<(usize, gtk::Button)>,
-    ) {
-        if let Some(previous) = self.cache_token.borrow_mut().take() {
-            previous.cancel();
-        }
-        let Some(center) = photos.iter().position(|(index, _)| Some(*index) == selected) else {
-            return;
-        };
-        let first = center.saturating_sub(3);
-        let last = (center + 4).min(photos.len());
-        let paths: Vec<_> = photos[first..last].to_vec();
-        let token = gtk::gio::Cancellable::new();
-        self.cache_token.replace(Some(token.clone()));
-        let job = gtk::gio::spawn_blocking(move || {
-            let provider = pivra::thumbnail::Provider::discover(None);
-            let mut frames = Vec::new();
-            for (index, path) in paths {
-                if token.is_cancelled() { break; }
-                if let pivra::thumbnail::Outcome::Hit(candidate) = provider.query(&path, &token) {
-                    if !candidate.still_current(&token) { continue; }
-                    let frame = gtk::glib::MainContext::new().block_on(
-                        crate::image_loader::load(&candidate.thumbnail.path, &token)
-                    );
-                    if let Ok(frame) = frame {
-                        if candidate.still_current(&token) {
-                            frames.push((index, frame));
-                        }
-                    }
-                }
-            }
-            (token, frames)
-        });
-        let active = self.cache_token.clone();
-        gtk::glib::MainContext::default().spawn_local(async move {
-            let Ok((token, frames)) = job.await else { return; };
-            if token.is_cancelled() { return; }
-            if !active.borrow().as_ref().is_some_and(|current| current == &token) {
-                return;
-            }
-            for (index, frame) in frames {
-                if let Some((_, button)) = cells.iter().find(|(id, _)| *id == index) {
-                    let picture = gtk::Picture::for_paintable(&frame.texture());
-                    picture.set_content_fit(gtk::ContentFit::Contain);
-                    button.set_child(Some(&picture));
-                }
-            }
-        });
-    }
-}
-/// Wait until GTK measures the strip; on the first catalog update the horizontal
-/// adjustment may still report upper == page_size (no scrollable range).
-fn align_selection(adj: &gtk::Adjustment, pending: &Cell<Option<usize>>) {
-    let Some(index) = pending.get() else { return; };
-    let page = adj.page_size();
-    if page <= 0.0 || adj.upper() <= page { return; }
-    let width = f64::from(CELL_WIDTH);
-    let x = index as f64 * (width + 8.0);
-    let start = adj.value();
-    let target = if x < start { x }
-        else if x + width > start + page { x + width - page }
-        else { start };
-    adj.set_value(target.clamp(adj.lower(), (adj.upper() - page).max(adj.lower())));
-    pending.set(None);
-}
-pub(crate) fn install(window: &impl IsA<gtk::Window>, overlay: &gtk::Overlay, available: bool) -> ThumbnailStrip {
+#[path = "thumbnail_strip.rs"]
+#[allow(dead_code)] // Standalone ImageView probes exercise only subsets of window integration.
+mod strip;
+pub(crate) use strip::{ThumbnailStats, ThumbnailStrip};
+pub(crate) fn install(
+    window: &impl IsA<gtk::Window>,
+    overlay: &gtk::Overlay,
+    available: bool,
+) -> ThumbnailStrip {
     install_css(&overlay.display());
     let items = gtk::Box::new(gtk::Orientation::Horizontal, 8);
     items.set_widget_name("thumbnail-items");
@@ -181,39 +59,12 @@ pub(crate) fn install(window: &impl IsA<gtk::Window>, overlay: &gtk::Overlay, av
         .height_request(112)
         .child(&items)
         .build();
-    let manually_scrolled = Rc::new(Cell::new(false));
-    let pending_selection = Rc::new(Cell::new(None));
-    let pending_on_measure = pending_selection.clone();
-    strip.hadjustment().connect_changed(move |adj| {
-        align_selection(adj, &pending_on_measure);
-    });
-    let wheel = gtk::EventControllerScroll::new(
-        gtk::EventControllerScrollFlags::VERTICAL
-            | gtk::EventControllerScrollFlags::HORIZONTAL,
-    );
-    let wheel_strip = strip.clone();
-    let wheel_flag = manually_scrolled.clone();
-    let pending_selection_for_wheel = pending_selection.clone();
-    wheel.connect_scroll(move |_, dx, dy| {
-        if dy.abs() > f64::EPSILON {
-            let adj = wheel_strip.hadjustment();
-            let delta = if dx.abs() > f64::EPSILON { dx } else { dy };
-            adj.set_value((adj.value() + delta * 48.0).clamp(
-                adj.lower(), (adj.upper() - adj.page_size()).max(adj.lower()),
-            ));
-            wheel_flag.set(true);
-            pending_selection_for_wheel.set(None);
-            glib::Propagation::Stop
-        } else {
-            glib::Propagation::Proceed
-        }
-    });
-    strip.add_controller(wheel);
     strip.set_widget_name("thumbnail-strip");
     strip.add_css_class("pivra-thumbnail-panel");
     strip.set_margin_start(8);
     strip.set_margin_end(8);
     strip.set_visible(false);
+    strip.set_min_content_width(0);
     let button = gtk::ToggleButton::builder()
         .icon_name("pan-up-symbolic")
         .tooltip_text("Show thumbnail strip")
@@ -354,7 +205,7 @@ pub(crate) fn install(window: &impl IsA<gtk::Window>, overlay: &gtk::Overlay, av
         unmap.cancel();
         unmap.render(false);
     });
-    ThumbnailStrip { items, scroller: strip, on_select: Rc::default(), manually_scrolled, pending_selection, cache_token: Rc::default() }
+    ThumbnailStrip::new(items, strip)
 }
 type PreferenceListener = Rc<dyn Fn(bool)>;
 struct Visibility {

@@ -60,7 +60,11 @@ fn update_title(window: &adw::ApplicationWindow, title: &adw::WindowTitle, conte
 }
 
 fn update_thumbnail_catalog(view: &ImageView, context: &FileContext) {
-    let photos: Vec<_> = context.collection.items().iter().enumerate()
+    let photos: Vec<_> = context
+        .collection
+        .items()
+        .iter()
+        .enumerate()
         .filter(|(_, item)| item.kind() == MediaKind::Image)
         .map(|(index, item)| (index, item.path().to_owned()))
         .collect();
@@ -186,8 +190,15 @@ pub(super) fn build(app: &adw::Application, settings: &Settings, file: Option<Op
         let select_window = window.downgrade();
         let teardown_view = view.clone();
         window.connect_destroy(move |_| teardown_view.clear_thumbnail_select());
+        let close_view = view.clone();
+        window.connect_close_request(move |_| {
+            close_view.clear_thumbnail_select();
+            glib::Propagation::Proceed
+        });
         view.on_thumbnail_select(move |index| {
-            let Some(window) = select_window.upgrade() else { return; };
+            let Some(window) = select_window.upgrade() else {
+                return;
+            };
             let mut context = select_context.borrow_mut();
             if context.collection.selected_index() == Some(index) {
                 return;
@@ -494,6 +505,10 @@ impl FolderWatch {
                     }
                     state.view.set_neighbors(context.collection.photo_neighbors());
                     update_thumbnail_catalog(&state.view, &context);
+                    // Revalidate the reconciled catalog: rebuilding the model may
+                    // cancel an older metadata epoch (e.g. replace + delete).
+                    state.view.invalidate_thumbnails();
+                    state.view.finish_initial_thumbnail_catalog(context.collection.selected_index());
                     let count = context.collection.items().len();
                     let suffix = if warnings == 0 {
                         format!("{count} {}", if count == 1 { "candidate" } else { "candidates" })
@@ -512,6 +527,9 @@ impl FolderWatch {
                     context.suffix = Some("folder scan failed".into());
                     context.warning = true;
                     update_thumbnail_catalog(&state.view, &context);
+                    // Revalidate the reconciled catalog: rebuilding the model may
+                    // cancel an older metadata epoch (e.g. replace + delete).
+                    state.view.invalidate_thumbnails();
                     if state.initialized.get() {
                         state.view.show_message("Folder unavailable. Media cannot be accessed.");
                     }

@@ -125,6 +125,10 @@ def main():
                         args.append("--zoom-pan")
                     if "--synthetic" in sys.argv[2:]:
                         args.append("--synthetic")
+                    if "--thumbnail-catalog" in sys.argv[2:]:
+                        args.append("--catalog-regression")
+                    if "--dark" in sys.argv[2:]:
+                        args.append("--dark")
                     result = subprocess.run(args, env={**env, "G_DEBUG": "fatal-criticals"},
                                             capture_output=True, text=True, timeout=60)
                     print(result.stdout, end="")

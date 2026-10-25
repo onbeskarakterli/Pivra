@@ -186,6 +186,7 @@ impl ImageView {
         self.slot.stats()
     }
 
+    #[allow(dead_code)] // Used by the production window, only a subset of standalone probes.
     pub(super) fn set_thumbnail_catalog(
         &self,
         photos: &[(usize, PathBuf)],
@@ -193,9 +194,23 @@ impl ImageView {
     ) {
         self.thumbnail_strip.set_catalog(photos, selected);
     }
+    #[allow(dead_code)]
+    pub(super) fn finish_initial_thumbnail_catalog(&self, selected: Option<usize>) {
+        self.thumbnail_strip.finish_initial_catalog(selected);
+    }
+    #[allow(dead_code)]
+    pub(super) fn thumbnail_stats(&self) -> thumbnail_overlay::ThumbnailStats {
+        self.thumbnail_strip.stats()
+    }
+    #[allow(dead_code)]
+    pub(super) fn invalidate_thumbnails(&self) {
+        self.thumbnail_strip.invalidate();
+    }
+    #[allow(dead_code)]
     pub(super) fn on_thumbnail_select(&self, callback: impl Fn(usize) + 'static) {
         self.thumbnail_strip.on_select(callback);
     }
+    #[allow(dead_code)]
     pub(super) fn clear_thumbnail_select(&self) {
         self.thumbnail_strip.clear_on_select();
     }

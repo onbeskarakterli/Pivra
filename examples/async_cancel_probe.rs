@@ -264,8 +264,11 @@ fn controlled(app: &adw::Application) {
     release(10, &joined, 11);
     wait(|| STARTED.load(Ordering::SeqCst) == 12);
     assert!(picture(&v).paintable().is_none());
-    assert!(status(&v).is_visible());
-    assert_eq!(status(&v).text(), "Loading image securely…");
+    // c9e16cc deliberately removed transient loading text. Verify the latest
+    // request still owns FullLoading without reviving an old callback's UI.
+    assert!(!status(&v).is_visible());
+    assert_eq!(status(&v).text(), "");
+    assert_eq!(v.phase(), pivra::image_pipeline::Phase::FullLoading);
     release(11, &joined, 12);
     assert_eq!(center(&w, &v), [255, 0, 255]);
     let (other, survivor) = open(app);
@@ -293,7 +296,9 @@ fn controlled(app: &adw::Application) {
     drop(w);
     release(12, &joined, 13);
     wait(|| weak.upgrade().is_none() && widget.upgrade().is_none());
-    assert_eq!(status(&survivor).text(), "Loading image securely…");
+    assert_eq!(status(&survivor).text(), "");
+    assert!(!status(&survivor).is_visible());
+    assert_eq!(survivor.phase(), pivra::image_pipeline::Phase::FullLoading);
     release(13, &joined, 14);
     assert!(!CANCELLED[13].load(Ordering::SeqCst));
     assert!(CANCELLED[12].load(Ordering::SeqCst));

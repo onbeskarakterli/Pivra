@@ -96,40 +96,6 @@ pub fn thumbnail_preference() -> Rc<ThumbnailPreference> {
     THUMBNAILS.with(Rc::clone)
 }
 
-#[cfg(test)]
-mod thumbnail_tests {
-    use super::*;
-    #[test]
-    fn default_persist_restart_and_corruption() {
-        let root = tempfile::tempdir().unwrap();
-        let path = root.path().join("pivra/thumbnails.conf");
-        let p = ThumbnailPreference::load(path.clone());
-        assert!(!p.enabled());
-        p.set_enabled(true);
-        assert!(ThumbnailPreference::load(path.clone()).enabled());
-        p.set_enabled(false);
-        assert!(!ThumbnailPreference::load(path.clone()).enabled());
-        std::fs::write(&path, b"invalid or partial data").unwrap();
-        assert!(!ThumbnailPreference::load(path).enabled());
-    }
-    #[test]
-    fn shared_listeners_and_unwritable_storage_are_nonfatal() {
-        let root = tempfile::tempdir().unwrap();
-        let path = root.path().join("not-a-directory");
-        std::fs::write(&path, b"file").unwrap();
-        let p = ThumbnailPreference::load(path.join("setting"));
-        let observed = Rc::new(Cell::new(false));
-        let c = observed.clone();
-        let listener: Rc<Listener> = Rc::new(move |value| c.set(value));
-        p.subscribe(&listener);
-        p.set_enabled(true);
-        assert!(p.enabled() && observed.get());
-        drop(listener);
-        p.set_enabled(false);
-        assert!(p.listeners.borrow().is_empty());
-    }
-}
-
 /// Remember the last chosen Fit / Fill / 100% preset between launches.
 pub fn load_view_mode() -> crate::viewing::ViewMode {
     use std::io::Read;
@@ -168,5 +134,39 @@ pub fn save_view_mode(mode: crate::viewing::ViewMode) {
     })();
     if let Err(err) = result {
         eprintln!("Pivra: could not save view mode: {err}");
+    }
+}
+
+#[cfg(test)]
+mod thumbnail_tests {
+    use super::*;
+    #[test]
+    fn default_persist_restart_and_corruption() {
+        let root = tempfile::tempdir().unwrap();
+        let path = root.path().join("pivra/thumbnails.conf");
+        let p = ThumbnailPreference::load(path.clone());
+        assert!(!p.enabled());
+        p.set_enabled(true);
+        assert!(ThumbnailPreference::load(path.clone()).enabled());
+        p.set_enabled(false);
+        assert!(!ThumbnailPreference::load(path.clone()).enabled());
+        std::fs::write(&path, b"invalid or partial data").unwrap();
+        assert!(!ThumbnailPreference::load(path).enabled());
+    }
+    #[test]
+    fn shared_listeners_and_unwritable_storage_are_nonfatal() {
+        let root = tempfile::tempdir().unwrap();
+        let path = root.path().join("not-a-directory");
+        std::fs::write(&path, b"file").unwrap();
+        let p = ThumbnailPreference::load(path.join("setting"));
+        let observed = Rc::new(Cell::new(false));
+        let c = observed.clone();
+        let listener: Rc<Listener> = Rc::new(move |value| c.set(value));
+        p.subscribe(&listener);
+        p.set_enabled(true);
+        assert!(p.enabled() && observed.get());
+        drop(listener);
+        p.set_enabled(false);
+        assert!(p.listeners.borrow().is_empty());
     }
 }

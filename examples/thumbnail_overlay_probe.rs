@@ -1,8 +1,22 @@
 //! TH-02 only: synthetic main image + explicitly labelled TEST PLACEHOLDERS.
+#[path = "support/thumbnail_catalog.rs"]
+mod catalog_probe;
 #[path = "../src/image_view.rs"]
 mod image_view;
+#[path = "../src/input.rs"]
+#[allow(dead_code)] // The application uses the GFile field too; this probe uses window input.
+mod input;
+#[path = "../src/image_loader.rs"]
+#[allow(dead_code)]
+mod native_image_loader;
 #[path = "support/render_frame.rs"]
 mod render_frame;
+#[path = "../src/window.rs"]
+mod window;
+static CORRUPT_DURING_LOAD: std::sync::atomic::AtomicBool =
+    std::sync::atomic::AtomicBool::new(false);
+static THUMB_LOADS: AtomicUsize = AtomicUsize::new(0);
+static THUMB_ORDER: std::sync::Mutex<Vec<std::path::PathBuf>> = std::sync::Mutex::new(Vec::new());
 use adw::prelude::*;
 use gtk::{gdk, gio, glib};
 use std::{
@@ -17,9 +31,26 @@ thread_local! {
 }
 mod image_loader {
     use super::*;
-    pub struct LoadedFrame;
+    pub enum LoadedFrame {
+        Synthetic(bool),
+        Native(native_image_loader::LoadedFrame),
+    }
     impl LoadedFrame {
         pub fn texture(&self) -> gdk::Texture {
+            match self {
+                Self::Native(frame) => return frame.texture(),
+                Self::Synthetic(true) => {
+                    return gdk::MemoryTexture::new(
+                        64,
+                        32,
+                        gdk::MemoryFormat::R8g8b8a8,
+                        &glib::Bytes::from_owned([180, 80, 40, 255].repeat(64 * 32)),
+                        256,
+                    )
+                    .upcast();
+                }
+                Self::Synthetic(false) => {}
+            }
             let mut bytes = Vec::with_capacity(1600 * 1200 * 4);
             for y in 0..1200 {
                 for x in 0..1600 {
@@ -41,16 +72,38 @@ mod image_loader {
             .upcast()
         }
     }
-    pub async fn load(_: &std::path::Path, _: &gio::Cancellable) -> Result<LoadedFrame, String> {
+    pub async fn load(
+        path: &std::path::Path,
+        cancel: &gio::Cancellable,
+    ) -> Result<LoadedFrame, String> {
         LOADS.fetch_add(1, Ordering::SeqCst);
-        Ok(LoadedFrame)
+        if path.is_absolute() && std::env::args().any(|s| s == "--native-thumbnails") {
+            return native_image_loader::load(path, cancel)
+                .await
+                .map(LoadedFrame::Native);
+        }
+        Ok(LoadedFrame::Synthetic(
+            path.starts_with(glib::user_cache_dir().join("thumbnails")),
+        ))
     }
     pub async fn preload(
         p: &std::path::Path,
         c: &gio::Cancellable,
-        _: usize,
+        budget: usize,
     ) -> Result<LoadedFrame, String> {
-        load(p, c).await
+        THUMB_LOADS.fetch_add(1, Ordering::SeqCst);
+        THUMB_ORDER.lock().unwrap().push(p.to_owned());
+        if std::env::args().any(|s| s == "--native-thumbnails") {
+            native_image_loader::preload(p, c, budget)
+                .await
+                .map(LoadedFrame::Native)
+        } else {
+            let result = load(p, c).await;
+            if CORRUPT_DURING_LOAD.swap(false, Ordering::SeqCst) {
+                std::fs::write(p, b"controlled cache race").unwrap();
+            }
+            result
+        }
     }
 }
 fn pump() {
@@ -278,6 +331,16 @@ fn key(w: &adw::ApplicationWindow, modifiers: gdk::ModifierType) -> bool {
         .emit_by_name::<bool>("key-pressed", &[&gdk::Key::t, &0u32, &modifiers])
 }
 fn main() {
+    if std::env::args().any(|s| s == "--require-generation-helper") {
+        if let Some(path) = pivra::thumbnail::generation_helper().filter(|p| p.is_file()) {
+            println!("GNOME factory sidecar: {}", path.display());
+            return;
+        }
+        eprintln!(
+            "NOT RUN: no API-checked GNOME generation sidecar; install native GNOME development packages and rebuild"
+        );
+        std::process::exit(77);
+    }
     // Separate-process persistence checks, without GTK initialization or a display.
     for arg in std::env::args() {
         if let Some(value) = arg.strip_prefix("--persist-enabled=") {
@@ -303,6 +366,10 @@ fn main() {
         .flags(gio::ApplicationFlags::NON_UNIQUE)
         .build();
     app.register(None::<&gio::Cancellable>).unwrap();
+    if std::env::args().any(|s| s == "--catalog-regression") {
+        catalog_probe::run(&app);
+        return;
+    }
     if std::env::args().any(|s| s == "--manual") {
         let (first, _first_view, _first_picture) = open(&app);
         let (second, _second_view, _second_picture) = open(&app);
@@ -540,12 +607,14 @@ fn main() {
         255,
         "thumbnail pixels remain opaque"
     );
-    assert_eq!(
-        selected.2[(selected.0 * 24 + 1) * 4 + 3],
-        0,
-        "no side frame/background"
+    assert!(
+        selected.2[(selected.0 * 24 + 1) * 4 + 3] > 0,
+        "TH-04 selected outline"
     );
-    assert_eq!(selected.2[(selected.0 + 1) * 4 + 3], 0, "no top frame");
+    assert!(
+        selected.2[(selected.0 + 1) * 4 + 3] > 0,
+        "selected top outline"
+    );
     assert!(
         selected.2[((selected.1 - 1) * selected.0 + 1) * 4 + 3] > 0,
         "selected underline"

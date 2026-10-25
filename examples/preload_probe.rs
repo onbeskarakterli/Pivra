@@ -197,7 +197,7 @@ fn run(app: &adw::Application, controlled: bool) {
             .state()
             .unwrap()
             .str(),
-        Some("fit")
+        Some("actual") // Current accepted behavior preserves the selected preset across navigation.
     );
     assert_eq!(
         w.lookup_action("image-resampling")
@@ -208,7 +208,13 @@ fn run(app: &adw::Application, controlled: bool) {
         Some("nearest")
     );
     choose(&w, "image-resampling", "smooth");
+    // Actual is a presentation wrapper; Fit exposes its same backing texture.
+    // Check object identity in that representation without expecting a cache hit
+    // to reset the user's preset implicitly.
+    choose(&w, "image-mode", "fit");
     assert_eq!(picture(&v).paintable(), Some(next.upcast()));
+    assert_eq!(v.preload_stats().foreground_decoded, decodes);
+    choose(&w, "image-mode", "actual");
     v.set_neighbors(vec![]);
     v.load(paths[1].clone());
     loaded(&v);
@@ -272,7 +278,7 @@ fn run(app: &adw::Application, controlled: bool) {
         }
     }
     println!(
-        "PASS {} cache hits reuse texture/Fit/filter, next-before-previous preload, LRU re-decode, atomic replace/delete identity, fixed budget, injected pressure, off comparison, source integrity; stats {:?}",
+        "PASS {} cache hits reuse texture/selected-preset/filter, next-before-previous preload, LRU re-decode, atomic replace/delete identity, fixed budget, injected pressure, off comparison, source integrity; stats {:?}",
         if controlled {
             "controlled synthetic"
         } else {

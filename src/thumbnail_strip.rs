@@ -1,0 +1,789 @@
+//! TH-04/05 stable cells and bounded, viewport-prioritized thumbnail work.
+use super::{CELL_HEIGHT, CELL_WIDTH};
+use gtk::{gdk, gio, glib, prelude::*};
+use pivra::{
+    image_cache::{FileKey, texture_cost},
+    thumbnail::{Outcome, Provider},
+};
+use std::{
+    cell::{Cell, RefCell},
+    collections::HashMap,
+    path::PathBuf,
+    rc::Rc,
+    sync::Mutex,
+};
+const BUDGET: usize = 16 * 1024 * 1024;
+const LIMIT: usize = 64;
+static WORKERS: Mutex<Vec<PathBuf>> = Mutex::new(Vec::new());
+struct Permit(PathBuf);
+impl Permit {
+    fn take(path: &std::path::Path) -> Option<Self> {
+        let mut jobs = WORKERS.lock().unwrap();
+        if jobs.len() >= 2 || jobs.iter().any(|p| p == path) {
+            return None;
+        }
+        jobs.push(path.to_owned());
+        Some(Self(path.to_owned()))
+    }
+}
+impl Drop for Permit {
+    fn drop(&mut self) {
+        WORKERS.lock().unwrap().retain(|p| p != &self.0);
+    }
+}
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum Phase {
+    Pending,
+    Loading,
+    Ready,
+    Evicted,
+    Failed,
+}
+struct CellWidgets {
+    button: gtk::Button,
+    picture: gtk::Picture,
+    spinner: gtk::Spinner,
+    icon: gtk::Image,
+}
+struct Entry {
+    index: Rc<Cell<usize>>,
+    path: PathBuf,
+    widgets: Option<CellWidgets>,
+    phase: Phase,
+    texture: Option<gdk::Texture>,
+    keys: Option<(FileKey, FileKey)>,
+    cost: usize,
+    used: u64,
+}
+type Selection = Box<dyn Fn(usize)>;
+struct Active {
+    path: PathBuf,
+    token: gio::Cancellable,
+    epoch: u64,
+}
+struct Inner {
+    items: gtk::Box,
+    scroller: gtk::ScrolledWindow,
+    entries: RefCell<Vec<Entry>>,
+    select: RefCell<Option<Selection>>,
+    selected: Cell<Option<usize>>,
+    initial: Cell<Option<usize>>,
+    initialized: Cell<bool>,
+    restore: Cell<Option<f64>>,
+    epoch: Cell<u64>,
+    clock: Cell<u64>,
+    started: Cell<u64>,
+    last_visible: Cell<Option<(usize, usize)>>,
+    active: RefCell<Option<Active>>,
+    building: RefCell<Option<glib::SourceId>>,
+    retry: RefCell<Option<glib::SourceId>>,
+    closed: Cell<bool>,
+    frames: RefCell<Option<(gdk::FrameClock, glib::SignalHandlerId)>>,
+    validation: RefCell<Option<gio::Cancellable>>,
+}
+#[derive(Debug, Default)]
+pub(crate) struct ThumbnailStats {
+    pub total: usize,
+    pub completed: usize,
+    pub failed: usize,
+    pub textures: usize,
+    pub bytes: usize,
+    pub running: bool,
+    pub started: u64,
+}
+#[derive(Clone)]
+pub(crate) struct ThumbnailStrip(Rc<Inner>);
+impl ThumbnailStrip {
+    pub(super) fn new(items: gtk::Box, scroller: gtk::ScrolledWindow) -> Self {
+        let inner = Rc::new(Inner {
+            items,
+            scroller,
+            entries: RefCell::new(Vec::new()),
+            select: RefCell::new(None),
+            selected: Cell::new(None),
+            initial: Cell::new(None),
+            initialized: Cell::new(false),
+            restore: Cell::new(None),
+            epoch: Cell::new(0),
+            clock: Cell::new(0),
+            started: Cell::new(0),
+            last_visible: Cell::new(None),
+            active: RefCell::new(None),
+            building: RefCell::new(None),
+            retry: RefCell::new(None),
+            closed: Cell::new(false),
+            frames: RefCell::new(None),
+            validation: RefCell::new(None),
+        });
+        let weak = Rc::downgrade(&inner);
+        inner.scroller.connect_map(move |strip| {
+            if let Some(inner) = weak.upgrade() {
+                if let Some(clock) = strip.frame_clock() {
+                    let weak = Rc::downgrade(&inner);
+                    let handler = clock.connect_after_paint(move |_| {
+                        if let Some(i) = weak.upgrade() {
+                            i.align();
+                            i.drive();
+                        }
+                    });
+                    inner.frames.replace(Some((clock, handler)));
+                }
+                inner.build();
+                inner.revalidate(false);
+                inner.scroller.queue_draw();
+            }
+        });
+        let weak = Rc::downgrade(&inner);
+        inner.scroller.connect_unmap(move |_| {
+            if let Some(i) = weak.upgrade() {
+                i.pause();
+                i.disconnect();
+            }
+        });
+        let weak = Rc::downgrade(&inner);
+        inner
+            .scroller
+            .hadjustment()
+            .connect_value_changed(move |_| {
+                if let Some(i) = weak.upgrade() {
+                    i.drive();
+                }
+            });
+        let wheel = gtk::EventControllerScroll::new(gtk::EventControllerScrollFlags::BOTH_AXES);
+        let weak = Rc::downgrade(&inner);
+        wheel.connect_scroll(move |_, dx, dy| {
+            if let Some(i) = weak.upgrade() {
+                i.initial.set(None);
+                let adj = i.scroller.hadjustment();
+                let delta = if dx.abs() > f64::EPSILON { dx } else { dy };
+                adj.set_value((adj.value() + delta * 48.).clamp(
+                    adj.lower(),
+                    (adj.upper() - adj.page_size()).max(adj.lower()),
+                ));
+                return glib::Propagation::Stop;
+            }
+            glib::Propagation::Proceed
+        });
+        inner.scroller.add_controller(wheel);
+        Self(inner)
+    }
+    pub(crate) fn stats(&self) -> ThumbnailStats {
+        let e = self.0.entries.borrow();
+        ThumbnailStats {
+            total: e.len(),
+            completed: e
+                .iter()
+                .filter(|e| !matches!(e.phase, Phase::Pending | Phase::Loading))
+                .count(),
+            failed: e.iter().filter(|e| e.phase == Phase::Failed).count(),
+            textures: e.iter().filter(|e| e.texture.is_some()).count(),
+            bytes: e.iter().map(|e| e.cost).sum(),
+            running: self.0.active.borrow().is_some() || self.0.validation.borrow().is_some(),
+            started: self.0.started.get(),
+        }
+    }
+    pub(crate) fn finish_initial_catalog(&self, selected: Option<usize>) {
+        // The production window first supplies a singleton, then its asynchronous
+        // folder scan. Only the first completed scan gets this initial anchor.
+        if !self.0.initialized.replace(true) {
+            self.0.initial.set(selected);
+            self.0.restore.set(None);
+            self.0.scroller.queue_draw();
+        }
+    }
+    pub(crate) fn on_select(&self, callback: impl Fn(usize) + 'static) {
+        self.0.select.replace(Some(Box::new(callback)));
+    }
+    pub(crate) fn clear_on_select(&self) {
+        self.0.select.borrow_mut().take();
+        self.0.closed.set(true);
+        self.0.pause();
+        self.0.disconnect();
+        if let Some(id) = self.0.building.borrow_mut().take() {
+            id.remove();
+        }
+    }
+    /// Selection-only calls never rebuild, cancel a worker, focus or realign.
+    pub(crate) fn set_catalog(&self, photos: &[(usize, PathBuf)], selected: Option<usize>) {
+        let i = &self.0;
+        i.selected.set(selected);
+        // An unconsumed first-reveal anchor follows catalog index changes.
+        if i.initial.get().is_some() {
+            i.initial.set(selected);
+        }
+        let same = {
+            let e = i.entries.borrow();
+            e.len() == photos.len() && e.iter().zip(photos).all(|(e, (_, p))| &e.path == p)
+        };
+        if !same {
+            i.last_visible.set(None);
+            i.epoch.set(i.epoch.get().wrapping_add(1));
+            i.pause();
+            let first = i.entries.borrow().is_empty();
+            let offset = i.scroller.hadjustment().value();
+            let mut old: HashMap<_, _> = i
+                .entries
+                .borrow_mut()
+                .drain(..)
+                .map(|e| (e.path.clone(), e))
+                .collect();
+            let mut next = Vec::with_capacity(photos.len());
+            for (index, path) in photos {
+                let mut entry = old.remove(path).unwrap_or_else(|| Entry {
+                    index: Rc::new(Cell::new(*index)),
+                    path: path.clone(),
+                    widgets: None,
+                    phase: Phase::Pending,
+                    texture: None,
+                    keys: None,
+                    cost: 0,
+                    used: 0,
+                });
+                entry.index.set(*index);
+                if entry.phase == Phase::Loading {
+                    entry.phase = Phase::Pending;
+                }
+                next.push(entry);
+            }
+            while let Some(child) = i.items.first_child() {
+                i.items.remove(&child);
+            }
+            for entry in &next {
+                if let Some(w) = &entry.widgets {
+                    i.items.append(&w.button);
+                }
+            }
+            i.entries.replace(next);
+            if first || i.initial.get().is_some() {
+                i.initial.set(selected);
+                i.restore.set(None);
+            } else {
+                i.restore.set(Some(offset));
+            }
+            if i.scroller.is_mapped() {
+                i.build();
+            }
+        } else {
+            for (entry, (index, _)) in i.entries.borrow().iter().zip(photos) {
+                entry.index.set(*index);
+            }
+        }
+        for entry in i.entries.borrow().iter() {
+            if let Some(w) = &entry.widgets {
+                w.button
+                    .set_widget_name(&format!("thumbnail-cell-{}", entry.index.get()));
+                if Some(entry.index.get()) == selected {
+                    w.button.add_css_class("selected");
+                } else {
+                    w.button.remove_css_class("selected");
+                }
+            }
+        }
+        i.scroller.queue_draw();
+    }
+    /// Called on a real source-folder rescan, not on photo selection.
+    pub(crate) fn invalidate(&self) {
+        self.0.revalidate(true);
+    }
+}
+impl Inner {
+    fn revalidate(self: &Rc<Self>, retry_failures: bool) {
+        self.epoch.set(self.epoch.get().wrapping_add(1));
+        let epoch = self.epoch.get();
+        self.pause();
+        let samples: Vec<_> = self
+            .entries
+            .borrow()
+            .iter()
+            .filter(|e| e.keys.is_some() || (retry_failures && e.phase == Phase::Failed))
+            .map(|e| (e.path.clone(), e.keys.clone()))
+            .collect();
+        if samples.is_empty() {
+            self.scroller.queue_draw();
+            return;
+        }
+        let token = gio::Cancellable::new();
+        self.validation.replace(Some(token.clone()));
+        let work = gio::spawn_blocking(move || {
+            let mut dirty = Vec::new();
+            for (path, keys) in samples {
+                if token.is_cancelled() {
+                    return None;
+                }
+                if keys.as_ref().is_none_or(|(source, cache)| {
+                    FileKey::read(&path).ok().as_ref() != Some(source)
+                        || FileKey::read(&cache.path).ok().as_ref() != Some(cache)
+                }) {
+                    dirty.push(path);
+                }
+            }
+            Some(dirty)
+        });
+        let weak = Rc::downgrade(self);
+        glib::MainContext::default().spawn_local(async move {
+            let Ok(Some(dirty)) = work.await else {
+                return;
+            };
+            let Some(i) = weak.upgrade() else {
+                return;
+            };
+            if i.epoch.get() != epoch || i.closed.get() {
+                return;
+            }
+            i.validation.borrow_mut().take();
+            for e in i
+                .entries
+                .borrow_mut()
+                .iter_mut()
+                .filter(|e| dirty.contains(&e.path))
+            {
+                e.phase = Phase::Pending;
+                e.texture = None;
+                e.keys = None;
+                e.cost = 0;
+                if let Some(w) = &e.widgets {
+                    w.picture.set_paintable(None::<&gdk::Texture>);
+                    w.icon.set_visible(true);
+                }
+            }
+            i.scroller.queue_draw();
+            i.drive();
+        });
+    }
+    fn disconnect(&self) {
+        if let Some((clock, id)) = self.frames.borrow_mut().take() {
+            clock.disconnect(id);
+        }
+    }
+    fn pause(&self) {
+        if !self.scroller.is_mapped() {
+            if let Some(id) = self.building.borrow_mut().take() {
+                id.remove();
+            }
+        }
+        if let Some(token) = self.validation.borrow_mut().take() {
+            token.cancel();
+        }
+        if let Some(active) = self.active.borrow().as_ref() {
+            active.token.cancel();
+        }
+        if let Some(id) = self.retry.borrow_mut().take() {
+            id.remove();
+        }
+        for e in self.entries.borrow().iter() {
+            if let Some(w) = &e.widgets {
+                w.spinner.stop();
+            }
+        }
+    }
+    fn build(self: &Rc<Self>) {
+        if self.building.borrow().is_some()
+            || !self.entries.borrow().iter().any(|e| e.widgets.is_none())
+        {
+            return;
+        }
+        let weak = Rc::downgrade(self);
+        let id = glib::idle_add_local(move || {
+            let Some(i) = weak.upgrade() else {
+                return glib::ControlFlow::Break;
+            };
+            if i.closed.get() || !i.scroller.is_mapped() {
+                i.building.borrow_mut().take();
+                return glib::ControlFlow::Break;
+            }
+            let mut entries = i.entries.borrow_mut();
+            for entry in entries.iter_mut().filter(|e| e.widgets.is_none()).take(32) {
+                let button = gtk::Button::new();
+                button.add_css_class("pivra-thumbnail-cell");
+                button.set_size_request(CELL_WIDTH, CELL_HEIGHT);
+                button.set_valign(gtk::Align::Center);
+                button.set_focus_on_click(false);
+                button.set_widget_name(&format!("thumbnail-cell-{}", entry.index.get()));
+                button.set_tooltip_text(Some(
+                    &entry.path.file_name().unwrap_or_default().to_string_lossy(),
+                ));
+                if Some(entry.index.get()) == i.selected.get() {
+                    button.add_css_class("selected");
+                }
+                let content = gtk::Overlay::new();
+                let picture = gtk::Picture::new();
+                picture.set_content_fit(gtk::ContentFit::Contain);
+                picture.set_can_shrink(true);
+                let spinner = gtk::Spinner::new();
+                spinner.set_halign(gtk::Align::Center);
+                spinner.set_valign(gtk::Align::Center);
+                let icon = gtk::Image::from_icon_name("image-x-generic-symbolic");
+                icon.set_halign(gtk::Align::Center);
+                icon.set_valign(gtk::Align::Center);
+                for child in [
+                    picture.upcast_ref::<gtk::Widget>(),
+                    icon.upcast_ref(),
+                    spinner.upcast_ref(),
+                ] {
+                    content.add_overlay(child);
+                    content.set_measure_overlay(child, false);
+                    content.set_clip_overlay(child, true);
+                }
+                button.set_child(Some(&content));
+                let weak = Rc::downgrade(&i);
+                let index = entry.index.clone();
+                button.connect_clicked(move |_| {
+                    if let Some(i) = weak.upgrade() {
+                        if let Some(callback) = i.select.borrow().as_ref() {
+                            callback(index.get());
+                        }
+                    }
+                });
+                i.items.append(&button);
+                entry.widgets = Some(CellWidgets {
+                    button,
+                    picture,
+                    spinner,
+                    icon,
+                });
+            }
+            if entries.iter().any(|e| e.widgets.is_none()) {
+                glib::ControlFlow::Continue
+            } else {
+                i.building.borrow_mut().take();
+                let mut previous: Option<gtk::Button> = None;
+                for entry in entries.iter() {
+                    if let Some(w) = &entry.widgets {
+                        i.items.reorder_child_after(&w.button, previous.as_ref());
+                        previous = Some(w.button.clone());
+                    }
+                }
+                i.scroller.queue_draw();
+                glib::ControlFlow::Break
+            }
+        });
+        self.building.replace(Some(id));
+    }
+    fn align(&self) {
+        if !self.scroller.is_mapped() || self.building.borrow().is_some() {
+            return;
+        }
+        let adj = self.scroller.hadjustment();
+        let page = adj.page_size();
+        if page <= 0. || page > f64::from(self.scroller.width()) + 1. {
+            return;
+        }
+        let entries = self.entries.borrow();
+        // The measured content must include the final cell, not a provisional
+        // hidden-strip adjustment range. This is a layout certificate, not a sleep.
+        let Some(last) = entries
+            .last()
+            .and_then(|e| e.widgets.as_ref())
+            .and_then(|w| w.button.compute_bounds(&self.items))
+        else {
+            self.initial.set(None);
+            return;
+        };
+        if last.width() <= 0. || adj.upper() + 1. < f64::from(last.x() + last.width()) {
+            return;
+        }
+        if let Some(index) = self.initial.get() {
+            if let Some(bounds) = entries
+                .iter()
+                .find(|e| e.index.get() == index)
+                .and_then(|e| e.widgets.as_ref())
+                .and_then(|w| w.button.compute_bounds(&self.items))
+            {
+                let x = f64::from(bounds.x());
+                let right = x + f64::from(bounds.width());
+                let target = if x < adj.value() {
+                    x
+                } else if right > adj.value() + page {
+                    right - page
+                } else {
+                    adj.value()
+                };
+                self.initial.set(None);
+                drop(entries);
+                adj.set_value(target.clamp(adj.lower(), (adj.upper() - page).max(adj.lower())));
+            } else {
+                self.initial.set(None);
+            }
+        } else if let Some(offset) = self.restore.take() {
+            drop(entries);
+            adj.set_value(offset.clamp(adj.lower(), (adj.upper() - page).max(adj.lower())));
+        }
+    }
+    fn visible(&self, entries: &[Entry]) -> std::ops::Range<usize> {
+        let adj = self.scroller.hadjustment();
+        let first = (adj.value() / f64::from(CELL_WIDTH + 8)).floor().max(0.) as usize;
+        let last = ((adj.value() + adj.page_size()) / f64::from(CELL_WIDTH + 8))
+            .ceil()
+            .max(0.) as usize;
+        first.min(entries.len())..last.min(entries.len())
+    }
+    fn drive(self: &Rc<Self>) {
+        if self.closed.get()
+            || !self.scroller.is_mapped()
+            || self.building.borrow().is_some()
+            || self.initial.get().is_some()
+            || self.retry.borrow().is_some()
+            || self.validation.borrow().is_some()
+        {
+            return;
+        }
+        let mut entries = self.entries.borrow_mut();
+        let visible = self.visible(&entries);
+        reconsider_evicted(&mut entries, &visible, &self.last_visible);
+        let near = visible.start.saturating_sub(2)..(visible.end + 2).min(entries.len());
+        self.clock.set(self.clock.get().wrapping_add(1));
+        for (n, e) in entries.iter_mut().enumerate() {
+            if visible.contains(&n) {
+                e.used = self.clock.get();
+            }
+            if let Some(w) = &e.widgets {
+                if visible.contains(&n) && matches!(e.phase, Phase::Pending | Phase::Loading) {
+                    w.spinner.start();
+                    w.icon.set_visible(false);
+                } else {
+                    w.spinner.stop();
+                }
+            }
+        }
+        let next = visible
+            .clone()
+            .find(|&n| entries[n].phase == Phase::Pending)
+            .or_else(|| near.clone().find(|&n| entries[n].phase == Phase::Pending))
+            .or_else(|| entries.iter().position(|e| e.phase == Phase::Pending));
+        if let Some(active) = self.active.borrow().as_ref() {
+            if let Some(next) = next {
+                if visible.contains(&next)
+                    && !entries
+                        .iter()
+                        .position(|e| e.path == active.path)
+                        .is_some_and(|n| near.contains(&n))
+                {
+                    active.token.cancel();
+                }
+            }
+            return;
+        }
+        let Some(n) = next else {
+            return;
+        };
+        let path = entries[n].path.clone();
+        entries[n].phase = Phase::Loading;
+        drop(entries);
+        let token = gio::Cancellable::new();
+        let epoch = self.epoch.get();
+        self.started.set(self.started.get().saturating_add(1));
+        self.active.replace(Some(Active {
+            path: path.clone(),
+            token: token.clone(),
+            epoch,
+        }));
+        let worker_path = path.clone();
+        let worker_token = token.clone();
+        let job = gio::spawn_blocking(move || {
+            let Some(_permit) = Permit::take(&worker_path) else {
+                return Work::Busy;
+            };
+            if worker_token.is_cancelled() {
+                return Work::Cancelled;
+            }
+            let provider = Provider::discover(None);
+            match pivra::thumbnail::query_or_generate(&provider, &worker_path, &worker_token) {
+                Outcome::Hit(candidate) => {
+                    if !candidate.still_current(&worker_token) {
+                        return if worker_token.is_cancelled() {
+                            Work::Cancelled
+                        } else {
+                            Work::Failed("thumbnail identity changed before decode".into())
+                        };
+                    }
+                    let frame = glib::MainContext::new().block_on(crate::image_loader::preload(
+                        &candidate.thumbnail.path,
+                        &worker_token,
+                        BUDGET,
+                    ));
+                    match frame {
+                        Ok(frame) if candidate.still_current(&worker_token) => {
+                            Work::Hit(frame, candidate.source, candidate.thumbnail)
+                        }
+                        Ok(_) if worker_token.is_cancelled() => Work::Cancelled,
+                        Ok(_) => Work::Failed("thumbnail identity changed during decode".into()),
+                        Err(e) => Work::Failed(e),
+                    }
+                }
+                Outcome::Cancelled => Work::Cancelled,
+                outcome => Work::Failed(format!("{outcome:?}")),
+            }
+        });
+        let weak = Rc::downgrade(self);
+        glib::MainContext::default().spawn_local(async move {
+            let result = job
+                .await
+                .unwrap_or_else(|_| Work::Failed("thumbnail worker failed".into()));
+            let Some(i) = weak.upgrade() else {
+                return;
+            };
+            let valid = i
+                .active
+                .borrow()
+                .as_ref()
+                .is_some_and(|a| a.token == token && a.epoch == epoch);
+            if !valid {
+                return;
+            }
+            i.active.borrow_mut().take();
+            if i.closed.get() {
+                return;
+            }
+            let mut entries = i.entries.borrow_mut();
+            if let Some(entry) = entries.iter_mut().find(|e| e.path == path) {
+                let stale = token.is_cancelled() || epoch != i.epoch.get();
+                entry.phase = Phase::Failed;
+                match result {
+                    _ if stale => entry.phase = Phase::Pending,
+                    Work::Hit(frame, source, cache) => {
+                        // Identity was verified on the worker before publication;
+                        // source rescans invalidate the window epoch as well.
+                        let texture = frame.texture();
+                        let cost = texture_cost(texture.width() as u32, texture.height() as u32)
+                            .unwrap_or(usize::MAX);
+                        if cost <= BUDGET {
+                            entry.cost = cost;
+                            entry.texture = Some(texture.clone());
+                            entry.phase = Phase::Ready;
+                            entry.used = i.clock.get();
+                            if let Some(w) = &entry.widgets {
+                                w.picture.set_paintable(Some(&texture));
+                                w.icon.set_visible(false);
+                            }
+                        }
+                        entry.keys = Some((source, cache));
+                    }
+                    Work::Busy => entry.phase = Phase::Pending,
+                    Work::Cancelled => entry.phase = Phase::Failed,
+                    Work::Failed(error) => {
+                        if let Some(w) = &entry.widgets {
+                            w.button
+                                .set_tooltip_text(Some(&format!("{}: {error}", path.display())));
+                        }
+                    }
+                }
+                if let Some(w) = &entry.widgets {
+                    w.spinner.stop();
+                    w.icon.set_visible(entry.phase == Phase::Failed);
+                }
+            }
+            // LRU bounds apply to widget paintables as well, not just a side map.
+            while entries.iter().map(|e| e.cost).sum::<usize>() > BUDGET
+                || entries.iter().filter(|e| e.texture.is_some()).count() > LIMIT
+            {
+                let visible = i.visible(&entries);
+                let victim = entries
+                    .iter()
+                    .enumerate()
+                    .filter(|(_, e)| e.texture.is_some())
+                    .min_by_key(|(n, e)| (visible.contains(n), e.used))
+                    .map(|(n, _)| n);
+                let Some(n) = victim else {
+                    break;
+                };
+                let e = &mut entries[n];
+                e.texture = None;
+                e.cost = 0;
+                e.phase = Phase::Evicted;
+                if let Some(w) = &e.widgets {
+                    w.picture.set_paintable(None::<&gdk::Texture>);
+                    w.icon.set_visible(true);
+                }
+            }
+            drop(entries);
+            // Yield even on Busy; no unbounded idle retry loop or queued decoders.
+            let weak = Rc::downgrade(&i);
+            let id =
+                glib::timeout_add_local_once(std::time::Duration::from_millis(30), move || {
+                    if let Some(i) = weak.upgrade() {
+                        i.retry.borrow_mut().take();
+                        i.drive();
+                    }
+                });
+            i.retry.replace(Some(id));
+        });
+    }
+}
+// A viewport wider than the RAM budget must not endlessly decode/evict the
+// same visible images. Budget-evicted entries are reconsidered on viewport or
+// catalog change, not on every paint/worker completion.
+fn reconsider_evicted(
+    entries: &mut [Entry],
+    visible: &std::ops::Range<usize>,
+    last: &Cell<Option<(usize, usize)>>,
+) {
+    let range = Some((visible.start, visible.end));
+    if last.replace(range) != range {
+        for e in entries.iter_mut().take(visible.end).skip(visible.start) {
+            if e.phase == Phase::Evicted {
+                e.phase = Phase::Pending;
+            }
+        }
+    }
+}
+enum Work {
+    Hit(crate::image_loader::LoadedFrame, FileKey, FileKey),
+    Failed(String),
+    Cancelled,
+    Busy,
+}
+impl Drop for Inner {
+    fn drop(&mut self) {
+        self.pause();
+        self.disconnect();
+        if let Some(id) = self.building.borrow_mut().take() {
+            id.remove();
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    #[test]
+    fn over_budget_visible_entries_do_not_spin_until_viewport_changes() {
+        let mut entries: Vec<_> = (0..65)
+            .map(|index| Entry {
+                index: Rc::new(Cell::new(index)),
+                path: PathBuf::from(index.to_string()),
+                widgets: None,
+                phase: Phase::Evicted,
+                texture: None,
+                keys: None,
+                cost: 0,
+                used: 0,
+            })
+            .collect();
+        let last = Cell::new(None);
+        reconsider_evicted(&mut entries, &(0..64), &last);
+        assert!(entries[..64].iter().all(|e| e.phase == Phase::Pending));
+        for e in &mut entries[..64] {
+            e.phase = Phase::Evicted;
+        } // RAM eviction after admission
+        reconsider_evicted(&mut entries, &(0..64), &last);
+        assert!(entries[..64].iter().all(|e| e.phase == Phase::Evicted));
+        reconsider_evicted(&mut entries, &(1..65), &last);
+        assert!(entries[1..].iter().all(|e| e.phase == Phase::Pending));
+        assert!(entries[0].phase == Phase::Evicted);
+    }
+    #[test]
+    fn global_worker_bound_deduplicates_and_releases_paths() {
+        let root = tempfile::tempdir().unwrap();
+        let a = root.path().join("a");
+        let b = root.path().join("b");
+        let c = root.path().join("c");
+        let first = Permit::take(&a).unwrap();
+        assert!(Permit::take(&a).is_none());
+        let second = Permit::take(&b).unwrap();
+        assert!(Permit::take(&c).is_none());
+        drop(first);
+        assert!(Permit::take(&c).is_some());
+        drop(second);
+        assert!(WORKERS.lock().unwrap().is_empty());
+    }
+}

@@ -387,10 +387,13 @@ pub(super) fn native_checker(app: &adw::Application) {
     std::fs::copy(&other, dir.path().join("4.png")).unwrap();
     let w = open_window(app, &dir.path().join("1.png"));
     filtered(&w, Resampling::Nearest);
-    let p = loaded(&w);
+    let p = loaded(&w, "1.png", (16, 16), None);
     wait(|| w.title().is_some_and(|s| s.ends_with("(4 candidates)")));
     let old = p.paintable().unwrap();
     assert_eq!((old.intrinsic_width(), old.intrinsic_height()), (16, 16));
+    // 8x starts from Actual. A tiny image in Fit can already be above the
+    // manual max scale on a large viewport, in which case zoom-up is a no-op.
+    select(&w, ViewMode::Actual);
     let vp = (p.width() as f64, p.height() as f64);
     let list = p.observe_controllers();
     let motion = (0..list.n_items())
@@ -443,8 +446,9 @@ pub(super) fn native_checker(app: &adw::Application) {
     assert_eq!(state(&w), "manual");
     // Preference survives a new image and remains local to this window.
     filtered(&w, Resampling::Nearest);
+    let before_navigation = p.paintable().unwrap();
     gio::prelude::ActionGroupExt::activate_action(&w, "next-media", None);
-    loaded(&w);
+    loaded(&w, "2.png", (32, 64), Some(&before_navigation));
     assert_eq!(
         w.lookup_action("image-resampling")
             .unwrap()
@@ -455,26 +459,11 @@ pub(super) fn native_checker(app: &adw::Application) {
     );
     assert_eq!(state(&w), "fit");
     assert_eq!(p.paintable().unwrap().intrinsic_width(), 32);
+    let before_error = p.paintable().unwrap();
     gio::prelude::ActionGroupExt::activate_action(&w, "next-media", None);
-    wait(|| {
-        p.next_sibling()
-            .unwrap()
-            .downcast::<gtk::Label>()
-            .unwrap()
-            .text()
-            .starts_with("Unable")
-    });
-    assert!(p.paintable().is_none());
-    assert!(
-        !p.next_sibling()
-            .unwrap()
-            .downcast::<gtk::Label>()
-            .unwrap()
-            .text()
-            .contains("Loader process exited early")
-    );
+    failed_selection(&w, "3.png", &before_error);
     gio::prelude::ActionGroupExt::activate_action(&w, "next-media", None);
-    loaded(&w);
+    loaded(&w, "4.png", (32, 64), Some(&before_error));
     assert_eq!(
         w.lookup_action("image-resampling")
             .unwrap()
@@ -491,7 +480,7 @@ pub(super) fn native_checker(app: &adw::Application) {
     let second_dir = tempfile::tempdir().unwrap();
     std::fs::write(second_dir.path().join("only.png"), &original).unwrap();
     let second = open_window(app, &second_dir.path().join("only.png"));
-    loaded(&second);
+    loaded(&second, "only.png", (16, 16), None);
     filtered(&w, Resampling::Nearest);
     assert_eq!(
         second

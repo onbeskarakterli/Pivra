@@ -1,6 +1,70 @@
-//! Default: real secure decode + production actions. --synthetic: renderer only.
+//! Default: secure decode + production actions. --synthetic: renderer only.
+//! --controlled-navigation: explicit synthetic loader, real production actions.
 #[path = "../src/image_loader.rs"]
-mod image_loader;
+#[allow(dead_code)]
+mod secure_image_loader;
+// The default probe always uses secure Glycin. Controlled navigation is an
+// explicit test-only boundary, never a decoder fallback in the application.
+mod image_loader {
+    use super::*;
+    pub enum LoadedFrame {
+        Native(secure_image_loader::LoadedFrame),
+        Controlled(i32, i32),
+    }
+    impl LoadedFrame {
+        pub fn texture(&self) -> gdk::Texture {
+            match self {
+                Self::Native(frame) => frame.texture(),
+                Self::Controlled(w, h) => gdk::MemoryTexture::new(
+                    *w,
+                    *h,
+                    gdk::MemoryFormat::R8g8b8a8,
+                    &glib::Bytes::from_owned([180, 80, 40, 255].repeat((*w * *h) as usize)),
+                    *w as usize * 4,
+                )
+                .upcast(),
+            }
+        }
+    }
+    fn controlled() -> bool {
+        std::env::args().any(|s| s == "--controlled-navigation")
+    }
+    pub async fn load(path: &Path, cancel: &gio::Cancellable) -> Result<LoadedFrame, String> {
+        if !controlled() {
+            return secure_image_loader::load(path, cancel)
+                .await
+                .map(LoadedFrame::Native);
+        }
+        if cancel.is_cancelled() {
+            return Err("controlled request cancelled".into());
+        }
+        match path.file_name().and_then(|p| p.to_str()) {
+            Some("1.png") => Ok(LoadedFrame::Controlled(1600, 1200)),
+            Some("2.png" | "only.png") => Ok(LoadedFrame::Controlled(32, 64)),
+            Some("4.png") => Ok(LoadedFrame::Controlled(4, 2)),
+            Some("3.png") => Err("controlled broken image (not secure decoder evidence)".into()),
+            _ => Err(format!("unexpected controlled input {}", path.display())),
+        }
+    }
+    pub async fn preload(
+        path: &Path,
+        cancel: &gio::Cancellable,
+        budget: usize,
+    ) -> Result<LoadedFrame, String> {
+        if !controlled() {
+            return secure_image_loader::preload(path, cancel, budget)
+                .await
+                .map(LoadedFrame::Native);
+        }
+        let frame = load(path, cancel).await?;
+        if let LoadedFrame::Controlled(w, h) = frame {
+            if pivra::image_cache::texture_cost(w as u32, h as u32).is_none_or(|n| n > budget) {
+                return Err("controlled preload budget exceeded".into());
+            }
+        }
+        Ok(frame)
+    }
+}
 #[path = "../src/image_view.rs"]
 mod image_view;
 #[path = "../src/input.rs"]
@@ -216,23 +280,78 @@ fn open_window(app: &adw::Application, path: &Path) -> adw::ApplicationWindow {
     wait(|| w.is_mapped());
     w
 }
-fn loaded(w: &adw::ApplicationWindow) -> gtk::Picture {
+fn status(p: &gtk::Picture) -> gtk::Label {
+    p.next_sibling().unwrap().downcast::<gtk::Label>().unwrap()
+}
+fn selected(w: &adw::ApplicationWindow, name: &str) -> bool {
+    w.title()
+        .is_some_and(|s| s.starts_with(&format!("{name} —")))
+}
+fn loaded(
+    w: &adw::ApplicationWindow,
+    name: &str,
+    size: (i32, i32),
+    previous: Option<&gdk::Paintable>,
+) -> gtk::Picture {
     let p = picture(w);
-    wait(|| {
-        p.paintable().is_some()
-            || p.next_sibling()
-                .unwrap()
-                .downcast::<gtk::Label>()
-                .unwrap()
-                .text()
-                .starts_with("Unable")
-    });
+    let label = status(&p);
+    let end = Instant::now() + Duration::from_secs(20);
+    loop {
+        assert!(
+            !(selected(w, name) && label.is_visible() && label.text().starts_with("Unable")),
+            "valid selected image {name} failed after baseline: {}",
+            label.text()
+        );
+        // Retained old pixels and the synchronous title change do not certify
+        // completion. Hold the old object alive and require a replacement with
+        // the selected fixture's dimensions. Sample only after the GTK callback.
+        if selected(w, name)
+            && p.paintable().is_some_and(|frame| {
+                (frame.intrinsic_width(), frame.intrinsic_height()) == size
+                    && previous.is_none_or(|old| &frame != old)
+            })
+        {
+            break;
+        }
+        assert!(
+            Instant::now() < end,
+            "selected-frame deadline: target={name} size={size:?} title={:?} mode={} current-size={:?} error={}",
+            w.title(),
+            state(w),
+            p.paintable()
+                .map(|p| (p.intrinsic_width(), p.intrinsic_height())),
+            label.text()
+        );
+        pump();
+    }
     assert!(
-        p.paintable().is_some(),
-        "valid image failed after secure baseline"
+        !label.is_visible(),
+        "ready selected image still shows an error"
     );
     p
 }
+
+fn failed_selection(w: &adw::ApplicationWindow, name: &str, previous: &gdk::Paintable) {
+    let p = picture(w);
+    let label = status(&p);
+    wait(|| {
+        selected(w, name)
+            && label.is_visible()
+            && label.text().starts_with("Unable")
+            && label.text().contains(&format!("File: {name}"))
+    });
+    assert_eq!(
+        p.paintable().as_ref(),
+        Some(previous),
+        "failed image must retain the previous photo"
+    );
+    assert!(label.text().contains("Previous photo is still displayed."));
+    assert!(
+        !label.text().contains("Loader process exited early"),
+        "loader failure is not invalid-media success"
+    );
+}
+
 fn native_isolation(app: &adw::Application, fixtures: &Path) {
     let a = tempfile::tempdir().unwrap();
     let b = tempfile::tempdir().unwrap();
@@ -249,8 +368,8 @@ fn native_isolation(app: &adw::Application, fixtures: &Path) {
     let first = open_window(app, &a.path().join("1.png"));
     let second = open_window(app, &b.path().join("only.png"));
     wait(|| first.title().is_some_and(|s| s.ends_with("(4 candidates)")));
-    let p = loaded(&first);
-    let q = loaded(&second);
+    let p = loaded(&first, "1.png", (1600, 1200), None);
+    let q = loaded(&second, "only.png", (32, 64), None);
     if std::env::args().any(|s| s == "--zoom-pan") {
         zoom_pan_cases::native(&first);
         assert_eq!(state(&second), "fit");
@@ -264,40 +383,96 @@ fn native_isolation(app: &adw::Application, fixtures: &Path) {
     render(&second, &q, (32, 64), ViewMode::Fill, false);
     first.set_default_size(480, 320);
     render(&first, &p, (1600, 1200), ViewMode::Actual, false);
+    let old = p.paintable().unwrap();
     gio::prelude::ActionGroupExt::activate_action(&first, "next-media", None);
-    assert_eq!(state(&first), "fit");
-    loaded(&first);
+    assert!(selected(&first, "2.png"));
+    assert_eq!(
+        p.paintable().as_ref(),
+        Some(&old),
+        "request acceptance must not be confused with publication"
+    );
+    assert_eq!(
+        state(&first),
+        "actual",
+        "pending navigation must preserve the visible preset"
+    );
+    loaded(&first, "2.png", (32, 64), Some(&old));
+    assert_eq!(
+        state(&first),
+        "actual",
+        "accepted preset must survive new-frame publication"
+    );
+    render(&first, &p, (32, 64), ViewMode::Actual, false);
+    // Explicit user mode changes exercise Fit and expose its backing texture
+    // for the cache identity check below; this is not an automatic Fit reset.
+    select(&first, ViewMode::Fit);
+    gio::prelude::ActionGroupExt::activate_action(
+        &first,
+        "image-resampling",
+        Some(&"smooth".to_variant()),
+    );
+    let cached_tall = p.paintable().unwrap().downcast::<gdk::Texture>().unwrap();
     render(&first, &p, (32, 64), ViewMode::Fit, false);
     select(&first, ViewMode::Fill);
+    let before_error = p.paintable();
     gio::prelude::ActionGroupExt::activate_action(&first, "next-media", None);
-    wait(|| {
-        p.next_sibling()
-            .unwrap()
-            .downcast::<gtk::Label>()
-            .unwrap()
-            .text()
-            .starts_with("Unable")
-    });
-    assert!(p.paintable().is_none());
-    assert!(
-        !p.next_sibling()
-            .unwrap()
-            .downcast::<gtk::Label>()
-            .unwrap()
-            .text()
-            .contains("Loader process exited early"),
-        "loader failure is not invalid-media success"
+    failed_selection(&first, "3.png", before_error.as_ref().unwrap());
+    assert_eq!(state(&first), "fill");
+    let old = p.paintable().unwrap();
+    gio::prelude::ActionGroupExt::activate_action(&first, "next-media", None);
+    loaded(&first, "4.png", (4, 2), Some(&old));
+    assert_eq!(
+        state(&first),
+        "fill",
+        "error recovery must preserve the chosen preset"
     );
-    gio::prelude::ActionGroupExt::activate_action(&first, "next-media", None);
-    assert_eq!(state(&first), "fit");
-    loaded(&first);
-    render(&first, &p, (4, 2), ViewMode::Fit, false);
+    render(&first, &p, (4, 2), ViewMode::Fill, false);
+    select(&first, ViewMode::Actual);
+    let scroll = p
+        .observe_controllers()
+        .iter::<glib::Object>()
+        .filter_map(Result::ok)
+        .find_map(|c| c.downcast::<gtk::EventControllerScroll>().ok())
+        .unwrap();
+    assert!(scroll.emit_by_name::<bool>("scroll", &[&0f64, &-1f64]));
+    assert_eq!(state(&first), "manual");
+    let manual = p.paintable().unwrap();
+    // Rapid 4→broken3→cached2: old error may not overwrite the latest selection.
+    gio::prelude::ActionGroupExt::activate_action(&first, "previous-media", None);
+    gio::prelude::ActionGroupExt::activate_action(&first, "previous-media", None);
+    assert_eq!(
+        state(&first),
+        "manual",
+        "manual geometry must remain until the replacement is ready"
+    );
+    loaded(&first, "2.png", (32, 64), Some(&manual));
+    assert_eq!(
+        state(&first),
+        "fit",
+        "manual transform must reset only at new-frame handoff"
+    );
+    assert_eq!(
+        p.paintable(),
+        Some(cached_tall.upcast()),
+        "warm navigation did not reuse the cached source texture"
+    );
+    assert_eq!(
+        first
+            .lookup_action("image-resampling")
+            .unwrap()
+            .state()
+            .unwrap()
+            .str(),
+        Some("smooth")
+    );
+    render(&first, &p, (32, 64), ViewMode::Fit, false);
     assert_eq!(state(&second), "fill");
     assert_eq!(q.paintable(), survivor);
     select(&first, ViewMode::Actual);
+    let closed = first.downgrade();
     first.close();
     drop(first);
-    settle();
+    wait(|| closed.upgrade().is_none());
     assert!(second.is_visible());
     assert_eq!(state(&second), "fill");
     render(&second, &q, (32, 64), ViewMode::Fill, false);
@@ -312,8 +487,13 @@ fn native_isolation(app: &adw::Application, fixtures: &Path) {
         std::fs::read(b.path().join("only.png")).unwrap(),
         std::fs::read(fixtures.join("tall.png")).unwrap()
     );
+    let boundary = if std::env::args().any(|s| s == "--controlled-navigation") {
+        "CONTROLLED pixels, not Glycin"
+    } else {
+        "SECURE Glycin pixels"
+    };
     println!(
-        "PASS secure two-window mode isolation, resize, new-media Fit reset, broken-to-valid recovery and mode/close"
+        "PASS {boundary}: selected-frame handoff, Actual/Fill preset retention, manual-to-Fit reset, warm texture identity, rapid broken-to-cached navigation and two-window close/isolation"
     );
 }
 fn native(app: &adw::Application) {
@@ -429,7 +609,14 @@ fn main() {
         .flags(gio::ApplicationFlags::NON_UNIQUE)
         .build();
     app.register(None::<&gio::Cancellable>).unwrap();
-    if std::env::args().any(|s| s == "--synthetic") {
+    if std::env::args().any(|s| s == "--controlled-navigation") {
+        assert!(
+            !std::env::args().any(|s| s == "--synthetic"),
+            "navigation and renderer-only modes must stay separate"
+        );
+        let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/images");
+        native_isolation(&app, &root);
+    } else if std::env::args().any(|s| s == "--synthetic") {
         if std::env::args().any(|s| s == "--resampling") {
             resampling_cases::synthetic(&app);
         } else if std::env::args().any(|s| s == "--zoom-pan") {

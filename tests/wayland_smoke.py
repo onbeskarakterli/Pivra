@@ -126,6 +126,8 @@ def main():
                         args.append("--zoom-pan")
                     if "--synthetic" in sys.argv[2:]:
                         args.append("--synthetic")
+                    if "--controlled-navigation" in sys.argv[2:]:
+                        args.append("--controlled-navigation")
                     if "--thumbnail-catalog" in sys.argv[2:]:
                         args.append("--catalog-regression")
                     if "--thumbnail-retention" in sys.argv[2:]:

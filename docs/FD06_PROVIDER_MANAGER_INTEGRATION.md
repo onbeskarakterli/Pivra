@@ -148,3 +148,70 @@ alta götürün, T ile kapatıp/açın, thumbnail piksellerini, kaydırma/tıkla
 Sol/Sağ gezinmesini kontrol edin. İki manuel pencereyi kapatınca otomatik aktif
 decode kapanış testi başlar. Nihai exit 0 ve gerçek piksel/aktif kapanış çıktıları
 olmadan Freedesktop native kabulü verilmez. FD-06 TESTING; FD-07 başlamadı.
+
+## Aktif native kapanış teşhisi — 2026-10-26
+
+Kullanıcının `1ea0948` Arch/GNOME logu: Freedesktop seçim/T, 120 benzersiz secure
+cache decode, değiştirilmiş kaynak pikselleri, gezinme ve iki pencere PASS.
+Aktif kapanış bölümü `READY` ve `CANCEL_ISSUED` sonrasında 95 saniyelik deadline'a
+ulaşmış, GLib callback içindeki assertion nedeniyle non-unwinding panic ile
+sonlanmıştır (driver exit 1). Bu başarısızlık kaydı korunur.
+
+`/tmp/pivra-fd06-close-report-f2vseflx.json` bu Codex ortamında yoktur; paylaşılan
+metin yalnız logdur, JSON değildir. PID/starttime, partial certificate ve loader
+çıkışı alanları bağımsız okunamadı. Mevcut driver'da cancel komutu ancak STOP
+sonrası doğrulanmış partial-frame checkpoint'inden sonra gönderilir; log bu
+protokol aşamasına ulaşıldığıyla tutarlıdır, fakat eksik JSON alanları tahmin
+edilmez. İki 64x32 FD05A_FRAME kaydı büyük işin tamamlandığını kanıtlamaz.
+
+**Kanıtlanmış harness kusuru:** eski hazır koşulu pencere ve fotoğraf weak
+referanslarının None olmasını bekliyordu. Bu, native pencere kapanışı ve decoder
+kaynak temizliğiyle aynı olay değildir. Gerçek GTK kontrollü testinde referanslar
+bilerek tutulduğunda `close-request` ve `unmap` geldi; native GDK surface
+`is_destroyed=true`, görünür/mapped false ve worker/rezervasyon sıfır olduğu
+halde iki GObject referansı da yaşıyordu. Widget `destroy` sinyali ancak eldeki
+referanslar bırakılırken geldi. Aynı davranış X11 ve Sway/Wayland'da doğrulandı.
+Bu bulgu eski bekleme koşulunun yanlışlığını kanıtlar; kullanıcının son
+çalışmasında worker'ın gerçekten takılıp takılmadığı eksik JSON nedeniyle
+belirlenemez. Üretim cleanup kusuru kanıtlanmadı; `src/` değiştirilmedi.
+
+Düzeltme şunları ayrı ayrı zorunlu tutar ve loglar:
+
+- `close-request`, unmap, görünmez/unmapped pencere ve **gerçek native GDK
+  yüzeyinin yok edilmesi**; Widget destroy/ref yaşam süresi ayrıca tanı verisidir.
+- Ortak Permit sayısı 0, reserved bytes 0 ve large reservation false.
+- Dış gözlemcinin değişmeyen PID/starttime/pidfd STOP+partial sertifikası,
+  CANCEL_ISSUED onayı ve diğer pencere açıkken gerçek loader process çıkışı.
+- Ancak bu koşullardan sonra finish el sıkışması; ana GTK döngüsü bitince diğer
+  pencerenin başlığı/render pikselleri ve kaynak kimliği yeniden doğrulanır.
+
+95 saniye ve dış loader çıkışı için 5 saniye sınırları artırılmadı. Callback artık
+assert/panic veya render beklemesi yapmaz: sonucu kaydedip MainLoop'u sonlandırır;
+FAIL/exit 1 ve NOT RUN/77 ana akışta verilir. Erken ikinci pencere kapanışı,
+yinelenen/erken komut ve observer kopması açık hatadır. Observer timeout hatası
+artık JSON'a da kaydedilir; cleanup doğrulanmadıysa NOT VERIFIED kalır.
+
+Doğrulama: Rust check/example build/Clippy PASS; normal Rust 185 ve example
+26 test PASS (2 yeni kapanış koşulu testi dahil). Thumbnail Python 37 ve observer
+Python 5 PASS (eksik sertifika/ack/loader exit/finish negatifleri dahil).
+X11/Sway gerçek GTK kapanış regresyonu PASS, **decoder mock'u veya gerçek aktif
+decode PASS değildir**. Shell syntax, Python compile, diff-check PASS.
+fmt --check önceki image_view/active_decode_close_probe/application_open_probe
+format farkları nedeniyle FAIL; yeni değişikliklerde format farkı yok.
+Bu düzeltmenin native secure aktif kapanış kabulü **NOT RUN**: bilinen Codex
+Bwrap engeli nedeniyle native benchmark tekrarlanmadı.
+
+Tek yeniden test komutu değişmedi:
+
+```sh
+bash tests/run_fd06_freedesktop_probe.sh; printf 'EXIT CODE: %s\n' "$?"
+```
+
+`MANUAL TH-05` bölümündeki iki pencereyi kontrol edip kapatın. Ardından açılan
+aktif decode bölümündeki pencereleri **elle kapatmayın**; observer kapatma ve
+loader çıkışını kendisi doğrular. `CLOSE_EVENT`, `CLOSE_STATE`, certificate,
+`window_finish_sent` ve cleanup alanlarını içeren yeni raporu saklayın.
+FD-06 TESTING kalır; FD-07 başlamadı.
+
+Kapanış harness/observer düzeltme commit'i:
+`84b9b4d5c621555bf2782213bf65f4b2a260f47a`.

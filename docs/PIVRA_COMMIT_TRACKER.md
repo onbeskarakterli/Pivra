@@ -2560,3 +2560,20 @@ Native birleşik `bash tests/run_preview_pipeline_probe.sh` **exit 0** (Takip 04
   (Bwrap). fmt --check önceki kapsam dışı farklar nedeniyle FAIL.
 - Tek native komut ve kabul adımları: [FD06_PROVIDER_MANAGER_INTEGRATION.md](FD06_PROVIDER_MANAGER_INTEGRATION.md).
   Gerçek FD üretim ve aktif kapanış native kabulü bekleniyor. FD-07 başlamadı.
+
+#### FD-06 aktif native kapanış harness düzeltmesi — TESTING
+
+- Kullanıcı `1ea0948` native logu: Freedesktop/T/120 secure thumbnail/pencere
+  gezinmesi PASS; aktif kapanış CANCEL_ISSUED sonrası deadline/non-unwinding
+  panic, driver exit 1. Native aktif kapanış PASS değildir.
+- `84b9b4d5c621555bf2782213bf65f4b2a260f47a`: GObject finalizasyonu yerine
+  close-request/unmap/native GDK surface destruction + worker/rezervasyon
+  temizliği kontrolü; deadline artırılmadan callback kontrollü sonucu ve ayrı
+  lifecycle logları. Dış pidfd/partial sertifikası ve loader çıkışı zorunlu.
+- X11/Sway kontrollü GTK testi yaşayan referanslarla kapanışı kanıtladı.
+  Rust 185 + example 26, Python thumbnail 37 + observer 5 PASS; check/build/
+  Clippy PASS. fmt önceki kapsam dışı farklar nedeniyle FAIL.
+- Arch JSON raporu bu ortamda yok; loader temizliği alanları tahmin edilmedi.
+  Yeni native aktif kapanış NOT RUN; bilinen Codex Bwrap kısıtı. Üretim kodu
+  değiştirilmedi. FD-06 TESTING, FD-07 başlamadı.
+- Komut/kanıt ayrımı: [FD06_PROVIDER_MANAGER_INTEGRATION.md](FD06_PROVIDER_MANAGER_INTEGRATION.md).

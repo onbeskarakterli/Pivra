@@ -109,7 +109,6 @@ def failure_message(result):
 def window_protocol_complete(certificate,finished):
     return bool(certificate and certificate.get('partial_after_stop')
                 and certificate.get('cancel_acknowledged')
-                and certificate.get('loader_exited_while_other_window_alive')
                 and certificate.get('other_window_verified') and finished)
 
 def job(binary,path,w,h,cancel,extra=()):
@@ -163,14 +162,12 @@ def job(binary,path,w,h,cancel,extra=()):
                         if window_deadline is None:
                             window_deadline=time.monotonic()
                             loader_before=observe_loader(certificate['pid'],certificate['starttime'],w*h*3)
-                        elapsed=time.monotonic()-window_deadline
-                        phase=loader_exit_progress(bool(select.select([target],[],[],0)[0]),elapsed)
-                        if phase != exit_phase:
-                            print(f"LOADER_EXIT phase={phase} pid={certificate['pid']} starttime={certificate['starttime']} observed={elapsed:.3f}s bounded_observation=35s retention_origin=unmeasured",flush=True)
-                            exit_phase=phase
-                        if phase == 'exited' and certificate.get('other_window_verified'):
-                            certificate['loader_exited_while_other_window_alive']=True
-                            certificate['loader_exit_wait_seconds']=elapsed
+                        # A pooled Glycin PID belongs to the entire process, not
+                        # this closed window. Wait for verified GTK/worker cleanup,
+                        # not the pool's 30-second idle retention.
+                        if certificate.get('other_window_verified'):
+                            certificate['loader_after_window_close']=observe_loader(
+                                certificate['pid'],certificate['starttime'],w*h*3)
                             p.stdin.write('finish\n');p.stdin.flush();finished=True
                 samples.append(row)
                 if cancel and certificate is None and time.monotonic()>limit-90:

@@ -323,6 +323,17 @@ pub(super) fn build(app: &adw::Application, settings: &Settings, file: Option<Op
         zoom_toggle.set_child(Some(&lens));
         zoom_toggle.set_active(false);
         header.pack_end(&zoom_toggle);
+        let zoom_for_key = zoom_toggle.clone();
+        let zoom_key = gtk::EventControllerKey::new();
+        zoom_key.set_propagation_phase(gtk::PropagationPhase::Capture);
+        zoom_key.connect_key_pressed(move |_, key, _, modifiers| {
+            if !matches!(key, gdk::Key::z | gdk::Key::Z)
+                || modifiers.intersects(gdk::ModifierType::CONTROL_MASK | gdk::ModifierType::ALT_MASK | gdk::ModifierType::SUPER_MASK | gdk::ModifierType::META_MASK)
+            { return glib::Propagation::Proceed; }
+            zoom_for_key.set_active(!zoom_for_key.is_active());
+            glib::Propagation::Stop
+        });
+        window.add_controller(zoom_key);
         let zoom_view = view.clone();
         zoom_toggle.connect_toggled(move |button| {
             zoom_view.set_zoom_wheel_enabled(button.is_active());

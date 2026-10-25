@@ -117,6 +117,7 @@ pub(crate) fn install(
     overlay.add_overlay(&resize_edge);
     overlay.set_measure_overlay(&resize_edge, false);
     overlay.set_clip_overlay(&resize_edge, true);
+    let thumbnails = ThumbnailStrip::new(items, strip.clone());
     let preference = pivra::settings::thumbnail_preference();
     let state = Rc::new(Visibility {
         available,
@@ -202,6 +203,7 @@ pub(crate) fn install(
         gesture.set_state(gtk::EventSequenceState::Claimed);
     });
     let drag_state = state.clone();
+    let resize_thumbnails = thumbnails.clone();
     resize.connect_drag_update(move |gesture, _, delta_y| {
         if !drag_state.resizing.get() || !delta_y.is_finite() { return; }
         if let (Some(strip), Some(overlay)) = (drag_state.strip.upgrade(), drag_state.overlay.upgrade()) {
@@ -210,6 +212,7 @@ pub(crate) fn install(
                 .clamp(128.0, f64::from(ceiling)) as i32;
             if strip.height_request() != height {
                 strip.set_height_request(height);
+                resize_thumbnails.resize_cells(height);
                 drag_state.place_toggle();
             }
             gesture.set_state(gtk::EventSequenceState::Claimed);
@@ -313,7 +316,7 @@ pub(crate) fn install(
         unmap.cancel();
         unmap.render(false);
     });
-    ThumbnailStrip::new(items, strip)
+    thumbnails
 }
 type PreferenceListener = Rc<dyn Fn(bool)>;
 struct Visibility {

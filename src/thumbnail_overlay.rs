@@ -17,7 +17,9 @@ fn install_css(display: &gtk::gdk::Display) {
             .pivra-thumbnail-panel { background-color: alpha(@window_bg_color, 0.25); border-radius: 12px 12px 0 0; padding: 8px; }\n\
             .pivra-thumbnail-toggle { background-image: none; background-color: alpha(@window_bg_color, 0.25); border-radius: 16px; padding: 4px; min-width: 24px; min-height: 24px; }\n\
             .pivra-thumbnail-cell { background-image: none; background-color: transparent; padding: 0; min-width: 0; min-height: 0; border: none; border-radius: 0; box-shadow: none; }\n\
-            .pivra-thumbnail-cell.selected { box-shadow: inset 0 0 0 2px @accent_color; }\n");
+            .pivra-thumbnail-cell.selected { box-shadow: none; }\n\
+            .pivra-thumbnail-selection { background: transparent; border: 0; padding: 0; box-shadow: none; }\n\
+            .pivra-thumbnail-selection.selected { box-shadow: inset 0 0 0 2px @accent_color; }\n");
         gtk::style_context_add_provider_for_display(display,&css,gtk::STYLE_PROVIDER_PRIORITY_APPLICATION);
     });
 }

@@ -79,9 +79,7 @@ impl ThumbnailStrip {
                     photos.iter().position(|(index, _)| Some(*index) == selected)
                 );
                 if self.scroller.is_visible() {
-                    if self.scroller.is_visible() {
-                align_selection(&self.scroller.hadjustment(), &self.pending_selection);
-            }
+                    align_selection(&self.scroller.hadjustment(), &self.pending_selection);
                 }
             }
             return;
@@ -130,7 +128,9 @@ impl ThumbnailStrip {
             self.pending_selection.set(
                 photos.iter().position(|(index, _)| Some(*index) == selected)
             );
-            align_selection(&self.scroller.hadjustment(), &self.pending_selection);
+            if self.scroller.is_visible() {
+                align_selection(&self.scroller.hadjustment(), &self.pending_selection);
+            }
         }
 
     }

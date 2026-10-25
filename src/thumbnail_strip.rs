@@ -554,12 +554,24 @@ impl Inner {
                 let picture = gtk::Picture::new();
                 picture.set_content_fit(gtk::ContentFit::Contain);
                 picture.set_can_shrink(true);
+                // Hidden predecode can complete before a GTK cell exists.
+                // Hydrate new cells from their already-ready textures.
+                if let Some(texture) = entry.texture.as_ref() {
+                    let ratio = (CELL_WIDTH as f64 / texture.width() as f64)
+                        .min(CELL_HEIGHT as f64 / texture.height() as f64);
+                    selection.set_size_request(
+                        ((texture.width() as f64 * ratio).round() as i32).max(1),
+                        ((texture.height() as f64 * ratio).round() as i32).max(1),
+                    );
+                    picture.set_paintable(Some(texture));
+                }
                 let spinner = gtk::Spinner::new();
                 spinner.set_halign(gtk::Align::Center);
                 spinner.set_valign(gtk::Align::Center);
                 let icon = gtk::Image::from_icon_name("image-x-generic-symbolic");
                 icon.set_halign(gtk::Align::Center);
                 icon.set_valign(gtk::Align::Center);
+                icon.set_visible(entry.phase == Phase::Failed || entry.phase == Phase::Evicted);
                 for child in [
                     picture.upcast_ref::<gtk::Widget>(),
                     icon.upcast_ref(),

@@ -403,8 +403,8 @@ mevcut PIV-18'e bağlı alt görevdir. PIV-01–60 numaraları korunur.
 | TH-03 | Otomatik gizlenme, `T`, kalıcı ayar | TESTING — native kabul bekleniyor |
 | TH-04 | Thumbnail gezinme senkronizasyonu | DONE — kullanıcı Arch GNOME kabulü, 1b11074 |
 | TH-05 | Sistem thumbnail üretimi | DONE — kullanıcı Arch GNOME kabulü, 1b11074 |
-| TH-06 | Thumbnail genel kabul ve optimizasyon | TESTING — TH-06.1/06.2, native kabul bekleniyor |
-| TH-07 | Tam ekran fotoğraf görüntüleme | TODO — yalnız planlama |
+| TH-06 | Thumbnail genel kabul ve optimizasyon | DONE — kullanıcı native kabulü, 25.10.2026 |
+| TH-07 | Tam ekran fotoğraf görüntüleme | TESTING — native GNOME kabulü bekleniyor |
 
 TH-07: ana fotoğrafta çift tıklama veya `F` ile fullscreen aç/kapa, `Esc` ile çıkış;
 başlık/menü/pencere kontrolleri gizli, oran korunarak tüm ekran kullanılır.
@@ -448,3 +448,14 @@ pikselleri, hizalama/scroll/seçim/iki pencere/kapanış ve manuel inceleme kull
  tarafından PASS bildirildi. [Kapanış ve kanıt kaynağı](TH05_THUMBNAIL_SYSTEM_VALIDATION.md).
 TH-04/TH-05 DONE; PIV-18 TESTING kalır. TH-06 ayrı yeni geliştirme/native kabul
 kapısıdır; TH-07 fullscreen TODO olarak korunur.
+
+
+## TH-06 kabulü / TH-07 native fullscreen — 25.10.2026
+
+Kullanıcı0571986 sonrasını native Arch GNOME'da kabul etti: TH-06 DONE. TH-03'ün
+bağımsız kabul durumu korunur. TH-07 uygulandı; F/Esc ve yalnız ana fotoğrafta
+çift tıklama mevcut GTK penceresini fullscreen yapar. Gerçek state header'ı yönetir;
+texture/zoom/pan/resampling, native güvenli decoder ve thumbnail sistemi korunur.
+Sway/Xfwm ve kontrollü GTK regresyonları PASS; fiziksel native GNOME kabulü henüz
+NOT RUN. **TH-07 TESTING**, PIV-18 TESTING. [Kayıt/komut](TH07_FULLSCREEN_VALIDATION.md).
+Diğer PIV numaraları, Faz0/DESKTOP-06 ve sonraki görev kapıları değişmedi.

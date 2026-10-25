@@ -874,7 +874,7 @@ manual two-window acceptance. TH-04/TH-05 DONE; historical Codex NOT RUN records
 remain distinct. PIV-18 is still TESTING; TH-06 acceptance is separate.
 
 
-TH-06 is TESTING: the thumbnail panel now meets the bottom/side edges, with the
+TH-06 implementation (subsequently accepted by the user): the thumbnail panel now meets the bottom/side edges, with the
 floating toggle above the open panel. Photo requests keep the last ready pixels
 and zoom/pan until the new texture is ready; failures name the target and clearly
 identify the retained previous photo. Secure Glycin, cache and prefetch remain in
@@ -893,3 +893,20 @@ textures. The 64-texture/16 MiB limits remain; main-photo cache accounting and
 secure loading are unchanged. The native thumbnail command above now runs an
 explicit synthetic 81/120 large-cache retention test before real secure/native
 acceptance. Physical GNOME acceptance of this fix is pending; TH-06 stays TESTING.
+
+
+TH-06 is now DONE by the user's Arch GNOME acceptance after0571986 (2026-10-25).
+TH-07 adds native fullscreen to the current photo window: **F** or a double-click
+on the main photo toggles fullscreen; **Esc** exits. Header controls hide in
+fullscreen. Thumbnail/T/navigation and viewing preferences remain available;
+fullscreen itself does not reload the main photo. TH-03 keeps its separate
+acceptance status; TH-07 and PIV-18 remain TESTING.
+
+Arch GNOME Wayland acceptance (private TEST media/config/cache, secure decoder
+gate, automatic checks, then two normal production windows for physical review):
+
+```bash
+bash tests/run_fullscreen_probe.sh
+```
+
+[Fullscreen implementation, tested evidence and remaining native checks](docs/TH07_FULLSCREEN_VALIDATION.md).

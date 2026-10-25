@@ -1,6 +1,6 @@
 # PIV-18 — Thumbnail ve fullscreen alt görev planı
 
-25.10.2026 · dev · **Yalnız planlama; geliştirme yetkisi değildir.**
+25.10.2026 · dev · **TH-07 uygulanıyor — TESTING; kullanıcı talimatıyla yetkili geliştirme.**
 TH aşamaları mevcut PIV-18 kapsamına bağlı alt görevlerdir; yeni PIV aşaması
 oluşturulmaz, PIV numaraları ve diğer aşamaların sırası değiştirilmez.
 PIV-18 TESTING; PIV-19 başlamadı.
@@ -14,17 +14,17 @@ PIV-18 TESTING; PIV-19 başlamadı.
 | TH-03 | Otomatik gizlenme, `T`, kalıcı ayar | TESTING — kod/otomatik testler; native kabul bekleniyor |
 | TH-04 | Thumbnail gezinme senkronizasyonu | DONE — kullanıcı Arch GNOME kabulü, 1b11074 |
 | TH-05 | Sistem thumbnail üretimi | DONE — kullanıcı Arch GNOME kabulü, 1b11074 |
-| TH-06 | Thumbnail genel kabul ve optimizasyon | TESTING — TH-06.1/06.2, native kabul bekleniyor |
-| TH-07 | Tam ekran fotoğraf görüntüleme | TODO — yalnız planlandı |
+| TH-06 | Thumbnail genel kabul ve optimizasyon | DONE — kullanıcı native kabulü, 25.10.2026 |
+| TH-07 | Tam ekran fotoğraf görüntüleme | TESTING — native GNOME kabulü bekleniyor |
 
 TH-02 [kullanıcı native kabulüyle DONE](TH02_THUMBNAIL_OVERLAY_VALIDATION.md).
 TH-03 [ayrı native kabul bekler](TH03_THUMBNAIL_VISIBILITY_VALIDATION.md).
 TH-04/TH-05 [kullanıcı native kabulüyle DONE](TH05_THUMBNAIL_SYSTEM_VALIDATION.md).
-TH-06/TH-07 yalnız plandır; geliştirmeleri başlamadı.
+TH-06 kullanıcı native kabulüyle DONE. TH-07 uygulandı; [doğrulama/native kapı](TH07_FULLSCREEN_VALIDATION.md) TESTING.
 
 ## TH-07 — Tam Ekran Fotoğraf Görüntüleme
 
-TH-06 sonrasında uygulanacak; TH-03 görünürlük ve kısayol kurallarıyla bütünleşir.
+TH-06 kabulünden sonra uygulandı; TH-03 görünürlük ve kısayol kurallarıyla bütünleşir.
 
 1. Ana fotoğraf alanında çift tıklama fullscreen açar/kapatır.
 2. `F` fullscreen açar/kapatır.
@@ -46,7 +46,7 @@ TH-06 sonrasında uygulanacak; TH-03 görünürlük ve kısayol kurallarıyla b�
     oluşturulmaz, görüntüleme motoru yeniden başlatılmaz.
 15. Native Arch Linux GNOME Wayland testi ile klavye/fare regresyonları kabul koşuludur.
 
-## TH-07 kabul kapısı — henüz çalıştırılmadı
+## TH-07 kabul kapısı — otomatik kontroller / ayrı native kabul
 
 - Gerçek GNOME'da çift tıklama, `F`, `Esc`, `T` ve Sol/Sağ; focus ve overlay
   etkileşimleriyle birlikte doğrulanır. Thumbnail/düğmeye çift tıklamanın fullscreen
@@ -59,4 +59,4 @@ TH-06 sonrasında uygulanacak; TH-03 görünürlük ve kısayol kurallarıyla b�
   kabulü ayrı raporlanır. Çalıştırılmayan test PASS sayılmaz; native kabul olmadan DONE yoktur.
 
 Mevcut secure Glycin, asenkron yükleme, cancellation, cache ve preload korunur.
-Bu belgeyle üretim kodu veya test uygulaması eklenmemiştir.
+İlk planlama kaydından sonra kullanıcı talimatıyla üretim fullscreen ve testler eklendi; native kabul henüz yapılmadı.

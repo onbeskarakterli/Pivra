@@ -2166,8 +2166,8 @@ Missing tek başına hata değildir. [Kanıt/komut](TH01_THUMBNAIL_VALIDATION.md
 | TH-03 | TESTING | Otomatik gizlenme, `T`, kalıcı ayar; ayrı native kabul bekleniyor |
 | TH-04 | DONE | DONE — kullanıcı Arch GNOME kabulü, 1b11074 |
 | TH-05 | DONE | DONE — kullanıcı Arch GNOME kabulü, 1b11074 |
-| TH-06 | TESTING — TH-06.1/06.2, native kabul bekleniyor | Thumbnail genel kabul ve optimizasyon |
-| TH-07 | TODO | Tam ekran fotoğraf görüntüleme; PIV-18 alt görevi, yalnız planlandı |
+| TH-06 | DONE — kullanıcı native kabulü, 25.10.2026 | Thumbnail genel kabul ve optimizasyon |
+| TH-07 | TESTING — native GNOME kabulü bekleniyor | Native fullscreen uygulandı; [doğrulama](TH07_FULLSCREEN_VALIDATION.md), kullanıcı kabulü açık |
 
 TH-02 başlangıç `e503e8fec645ddf79b2b73b4b34b9c03573f8eec`, temiz/güncel dev.
 
@@ -2406,3 +2406,39 @@ Native: `PIVRA_TRACE_THUMBNAILS=1 bash tests/run_thumbnail_system_probe.sh`.
 Tekrarlanan dosya adları/cache URI/token/result ve priority/epoch/eviction izleri
 raporlanır; gerçek iptalsiz tekrar varsa test FAIL kalır. [Detay](TH06_VALIDATION.md).
 TH-06 TESTING, TH-04/TH-05 DONE, TH-07 TODO; PIV-18 TESTING.
+
+
+## TH-06 kullanıcı kapanışı / TH-07 fullscreen — 25.10.2026
+
+TH-07 talimatındaki kullanıcı beyanıyla TH-06 DONE: native Arch GNOME kabulü,
+`3dc589df0f8a5aba7011af21166a84f8e5c5ec5a` selected-follow ve
+`0571986fc956309e37a35e4c0a42221d5cce5c42` flush-toggle sonrası. Ayrı yeni
+ayrıntılı native log verilmedi; bu bir kullanıcı kabulüdür, Codex çalıştırması
+sayılmaz. TH-03 önceki bağımsız TESTING durumunda korunur. TH-01/02/04/05 DONE.
+
+Başlangıç güncel/temiz dev=`0571986fc956309e37a35e4c0a42221d5cce5c42`.
+
+- `089775a6d53b2341fbda9b103e3172f0db7dd4ca` — native fullscreen state,
+  F/Esc/photo double-click, gerçek GTK notification ile chrome yönetimi.
+- `78d45ad4649a115ee3fa606c9d6116f7258bc9c1` — fullscreen probe/native script;
+  gerçek Sway/Xfwm fullscreen, XTest keyboard/double-click,2x output ve üretim
+  window/thumbnail/loaded-error state testleri. Eski4px test beklentisi kabul
+  edilen0571986'daki0px flush geometriye uyarlandı; ürün overlay kodu korunur.
+
+PASS:fmt/check/build/all-target Clippy -D warnings;88 Rust testi; Sway1x/koyu2x
+fullscreen ve native GDK state/monitor allocation; Xfwm/Xvfb fullscreen + gerçek
+XTest F/Esc/photo/thumbnail/toggle/header routing;81/120 thumbnail retention ve
+katalog, TH-02/03 overlay/visibility, TH-06.2 geçiş/cancel/error recovery,
+PIV-17 preload ve production-window/GIO close/late-result yarışları.
+Bunların fotoğraf pikselleri kontrollüdür; yeni native Glycin PASS değildir.
+
+NOT RUN/BLOCKED:run_thumbnail_system_probe.sh exit77 (GNOME development helper
+bu SDK'da yok); run_image_transition_probe.sh exit77 (secure loader process1).
+Tek secure gate denendi, bypass veya tekrar yok. Yeni native fullscreen script
+ve fiziksel GNOME kabulü NOT RUN. [Ayrıntı/native kontrol listesi](TH07_FULLSCREEN_VALIDATION.md).
+
+Native tek komut: `bash tests/run_fullscreen_probe.sh` — secure gate, otomatik
+fullscreen ve iki özel TEST üretim penceresi. Kullanıcı native kabulüne kadar
+**TH-07 TESTING**. PIV-18 TESTING; PIV-19/sonraki işler başlamadı. Faz0 ve
+DESKTOP-06 açık kalır. Main ve fotoğraf/thumbnail decoder/cache/preload kaynakları
+korundu; yeni dependency/decoder/CI/paket kurulmadı.

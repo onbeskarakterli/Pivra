@@ -1,9 +1,12 @@
-# PIV-18 / TH-06 — TESTING
+# PIV-18 / TH-06 — DONE (kullanıcı native kabulü)
 
 25.10.2026 · dev · başlangıç `1b11074e6ae6b00cdd79c0c6dae985cbb6ea6dce`.
 TH-04/TH-05 kullanıcı Arch GNOME kabulüyle DONE; kapanış commit'i
-`0b50b7a8a0e514b2ea7743b7ff81c983b7a12acc`. PIV-18 TESTING; TH-07 TODO.
-Kullanıcı native kabulü olmadan TH-06 DONE değildir.
+`0b50b7a8a0e514b2ea7743b7ff81c983b7a12acc`. PIV-18 TESTING; TH-07 TESTING.
+Güncel durum: TH-07 talimatında kullanıcı TH-06'yı kabul ettiğini bildirdi
+(25.10.2026, 0571986 sonrası). TH-06 DONE. Aşağıdaki TESTING/NOT RUN satırları
+önceki çalıştırmaların tarihsel kayıtlarıdır; Codex native çalıştırması yapılmış
+gibi değiştirilmez. TH-07 ayrı TESTING kabul kapısıdır.
 
 ## TH-06.1 — Alt kenara bağlı şerit / üst orta düğme
 

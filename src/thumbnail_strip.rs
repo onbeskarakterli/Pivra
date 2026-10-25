@@ -110,6 +110,7 @@ impl ThumbnailStrip {
         let weak = Rc::downgrade(&inner);
         inner.scroller.connect_map(move |strip| {
             if let Some(inner) = weak.upgrade() {
+                if let Some(token) = inner.warming.borrow_mut().take() { token.cancel(); }
                 if let Some(clock) = strip.frame_clock() {
                     let weak = Rc::downgrade(&inner);
                     let handler = clock.connect_after_paint(move |_| {

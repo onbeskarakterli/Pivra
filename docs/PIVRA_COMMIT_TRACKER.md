@@ -2591,3 +2591,19 @@ Native birleşik `bash tests/run_preview_pipeline_probe.sh` **exit 0** (Takip 04
   185 Rust PASS; check/build/Clippy ve kontrollü GNOME X11 katalog PASS.
 - Yeni native sonuç NOT RUN; FD-06 TESTING, FD-07 başlamadı. Kanıt ve sınırlamalar:
   [FD06_PROVIDER_MANAGER_INTEGRATION.md](FD06_PROVIDER_MANAGER_INTEGRATION.md).
+
+#### FD-06 Glycin shared-pool sahiplik araştırması — TESTING
+
+- `ade7qqu9.json` okundu: 35s yaşayan hedef PID, aktif partial/cancel sertifikası,
+  kapalı native yüzey ve sıfır permit/bellek. done/tracker/process sahipliği
+  ölçülmediğinden aktif iş/sızıntı teşhisi konulamaz; önceki FAIL kaydı korunur.
+- `abaed4ca8705b6e77a0ed2f5bad83dc0d259b217`: gerçek kaynak/Arc testiyle shared
+  global pool doğrulandı. Retention başlangıcı son tracker drop; WINDOW_CLOSED
+  değildir. Verify el sıkışması, pool trace ve proc/frame tanıları eklendi.
+- Salt yaşayan PID sonucu NOT RUN/INCONCLUSIVE 77; actual pidfd exit ve diğer
+  pencere doğrulamaları olmadan PASS yok. Süre sınırları artırılmadı.
+- Üretim src/security/GNOME değişmedi; mevcut transitive tracing yalnız dev
+  dependency oldu. Rust 185 + example 27, Python 46 PASS; kontrollü GNOME katalog,
+  check/build/Clippy PASS; fmt eski kapsam dışı farklar nedeniyle FAIL.
+- Yeni native pool/verify kabulü NOT RUN; FD-06 TESTING, FD-07 başlamadı.
+  Ayrıntı/tek komut: [FD06_PROVIDER_MANAGER_INTEGRATION.md](FD06_PROVIDER_MANAGER_INTEGRATION.md).

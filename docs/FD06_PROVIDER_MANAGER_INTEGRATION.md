@@ -275,3 +275,78 @@ Tek komut: `bash tests/run_fd06_freedesktop_probe.sh; printf 'EXIT CODE: %s\n' "
 Son otomatik decode pencerelerini elle kapatmayın. Loader retention aşaması
 loglandığında bekleyin; gerçek PID çıkışı ve tüm final kontrolleri olmadan
 kabul verilmez. **FD-06 TESTING; FD-07 başlamadı.**
+
+## Glycin pool yaşam döngüsü araştırması — ade7qqu9 native raporu
+
+`pivra-fd06-close-report-ade7qqu9.json` okundu: 708 örnek, yaklaşık 35.419s,
+hedef PID 283603/starttime 18152698; 150 MB partial-after-STOP ve cancel ack mevcut.
+Pencere/surface kapalı; worker ve rezervasyon sıfır; son hedef RSS 8638464 byte.
+Fakat yalnız PID'nin 35.043s sonra hâlâ yaşaması eski observer'da FAIL üretiyordu.
+Raporda pool kullanıcı sayısı, done tamamlanması, CPU tick, frame mapping veya
+process wait-state yok. Bu nedenle **aktif decode/sızıntı veya sağlıklı idle
+pool ayrımı yapılamaz**. Önceki native exit 1 tarihsel kayıt olarak korunur;
+bu veri gerçek üretim cleanup kusuru kanıtı olarak sınıflandırılmaz.
+
+### Kaynak kodundan doğrulanan model
+
+Sabitlenmiş Glycin 3.0.8:
+
+1. `api_loader.rs` Loader::new_source, `Pool::global()` kullanır. Foreground ve
+   thumbnail yollarımız aynı Glycin crate instance'ında bunu kullanır.
+   Runtime unit testi iki global Arc'ın aynı olduğunu da doğrular.
+2. `pool.rs` get_process; exec/fontconfig/expose_base_dir/base_dir/sandbox
+   hash'ine göre ortak havuzdan bağlı ve kapasitesi uygun process seçer.
+   Birden fazla process görülmesi pencere başına bağımsız pool kanıtı değildir.
+   Aynı loader'ın ikinci pencere tarafından yeniden kullanılması API'ye uygundur;
+   bu native koşuda hedef PID'nin gerçekten yeniden kullanıldığı henüz ölçülmedi.
+3. Retention timer **son UsageTracker Arc drop** olayında planlanır (30s).
+   Image::drop önce ayrı async task'ta `done(image_path)` bekler, sonra tracker'ı
+   bırakır. İptal de image-path done gönderir; doğrudan process kill değildir.
+4. `PooledProcess::use_` last_use saatini yeniler. clean_loaders ancak n_users=0
+   ve last_use üzerinden idle>30s ise pool girdisini kaldırır. RemoteProcess'in
+   son Arc'ı bırakılınca cancellable process'i sonlandırır. Pool'dan kaldırılma,
+   tüm Arc'ların bırakılması ve gerçek process çıkışı aynı olay değildir.
+
+Önceki "WINDOW_CLOSED_OTHER_ALIVE + 30+5s kesin exit sınırıdır" yorumumuz bu
+nedenle fazla güçlüydü. Son tracker drop/done zamanı ölçülmeden bu hesap yapılamaz.
+Boş permit/reservation decode await kapsamının bırakıldığını destekler; ayrı
+Glycin async done/UsageTracker/RemoteProcess sahipliğini kanıtlamaz.
+
+### Sınırlı test düzeltmesi
+
+`abaed4ca8705b6e77a0ed2f5bad83dc0d259b217`:
+
+- Diğer pencerenin title/render/source ve sıfır kaynak kontrolleri yeni `verify`
+  el sıkışmasıyla **PID beklemesinden bağımsız** çalışır. OTHER_WINDOW_VERIFIED
+  sertifikası olmadan final PASS yok; final kontroller ayrıca tekrar edilir.
+- 35s gözlem penceresi ve 95/100s üst sınırlar artırılmadı. Gözlem sonu yalnız
+  PID yaşıyor diye üretim FAIL sayılmaz: **NOT RUN / INCONCLUSIVE (77)**,
+  cleanup NOT VERIFIED. Gerçek pidfd çıkışı olmadan native PASS hâlâ yasaktır.
+- `/proc` başlangıç/son tanısı: kimlik, process state, CPU ticks, wchan, en fazla
+  16 frame memfd'nin boyut/inode/mapping bilgisi ve hedef partial-frame durumu.
+  Bunlar tanıdır; uyuyan süreç/düşük RSS veya tamamlanmış eski mapping otomatik
+  idle ya da aktif decode sertifikası sayılmaz.
+- Yalnız örnekte Glycin pool/api_loader/dbus tracing olayları kaydedilir:
+  reuse, usage tracker drop, clean_loaders kullanıcı/idle/drop kararları ve
+  RemoteProcess winding-down. Aynı exec'li birden fazla entry varsa event tek
+  başına hedef PID'ye atfedilmez; ham olaylar süreç gözlemiyle birlikte incelenir.
+- `tracing` yalnız dev-dependency olarak açıldı; zaten lock'taki Glycin bağımlılığıdır.
+  Yeni paket eklenmedi, üretim dependencies/src/sandbox/GNOME kodu değiştirilmedi.
+
+Codex: 185 Rust + 27 example testi PASS; 9 observer + 37 GNOME thumbnail Python
+PASS. Check, build, Clippy all-targets, shell syntax, Python compile, diff-check
+PASS; kontrollü X11 GNOME katalog/iki pencere regresyonu PASS (secure decode
+iddiası değil). fmt --check önceki kapsam dışı üç dosyanın farkları nedeniyle
+FAIL; bu değişikliklerin formatı temizdir.
+
+Yeni pool olayları ve verify el sıkışmasının **native doğrulaması NOT RUN**.
+Bilinen Codex Bwrap engeli tekrarlanmadı. Kullanıcının tek komutu:
+
+```sh
+bash tests/run_fd06_freedesktop_probe.sh; printf 'EXIT CODE: %s\n' "$?"
+```
+
+Son otomatik pencereleri elle kapatmayın. Yeni JSON'daki pool_events,
+loader_before/after, certificate.other_window_verified ve cleanup birlikte
+incelenmelidir. Yalnız sağlıklı idle olabileceği gerekçesiyle PASS verilmez.
+**FD-06 TESTING; FD-07 başlamadı.**

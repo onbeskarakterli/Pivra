@@ -74,6 +74,12 @@ pub enum Error {
     Cancelled,
     TimedOut,
     SourceUnavailable(String),
+    /// FD-04: identity changed after the request snapshot.
+    SourceChanged,
+    /// FD-04: bounded source/frame/output admission failed.
+    LimitExceeded(String),
+    /// FD-04: fail-fast admission, no queued or duplicate decode.
+    Busy,
     InvalidSource(String),
     Ineligible,
     Io(String),

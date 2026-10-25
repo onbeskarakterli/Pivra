@@ -150,7 +150,7 @@ fn zero_overflow_edges_and_large_decode_budget_are_rejected() {
         (u32::MAX, u32::MAX),
         (32769, 1),
         (8000, 8000),
-        (4000, 6000),
+        (10000, 10800),
     ] {
         assert!(matches!(
             fitted_size(w, h, SizeClass::Normal),
@@ -552,4 +552,42 @@ fn alpha_quadrants_survive_real_postdecode_downsampling() {
             }
         }
     }
+}
+
+#[test]
+fn high_resolution_geometry_and_weighted_admission_are_bounded() {
+    let _f = Fixture::new();
+    for (w, h) in [(4000, 3000), (6000, 4000), (8000, 6000), (10000, 5000)] {
+        let (x, y) = fitted_size(w, h, SizeClass::Normal).unwrap();
+        assert!(x <= 128 && y <= 128);
+        let job =
+            Reservation::acquire(u64::from(w) * u64::from(h), 8 * 1024 * 1024 * 1024).unwrap();
+        assert!(job.large);
+        assert!(matches!(
+            Reservation::acquire(12_000_000, 8 * 1024 * 1024 * 1024),
+            Err(Error::Busy)
+        ));
+        drop(job);
+    }
+    assert!(matches!(
+        Reservation::acquire(24_000_000, 512 * 1024 * 1024),
+        Err(Error::LimitExceeded(_))
+    ));
+    assert!(matches!(
+        Reservation::acquire(108_000_000, usize::MAX),
+        Err(Error::LimitExceeded(_))
+    ));
+    let large = Reservation::acquire(50_000_000, 8 * 1024 * 1024 * 1024).unwrap();
+    let small = Reservation::acquire(1_000_000, 8 * 1024 * 1024 * 1024).unwrap();
+    assert!(matches!(
+        Reservation::acquire(8_000_000, 8 * 1024 * 1024 * 1024),
+        Err(Error::LimitExceeded(_))
+    ));
+    drop(small);
+    drop(large);
+    assert_eq!(MEMORY.lock().unwrap().0, 0);
+    assert!(
+        secure_loader::validate_dimensions(8000, 6000).is_err(),
+        "main photo policy remains32MP"
+    );
 }

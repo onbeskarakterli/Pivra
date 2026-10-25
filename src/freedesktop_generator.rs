@@ -21,9 +21,9 @@ use std::{
 #[path = "image_loader.rs"]
 mod secure_loader;
 
-pub const DECODE_BUDGET: usize = 256 * 1024 * 1024;
+pub const DECODE_BUDGET: usize = 512 * 1024 * 1024;
 const MAX_FILE: u64 = 64 * 1024 * 1024;
-const MAX_DOWNLOAD: usize = 64 * 1024 * 1024;
+const MAX_DOWNLOAD: usize = 224 * 1024 * 1024;
 static ACTIVE: Mutex<Vec<(u64, u64)>> = Mutex::new(Vec::new());
 
 #[derive(Debug)]
@@ -54,7 +54,7 @@ pub struct GeneratedThumbnail {
 /// deduplicated by dev/inode (including hardlinks). FD-06 must share the existing
 /// application worker permit; this separate adapter is not wired into the strip.
 pub fn generate(request: &Request<'_>, class: SizeClass) -> Result<GeneratedThumbnail, Error> {
-    generate_with(request, class, &SecureDecoder)
+    generate_with(request, class, &SecureDecoder::default())
 }
 
 struct Admission((u64, u64));
@@ -169,15 +169,171 @@ type DecodeFuture<'a> = Pin<Box<dyn Future<Output = Result<Decoded, Error>> + 'a
 trait Decoder {
     fn decode<'a>(&'a self, path: &'a Path, cancel: &'a gio::Cancellable) -> DecodeFuture<'a>;
 }
-struct SecureDecoder;
+#[derive(Default)]
+struct SecureDecoder {
+    reservation: std::cell::RefCell<Option<Reservation>>,
+}
+static MEMORY: Mutex<(usize, bool)> = Mutex::new((0, false));
+struct Reservation {
+    cost: usize,
+    large: bool,
+    pixels: u64,
+}
+impl Reservation {
+    fn acquire(pixels: u64, available: usize) -> Result<Self, Error> {
+        if pixels == 0 || pixels > 50_000_000 {
+            return Err(Error::LimitExceeded("experimental ceiling 50 MP".into()));
+        }
+        let cost = usize::try_from(pixels)
+            .ok()
+            .and_then(|p| p.checked_mul(32))
+            .and_then(|v| v.checked_add(128 * 1024 * 1024))
+            .ok_or_else(|| Error::LimitExceeded("memory accounting overflow".into()))?;
+        let large = pixels > 8_388_608;
+        let mut budget = MEMORY
+            .lock()
+            .map_err(|_| Error::GenerationFailed("memory admission poisoned".into()))?;
+        if large && budget.1 {
+            return Err(Error::Busy);
+        }
+        let total = budget
+            .0
+            .checked_add(cost)
+            .ok_or_else(|| Error::LimitExceeded("global memory accounting overflow".into()))?;
+        if total > 2 * 1024 * 1024 * 1024 || available < total.saturating_add(512 * 1024 * 1024) {
+            return Err(Error::LimitExceeded(
+                "insufficient memory headroom for thumbnail reservation".into(),
+            ));
+        }
+        budget.0 = total;
+        if large {
+            budget.1 = true;
+        }
+        Ok(Self {
+            cost,
+            large,
+            pixels,
+        })
+    }
+}
+impl Drop for Reservation {
+    fn drop(&mut self) {
+        let mut b = MEMORY.lock().unwrap_or_else(|e| e.into_inner());
+        b.0 -= self.cost;
+        if self.large {
+            b.1 = false;
+        }
+    }
+}
+/// Observed host/visible-cgroup headroom; not an RSS hard cap or reservation.
+pub fn memory_headroom() -> Result<usize, Error> {
+    let text = std::fs::read_to_string("/proc/meminfo").map_err(|e| Error::Io(e.to_string()))?;
+    let mut available = text
+        .lines()
+        .find_map(|line| {
+            line.strip_prefix("MemAvailable:")
+                .and_then(|v| v.split_whitespace().next())
+                .and_then(|v| v.parse::<usize>().ok())
+        })
+        .and_then(|v| v.checked_mul(1024))
+        .ok_or_else(|| Error::LimitExceeded("MemAvailable unavailable".into()))?;
+    // Include every visible finite v2 ancestor; never modify cgroup settings.
+    let base = std::path::Path::new("/sys/fs/cgroup");
+    let mut paths = vec![base.to_path_buf()];
+    if let Ok(groups) = std::fs::read_to_string("/proc/self/cgroup") {
+        if let Some(relative) = groups.lines().find_map(|s| s.strip_prefix("0::")) {
+            let path = base.join(relative.trim_start_matches('/'));
+            if !path
+                .components()
+                .any(|c| matches!(c, std::path::Component::ParentDir))
+            {
+                let mut current = path.as_path();
+                while current.starts_with(base) {
+                    paths.push(current.to_path_buf());
+                    let Some(parent) = current.parent() else {
+                        break;
+                    };
+                    current = parent;
+                }
+            }
+        }
+    }
+    for path in paths {
+        match std::fs::read_to_string(path.join("memory.max")) {
+            Ok(max) if max.trim() != "max" => {
+                let max = max
+                    .trim()
+                    .parse::<usize>()
+                    .map_err(|_| Error::LimitExceeded("invalid cgroup memory.max".into()))?;
+                let current = std::fs::read_to_string(path.join("memory.current"))
+                    .map_err(|e| Error::Io(e.to_string()))?
+                    .trim()
+                    .parse::<usize>()
+                    .map_err(|_| Error::LimitExceeded("invalid cgroup memory.current".into()))?;
+                available = available.min(max.saturating_sub(current));
+            }
+            Ok(_) => {}
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound => {}
+            Err(e) => return Err(Error::Io(e.to_string())),
+        }
+    }
+    Ok(available)
+}
 impl Decoder for SecureDecoder {
     fn decode<'a>(&'a self, path: &'a Path, cancel: &'a gio::Cancellable) -> DecodeFuture<'a> {
         Box::pin(async move {
-            let frame = secure_loader::preload(path, cancel, DECODE_BUDGET)
-                .await
-                .map_err(loader_error)?;
+            let failure = std::cell::RefCell::new(None);
+            let admit = |w, h| {
+                let result = memory_headroom().and_then(|available| {
+                    Reservation::acquire(u64::from(w) * u64::from(h), available)
+                });
+                match result {
+                    Ok(r) => {
+                        self.reservation.replace(Some(r));
+                        Ok(())
+                    }
+                    Err(e) => {
+                        failure.replace(Some(e));
+                        Err("Thumbnail memory admission refused".into())
+                    }
+                }
+            };
+            let result = secure_loader::load_thumbnail(path, cancel, &admit).await;
+            if let Some(error) = failure.into_inner() {
+                return Err(error);
+            }
+            let frame = result.map_err(loader_error)?;
+            let min_len = (frame.height() as usize - 1)
+                .checked_mul(frame.stride() as usize)
+                .and_then(|v| v.checked_add(frame.width() as usize))
+                .ok_or_else(|| Error::LimitExceeded("frame stride overflow".into()))?;
+            if frame.stride() < frame.width() || frame.buf_slice().len() < min_len {
+                return Err(Error::GenerationFailed(
+                    "invalid actual frame stride/buffer".into(),
+                ));
+            }
+            if std::env::var_os("PIVRA_TRACE_FD05A").is_some_and(|v| v == "1") {
+                eprintln!(
+                    "FD05A_FRAME width={} height={} stride={} format={:?} bytes={}",
+                    frame.width(),
+                    frame.height(),
+                    frame.stride(),
+                    frame.memory_format(),
+                    frame.buf_slice().len()
+                );
+            }
+            if self
+                .reservation
+                .borrow()
+                .as_ref()
+                .is_none_or(|r| u64::from(frame.width()) * u64::from(frame.height()) > r.pixels)
+            {
+                return Err(Error::LimitExceeded(
+                    "actual frame exceeds reserved pixels".into(),
+                ));
+            }
             if frame.buf_slice().len() > DECODE_BUDGET {
-                return Err(Error::LimitExceeded("actual frame buffer >256MiB".into()));
+                return Err(Error::LimitExceeded("actual frame buffer >512MiB".into()));
             }
             fitted_size(frame.width(), frame.height(), SizeClass::XxLarge)?;
             Ok(Decoded {
@@ -190,7 +346,8 @@ impl Decoder for SecureDecoder {
 fn loader_error(message: String) -> Error {
     // Exact messages owned by our unchanged boundary, never filename/content matching.
     match message.as_str() {
-        "Preload exceeds cache entry budget"
+        "Thumbnail exceeds experimental 50 MP / 32768 edge ceiling"
+        | "Preload exceeds cache entry budget"
         | "Decoded frame exceeds the 512 MiB buffer limit"
         | "Image exceeds the 32 MP / 32768-pixel edge limit or has invalid dimensions" => {
             Error::LimitExceeded(message)
@@ -219,7 +376,7 @@ fn generate_with(
             source_current(request)?;
             let decoded = decoded?;
             if decoded.frame_bytes > DECODE_BUDGET {
-                return Err(Error::LimitExceeded("actual frame buffer >256MiB".into()));
+                return Err(Error::LimitExceeded("actual frame buffer >512MiB".into()));
             }
             let decode_time = begin.elapsed();
             let start = Instant::now();
@@ -248,10 +405,14 @@ fn generate_with(
 }
 
 fn fitted_size(width: u32, height: u32, class: SizeClass) -> Result<(u32, u32), Error> {
-    secure_loader::validate_dimensions(width, height).map_err(Error::LimitExceeded)?;
-    if crate::image_cache::texture_cost(width, height).is_none_or(|cost| cost > DECODE_BUDGET) {
+    if width == 0
+        || height == 0
+        || width > 32768
+        || height > 32768
+        || u64::from(width) * u64::from(height) > 50_000_000
+    {
         return Err(Error::LimitExceeded(
-            "decode accounting >256MiB (32 bytes/pixel)".into(),
+            "experimental thumbnail ceiling 50 MP / 32768 edge".into(),
         ));
     }
     let edge = class.max_edge();

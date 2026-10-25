@@ -57,7 +57,7 @@ pub(crate) async fn load(
     path: &Path,
     cancellable: &gio::Cancellable,
 ) -> Result<LoadedFrame, String> {
-    load_limited(path, cancellable, None).await
+    load_limited(path, cancellable, None, None).await
 }
 
 #[allow(dead_code)] // Standalone image_probe includes only the foreground path.
@@ -66,12 +66,36 @@ pub(crate) async fn preload(
     cancellable: &gio::Cancellable,
     budget: usize,
 ) -> Result<LoadedFrame, String> {
-    load_limited(path, cancellable, Some(budget)).await
+    load_limited(path, cancellable, Some(budget), None).await
+}
+/// Opt-in thumbnail policy. Foreground/preload defaults remain unchanged.
+#[allow(dead_code)]
+pub(crate) async fn load_thumbnail(
+    path: &Path,
+    cancel: &gio::Cancellable,
+    admit: &dyn Fn(u32, u32) -> Result<(), String>,
+) -> Result<LoadedFrame, String> {
+    load_limited(path, cancel, None, Some(admit)).await
+}
+fn dimensions_for(width: u32, height: u32, thumbnail: bool) -> Result<(), String> {
+    if !thumbnail {
+        return validate_dimensions(width, height);
+    }
+    if width == 0
+        || height == 0
+        || width > MAX_EDGE
+        || height > MAX_EDGE
+        || u64::from(width) * u64::from(height) > 50_000_000
+    {
+        return Err("Thumbnail exceeds experimental 50 MP / 32768 edge ceiling".into());
+    }
+    Ok(())
 }
 async fn load_limited(
     path: &Path,
     cancellable: &gio::Cancellable,
     budget: Option<usize>,
+    admit: Option<&dyn Fn(u32, u32) -> Result<(), String>>,
 ) -> Result<LoadedFrame, String> {
     if cancellable.is_cancelled() {
         return Err("Image loading cancelled".into());
@@ -98,7 +122,14 @@ async fn load_limited(
     ) {
         return Err("Decoded content is not a JPEG or PNG image".into());
     }
-    validate_dimensions(image.details().width(), image.details().height())?;
+    dimensions_for(
+        image.details().width(),
+        image.details().height(),
+        admit.is_some(),
+    )?;
+    if let Some(admit) = admit {
+        admit(image.details().width(), image.details().height())?;
+    }
     if let Some(budget) = budget {
         if pivra::image_cache::texture_cost(image.details().width(), image.details().height())
             .is_none_or(|cost| cost > budget)
@@ -110,7 +141,7 @@ async fn load_limited(
         .next_frame()
         .await
         .map_err(|e| format!("Image decode failed: {e}"))?;
-    validate_dimensions(frame.width(), frame.height())?;
+    dimensions_for(frame.width(), frame.height(), admit.is_some())?;
     if frame.buf_slice().len() > MAX_FRAME_BYTES {
         return Err("Decoded frame exceeds the 512 MiB buffer limit".into());
     }
@@ -124,6 +155,15 @@ async fn load_limited(
 mod tests {
     use super::*;
 
+    #[test]
+    fn thumbnail_opt_in_does_not_raise_foreground_pixel_ceiling() {
+        assert!(dimensions_for(6000, 4000, false).is_ok());
+        assert!(dimensions_for(8000, 6000, false).is_err());
+        assert!(dimensions_for(8000, 6000, true).is_ok());
+        assert!(dimensions_for(10000, 5000, true).is_ok());
+        assert!(dimensions_for(12000, 9000, true).is_err());
+        assert!(pivra::image_cache::texture_cost(6000, 4000).unwrap() > 256 * 1024 * 1024);
+    }
     #[test]
     fn dimension_limits_reject_zero_extremes_and_excessive_pixel_count() {
         for (width, height) in [

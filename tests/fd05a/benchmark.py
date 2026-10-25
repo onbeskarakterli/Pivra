@@ -63,6 +63,7 @@ def job(binary,path,w,h,cancel):
     samples=[];handles={};certificate=None;errors=0;peak_before=cgroup_peak()
     with tempfile.TemporaryFile(mode='w+') as out,tempfile.TemporaryFile(mode='w+') as err:
         p=subprocess.Popen([binary,str(path)]+(['--cancel-active']if cancel else []),stdin=subprocess.PIPE,stdout=out,stderr=err,text=True,env={**os.environ,'PIVRA_TRACE_FD05A':'1'})
+        parent_identity=processes().get(p.pid)
         limit=time.monotonic()+100
         try:
             while p.poll() is None and time.monotonic()<limit:
@@ -112,7 +113,7 @@ def job(binary,path,w,h,cancel):
             else:cleanup=False
             if not cleanup:code=1
             if cancel and (certificate is None or 'PASS CANCELLED' not in stdout or not cleanup):code=(77 if p.returncode in (0,77) else p.returncode) if certificate is None else 1
-            return {'size':[w,h],'format':path.suffix,'cancel':cancel,'exit':code,'stdout':stdout,'stderr':stderr,'certificate':certificate,'cleanup':cleanup,'tracked_descendants':[{'pid':pid,'starttime':start}for pid,start in handles],'proc_errors':errors,'samples':samples,'child_rss':'MEASURED'if any(('Rss' in v or 'VmRSS' in v)for s in samples for v in s['loaders'].values())else'NOT MEASURED','child_pss':'MEASURED'if any('Pss' in v for s in samples for v in s['loaders'].values())else'NOT MEASURED','cancel_stage':('certified_partial_frame'if certificate else'NOT RUN partial_frame_checkpoint')if cancel else'not_requested','max_observed_loader_processes':max((len(s['loaders']) for s in samples),default=0),'cgroup_peak_before':peak_before,'cgroup_peak_after':cgroup_peak()}
+            return {'parent_pid':p.pid,'parent_starttime':parent_identity[1]if parent_identity else'NOT MEASURED','size':[w,h],'format':path.suffix,'cancel':cancel,'exit':code,'stdout':stdout,'stderr':stderr,'certificate':certificate,'cleanup':cleanup,'tracked_descendants':[{'pid':pid,'starttime':start}for pid,start in handles],'proc_errors':errors,'samples':samples,'child_rss':'MEASURED'if any(('Rss' in v or 'VmRSS' in v)for s in samples for v in s['loaders'].values())else'NOT MEASURED','child_pss':'MEASURED'if any('Pss' in v for s in samples for v in s['loaders'].values())else'NOT MEASURED','cancel_stage':('certified_partial_frame'if certificate else'NOT RUN partial_frame_checkpoint')if cancel else'not_requested','max_observed_loader_processes':max((len(s['loaders']) for s in samples),default=0),'cgroup_peak_before':peak_before,'cgroup_peak_after':cgroup_peak()}
         finally:
             if p.poll() is None:
                 p.terminate()

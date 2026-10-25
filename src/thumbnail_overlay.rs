@@ -284,7 +284,7 @@ impl Visibility {
             } else {
                 None
             };
-            height.unwrap_or_else(|| panel.measure(gtk::Orientation::Vertical, -1).1) + 4
+            height.unwrap_or_else(|| panel.measure(gtk::Orientation::Vertical, -1).1)
         } else {
             4
         };

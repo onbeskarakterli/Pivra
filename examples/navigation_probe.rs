@@ -126,7 +126,13 @@ fn open(app: &adw::Application, path: &Path, count: usize) -> adw::ApplicationWi
 fn image(window: &adw::ApplicationWindow, blocked: bool, size: (i32, i32)) {
     let picture = picture(window);
     let label = status(window);
-    wait(|| picture.paintable().is_some() || label.text().starts_with("Unable to display image."));
+    // A retained previous paintable is not evidence that this target loaded.
+    wait(|| {
+        label.text().starts_with("Unable to display image.")
+            || picture
+                .paintable()
+                .is_some_and(|p| (p.intrinsic_width(), p.intrinsic_height()) == size)
+    });
     if blocked {
         assert!(picture.paintable().is_none());
         assert!(label.text().starts_with("Unable to display image."));
@@ -234,12 +240,21 @@ fn video(window: &adw::ApplicationWindow) {
 }
 
 fn invalid(window: &adw::ApplicationWindow, missing: bool) {
+    let previous = picture(window).paintable();
     wait(|| {
         status(window)
             .text()
             .starts_with("Unable to display image.")
     });
-    assert!(picture(window).paintable().is_none());
+    assert_eq!(picture(window).paintable(), previous);
+    if previous.is_some() {
+        assert!(
+            status(window)
+                .text()
+                .contains("Previous photo is still displayed.")
+        );
+    }
+    assert!(status(window).text().contains("File:"));
     if missing {
         assert!(status(window).text().contains("Cannot access image"));
     }

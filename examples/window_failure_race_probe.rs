@@ -329,7 +329,7 @@ fn main() {
             .state()
             .unwrap()
             .str(),
-        Some("fit")
+        Some("fill") // Pending requests do not reset presentation preferences.
     );
     assert_eq!(
         second
@@ -388,7 +388,11 @@ fn main() {
     for id in [0, 2, 3, 4, 5] {
         assert!(CANCELLED[id].load(Ordering::SeqCst));
     }
-    assert_eq!(status(&second), "Loading image securely…");
+    assert_eq!(
+        status(&second),
+        "",
+        "pending load must not show loading text"
+    );
     action(&first, "next-media", 7);
     // Close while a new worker and a monitor timer can both be pending.
     std::fs::write(dir.path().join("3.png"), b"closing event").unwrap();
@@ -401,7 +405,11 @@ fn main() {
     settle();
     assert!(CANCELLED[6].load(Ordering::SeqCst));
     assert!(second.is_visible());
-    assert_eq!(status(&second), "Loading image securely…");
+    assert_eq!(
+        status(&second),
+        "",
+        "pending load must not show loading text"
+    );
     assert!(!banner(&second));
     RELEASE[1].store(true, Ordering::SeqCst);
     wait(|| status(&second).contains("controlled window error 1"));

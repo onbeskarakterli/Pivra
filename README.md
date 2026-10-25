@@ -864,7 +864,7 @@ bash tests/run_thumbnail_system_probe.sh
 
 Missing GNOME factory development API/helper returns77/NOT RUN; it is not a
 successful generation test. Normal cache-only viewing remains available. Native
-acceptance is still pending. See [root cause and validation](docs/TH05_THUMBNAIL_SYSTEM_VALIDATION.md)
+acceptance at implementation time was pending; user acceptance is recorded below. See [root cause and validation](docs/TH05_THUMBNAIL_SYSTEM_VALIDATION.md)
 for the real SHAs, controlled/native evidence split and remaining limits.
 
 
@@ -872,3 +872,16 @@ TH-04/TH-05 native closure (2026-10-25): the user reported successful Arch GNOME
 Wayland acceptance after `1b11074`,120/120 real secure thumbnails, failed0 and
 manual two-window acceptance. TH-04/TH-05 DONE; historical Codex NOT RUN records
 remain distinct. PIV-18 is still TESTING; TH-06 acceptance is separate.
+
+
+TH-06 is TESTING: the thumbnail panel now meets the bottom/side edges, with the
+floating toggle above the open panel. Photo requests keep the last ready pixels
+and zoom/pan until the new texture is ready; failures name the target and clearly
+identify the retained previous photo. Secure Glycin, cache and prefetch remain in
+place. Controlled GTK tests passed; native TH-06 visual acceptance is pending.
+See [TH-06 evidence and manual checks](docs/TH06_VALIDATION.md). Arch GNOME:
+
+```bash
+bash tests/run_thumbnail_system_probe.sh
+bash tests/run_image_transition_probe.sh
+```

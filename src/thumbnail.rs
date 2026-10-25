@@ -336,8 +336,10 @@ pub fn query_or_generate(provider: &Provider, path: &Path, cancel: &gio::Cancell
             .and_then(|mut hash| {
                 hash.update(uri.as_bytes());
                 hash.string().map(|digest| {
-                    gtk::glib::user_cache_dir().join("thumbnails/normal")
-                        .join(format!("{digest}.png")).is_file()
+                    gtk::glib::user_cache_dir()
+                        .join("thumbnails/normal")
+                        .join(format!("{digest}.png"))
+                        .is_file()
                 })
             })
             .unwrap_or(false)

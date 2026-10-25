@@ -2329,3 +2329,24 @@ PASS:86 Rust, fmt/check/all-target Clippy; X11/Sway geometri ve gerçek GSK
 Photo snapshot sürekliliği; koyu tema+scale2 altında120 kayıt TH-05 regresyonu.
 Native GNOME fiziksel kabul NOT RUN. [Kayıt/komut](TH06_VALIDATION.md).
 TH-06 TESTING, TH-07 TODO; PIV-18 genel kapanışı yapılmadı.
+
+
+### TH-06.2 — 25.10.2026 — TESTING
+
+Kök neden yeni dosya istenirken prepare() ile mevcut texture'ın temizlenmesiydi;
+negatif GTK testi bunu gösterdi. Hazır eski görüntü/zoom/pan/cache pin korunur,
+yeni texture callback'te tek sunumla değişir. ActualPaintable texture kimliği
+kontrolü eklendi. Hatalı hedef dosya adı + önceki fotoğraf açıklamasıyla Failed
+kalır; Loading yazısı/animasyon/bypass yok. Mevcut token/worker/cache/preload
+implementasyonları korunur.
+
+PASS:86 Rust, fmt/check/all-target Clippy, examples build; X11 kontrollü tam-frame
+geçiş/pan/hata-recovery, cache/priority/promotion/LRU ve iki pencere/GIO yarışları;
+Sway/Wayland async ve120/120 kontrollü thumbnail katalog regresyonu. Fiziksel
+GNOME ve gerçek Glycin TH-06 kabulü NOT RUN, bilinen Bwrap engeli tekrar denenmedi.
+[Detay/tekil native test girişleri](TH06_VALIDATION.md).
+
+Gerçek commit'ler: `0b50b7a8a0e514b2ea7743b7ff81c983b7a12acc` TH-04/05 kapanışı;
+`8c077954bd14a0d41b716ad71d8095cb44c5247d` TH-06.1 geometri. TH-06.2 kod/test/kayıt
+bu bölümün eklendiği commit'tedir (`git log --oneline -- docs/TH06_VALIDATION.md`);
+kendi SHA'sı teslim raporunda belirtilir. TH-06 TESTING, TH-07 TODO, PIV-18 TESTING.

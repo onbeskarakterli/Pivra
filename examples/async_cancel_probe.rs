@@ -1,6 +1,8 @@
 //! Default secure native gate. --controlled uses explicit synthetic successes/errors.
 #[path = "../src/image_view.rs"]
 mod image_view;
+#[path = "support/render_frame.rs"]
+mod render_frame;
 #[path = "../src/image_loader.rs"]
 mod secure_loader;
 use adw::prelude::*;
@@ -15,8 +17,8 @@ use std::{
 static CONTROLLED: AtomicBool = AtomicBool::new(false);
 static STARTED: AtomicUsize = AtomicUsize::new(0);
 static TEXTURES: AtomicUsize = AtomicUsize::new(0);
-static RELEASE: [AtomicBool; 14] = [const { AtomicBool::new(false) }; 14];
-static CANCELLED: [AtomicBool; 14] = [const { AtomicBool::new(false) }; 14];
+static RELEASE: [AtomicBool; 16] = [const { AtomicBool::new(false) }; 16];
+static CANCELLED: [AtomicBool; 16] = [const { AtomicBool::new(false) }; 16];
 static REQUESTS: std::sync::Mutex<Vec<(std::path::PathBuf, gio::Cancellable)>> =
     std::sync::Mutex::new(Vec::new());
 mod image_loader {
@@ -50,9 +52,20 @@ mod image_loader {
                         9 => [255, 0, 0],
                         11 => [255, 0, 255],
                         13 => [0, 255, 255],
+                        15 => [30, 200, 40],
                         _ => [255, 255, 0],
                     };
-                    let data = [rgb[0], rgb[1], rgb[2], 255].repeat(800 * 600);
+                    let mut data = Vec::with_capacity(800 * 600 * 4);
+                    for _ in 0..600 {
+                        for x in 0..800 {
+                            let color = if !(180..620).contains(&x) {
+                                [80, 80, 80]
+                            } else {
+                                rgb
+                            };
+                            data.extend_from_slice(&[color[0], color[1], color[2], 255]);
+                        }
+                    }
                     gdk::MemoryTexture::new(
                         800,
                         600,
@@ -72,7 +85,7 @@ mod image_loader {
                 .map(LoadedFrame::Secure);
         }
         let id = STARTED.fetch_add(1, Ordering::SeqCst);
-        assert!(id < 14, "unexpected decode/retry");
+        assert!(id < 16, "unexpected decode/retry");
         REQUESTS
             .lock()
             .unwrap()
@@ -83,7 +96,7 @@ mod image_loader {
             std::thread::sleep(Duration::from_millis(1));
         }
         CANCELLED[id].store(token.is_cancelled(), Ordering::SeqCst);
-        if [1, 4, 7, 8].contains(&id) {
+        if [1, 4, 7, 8, 14].contains(&id) {
             Err(format!("controlled late error {id}"))
         } else {
             Ok(LoadedFrame::Synthetic(id))
@@ -136,24 +149,11 @@ fn state(w: &adw::ApplicationWindow, action: &str) -> String {
         .unwrap()
         .into()
 }
-fn center(w: &adw::ApplicationWindow, v: &image_view::ImageView) -> [u8; 3] {
+fn pixels(w: &adw::ApplicationWindow, v: &image_view::ImageView) -> (usize, usize, Vec<u8>) {
     let p = picture(v);
-    let frames = Rc::new(Cell::new(0));
-    let tick = frames.clone();
-    p.add_tick_callback(move |_, _| {
-        tick.set(tick.get() + 1);
-        if tick.get() >= 2 {
-            glib::ControlFlow::Break
-        } else {
-            glib::ControlFlow::Continue
-        }
-    });
-    p.queue_draw();
-    wait(|| frames.get() >= 2);
-    let s = gtk::Snapshot::new();
-    gtk::WidgetPaintable::new(Some(&p)).snapshot(&s, p.width() as f64, p.height() as f64);
+    let node = render_frame::rendered_node(w, &p);
     let t = w.renderer().unwrap().render_texture(
-        s.to_node().unwrap(),
+        node,
         Some(&gtk::graphene::Rect::new(
             0.,
             0.,
@@ -161,11 +161,18 @@ fn center(w: &adw::ApplicationWindow, v: &image_view::ImageView) -> [u8; 3] {
             p.height() as f32,
         )),
     );
-    let mut bytes = vec![0; p.width() as usize * p.height() as usize * 4];
-    t.download(&mut bytes, p.width() as usize * 4);
-    let i = ((p.height() / 2 * p.width() + p.width() / 2) * 4) as usize;
+    let width = t.width() as usize;
+    let height = t.height() as usize;
+    let mut bytes = vec![0; width * height * 4];
+    t.download(&mut bytes, width * 4);
+    (width, height, bytes)
+}
+fn center(w: &adw::ApplicationWindow, v: &image_view::ImageView) -> [u8; 3] {
+    let (width, height, bytes) = pixels(w, v);
+    let i = (height / 2 * width + width / 2) * 4;
     [bytes[i + 2], bytes[i + 1], bytes[i]]
 }
+
 fn request(v: &image_view::ImageView, path: &str, joined: &Rc<Cell<usize>>) {
     let count = joined.clone();
     v.load_with_completion(path.into(), move || count.set(count.get() + 1));
@@ -196,9 +203,21 @@ fn controlled(app: &adw::Application) {
     assert!(v.load_stats().suppressed >= 2);
     assert_eq!(state(&w, "image-mode"), "fill");
     assert_eq!(state(&w, "image-resampling"), "nearest");
+    let retained = picture(&v).paintable();
+    let retained_pixels = pixels(&w, &v);
     for (i, name) in ["A", "B", "A"].into_iter().enumerate() {
         request(&v, name, &joined);
         wait(|| STARTED.load(Ordering::SeqCst) == i + 4);
+        assert_eq!(
+            picture(&v).paintable(),
+            retained,
+            "pending selection cleared the last ready image"
+        );
+        assert_eq!(
+            pixels(&w, &v),
+            retained_pixels,
+            "pending repaint changed last ready pixels"
+        );
     }
     {
         let records = REQUESTS.lock().unwrap();
@@ -225,9 +244,22 @@ fn controlled(app: &adw::Application) {
     assert_eq!(center(&w, &v), [0, 255, 0]);
     assert_eq!(state(&w, "image-mode"), "manual");
     assert_eq!(state(&w, "image-resampling"), "smooth");
+    let drag = (0..list.n_items())
+        .find_map(|i| list.item(i).unwrap().downcast::<gtk::GestureDrag>().ok())
+        .unwrap();
+    drag.emit_by_name::<()>("drag-begin", &[&100f64, &100f64]);
+    drag.emit_by_name::<()>("drag-update", &[&20f64, &-10f64]);
+    drag.emit_by_name::<()>("drag-end", &[&20f64, &-10f64]);
+    let posed = pixels(&w, &v);
     for i in 0..3 {
         request(&v, "held", &joined);
         wait(|| STARTED.load(Ordering::SeqCst) == i + 7);
+        assert_eq!(
+            pixels(&w, &v),
+            posed,
+            "pending load reset zoom/pan or cleared image"
+        );
+        assert_eq!(state(&w, "image-mode"), "manual");
     }
     for i in 0..1000 {
         request(&v, &format!("queued-{i}"), &joined);
@@ -263,7 +295,12 @@ fn controlled(app: &adw::Application) {
     wait(|| STARTED.load(Ordering::SeqCst) == 11);
     release(10, &joined, 11);
     wait(|| STARTED.load(Ordering::SeqCst) == 12);
-    assert!(picture(&v).paintable().is_none());
+    assert!(picture(&v).paintable().is_some());
+    assert_eq!(
+        center(&w, &v),
+        [255, 255, 0],
+        "reentrant next request must retain just-published frame"
+    );
     // c9e16cc deliberately removed transient loading text. Verify the latest
     // request still owns FullLoading without reviving an old callback's UI.
     assert!(!status(&v).is_visible());
@@ -306,9 +343,36 @@ fn controlled(app: &adw::Application) {
     let stats = survivor.load_stats();
     assert_eq!((stats.running, stats.pending), (0, 0));
     assert_eq!(TEXTURES.load(Ordering::SeqCst), 6);
+    let last = picture(&survivor).paintable();
+    let last_pixels = pixels(&other, &survivor);
+    request(&survivor, "broken-latest.png", &joined);
+    wait(|| STARTED.load(Ordering::SeqCst) == 15);
+    assert_eq!(picture(&survivor).paintable(), last);
+    assert_eq!(pixels(&other, &survivor), last_pixels);
+    release(14, &joined, 15);
+    assert_eq!(survivor.phase(), pivra::image_pipeline::Phase::Failed);
+    assert_eq!(picture(&survivor).paintable(), last);
+    assert_eq!(pixels(&other, &survivor), last_pixels);
+    assert!(status(&survivor).is_visible());
+    assert!(status(&survivor).text().contains("broken-latest.png"));
+    assert!(status(&survivor).text().contains("Previous photo"));
+    request(&survivor, "recovery.png", &joined);
+    wait(|| STARTED.load(Ordering::SeqCst) == 16);
+    assert_eq!(picture(&survivor).paintable(), last);
+    assert!(!status(&survivor).is_visible());
+    release(15, &joined, 16);
+    assert_eq!(
+        center(&other, &survivor),
+        [30, 200, 40],
+        "Actual paintable kept previous texture"
+    );
+    assert_eq!(survivor.phase(), pivra::image_pipeline::Phase::FullReady);
+    assert!(!status(&survivor).is_visible());
+    assert_eq!(TEXTURES.load(Ordering::SeqCst), 7);
+
     other.close();
     println!(
-        "PASS controlled synthetic success/error GTK/GIO: C-before-A/B pixels, A/B/A identity, 1000 latest-only pending requests, max3 workers, idle responsiveness, reentrant loading indicator, same-file two-window cancellation, joined jobs and weak cleanup"
+        "PASS controlled synthetic success/error GTK/GIO: C-before-A/B pixels, A/B/A identity, 1000 latest-only pending requests, max3 workers, idle responsiveness, retained full-frame pixels/zoom/pan through slow load, named failure keeps previous photo/recovery, reentrant handoff, same-file two-window cancellation, joined jobs and weak cleanup"
     );
     println!(
         "NOT TESTED real Glycin decode, active secure decoder cancellation or process cleanup; synthetic frames and controlled noncooperative barriers only"
@@ -363,16 +427,33 @@ fn native(app: &adw::Application) {
     let originals = [&a, &b, &c].map(|p| std::fs::read(p).unwrap());
     v.load(a.clone());
     survivor.load(a.clone());
-    wait(|| picture(&v).paintable().is_some() || status(&v).text().starts_with("Unable"));
+    wait(|| {
+        matches!(
+            v.phase(),
+            pivra::image_pipeline::Phase::FullReady | pivra::image_pipeline::Phase::Failed
+        )
+    });
     if picture(&v).paintable().is_none() {
         eprintln!("NOT RUN secure async baseline: {}", status(&v).text());
         std::process::exit(77);
     }
     wait(|| {
-        picture(&survivor).paintable().is_some() || status(&survivor).text().starts_with("Unable")
+        matches!(
+            survivor.phase(),
+            pivra::image_pipeline::Phase::FullReady | pivra::image_pipeline::Phase::Failed
+        )
     });
     assert!(picture(&survivor).paintable().is_some());
     let preserved = picture(&survivor).paintable();
+    let photo = picture(&v);
+    let gap = Rc::new(Cell::new(false));
+    let seen = gap.clone();
+    let monitor = photo.connect_paintable_notify(move |p| {
+        if p.paintable().is_none() {
+            seen.set(true);
+        }
+    });
+
     for _ in 0..50 {
         v.load(a.clone());
         v.load(b.clone());
@@ -380,7 +461,12 @@ fn native(app: &adw::Application) {
     v.load(c.clone());
     choose(&w, "image-mode", "fill");
     choose(&w, "image-resampling", "nearest");
-    wait(|| picture(&v).paintable().is_some() || status(&v).text().starts_with("Unable"));
+    wait(|| {
+        matches!(
+            v.phase(),
+            pivra::image_pipeline::Phase::FullReady | pivra::image_pipeline::Phase::Failed
+        )
+    });
     assert!(
         picture(&v).paintable().is_some(),
         "latest valid decode failed after baseline"
@@ -411,7 +497,12 @@ fn native(app: &adw::Application) {
     v.load(a.clone());
     v.load(b.clone());
     v.load(a.clone());
-    wait(|| picture(&v).paintable().is_some() || status(&v).text().starts_with("Unable"));
+    wait(|| {
+        matches!(
+            v.phase(),
+            pivra::image_pipeline::Phase::FullReady | pivra::image_pipeline::Phase::Failed
+        )
+    });
     assert!(picture(&v).paintable().is_some());
     wait(|| v.load_stats().running == 0);
     assert_eq!(picture(&v).paintable().unwrap().intrinsic_width(), 1600);
@@ -419,13 +510,23 @@ fn native(app: &adw::Application) {
     v.load(root.join("broken.png"));
     wait(|| status(&v).text().starts_with("Unable"));
     v.load(c.clone());
-    wait(|| picture(&v).paintable().is_some() || status(&v).text().starts_with("Unable"));
+    wait(|| {
+        matches!(
+            v.phase(),
+            pivra::image_pipeline::Phase::FullReady | pivra::image_pipeline::Phase::Failed
+        )
+    });
     assert!(picture(&v).paintable().is_some());
+    assert!(!gap.get(), "secure transition emitted an empty paintable");
+    photo.disconnect(monitor);
     v.load(a.clone());
     w.close();
     survivor.load(c.clone());
     wait(|| {
-        picture(&survivor).paintable().is_some() || status(&survivor).text().starts_with("Unable")
+        matches!(
+            survivor.phase(),
+            pivra::image_pipeline::Phase::FullReady | pivra::image_pipeline::Phase::Failed
+        )
     });
     assert!(picture(&survivor).paintable().is_some());
     wait(|| v.load_stats().running == 0 && survivor.load_stats().running == 0);

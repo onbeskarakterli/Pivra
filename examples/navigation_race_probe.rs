@@ -133,7 +133,7 @@ fn main() {
             .state()
             .unwrap()
             .str(),
-        Some("fit")
+        Some("fill") // Keep presentation preferences while the next request is pending.
     );
     view.show_message("Video playback is not available yet.");
     RELEASE[3].store(true, Ordering::SeqCst);
@@ -151,7 +151,7 @@ fn main() {
     wait(|| joined.get() == 5 && weak.upgrade().is_none() && widget.upgrade().is_none());
     assert!(CANCELLED[4].load(Ordering::SeqCst));
     assert!(second.is_visible());
-    assert_eq!(text(&other), "Loading image securely…");
+    assert_eq!(text(&other), "", "pending load must not show loading text");
     RELEASE[5].store(true, Ordering::SeqCst);
     wait(|| joined.get() == 6);
     assert!(!CANCELLED[5].load(Ordering::SeqCst));
@@ -162,7 +162,7 @@ fn main() {
     RELEASE[6].store(true, Ordering::SeqCst);
     wait(|| joined.get() == 7);
     assert!(CANCELLED[6].load(Ordering::SeqCst));
-    assert_eq!(text(&other), "Loading image securely…");
+    assert_eq!(text(&other), "", "pending load must not show loading text");
     RELEASE[7].store(true, Ordering::SeqCst);
     wait(|| joined.get() == 8);
     assert!(text(&other).contains("controlled error 7"));

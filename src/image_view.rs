@@ -386,21 +386,16 @@ impl ImageView {
         } else {
             self.slot.begin()
         };
-        // Keep the selected preset across catalog navigation. The per-image
-        // manual transform is still reset by prepare(), preventing stale pan/zoom.
-        let selected_mode = self
-            .mode_action
-            .state()
-            .and_then(|state| state.str().and_then(ViewMode::from_id));
-        self.prepare("", false);
-        if let Some(mode) = selected_mode {
-            self.mode_action.set_state(&mode.id().to_variant());
-        }
+        // A request is not a presentation. Keep the last ready paintable,
+        // transform and cache pin until a replacement texture is fully ready.
+        // No loading text, blank placeholder or early geometry reset.
+        self.status.set_text("");
+        self.status.set_visible(false);
         self.phase.set(Phase::FullLoading);
         {
             let mut state = self.prefetch.borrow_mut();
             state.current_path = Some(path.clone());
-            state.active_large = false;
+            state.queue = state.neighbors.clone().into();
         }
 
         self.requested.replace(Some(path.clone()));
@@ -416,6 +411,11 @@ impl ImageView {
         let prefetch = self.prefetch.clone();
         let epoch = prefetch.borrow().epoch.clone();
         let phase = self.phase.clone();
+        let target_name = path
+            .file_name()
+            .unwrap_or(path.as_os_str())
+            .to_string_lossy()
+            .into_owned();
         type Completion = preload::Completion;
         let completion: Rc<RefCell<Option<Completion>>> = Rc::new(RefCell::new(Some(Box::new({
             let slot = slot.clone();
@@ -472,6 +472,11 @@ impl ImageView {
                             .state()
                             .and_then(|v| v.str().and_then(ViewMode::from_id))
                             .unwrap_or_default();
+                        // One main-context handoff, without yielding a GTK frame:
+                        // old pixels stay in Picture until the new paintable is set.
+                        transform.borrow_mut().reset();
+                        texture.replace(Some(decoded.clone()));
+                        mode_action.set_state(&mode.id().to_variant());
                         present_filtered(
                             &picture,
                             Some(&decoded),
@@ -479,13 +484,20 @@ impl ImageView {
                             transform.clone(),
                             filter.clone(),
                         );
-                        texture.replace(Some(decoded));
                         status.set_visible(false);
                     }
                     Err(error) => {
                         eprintln!("Pivra: image load failed: {error}");
                         let summary = error.lines().next().unwrap_or("Secure loading failed.");
-                        status.set_text(&format!("Unable to display image.\n{summary}"));
+                        let retained = if texture.borrow().is_some() {
+                            "\nPrevious photo is still displayed."
+                        } else {
+                            ""
+                        };
+                        status.set_text(&format!(
+                            "Unable to display image.\nFile: {target_name}\n{summary}{retained}"
+                        ));
+                        status.set_visible(true);
                     }
                 }
                 preload::maybe_start(&prefetch, &slot, texture.borrow().is_some());
@@ -679,7 +691,7 @@ fn manual(
     if let Some(current) = picture
         .paintable()
         .and_then(|p| p.downcast::<actual_paintable::ActualPaintable>().ok())
-        .filter(|p| p.has_transform(&transform))
+        .filter(|p| p.has_transform(&transform) && p.has_texture(texture))
     {
         current.invalidate_contents();
     } else {
@@ -708,7 +720,7 @@ pub(super) fn present_filtered(
     if let Some(current) = picture
         .paintable()
         .and_then(|p| p.downcast::<actual_paintable::ActualPaintable>().ok())
-        .filter(|p| p.has_transform(&transform))
+        .filter(|p| p.has_transform(&transform) && p.has_texture(texture))
     {
         current.set_mode(mode);
         current.invalidate_contents();

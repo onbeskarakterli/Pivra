@@ -72,6 +72,12 @@ impl ActualPaintable {
     pub fn set_mode(&self, mode: pivra::viewing::ViewMode) {
         self.imp().mode.set(mode);
     }
+    pub fn has_texture(&self, texture: &gdk::Texture) -> bool {
+        self.imp()
+            .texture
+            .get()
+            .is_some_and(|current| current == texture)
+    }
     pub fn has_transform(&self, transform: &Rc<RefCell<pivra::viewing::Transform>>) -> bool {
         self.imp()
             .transform

@@ -116,7 +116,12 @@ fn status(v: &image_view::ImageView) -> gtk::Label {
     picture(v).next_sibling().unwrap().downcast().unwrap()
 }
 fn loaded(v: &image_view::ImageView) {
-    wait(|| picture(v).paintable().is_some() || status(v).text().starts_with("Unable"));
+    wait(|| {
+        matches!(
+            v.phase(),
+            pivra::image_pipeline::Phase::FullReady | pivra::image_pipeline::Phase::Failed
+        )
+    });
     assert!(
         picture(v).paintable().is_some(),
         "valid load failed: {}",
@@ -186,7 +191,13 @@ fn run(app: &adw::Application, controlled: bool) {
     let decodes = stats.foreground_decoded;
     choose(&w, "image-mode", "actual");
     choose(&w, "image-resampling", "nearest");
+    let previous = picture(&v).paintable();
     v.load(paths[2].clone());
+    assert_eq!(
+        picture(&v).paintable(),
+        previous,
+        "prefetched transition cleared current photo"
+    );
     loaded(&v);
     idle(&v);
     assert_eq!(v.preload_stats().foreground_decoded, decodes);
@@ -245,7 +256,12 @@ fn run(app: &adw::Application, controlled: bool) {
     std::fs::remove_file(&paths[3]).unwrap();
     v.load(paths[3].clone());
     wait(|| status(&v).text().starts_with("Unable"));
-    assert!(picture(&v).paintable().is_none());
+    assert!(
+        picture(&v).paintable().is_some(),
+        "failed next image discarded last ready photo"
+    );
+    assert!(status(&v).is_visible());
+    assert!(status(&v).text().contains("4.png"));
     assert!(v.cached_texture(&paths[3]).is_none());
     v.load(paths[0].clone());
     loaded(&v);

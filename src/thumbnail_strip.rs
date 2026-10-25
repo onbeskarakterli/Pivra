@@ -338,21 +338,89 @@ impl Inner {
         let token = gio::Cancellable::new();
         self.warming.replace(Some(token.clone()));
         let worker_token = token.clone();
+        let scale = self.scroller.scale_factor().clamp(1, 2);
+        let epoch = self.epoch.get();
         let job = gio::spawn_blocking(move || {
+            let mut results = Vec::new();
             for path in paths {
                 if worker_token.is_cancelled() { break; }
-                // Resolving validates and generates disk thumbnails without
-                // installing any textures into a hidden GTK widget.
-                let _ = Manager::session().resolve(&path, &worker_token);
+                // The hidden pass uses the SAME verified decode/resize path as
+                // the visible scheduler. Merely resolving disk cache entries
+                // leaves the GTK cells pending and forces a second decode.
+                let work = match Manager::session().resolve(&path, &worker_token) {
+                    Ok(response) => {
+                        if let Some(candidate) = response.candidate() {
+                            let cached = cache_work(candidate, &worker_token, response.deadline(), scale);
+                            if matches!(cached, Work::Hit(..)) { cached }
+                            else if let Some(generated) = response.memory() {
+                                memory_work(generated, &worker_token, response.deadline(), scale)
+                            } else { cached }
+                        } else if let Some(generated) = response.memory() {
+                            memory_work(generated, &worker_token, response.deadline(), scale)
+                        } else { Work::Failed("Thumbnail unavailable".into()) }
+                    }
+                    Err(Error::Busy) => Work::Busy,
+                    Err(Error::Cancelled) => Work::Cancelled,
+                    Err(_) => Work::Failed("Thumbnail unavailable".into()),
+                };
+                results.push((path, work));
             }
+            results
         });
         let weak = Rc::downgrade(self);
         glib::MainContext::default().spawn_local(async move {
-            let _ = job.await;
+            let results = job.await.unwrap_or_default();
             if let Some(i) = weak.upgrade() {
-                if i.warming.borrow().as_ref().is_some_and(|current| current == &token) {
-                    i.warming.borrow_mut().take();
+                let current = i.warming.borrow().as_ref().is_some_and(|t| t == &token);
+                if !current || token.is_cancelled() || i.closed.get() || i.epoch.get() != epoch {
+                    return;
                 }
+                i.warming.borrow_mut().take();
+                let mut entries = i.entries.borrow_mut();
+                for (path, work) in results {
+                    if let Work::Hit(texture, source, cache, decoded_cost) = work {
+                        let cost = display_cost(texture.width(), texture.height()).unwrap_or(usize::MAX);
+                        if cost > BUDGET { continue; }
+                        let Some(entry) = entries.iter_mut().find(|e| e.path == path) else { continue; };
+                        if entry.phase != Phase::Pending { continue; }
+                        i.decoded_max.set(i.decoded_max.get().max(decoded_cost));
+                        entry.cost = cost;
+                        entry.texture = Some(texture.clone());
+                        entry.keys = Some((source, cache));
+                        entry.phase = Phase::Ready;
+                        if let Some(w) = &entry.widgets {
+                            let ratio = (CELL_WIDTH as f64 / texture.width() as f64)
+                                .min(CELL_HEIGHT as f64 / texture.height() as f64);
+                            w.selection.set_size_request(
+                                ((texture.width() as f64 * ratio).round() as i32).max(1),
+                                ((texture.height() as f64 * ratio).round() as i32).max(1),
+                            );
+                            w.picture.set_paintable(Some(&texture));
+                            w.icon.set_visible(false);
+                        }
+                    }
+                }
+                // Enforce the same display-cache limits after hidden warming.
+                while entries.iter().map(|e| e.cost).sum::<usize>() > BUDGET
+                    || entries.iter().filter(|e| e.texture.is_some()).count() > LIMIT
+                {
+                    let victim = entries.iter().enumerate()
+                        .filter(|(_, e)| e.texture.is_some())
+                        .filter(|(_, e)| Some(e.index.get()) != i.selected.get())
+                        .min_by_key(|(_, e)| e.used)
+                        .map(|(n, _)| n);
+                    let Some(n) = victim else { break; };
+                    let entry = &mut entries[n];
+                    entry.texture = None;
+                    entry.cost = 0;
+                    entry.phase = Phase::Evicted;
+                    if let Some(w) = &entry.widgets {
+                        w.picture.set_paintable(None::<&gdk::Texture>);
+                        w.icon.set_visible(true);
+                    }
+                }
+                drop(entries);
+                i.scroller.queue_draw();
             }
         });
     }

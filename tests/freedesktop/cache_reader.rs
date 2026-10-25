@@ -475,16 +475,19 @@ fn successful_and_invalid_reads_leave_contents_and_write_metadata_unchanged() {
     assert_eq!(FileKey::read(&bad).unwrap(), before);
 }
 #[test]
-fn production_gnome_path_does_not_reference_independent_reader() {
-    // Wiring guard, not a mock provider selection or an FD-06 acceptance test.
+fn reader_integration_is_routed_through_manager_not_gnome_algorithm() {
+    // FD-06 activates the manager; retain the isolation boundary and verify wiring.
     for source in [
         include_str!("../../src/thumbnail.rs"),
-        include_str!("../../src/thumbnail_strip.rs"),
         include_str!("../../src/window.rs"),
         include_str!("../../src/image_loader.rs"),
     ] {
-        assert!(!source.contains("freedesktop_thumbnail"));
+        assert!(!source.contains("CacheReader::new"));
     }
+    let strip = include_str!("../../src/thumbnail_strip.rs");
+    assert!(!strip.contains("CacheReader::new"));
+    assert!(strip.contains("Manager::session()"));
+    assert!(include_str!("../../src/thumbnail_manager.rs").contains("CacheReader::new"));
 }
 
 #[test]

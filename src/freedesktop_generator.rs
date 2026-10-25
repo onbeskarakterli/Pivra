@@ -54,6 +54,19 @@ pub struct GeneratedThumbnail {
 /// deduplicated by dev/inode (including hardlinks). FD-06 must share the existing
 /// application worker permit; this separate adapter is not wired into the strip.
 pub fn generate(request: &Request<'_>, class: SizeClass) -> Result<GeneratedThumbnail, Error> {
+    request.check_control(Instant::now())?;
+    let permit = crate::thumbnail_manager::Permit::take(&request.source.path).ok_or(Error::Busy)?;
+    generate_admitted(request, class, &permit)
+}
+
+pub(crate) fn generate_admitted(
+    request: &Request<'_>,
+    class: SizeClass,
+    permit: &crate::thumbnail_manager::Permit,
+) -> Result<GeneratedThumbnail, Error> {
+    if !permit.covers(&request.source.path) {
+        return Err(Error::SourceChanged);
+    }
     generate_with(request, class, &SecureDecoder::default())
 }
 
@@ -111,14 +124,18 @@ fn preflight(request: &Request<'_>) -> Result<(u64, u64), Error> {
     Ok((m.dev(), m.ino()))
 }
 
-struct DecodeControl<'a> {
-    child: gio::Cancellable,
+pub(crate) struct DecodeControl<'a> {
+    pub(crate) child: gio::Cancellable,
     parent: &'a gio::Cancellable,
     handler: Option<gio::CancelledHandlerId>,
     timer: glib::Source,
+    cancel_on_drop: bool,
 }
 impl<'a> DecodeControl<'a> {
-    fn new(request: &Request<'a>, context: &glib::MainContext) -> Self {
+    pub(crate) fn complete(&mut self) {
+        self.cancel_on_drop = false;
+    }
+    pub(crate) fn new(request: &Request<'a>, context: &glib::MainContext) -> Self {
         let child = gio::Cancellable::new();
         let cancel = child.clone();
         let handler = request.cancel.connect_cancelled(move |_| cancel.cancel());
@@ -148,6 +165,7 @@ impl<'a> DecodeControl<'a> {
             parent: request.cancel,
             handler,
             timer,
+            cancel_on_drop: true,
         }
     }
 }
@@ -157,7 +175,9 @@ impl Drop for DecodeControl<'_> {
         if let Some(handler) = self.handler.take() {
             self.parent.disconnect_cancelled(handler);
         }
-        self.child.cancel();
+        if self.cancel_on_drop {
+            self.child.cancel();
+        }
     }
 }
 struct Decoded {
@@ -174,6 +194,11 @@ struct SecureDecoder {
     reservation: std::cell::RefCell<Option<Reservation>>,
 }
 static MEMORY: Mutex<(usize, bool)> = Mutex::new((0, false));
+/// Diagnostic snapshot, not a memory hard cap. Used by native lifecycle acceptance.
+pub fn reservation_state() -> (usize, bool) {
+    *MEMORY.lock().unwrap_or_else(|e| e.into_inner())
+}
+
 struct Reservation {
     cost: usize,
     large: bool,

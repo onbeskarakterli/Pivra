@@ -19,4 +19,5 @@ pub mod freedesktop_generator;
 pub mod freedesktop_thumbnail;
 pub mod freedesktop_writer;
 pub mod thumbnail;
+pub mod thumbnail_manager;
 pub mod thumbnail_provider;

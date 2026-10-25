@@ -3,34 +3,19 @@ use super::{CELL_HEIGHT, CELL_WIDTH};
 use gtk::{gdk, gio, glib, prelude::*};
 use pivra::{
     image_cache::{FileKey, texture_cost},
-    thumbnail::{Outcome, Provider},
+    thumbnail_manager::Manager,
+    thumbnail_provider::Error,
 };
 use std::{
     cell::{Cell, RefCell},
     collections::HashMap,
     path::PathBuf,
     rc::Rc,
-    sync::Mutex,
 };
 const BUDGET: usize = 16 * 1024 * 1024;
 const LIMIT: usize = 64;
-static WORKERS: Mutex<Vec<PathBuf>> = Mutex::new(Vec::new());
-struct Permit(PathBuf);
-impl Permit {
-    fn take(path: &std::path::Path) -> Option<Self> {
-        let mut jobs = WORKERS.lock().unwrap();
-        if jobs.len() >= 2 || jobs.iter().any(|p| p == path) {
-            return None;
-        }
-        jobs.push(path.to_owned());
-        Some(Self(path.to_owned()))
-    }
-}
-impl Drop for Permit {
-    fn drop(&mut self) {
-        WORKERS.lock().unwrap().retain(|p| p != &self.0);
-    }
-}
+#[cfg(test)]
+use pivra::thumbnail_manager::Permit;
 #[derive(Clone, Copy, PartialEq, Eq)]
 enum Phase {
     Pending,
@@ -51,7 +36,7 @@ struct Entry {
     widgets: Option<CellWidgets>,
     phase: Phase,
     texture: Option<gdk::Texture>,
-    keys: Option<(FileKey, FileKey)>,
+    keys: Option<(FileKey, Option<FileKey>)>,
     cost: usize,
     used: u64,
 }
@@ -333,7 +318,9 @@ impl Inner {
                 }
                 if keys.as_ref().is_none_or(|(source, cache)| {
                     FileKey::read(&path).ok().as_ref() != Some(source)
-                        || FileKey::read(&cache.path).ok().as_ref() != Some(cache)
+                        || cache.as_ref().is_some_and(|cache| {
+                            FileKey::read(&cache.path).ok().as_ref() != Some(cache)
+                        })
                 }) {
                     dirty.push(path);
                 }
@@ -631,55 +618,43 @@ impl Inner {
         let worker_path = path.clone();
         let worker_token = token.clone();
         let job = gio::spawn_blocking(move || {
-            let Some(_permit) = Permit::take(&worker_path) else {
-                return Work::Busy;
-            };
             if worker_token.is_cancelled() {
                 return Work::Cancelled;
             }
-            let provider = Provider::discover(None);
-            match pivra::thumbnail::query_or_generate(&provider, &worker_path, &worker_token) {
-                Outcome::Hit(candidate) => {
-                    if !candidate.still_current(&worker_token) {
-                        return if worker_token.is_cancelled() {
-                            Work::Cancelled
-                        } else {
-                            Work::Failed("thumbnail identity changed before decode".into())
-                        };
-                    }
-                    let frame = glib::MainContext::new().block_on(crate::image_loader::preload(
-                        &candidate.thumbnail.path,
-                        &worker_token,
-                        BUDGET,
-                    ));
-                    match frame {
-                        Ok(frame) if candidate.still_current(&worker_token) => {
-                            if worker_token.is_cancelled() {
-                                return Work::Cancelled;
-                            }
-                            let texture = frame.texture();
-                            let decoded_cost =
-                                texture_cost(texture.width() as u32, texture.height() as u32)
-                                    .unwrap_or(usize::MAX);
-                            match display_texture(&texture, scale) {
-                                Ok(texture) if !worker_token.is_cancelled() => Work::Hit(
-                                    texture,
-                                    candidate.source,
-                                    candidate.thumbnail,
-                                    decoded_cost,
-                                ),
-                                Ok(_) => Work::Cancelled,
-                                Err(error) => Work::Failed(error),
-                            }
-                        }
-                        Ok(_) if worker_token.is_cancelled() => Work::Cancelled,
-                        Ok(_) => Work::Failed("thumbnail identity changed during decode".into()),
-                        Err(e) => Work::Failed(e),
-                    }
+            let response = match Manager::session().resolve(&worker_path, &worker_token) {
+                Ok(response) => response,
+                Err(Error::Busy) => return Work::Busy,
+                Err(Error::Cancelled) => return Work::Cancelled,
+                Err(_) => return Work::Failed("Thumbnail unavailable".into()),
+            };
+            if let Some(candidate) = response.candidate() {
+                let cached = cache_work(candidate, &worker_token, response.deadline(), scale);
+                if matches!(&cached, Work::Hit(..)) {
+                    return cached;
                 }
-                Outcome::Cancelled => Work::Cancelled,
-                outcome => Work::Failed(format!("{outcome:?}")),
+                if let Some(generated) = response.memory() {
+                    return memory_work(generated, &worker_token, response.deadline(), scale);
+                }
+                if Manager::session().id() == pivra::thumbnail_provider::ProviderId::Freedesktop {
+                    return match Manager::session().recover_cache(
+                        &response,
+                        &worker_path,
+                        &worker_token,
+                    ) {
+                        Ok(generated) => {
+                            memory_work(&generated, &worker_token, response.deadline(), scale)
+                        }
+                        Err(Error::Cancelled) => Work::Cancelled,
+                        Err(Error::Busy) => Work::Busy,
+                        Err(_) => Work::Failed("Thumbnail unavailable".into()),
+                    };
+                }
+                return cached;
             }
+            if let Some(generated) = response.memory() {
+                return memory_work(generated, &worker_token, response.deadline(), scale);
+            }
+            Work::Failed("Thumbnail unavailable".into())
         });
         let weak = Rc::downgrade(self);
         glib::MainContext::default().spawn_local(async move {
@@ -789,6 +764,107 @@ impl Inner {
 // A viewport wider than the RAM budget must not endlessly decode/evict the
 // same visible images. Budget-evicted entries are reconsidered on viewport or
 // catalog change, not on every paint/worker completion.
+fn cache_work(
+    candidate: &pivra::thumbnail_provider::Candidate,
+    worker_token: &gio::Cancellable,
+    deadline: std::time::Instant,
+    scale: i32,
+) -> Work {
+    if !candidate.still_current(worker_token) {
+        return if worker_token.is_cancelled() {
+            Work::Cancelled
+        } else {
+            Work::Failed("thumbnail identity changed before decode".into())
+        };
+    }
+    let context = glib::MainContext::new();
+    let request = pivra::thumbnail_provider::Request {
+        source: &candidate.source,
+        cancel: worker_token,
+        deadline,
+    };
+    let mut control = pivra::thumbnail_manager::CacheControl::new(&request, &context);
+    let frame = context.block_on(crate::image_loader::preload(
+        &candidate.thumbnail.path,
+        control.cancellable(),
+        BUDGET,
+    ));
+    if frame.is_ok() {
+        control.complete();
+    }
+    if let Err(error) = request.check_control(std::time::Instant::now()) {
+        return match error {
+            Error::Cancelled => Work::Cancelled,
+            _ => Work::Failed("Thumbnail timed out".into()),
+        };
+    }
+    match frame {
+        Ok(frame) if candidate.still_current(worker_token) => {
+            if worker_token.is_cancelled() {
+                return Work::Cancelled;
+            }
+            let texture = frame.texture();
+            let decoded_cost =
+                texture_cost(texture.width() as u32, texture.height() as u32).unwrap_or(usize::MAX);
+            match display_texture(&texture, scale) {
+                Ok(texture)
+                    if !worker_token.is_cancelled() && std::time::Instant::now() < deadline =>
+                {
+                    Work::Hit(
+                        texture,
+                        candidate.source.clone(),
+                        Some(candidate.thumbnail.clone()),
+                        decoded_cost,
+                    )
+                }
+                Ok(_) => Work::Cancelled,
+                Err(error) => Work::Failed(error),
+            }
+        }
+        Ok(_) if worker_token.is_cancelled() => Work::Cancelled,
+        Ok(_) => Work::Failed("thumbnail identity changed during decode".into()),
+        Err(_) => Work::Failed("Thumbnail decode failed".into()),
+    }
+}
+fn memory_work(
+    generated: &pivra::freedesktop_generator::GeneratedThumbnail,
+    worker_token: &gio::Cancellable,
+    deadline: std::time::Instant,
+    scale: i32,
+) -> Work {
+    if worker_token.is_cancelled() || std::time::Instant::now() >= deadline {
+        return Work::Cancelled;
+    }
+    if FileKey::read(&generated.source.path).ok().as_ref() != Some(&generated.source) {
+        return Work::Failed("Source changed".into());
+    }
+    let texture = gdk::MemoryTexture::new(
+        generated.width as i32,
+        generated.height as i32,
+        gdk::MemoryFormat::R8g8b8a8,
+        &generated.pixels,
+        generated.stride,
+    )
+    .upcast();
+    match display_texture(&texture, scale) {
+        Ok(texture)
+            if !worker_token.is_cancelled()
+                && std::time::Instant::now() < deadline
+                && FileKey::read(&generated.source.path).ok().as_ref()
+                    == Some(&generated.source) =>
+        {
+            Work::Hit(
+                texture,
+                generated.source.clone(),
+                None,
+                generated.pixels.len(),
+            )
+        }
+        Ok(_) => Work::Cancelled,
+        Err(e) => Work::Failed(e),
+    }
+}
+
 fn reconsider_evicted(
     entries: &mut [Entry],
     visible: &std::ops::Range<usize>,
@@ -865,7 +941,7 @@ fn trace(event: &str, path: &std::path::Path) {
 }
 
 enum Work {
-    Hit(gdk::Texture, FileKey, FileKey, usize),
+    Hit(gdk::Texture, FileKey, Option<FileKey>, usize),
     Failed(String),
     Cancelled,
     Busy,
@@ -945,6 +1021,63 @@ mod tests {
         assert!(entries[4].phase == Phase::Evicted);
     }
     #[test]
+    fn generated_memory_texture_owns_pixels_and_never_invents_cache_identity() {
+        use pivra::freedesktop_generator::{GeneratedThumbnail, Metrics};
+        use pivra::freedesktop_thumbnail::SizeClass;
+        let root = tempfile::tempdir().unwrap();
+        let path = root.path().join("source.png");
+        std::fs::write(&path, b"controlled source identity only").unwrap();
+        let key = FileKey::read(&path).unwrap();
+        let t = GeneratedThumbnail {
+            source: key.clone(),
+            class: SizeClass::Normal,
+            width: 4,
+            height: 2,
+            stride: 16,
+            pixels: glib::Bytes::from_owned([20u8, 40, 60, 128].repeat(8)),
+            metrics: Metrics {
+                decoded_width: 4,
+                decoded_height: 2,
+                frame_bytes: 32,
+                download_bytes: 32,
+                output_bytes: 32,
+                decode_time: std::time::Duration::ZERO,
+                resize_time: std::time::Duration::ZERO,
+            },
+        };
+        let cancel = gio::Cancellable::new();
+        let deadline = std::time::Instant::now() + std::time::Duration::from_secs(10);
+        let Work::Hit(texture, source, cache, _) = memory_work(&t, &cancel, deadline, 1) else {
+            panic!("memory pixels");
+        };
+        assert_eq!(source, key);
+        assert!(cache.is_none());
+        assert_eq!((texture.width(), texture.height()), (4, 2));
+        assert!(!matches!(
+            memory_work(&t, &cancel, std::time::Instant::now(), 1),
+            Work::Hit(..)
+        ));
+        std::fs::write(&path, b"changed").unwrap();
+        assert!(!matches!(
+            memory_work(&t, &cancel, deadline, 1),
+            Work::Hit(..)
+        ));
+        cancel.cancel();
+        assert!(!matches!(
+            memory_work(&t, &cancel, deadline, 1),
+            Work::Hit(..)
+        ));
+        drop(t);
+        let mut downloader = gdk::TextureDownloader::new(&texture);
+        downloader.set_format(gdk::MemoryFormat::R8g8b8a8);
+        let (bytes, _) = downloader.download_bytes();
+        for pixel in bytes.chunks_exact(4) {
+            for (actual, expected) in pixel.iter().zip([20u8, 40, 60, 128]) {
+                assert!(actual.abs_diff(expected) <= 1);
+            }
+        }
+    }
+    #[test]
     fn global_worker_bound_deduplicates_and_releases_paths() {
         let root = tempfile::tempdir().unwrap();
         let a = root.path().join("a");
@@ -957,6 +1090,6 @@ mod tests {
         drop(first);
         assert!(Permit::take(&c).is_some());
         drop(second);
-        assert!(WORKERS.lock().unwrap().is_empty());
+        assert_eq!(Permit::active_count(), 0);
     }
 }

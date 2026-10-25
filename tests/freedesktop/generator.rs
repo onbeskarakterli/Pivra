@@ -415,15 +415,22 @@ fn decode_error_classification_never_promotes_file_errors_to_provider_loss() {
     }
 }
 #[test]
-fn production_has_no_generator_wiring_and_fd03_stays_independent() {
+fn generation_routes_only_through_manager_and_fd03_stays_independent() {
+    // FD-06 replaces the old pre-integration guard with a stricter routing boundary.
     for code in [
         include_str!("../../src/thumbnail.rs"),
-        include_str!("../../src/thumbnail_strip.rs"),
         include_str!("../../src/window.rs"),
         include_str!("../../src/freedesktop_thumbnail.rs"),
     ] {
-        assert!(!code.contains("freedesktop_generator"));
+        assert!(!code.contains("freedesktop_generator::generate"));
     }
+    let strip = include_str!("../../src/thumbnail_strip.rs");
+    assert!(strip.contains("Manager::session()"));
+    assert!(!strip.contains("freedesktop_generator::generate"));
+    assert!(
+        include_str!("../../src/thumbnail_manager.rs")
+            .contains("freedesktop_generator::generate_admitted")
+    );
 }
 
 #[test]

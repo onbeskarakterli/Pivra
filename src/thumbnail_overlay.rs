@@ -118,6 +118,9 @@ pub(crate) fn install(
     overlay.set_measure_overlay(&resize_edge, false);
     overlay.set_clip_overlay(&resize_edge, true);
     let thumbnails = ThumbnailStrip::new(items, strip.clone());
+    let saved_height = pivra::settings::load_thumbnail_height();
+    strip.set_height_request(saved_height);
+    thumbnails.resize_cells(saved_height);
     let preference = pivra::settings::thumbnail_preference();
     let state = Rc::new(Visibility {
         available,
@@ -184,7 +187,7 @@ pub(crate) fn install(
     });
     let resize = gtk::GestureDrag::new();
     resize.set_button(1);
-    let start_height = Rc::new(Cell::new(128i32));
+    let start_height = Rc::new(Cell::new(saved_height));
     let begin_state = state.clone();
     let begin_height = start_height.clone();
     resize.connect_drag_begin(move |gesture, _, y| {
@@ -220,6 +223,11 @@ pub(crate) fn install(
     });
     let end_state = state.clone();
     resize.connect_drag_end(move |_, _, _| {
+        if end_state.resizing.get() {
+            if let Some(strip) = end_state.strip.upgrade() {
+                pivra::settings::save_thumbnail_height(strip.height_request());
+            }
+        }
         end_state.resizing.set(false);
         end_state.place_toggle();
         if !end_state.pinned.get() && !end_state.near.get() { end_state.schedule(3000); }
@@ -240,6 +248,7 @@ pub(crate) fn install(
     let leave = state.clone();
     motion.connect_leave(move |_| {
         leave.pointer_y.set(None);
+        leave.update_resize_cursor(None);
         leave.away();
     });
     overlay.add_controller(motion);
@@ -381,6 +390,7 @@ impl Visibility {
         if let Some(edge) = self.resize_edge.upgrade() {
             edge.set_visible(show && self.preference.enabled());
         }
+        if !show { self.update_resize_cursor(None); }
         self.place_toggle();
     }
     fn place_toggle(&self) {
@@ -418,8 +428,18 @@ impl Visibility {
             }
         }
     }
+    fn update_resize_cursor(&self, y: Option<f64>) {
+        let (Some(overlay), Some(strip)) = (self.overlay.upgrade(), self.strip.upgrade()) else { return; };
+        let top = f64::from(overlay.height() - strip.height_request());
+        let on_border = self.shown.get() && self.preference.enabled()
+            && y.is_some_and(|position| (position - top).abs() <= 10.0);
+        let cursor = if on_border { Some("ns-resize") } else { None };
+        overlay.set_cursor_from_name(cursor);
+        strip.set_cursor_from_name(cursor);
+    }
     fn motion(self: &Rc<Self>, y: f64) {
         self.pointer_y.set(Some(y));
+        self.update_resize_cursor(Some(y));
         let Some(overlay) = self.overlay.upgrade() else {
             return;
         };

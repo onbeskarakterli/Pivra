@@ -2496,3 +2496,28 @@ PASS;21 harness /274 test icrası. Bu sayıya88 ana test ve farklı örneklerde
 yeniden derlenen ortak modül testleri dahildir;274 benzersiz özellik diye sayılmaz.
 Üretim kaynakları değiştirilmediğinden dokümantasyon sonrası grafik/native
 paketleri gereksiz yere tekrar çalıştırılmadı.
+
+
+## PIV-18 native view-mode assertion düzeltmesi — 25.10.2026
+
+Kullanıcı native preview pipeline FAIL: `view_modes_probe.rs:268` actual/fit;
+secure baseline/path/preload ve çoğu render PASS, tüm paket PASS değil.
+`ffe9ab5cb2a11af7e2825214d7a3a07993b735f9` test düzeltmesi:
+
+- Root:4abc166 ile preset korunması; Manual yeni texture kabulünde Fit olur.
+  Eski test Actual'ı koşulsuz Fit bekliyordu ve retained old paintable'ı ready
+  sanıyordu. Kontrollü koşuda aynı hata exit101 ile yeniden üretildi.
+- Gerçek seçili filename+boyut+strong old object'ten farklı paintable bariyeri;
+  Actual/Fill korunması, otomatik manual→Fit, warm texture identity, rapid
+  broken-to-cached recovery ve iki pencere/close testleri. Ortak resampling
+  native yardımcıları güncellendi; orijinal palette/clipping kontrolleri korunur.
+- PASS:88 ana Rust+20 örnek unit, fmt/check/Clippy all-target -D warnings,
+  examples build, X11 mode48/zoom/filter/async/cache/window races ve yeni
+  controlled navigation; Sway controlled navigation. Bunlar real GTK/GSK ve
+  sentetik decode sınırıdır. Üretim kodu/decoder/bütçe/preset politikası değişmedi.
+- Native secure tekrar BLOCKED/NOT RUN; bilinen Codex Bwrap engeli tekrar
+  denenmedi. Native FAIL yeniden test bekler. Komut değişmedi:
+  `bash tests/run_preview_pipeline_probe.sh`.
+
+[Ayrıntılı neden ve bariyer](PIV18_VALIDATION.md#native-view-mode-gezinme-regresyonu--25102026--testing).
+PIV-18 TESTING; başarılı native sonuç ve kapsam kararı gelmeden DONE yok.

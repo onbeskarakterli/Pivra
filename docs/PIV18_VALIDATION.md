@@ -285,3 +285,93 @@ bu temizlik kalan dosyaları ve aktif belge referanslarını kaldırır.
 Silinen prototip için native test, geliştirme veya üretim entegrasyonu beklenmez.
 PIV-18B Glycin araştırması ve mevcut secure full-only üretim davranışı korunur.
 **PIV-18 TESTING; PIV-19 başlamadı.**
+
+
+## Native view mode gezinme regresyonu — 25.10.2026 — TESTING
+
+Kullanıcı `bash tests/run_preview_pipeline_probe.sh` için yeni native **FAIL**
+bildirdi: `examples/view_modes_probe.rs:268`, left=`actual`, right=`fit`.
+Secure JPEG/PNG/EXIF, normal uygulama path/URI, preload/cache ve çoğu render
+kontrolünün PASS olduğu bildirildi; bütün native paket PASS değildir. Önceki
+kabul ve FAIL kayıtları korunur. Başlangıç dev `99de95124fe80c655e703883d29b3a4e2aaa9128`.
+
+### Kanıtlanan neden
+
+Bu yalnızca “biraz daha bekle” hatası değildir. Üretimdeki
+`4abc1668a2cc9b69b9742e6212677efb62f1972c` kararı Fit/Fill/Actual preset'ini
+fotoğraf gezinmesinde korur; TH-05/06 kayıtları ve preload_probe aynı davranışı
+zaten doğrular. `ImageView::load_request` yeni istekte mode/transform/texture'ı
+korur; güncel callback başarılı yeni texture'ı kabul ettiğinde transform reset
+eder. `ViewMode::from_id("actual")` Actual döndürür; yalnız `manual` gibi preset
+olmayan state `unwrap_or_default()` ile Fit'e döner. Bu yüzden yeni frame hazır
+olduktan sonra da Actual kalması doğrudur; üretim hatası bulunmadı/değiştirilmedi.
+
+İkinci eski varsayım `loaded()` içinde yalnız paintable.is_some() beklenmesiydi.
+TH-06 retention sonrasında bu önceki fotoğraf olabilir. Bozuk dosyada paintable
+None beklemek de kabul edilmiş “önceki fotoğraf + dosya adlı hata” davranışına
+aykırıydı. Sorunlar ortak test yardımcılarında giderildi, ürün Fit'e zorlanmadı.
+
+### Düzeltme ve sıkı bariyer
+
+Kod/test commit'i **`ffe9ab5cb2a11af7e2825214d7a3a07993b735f9`**.
+
+- `loaded` seçili dosyayı gerçek pencere başlığından, hedef frame boyutunu ve
+  önceki **strong-referenced paintable'dan farklı** yeni sunumu birlikte bekler.
+  Eski obje hayatta tutulduğu için pointer yeniden kullanımı kabulü yanıltmaz.
+  Aynı boyutlu resampling2→4 geçişinde de boyut tek başına yeterli değildir.
+  Geçerli hedefte gerçek hata görünürse hemen FAIL;20s deadline tanı verir.
+  Sabit settle/sleep eklenmedi, state sahte atanmadı veya assertion atlanmadı.
+- Actual→2.png geçişinde pending eski frame ve Actual korunması, **yeni frame
+  sonrasında da Actual** olması assert edilir. Fit render'ı ayrıca gerçek mode
+  action'ıyla sınanır; bu otomatik Fit reset diye sunulmaz.
+- Bozuk3.png'de aynı eski paintable, `File: 3.png`, görünür hata/previous-photo
+  açıklaması ve Fill korunması gerekir. Loader process exit'i invalid-media
+  başarı diye kabul edilmez.
+- Küçük4.png'de gerçek scroll controller ile `manual` oluşturulur. Hızlı
+  4→broken3→cached2 sırasında önce manual kalmalı; **yeni2 frame'i gelince Fit**
+  olmalıdır. Eski hata yeni seçime taşınmamalı. Cached tall GDK texture kimliği
+  ve resampling, diğer pencerenin Fill/texture durumu ayrıca korunur.
+- Close sonrası sabit settle yerine gerçek weak-window release beklenir.
+- Ortak loaded yardımcısını kullanan resampling native checker'ın dört çağrısı
+  aynı bariyere geçirildi. Nearest palette/Smooth/clipping assertion'ları aynen
+  kalır; broken-media None yerine retained-photo koşulları güçlendirilir.
+  Checker'ın8x scroll başlangıcı gerçek Actual action'ıyla belirlenir; tiny-image
+  Fit zaten manual MAX_SCALE üstündeyse zoom-up'ın doğru biçimde no-op olması
+  testte yanlış “manual olmadı” hatasına dönüştürülmez. Bu fake state değildir.
+
+### Kontrollü yeniden üretim ve test sonuçları
+
+`view_modes_probe --controlled-navigation` yalnız örnek programda açıkça seçilen
+sentetik loader sınırıdır. Aynı üretim window/actions/ImageView ve aynı isolation
+fonksiyonu çalışır; gerçek dosyayı host'ta decode etmez. Varsayılan/native yol
+her zaman mevcut secure_image_loader'a gider; uygulama loader'ı değişmedi ve
+hata halinde sentetik fallback yoktur. Native pipeline betiği bu flag'i kullanmaz.
+
+Eski assertion kontrollü X11 koşusunda aynı leftActual/rightFit ile **exit101
+FAIL** verdi. Düzeltme sonrası X11 ve izole Sway/Wayland aynı navigation/publish,
+preset/manual reset/cache/error/iki pencere testleri **PASS** verdi. Başarılı
+çıktı açıkça `CONTROLLED pixels, not Glycin` der; native başarı olarak sunulmaz.
+
+PASS:fmt/check/test/all-target Clippy -D warnings ve examples build (locked,
+offline, mevcut stable SDK, -j2); **88 ana Rust testi**, ayrıca view_modes_probe
+harness'inde20 unit testi (ortak kaynak tekrarları dahil). X11 controlled-nav,
+48 synthetic mode snapshot, synthetic zoom-pan ve resampling; controlled async
+A/B/A/reverse late callback, cache/preload/priority, window-failure/navigation
+race regresyonları PASS. Sway gerçek Wayland yüzeyinde controlled-nav PASS.
+Python Wayland sürücüsü syntax kontrolü ve git diff --check PASS.
+
+**Native secure yeniden test BLOCKED/NOT RUN:** aynı üretim loader'ının bilinen
+Codex Bwrap/proc ortam engeli tekrar denenmedi, güvenlik gevşetilmedi. Native
+resampling checker'ın değiştirilmiş default yolu derlendi; gerçek secure checker
+pikselleri bu oturumda çalıştırılmış gibi PASS sayılmaz. Önceki kullanıcı native
+FAIL kaydı, gerçek native sonuç gelene kadar kapanmış değildir.
+
+Arch/GNOME'da aynı komut:
+
+```bash
+bash tests/run_preview_pipeline_probe.sh
+```
+
+Çalıştırılan SHA ve JSON/exit sonucu kaydedilmeli. Başarı bile yalnız full-only
+paketi doğrular; erken-preview/foreground gösterge kapsam kararları ayrı kalır.
+**PIV-18 TESTING**; main ve sonraki görevler değiştirilmedi.

@@ -14,6 +14,25 @@ Bu çalışma üretim kodunu, bağımlılıkları veya test assertion'larını d
 Aşağıdaki Codex testleri o kaynak snapshot'ına aittir; belge değişiklikleri
 tekrar native decode yapılmış gibi sunulmaz.
 
+## Native son test takibi — 25.10.2026
+
+Bu rapordan sonra kullanıcı final native komutunda `view_modes_probe.rs:268`
+actual/fit FAIL bildirdi. Secure baseline, path/URI ve preload PASS kalır;
+bütün native entegrasyon paketi henüz PASS değildir. Aşağıdaki önceki Codex
+matrisi tarihsel snapshot'tır, native paketin tümünü doğruladığı anlamına gelmez.
+
+`ffe9ab5cb2a11af7e2825214d7a3a07993b735f9`: testin eski Fit-reset varsayımı ve
+retained-frame ready kontrolü düzeltildi. Actual/Fill korunması önceki kabul
+edilmiş üretim sözleşmesidir; manual yeni frame kabulünde Fit'e döner. Aynı
+actual/fit hatası kontrollü X11'de yeniden üretildi; yeni seçim/presentation
+bariyeri X11/Sway'de PASS.88 Rust+20 örnek unit ve ilgili mode/zoom/filter/
+async/cache/iki pencere regresyonları PASS, gerçek secure native tekrar
+BLOCKED/NOT RUN. Üretim kodu ve güvenlik değiştirilmedi.
+
+[Native FAIL ve düzeltmenin tam kaydı](PIV18_VALIDATION.md). Aynı native komut
+`bash tests/run_preview_pipeline_probe.sh` yeniden çalıştırılmalı. Bu düzeltme
+PIV-18 veya Faz2 kapanışı değildir; kapsam kararları ve diğer kapılar değişmez.
+
 ## 1. Tamamlanan özellikler
 
 PIV-01–17 DONE. TH-01/02/04/05/06/07 DONE; TH-03 bağımsız kabulü TESTING.

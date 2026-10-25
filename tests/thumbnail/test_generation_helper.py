@@ -43,10 +43,11 @@ GdkPixbuf *gnome_desktop_thumbnail_factory_generate_thumbnail(GnomeDesktopThumbn
  (void)f;(void)m;(void)c;
  if(getenv("FAIL")) { g_set_error_literal(e,G_IO_ERROR,G_IO_ERROR_FAILED,"controlled error");return NULL; }
  if(getenv("CHANGE")) {GFile *file=g_file_new_for_uri(u);char *path=g_file_get_path(file);g_file_set_contents(path,"replacement",-1,NULL);g_free(path);g_object_unref(file);}
- return gdk_pixbuf_new(GDK_COLORSPACE_RGB,TRUE,8,64,32);
+ return gdk_pixbuf_new(GDK_COLORSPACE_RGB,TRUE,8,getenv("OVERSIZED")?1025:64,32);
 }
 gboolean gnome_desktop_thumbnail_factory_save_thumbnail(GnomeDesktopThumbnailFactory *f,GdkPixbuf *p,const char *u,time_t t,GCancellable *c,GError **e) {
  (void)f;(void)p;(void)u;(void)t;(void)c;
+ if(getenv("SAVE_FAIL")) {g_set_error_literal(e,G_IO_ERROR,G_IO_ERROR_FAILED,"controlled save error");return FALSE;}
  gboolean saved=g_file_set_contents(getenv("STAMP"),"saved",-1,e);
  if(getenv("CHANGE_ON_SAVE")) {GFile *file=g_file_new_for_uri(u);char *path=g_file_get_path(file);g_file_set_contents(path,"late replacement",-1,NULL);g_free(path);g_object_unref(file);}
  return saved;
@@ -81,6 +82,12 @@ class Generation(unittest.TestCase):
   p,saved=self.run_case(INELIGIBLE='1');self.assertEqual((p.returncode,saved),(3,False))
  def test_generation_failure_does_not_save(self):
   p,saved=self.run_case(FAIL='1');self.assertEqual((p.returncode,saved),(4,False));self.assertIn('controlled error',p.stdout)
+ def test_oversized_generated_frame_is_rejected_before_save(self):
+  p,saved=self.run_case(OVERSIZED='1');self.assertEqual((p.returncode,saved),(5,False))
+  self.assertIn('source changed or output bound',p.stdout)
+ def test_cache_save_failure_is_not_generation_success(self):
+  p,saved=self.run_case(SAVE_FAIL='1');self.assertEqual((p.returncode,saved),(6,False))
+  self.assertIn('controlled save error',p.stdout)
  def test_source_change_during_save_discards_own_cache_artifact(self):
   p,saved=self.run_case(CHANGE_ON_SAVE='1');self.assertEqual((p.returncode,saved),(5,False))
   self.assertIn('source changed during cache save',p.stdout)

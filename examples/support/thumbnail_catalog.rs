@@ -568,15 +568,28 @@ fn production_windows(app: &adw::Application, photos: &[(usize, PathBuf)]) {
         motion.emit_by_name::<()>("motion", &[&20f64, &(overlay.height() as f64 - 4.)]);
         // Cell construction is incremental and pauses while the strip is hidden.
         // Keep the strip exposed until the final catalog cell is built.
-        until(|| {
+        let deadline = Instant::now() + Duration::from_secs(20);
+        while !contains(window.upcast_ref(), "thumbnail-cell-118") {
             if !strip.is_mapped() {
                 motion.emit_by_name::<()>(
                     "motion",
                     &[&20f64, &(overlay.height() as f64 - 4.)],
                 );
             }
-            contains(window.upcast_ref(), "thumbnail-cell-118")
-        }); //119 entries after deletion
+            assert!(
+                Instant::now() < deadline,
+                "production catalog cell deadline: title={:?} row_children={} strip_visible={} strip_mapped={} overlay_height={} row_mapped={} cell_79={} cell_118={}",
+                window.title(),
+                count(&row),
+                strip.is_visible(),
+                strip.is_mapped(),
+                overlay.height(),
+                row.is_mapped(),
+                contains(window.upcast_ref(), "thumbnail-cell-79"),
+                contains(window.upcast_ref(), "thumbnail-cell-118"),
+            );
+            pump();
+        } //119 entries after deletion
         // Keep the motion controller connected until the strip is mapped and
         // its incremental cells are created; disconnect only for stable probing.
         overlay.remove_controller(&motion);

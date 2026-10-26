@@ -644,8 +644,12 @@ fn production_windows(app: &adw::Application, photos: &[(usize, PathBuf)]) {
     assert_eq!(row.first_child().unwrap(), original);
     assert!((strip.hadjustment().value() - offset).abs() < 1.);
     assert_eq!(windows[1].0.title(), other_title);
+    // The controller was detached for stable click/scroll assertions.
+    // Reattach it before asking the production visibility state to hide.
+    overlay.add_controller(motion.clone());
     motion.emit_by_name::<()>("motion", &[&20f64, &20f64]);
     until(|| !strip.is_visible());
+    overlay.remove_controller(motion);
     gio::prelude::ActionGroupExt::activate_action(first, "next-media", None);
     until(|| {
         first

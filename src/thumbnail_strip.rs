@@ -500,10 +500,17 @@ impl Inner {
             let results = job.await.unwrap_or_default();
             if let Some(i) = weak.upgrade() {
                 let current = i.warming.borrow().as_ref().is_some_and(|t| t == &token);
-                if !current || token.is_cancelled() || i.closed.get() || i.epoch.get() != epoch {
+                if !current { return; }
+                // A completed worker must release ONLY its own admission, even
+                // when revalidation has advanced the catalog epoch.
+                i.warming.borrow_mut().take();
+                if token.is_cancelled() || i.closed.get() || i.epoch.get() != epoch {
+                    i.warm_again.set(false);
+                    if !i.closed.get() && !i.scroller.is_mapped() && i.initialized.get() {
+                        i.warm_hidden();
+                    }
                     return;
                 }
-                i.warming.borrow_mut().take();
                 let mut entries = i.entries.borrow_mut();
                 for (path, work) in results {
                     if let Work::Hit(texture, source, cache, decoded_cost) = work {

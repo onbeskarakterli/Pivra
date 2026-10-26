@@ -1297,7 +1297,12 @@ mod tests {
                 let (width, height) = display_size(w, h, scale);
                 assert!(width > 0 && height > 0 && width <= w && height <= h);
                 assert!(width <= CELL_WIDTH * 2 && height <= CELL_HEIGHT * 2);
-                assert!(display_cost(width, height).unwrap() * LIMIT <= BUDGET);
+                // One texture must fit. The cache is bounded by BOTH count
+                // and bytes; large thumbnails require eviction below LIMIT.
+                let cost = display_cost(width, height).unwrap();
+                assert!(cost <= BUDGET);
+                assert!((BUDGET / cost).min(LIMIT) >= 1);
+                assert!((BUDGET / cost).min(LIMIT) * cost <= BUDGET);
             }
         }
         assert_eq!(texture_cost(512, 512), Some(8 * 1024 * 1024));

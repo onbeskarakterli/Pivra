@@ -70,6 +70,7 @@ pub(super) fn synthetic(app: &adw::Application) {
         state.clone(),
         &mode,
         choice.clone(),
+        Rc::new(Cell::new(false)),
     );
     let cases = [0.1_f64, 0.5, 1., 2., 4., 8., 2.5, 32.]
         .into_iter()

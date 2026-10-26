@@ -185,6 +185,9 @@ impl ThumbnailStrip {
         drag.connect_drag_update(move |gesture, dx, _| {
             if let Some(i) = weak.upgrade() {
                 if !dx.is_finite() { return; }
+                // GTK can emit drag-update(0, 0) during an ordinary click.
+                // Do not claim the sequence until there is real horizontal movement.
+                if dx.abs() < 6.0 { return; }
                 drag_flag.set(true);
                 trace_click(&format!("drag-update dx={dx:.1}"));
                 i.initial.set(None);

@@ -111,7 +111,7 @@ pub(super) fn synthetic(app: &adw::Application) {
             state.clone(),
             &action,
             Rc::new(std::cell::Cell::new(pivra::viewing::Resampling::Smooth)),
-            Rc::new(std::cell::Cell::new(false)),
+            Rc::new(std::cell::Cell::new(true)),
         );
         let survivor = adw::ApplicationWindow::builder()
             .application(app)

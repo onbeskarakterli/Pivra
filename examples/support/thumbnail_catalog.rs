@@ -581,7 +581,7 @@ fn production_windows(app: &adw::Application, photos: &[(usize, PathBuf)]) {
             }
             assert!(
                 Instant::now() < deadline,
-                "production catalog cell deadline: title={:?} row_children={} strip_visible={} strip_mapped={} overlay_height={} row_mapped={} cell_79={} cell_118={}",
+                "production catalog cell deadline: title={:?} row_children={} strip_visible={} strip_mapped={} overlay_height={} row_mapped={} cell_79={} cell_118={} pref_enabled={} toggle_visible={} provider={:?} gnome_capability={:?}",
                 window.title(),
                 count(&row),
                 strip.is_visible(),
@@ -590,6 +590,10 @@ fn production_windows(app: &adw::Application, photos: &[(usize, PathBuf)]) {
                 row.is_mapped(),
                 contains(window.upcast_ref(), "thumbnail-cell-79"),
                 contains(window.upcast_ref(), "thumbnail-cell-118"),
+                pivra::settings::thumbnail_preference().enabled(),
+                find::<gtk::ToggleButton>(window.upcast_ref(), "thumbnail-toggle").is_visible(),
+                pivra::thumbnail_manager::Manager::session().id(),
+                pivra::thumbnail::Provider::discover(None).capability(),
             );
             pump();
         } //119 entries after deletion

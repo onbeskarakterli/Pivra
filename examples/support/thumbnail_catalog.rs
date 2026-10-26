@@ -567,7 +567,12 @@ fn production_windows(app: &adw::Application, photos: &[(usize, PathBuf)]) {
         let strip: gtk::ScrolledWindow = find(window.upcast_ref(), "thumbnail-strip");
         let overlay = strip.parent().unwrap().downcast::<gtk::Overlay>().unwrap();
         let motion = controller::<gtk::EventControllerMotion>(&overlay);
+        let toggle: gtk::ToggleButton = find(window.upcast_ref(), "thumbnail-toggle");
+        let pin: gtk::ToggleButton = toggle.next_sibling().unwrap().downcast().unwrap();
         until(|| window.is_mapped() && overlay.height() > 0);
+        // Pin explicitly for deterministic incremental cell construction.
+        // A synthetic motion signal alone need not establish pointer proximity.
+        pin.emit_clicked();
         motion.emit_by_name::<()>("motion", &[&20f64, &(overlay.height() as f64 - 4.)]);
         // Cell construction is incremental and pauses while the strip is hidden.
         // Keep the strip exposed until the final catalog cell is built.
@@ -597,6 +602,8 @@ fn production_windows(app: &adw::Application, photos: &[(usize, PathBuf)]) {
             );
             pump();
         } //119 entries after deletion
+        motion.emit_by_name::<()>("motion", &[&20f64, &(overlay.height() as f64 - 4.)]);
+        pin.emit_clicked(); // Restore unpinned production behavior for remaining assertions.
         // Keep the motion controller connected until the strip is mapped and
         // its incremental cells are created; disconnect only for stable probing.
         overlay.remove_controller(&motion);

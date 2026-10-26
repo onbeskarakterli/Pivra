@@ -355,8 +355,16 @@ pub(super) fn run(app: &adw::Application) {
             "thumbnail click reset scroll"
         );
         let cell_overlay: gtk::Overlay = button(&row, 103).child().unwrap().downcast().unwrap();
-        let selected_frame = cell_overlay.first_child().unwrap();
-        assert!(selected_frame.has_css_class("selected"));
+        let mut child = cell_overlay.first_child();
+        let mut selected_frame = None;
+        while let Some(widget) = child {
+            if widget.has_css_class("pivra-thumbnail-selection") {
+                selected_frame = Some(widget);
+                break;
+            }
+            child = widget.next_sibling();
+        }
+        assert!(selected_frame.expect("thumbnail selection frame").has_css_class("selected"));
         assert!(!button(&row, 103).gets_focus_on_click());
         for n in [104, 105, 106, 105, 104, 103] {
             view.set_thumbnail_catalog(&photos, Some(n));

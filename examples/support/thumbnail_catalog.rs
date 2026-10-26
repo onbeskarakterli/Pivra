@@ -567,7 +567,17 @@ fn production_windows(app: &adw::Application, photos: &[(usize, PathBuf)]) {
         overlay.remove_controller(&motion);
         until(|| window.is_mapped() && overlay.height() > 0);
         motion.emit_by_name::<()>("motion", &[&20f64, &(overlay.height() as f64 - 4.)]);
-        until(|| contains(window.upcast_ref(), "thumbnail-cell-118")); //119 entries after deletion
+        // Cell construction is incremental and pauses while the strip is hidden.
+        // Keep the strip exposed until the final catalog cell is built.
+        until(|| {
+            if !strip.is_mapped() {
+                motion.emit_by_name::<()>(
+                    "motion",
+                    &[&20f64, &(overlay.height() as f64 - 4.)],
+                );
+            }
+            contains(window.upcast_ref(), "thumbnail-cell-118")
+        }); //119 entries after deletion
         let end = Instant::now() + Duration::from_secs(20);
         loop {
             let selected_button = button(&row, selected);

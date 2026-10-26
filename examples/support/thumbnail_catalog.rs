@@ -385,7 +385,11 @@ pub(super) fn run(app: &adw::Application) {
         );
         for n in [100, 103, 119] {
             let bounds = button(&row, n).compute_bounds(&row).unwrap();
-            assert_eq!((bounds.width() as i32, bounds.height() as i32), (96, 80));
+            assert_eq!(
+                (bounds.width() as i32, bounds.height() as i32),
+                (CELL_WIDTH, CELL_HEIGHT),
+                "thumbnail cell geometry must match the configured dimensions"
+            );
         }
         println!(
             "PASS all120 cache entries processed, stable click/rapid-selection scroll and cells, bounded paintables, no repeated stable decode: {stats:?}; native-cache-decode={native}"

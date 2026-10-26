@@ -473,7 +473,8 @@ impl Visibility {
     }
     fn update_resize_cursor(&self, y: Option<f64>) {
         let (Some(overlay), Some(strip)) = (self.overlay.upgrade(), self.strip.upgrade()) else { return; };
-        let top = f64::from(overlay.height() - strip.height_request());
+        let top = strip.compute_bounds(&overlay)
+            .map_or(f64::from(overlay.height() - strip.height_request()), |bounds| f64::from(bounds.y()));
         let on_border = self.shown.get() && self.preference.enabled()
             && y.is_some_and(|position| (position - top).abs() <= 10.0);
         let cursor = if on_border { Some("ns-resize") } else { None };

@@ -397,7 +397,8 @@ fn main() {
     );
     // The selected file was removed, so next-media is disabled by contract.
     // Open an independent pending window to exercise close/worker cleanup.
-    let closing_path = dir.path().join("3.png");
+    let closing_dir = tempfile::tempdir().unwrap();
+    let closing_path = closing_dir.path().join("3.png");
     std::fs::write(&closing_path, b"closing event").unwrap();
     let closing = open(&app, &closing_path);
     wait(|| STARTED.load(Ordering::SeqCst) == 7);

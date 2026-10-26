@@ -395,13 +395,16 @@ fn main() {
         "",
         "pending load must not show loading text"
     );
-    action(&first, "next-media", 7);
-    // Close while a new worker and a monitor timer can both be pending.
-    std::fs::write(dir.path().join("3.png"), b"closing event").unwrap();
-    mode_key(&first, gtk::gdk::Key::F7, "fill");
-    let weak = first.downgrade();
-    first.close();
-    drop(first);
+    // The selected file was removed, so next-media is disabled by contract.
+    // Open an independent pending window to exercise close/worker cleanup.
+    let closing_path = dir.path().join("3.png");
+    std::fs::write(&closing_path, b"closing event").unwrap();
+    let closing = open(&app, &closing_path);
+    wait(|| STARTED.load(Ordering::SeqCst) == 7);
+    mode_key(&closing, gtk::gdk::Key::F7, "fill");
+    let weak = closing.downgrade();
+    closing.close();
+    drop(closing);
     RELEASE[6].store(true, Ordering::SeqCst);
     wait(|| FINISHED[6].load(Ordering::SeqCst) && weak.upgrade().is_none());
     settle();

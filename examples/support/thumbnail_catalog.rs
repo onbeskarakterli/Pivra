@@ -564,7 +564,6 @@ fn production_windows(app: &adw::Application, photos: &[(usize, PathBuf)]) {
         let strip: gtk::ScrolledWindow = find(window.upcast_ref(), "thumbnail-strip");
         let overlay = strip.parent().unwrap().downcast::<gtk::Overlay>().unwrap();
         let motion = controller::<gtk::EventControllerMotion>(&overlay);
-        overlay.remove_controller(&motion);
         until(|| window.is_mapped() && overlay.height() > 0);
         motion.emit_by_name::<()>("motion", &[&20f64, &(overlay.height() as f64 - 4.)]);
         // Cell construction is incremental and pauses while the strip is hidden.
@@ -578,6 +577,9 @@ fn production_windows(app: &adw::Application, photos: &[(usize, PathBuf)]) {
             }
             contains(window.upcast_ref(), "thumbnail-cell-118")
         }); //119 entries after deletion
+        // Keep the motion controller connected until the strip is mapped and
+        // its incremental cells are created; disconnect only for stable probing.
+        overlay.remove_controller(&motion);
         let end = Instant::now() + Duration::from_secs(20);
         loop {
             let selected_button = button(&row, selected);

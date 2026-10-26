@@ -188,6 +188,15 @@ impl ThumbnailStrip {
             }
         });
         inner.scroller.add_controller(drag);
+        // Opt-in press trace: distinguishes an input event lost before the
+        // button from a click consumed by selection or a competing gesture.
+        let press = gtk::GestureClick::new();
+        press.set_button(1);
+        press.set_propagation_phase(gtk::PropagationPhase::Capture);
+        press.connect_pressed(move |_, _, x, y| {
+            trace_click(&format!("press-at-strip x={x:.0} y={y:.0}"));
+        });
+        inner.scroller.add_controller(press);
         Self(inner)
     }
     pub(crate) fn refresh_hidden(&self) {
@@ -663,9 +672,13 @@ impl Inner {
                 let weak = Rc::downgrade(&i);
                 let index = entry.index.clone();
                 button.connect_clicked(move |_| {
+                    trace_click(&format!("button-click index={}", index.get()));
                     if let Some(i) = weak.upgrade() {
                         if let Some(callback) = i.select.borrow().as_ref() {
+                            trace_click(&format!("selection-callback index={}", index.get()));
                             callback(index.get());
+                        } else {
+                            trace_click("no-selection-callback");
                         }
                     }
                 });
@@ -1161,6 +1174,13 @@ fn display_size(width: i32, height: i32, scale: i32) -> (i32, i32) {
         (f64::from(width) * ratio).floor().max(1.) as i32,
         (f64::from(height) * ratio).floor().max(1.) as i32,
     )
+}
+
+// User-facing click diagnosis is opt-in and independent of thumbnail decode logs.
+fn trace_click(event: &str) {
+    if std::env::var_os("PIVRA_TRACE_CLICKS").is_some_and(|value| value == "1") {
+        eprintln!("[pivra-click] {event}");
+    }
 }
 
 // Explicit opt-in diagnostics only; never an unbounded in-memory event history.

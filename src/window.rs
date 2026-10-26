@@ -374,14 +374,20 @@ pub(super) fn build(app: &adw::Application, settings: &Settings, file: Option<Op
             glib::Propagation::Proceed
         });
         view.on_thumbnail_select(move |index| {
+            let diagnose = std::env::var_os("PIVRA_TRACE_CLICKS")
+                .is_some_and(|value| value == "1");
+            if diagnose { eprintln!("[pivra-click] window-received index={index}"); }
             let Some(window) = select_window.upgrade() else {
+                if diagnose { eprintln!("[pivra-click] window-gone"); }
                 return;
             };
             let mut context = select_context.borrow_mut();
             if context.collection.selected_index() == Some(index) {
+                if diagnose { eprintln!("[pivra-click] already-selected index={index}"); }
                 return;
             }
             if context.collection.select(index) {
+                if diagnose { eprintln!("[pivra-click] selected index={index}"); }
                 context.revision = context.revision.wrapping_add(1);
                 select_banner.set_reveal_child(false);
                 update_title(&window, &select_title, &context);

@@ -236,7 +236,9 @@ fn controlled(app: &adw::Application) {
                 .ok()
         })
         .unwrap();
-    scroll.emit_by_name::<bool>("scroll", &[&0_f64, &-1_f64]);
+    v.set_zoom_wheel_enabled(true);
+    assert!(scroll.emit_by_name::<bool>("scroll", &[&0_f64, &-1_f64]));
+    v.set_zoom_wheel_enabled(false);
     assert_eq!(state(&w, "image-mode"), "manual");
     choose(&w, "image-resampling", "smooth");
     release(3, &joined, 5);

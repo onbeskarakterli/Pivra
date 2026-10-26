@@ -310,7 +310,14 @@ pub(super) fn run(app: &adw::Application) {
             120 + cancelled,
             "each extra decode must be accounted for by a cancelled attempt"
         );
-        let first_visible = (strip.hadjustment().value() / 104.).floor() as usize;
+        // Use actual GTK allocations: thumbnail width varies with strip height.
+        let viewport_start = strip.hadjustment().value();
+        let first_visible = (0..120)
+            .find(|&index| {
+                let bounds = button(&row, index).compute_bounds(&row).unwrap();
+                f64::from(bounds.x() + bounds.width()) > viewport_start
+            })
+            .expect("at least one thumbnail intersects the viewport");
         assert_eq!(
             THUMB_ORDER.lock().unwrap()[order_before],
             cache_path(&photos[first_visible].1),

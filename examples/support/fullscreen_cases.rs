@@ -337,7 +337,25 @@ fn production(app: &adw::Application, native: bool) {
             && f64::from(b.x() + b.width())
                 <= strip.hadjustment().value() + strip.hadjustment().page_size() + 1.
     });
-    assert!(selected.has_css_class("selected"));
+    let selected_overlay: gtk::Overlay = selected
+        .child()
+        .expect("selected thumbnail content")
+        .downcast()
+        .expect("thumbnail content overlay");
+    let selection = selected_overlay
+        .first_child()
+        .and_then(|child| {
+            let mut widget = Some(child);
+            while let Some(current) = widget {
+                if current.has_css_class("pivra-thumbnail-selection") {
+                    return Some(current);
+                }
+                widget = current.next_sibling();
+            }
+            None
+        })
+        .expect("thumbnail selection frame");
+    assert!(selection.has_css_class("selected"));
     let cell: gtk::Button = find(w.upcast_ref(), "thumbnail-cell-18");
     let cb = cell.compute_bounds(&overlay).unwrap();
     let target = overlay

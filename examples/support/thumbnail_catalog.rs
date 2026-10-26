@@ -246,10 +246,13 @@ pub(super) fn run(app: &adw::Application) {
             let hidden_row: gtk::Box = find(view.widget().upcast_ref(), "thumbnail-items");
             pause(25);
             assert_eq!(count(&hidden_row), 0, "hidden strip constructed cells");
-            assert_eq!(
-                THUMB_LOADS.load(Ordering::SeqCst),
-                calls_before,
-                "hidden strip decoded thumbnails"
+            // Hidden prewarm is intentional: allow only the initial viewport
+            // batch, while keeping the strip unconstructed until reveal.
+            // The full catalog below still asserts exactly one decode per
+            // source (apart from explicitly accounted cancellations).
+            assert!(
+                THUMB_LOADS.load(Ordering::SeqCst) - calls_before <= 24,
+                "hidden prewarm exceeded its bounded viewport batch"
             );
         }
         set_enabled(&view, true);

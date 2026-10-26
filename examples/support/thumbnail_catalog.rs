@@ -545,6 +545,9 @@ pub(super) fn run(app: &adw::Application) {
 }
 
 fn production_windows(app: &adw::Application, photos: &[(usize, PathBuf)]) {
+    // Fresh isolated XDG configs default to thumbnails disabled. This probe
+    // explicitly exercises the enabled production strip in both windows.
+    pivra::settings::thumbnail_preference().set_enabled(true);
     let mut windows = Vec::new();
     for selected in [79, 10] {
         let before = app.windows();

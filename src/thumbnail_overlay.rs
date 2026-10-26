@@ -78,7 +78,7 @@ pub(crate) fn install(
     resize_edge.set_halign(gtk::Align::Fill);
     resize_edge.set_valign(gtk::Align::End);
     resize_edge.set_height_request(10);
-    resize_edge.set_can_target(true);
+    resize_edge.set_can_target(false);
     resize_edge.set_visible(false);
     resize_edge.set_cursor_from_name(Some("ns-resize"));
     let button = gtk::ToggleButton::builder()
@@ -206,9 +206,13 @@ pub(crate) fn install(
     let start_height = Rc::new(Cell::new(saved_height));
     let begin_state = state.clone();
     let begin_height = start_height.clone();
-    resize.connect_drag_begin(move |gesture, _, _| {
+    resize.connect_drag_begin(move |gesture, _, y| {
         let Some(strip) = begin_state.strip.upgrade() else { return; };
-        if !begin_state.shown.get() || !begin_state.preference.enabled() {
+        let Some(overlay) = begin_state.overlay.upgrade() else { return; };
+        let top = f64::from(overlay.height() - strip.height_request());
+        if !begin_state.shown.get() || !begin_state.preference.enabled()
+            || y < top - 10.0 || y > top + 10.0
+        {
             gesture.set_state(gtk::EventSequenceState::Denied);
             return;
         }
@@ -249,7 +253,8 @@ pub(crate) fn install(
         cancel_state.resizing.set(false);
         if !cancel_state.pinned.get() && !cancel_state.near.get() { cancel_state.schedule(3000); }
     });
-    resize_edge.add_controller(resize);
+    resize.set_propagation_phase(gtk::PropagationPhase::Capture);
+    overlay.add_controller(resize);
     let motion = gtk::EventControllerMotion::new();
     motion.set_propagation_phase(gtk::PropagationPhase::Capture);
     let enter = state.clone();

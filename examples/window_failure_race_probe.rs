@@ -164,10 +164,12 @@ fn input_while_pending(w: &adw::ApplicationWindow) {
                 .ok()
         })
         .unwrap();
+    let before = p.paintable();
     assert!(
-        !scroll.emit_by_name::<bool>("scroll", &[&0_f64, &-1_f64]),
-        "pending input must not fabricate a texture"
+        scroll.emit_by_name::<bool>("scroll", &[&0_f64, &-1_f64]),
+        "default wheel navigation should consume the event"
     );
+    assert_eq!(p.paintable(), before, "pending wheel input fabricated a texture");
     let drag = (0..list.n_items())
         .find_map(|i| list.item(i).unwrap().downcast::<gtk::GestureDrag>().ok())
         .unwrap();

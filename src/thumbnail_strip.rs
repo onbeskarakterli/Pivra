@@ -594,7 +594,7 @@ impl Inner {
             return;
         }
         let weak = Rc::downgrade(self);
-        let id = glib::idle_add_local(move || {
+        let id = glib::timeout_add_local(std::time::Duration::from_millis(16), move || {
             let Some(i) = weak.upgrade() else {
                 return glib::ControlFlow::Break;
             };
@@ -603,7 +603,7 @@ impl Inner {
                 return glib::ControlFlow::Break;
             }
             let mut entries = i.entries.borrow_mut();
-            for entry in entries.iter_mut().filter(|e| e.widgets.is_none()).take(32) {
+            for entry in entries.iter_mut().filter(|e| e.widgets.is_none()).take(8) {
                 let button = gtk::Button::new();
                 button.add_css_class("pivra-thumbnail-cell");
                 let (cell_width, cell_height) = i.cell_size.get();
@@ -626,6 +626,7 @@ impl Inner {
                 let picture = gtk::Picture::new();
                 picture.set_content_fit(gtk::ContentFit::Contain);
                 picture.set_can_shrink(true);
+                picture.set_can_target(false);
                 // Hidden predecode can complete before a GTK cell exists.
                 // Hydrate new cells from their already-ready textures.
                 if let Some(texture) = entry.texture.as_ref() {
@@ -644,6 +645,8 @@ impl Inner {
                 icon.set_halign(gtk::Align::Center);
                 icon.set_valign(gtk::Align::Center);
                 icon.set_visible(entry.phase != Phase::Ready);
+                icon.set_can_target(false);
+                spinner.set_can_target(false);
                 for child in [
                     picture.upcast_ref::<gtk::Widget>(),
                     icon.upcast_ref(),

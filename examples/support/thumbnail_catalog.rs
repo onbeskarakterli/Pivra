@@ -387,7 +387,7 @@ pub(super) fn run(app: &adw::Application) {
             let bounds = button(&row, n).compute_bounds(&row).unwrap();
             assert_eq!(
                 (bounds.width() as i32, bounds.height() as i32),
-                (CELL_WIDTH, CELL_HEIGHT),
+                (image_view::thumbnail_overlay::CELL_WIDTH, image_view::thumbnail_overlay::CELL_HEIGHT),
                 "thumbnail cell geometry must match the configured dimensions"
             );
         }

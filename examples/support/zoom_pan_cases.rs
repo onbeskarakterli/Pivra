@@ -111,7 +111,7 @@ pub(super) fn synthetic(app: &adw::Application) {
             state.clone(),
             &action,
             Rc::new(std::cell::Cell::new(pivra::viewing::Resampling::Smooth)),
-            Rc::new(Cell::new(false)),
+            Rc::new(std::cell::Cell::new(false)),
         );
         let survivor = adw::ApplicationWindow::builder()
             .application(app)
@@ -139,7 +139,7 @@ pub(super) fn synthetic(app: &adw::Application) {
             other_state.clone(),
             &other_action,
             Rc::new(std::cell::Cell::new(pivra::viewing::Resampling::Smooth)),
-            Rc::new(Cell::new(false)),
+            Rc::new(std::cell::Cell::new(false)),
         );
         image_view::present(&other, Some(&tex), ViewMode::Actual);
         let other_paintable = other.paintable();

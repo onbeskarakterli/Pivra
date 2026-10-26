@@ -343,7 +343,8 @@ pub(super) fn run(app: &adw::Application) {
         view.on_thumbnail_select(move |index| {
             selected_view.set_thumbnail_catalog(&selection_photos, Some(index))
         });
-        strip.hadjustment().set_value(100. * 104.);
+        let target_bounds = button(&row, 103).compute_bounds(&row).unwrap();
+        strip.hadjustment().set_value(f64::from(target_bounds.x()));
         image_bytes(&window, &picture);
         let offset = strip.hadjustment().value();
         button(&row, 103).emit_clicked();
@@ -353,7 +354,9 @@ pub(super) fn run(app: &adw::Application) {
             (strip.hadjustment().value() - offset).abs() < 1.,
             "thumbnail click reset scroll"
         );
-        assert!(button(&row, 103).has_css_class("selected"));
+        let cell_overlay: gtk::Overlay = button(&row, 103).child().unwrap().downcast().unwrap();
+        let selected_frame = cell_overlay.first_child().unwrap();
+        assert!(selected_frame.has_css_class("selected"));
         assert!(!button(&row, 103).gets_focus_on_click());
         for n in [104, 105, 106, 105, 104, 103] {
             view.set_thumbnail_catalog(&photos, Some(n));

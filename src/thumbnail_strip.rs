@@ -174,6 +174,7 @@ impl ThumbnailStrip {
         let origin = Rc::new(Cell::new(0.0f64));
         let start = origin.clone();
         drag.connect_drag_begin(move |_, _, _| {
+            trace_click("drag-begin");
             if let Some(i) = weak.upgrade() {
                 start.set(i.scroller.hadjustment().value());
             }
@@ -185,6 +186,7 @@ impl ThumbnailStrip {
             if let Some(i) = weak.upgrade() {
                 if !dx.is_finite() { return; }
                 drag_flag.set(true);
+                trace_click(&format!("drag-update dx={dx:.1}"));
                 i.initial.set(None);
                 let adj = i.scroller.hadjustment();
                 let limit = (adj.upper() - adj.page_size()).max(adj.lower());
@@ -192,6 +194,10 @@ impl ThumbnailStrip {
                 gesture.set_state(gtk::EventSequenceState::Claimed);
             }
         });
+        drag.connect_drag_end(move |_, dx, dy| {
+            trace_click(&format!("drag-end dx={dx:.1} dy={dy:.1}"));
+        });
+        drag.connect_cancel(move |_, _| trace_click("drag-cancel"));
         inner.scroller.add_controller(drag);
         // Opt-in press trace: distinguishes an input event lost before the
         // button from a click consumed by selection or a competing gesture.
@@ -223,6 +229,7 @@ impl ThumbnailStrip {
         });
         let release_weak = Rc::downgrade(&inner);
         press.connect_released(move |_, _, _, _| {
+            trace_click("press-released");
             let Some((index, count)) = pressed.take() else { return; };
             if dragged.get() { return; }
             let weak = release_weak.clone();
@@ -237,6 +244,7 @@ impl ThumbnailStrip {
                 }
             });
         });
+        press.connect_cancel(move |_, _| trace_click("press-cancel"));
         inner.scroller.add_controller(press);
         Self(inner)
     }

@@ -143,6 +143,7 @@ pub(crate) fn install(
         strip: strip.downgrade(),
         resize_edge: resize_edge.downgrade(),
         resizing: Cell::new(false),
+        preferred_height: Cell::new(saved_height),
         button: button.downgrade(),
         pin: pin.downgrade(),
         controls: controls.downgrade(),
@@ -209,7 +210,8 @@ pub(crate) fn install(
     resize.connect_drag_begin(move |gesture, _, y| {
         let Some(strip) = begin_state.strip.upgrade() else { return; };
         let Some(overlay) = begin_state.overlay.upgrade() else { return; };
-        let top = f64::from(overlay.height() - strip.height_request());
+        let top = strip.compute_bounds(&overlay)
+            .map_or(f64::from(overlay.height() - strip.height_request()), |b| f64::from(b.y()));
         if !begin_state.shown.get() || !begin_state.preference.enabled()
             || y < top - 10.0 || y > top + 10.0
         {
@@ -241,6 +243,7 @@ pub(crate) fn install(
     resize.connect_drag_end(move |_, _, _| {
         if end_state.resizing.get() {
             if let Some(strip) = end_state.strip.upgrade() {
+                end_state.preferred_height.set(strip.height_request());
                 pivra::settings::save_thumbnail_height(strip.height_request());
             }
         }
@@ -307,10 +310,12 @@ pub(crate) fn install(
     window.as_ref().add_controller(keys);
     let mapped = state.clone();
     let resize_preload = thumbnails.clone();
+    let resize_cells = thumbnails.clone();
     overlay.connect_map(move |overlay| {
         if let Some(clock) = overlay.frame_clock() {
             let weak = Rc::downgrade(&mapped);
             let preload = resize_preload.clone();
+            let cells = resize_cells.clone();
             let previous_width = Rc::new(Cell::new(-1i32));
             let width_state = previous_width.clone();
             let handler = clock.connect_after_paint(move |_| {
@@ -323,6 +328,19 @@ pub(crate) fn install(
                         }
                         let height = overlay.height();
                         if state.allocated_height.replace(height) != height {
+                            // Keep the saved preference, but constrain only the
+                            // on-screen height when the viewport shrinks.
+                            if !state.resizing.get() {
+                                if let Some(strip) = state.strip.upgrade() {
+                                    let effective = state.preferred_height.get()
+                                        .min((height - 48).max(128));
+                                    if strip.height_request() != effective {
+                                        strip.set_height_request(effective);
+                                        cells.resize_cells(effective);
+                                        state.place_toggle();
+                                    }
+                                }
+                            }
                             if let Some(y) = state.pointer_y.get() {
                                 state.motion(y);
                             }
@@ -358,6 +376,7 @@ struct Visibility {
     strip: glib::WeakRef<gtk::ScrolledWindow>,
     resize_edge: glib::WeakRef<gtk::Box>,
     resizing: Cell<bool>,
+    preferred_height: Cell<i32>,
     button: glib::WeakRef<gtk::ToggleButton>,
     pin: glib::WeakRef<gtk::ToggleButton>,
     controls: glib::WeakRef<gtk::Box>,

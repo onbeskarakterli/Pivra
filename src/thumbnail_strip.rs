@@ -193,8 +193,24 @@ impl ThumbnailStrip {
         let press = gtk::GestureClick::new();
         press.set_button(1);
         press.set_propagation_phase(gtk::PropagationPhase::Capture);
+        let weak = Rc::downgrade(&inner);
         press.connect_pressed(move |_, _, x, y| {
-            trace_click(&format!("press-at-strip x={x:.0} y={y:.0}"));
+            if std::env::var_os("PIVRA_TRACE_CLICKS").is_none_or(|v| v != "1") { return; }
+            let Some(i) = weak.upgrade() else { return; };
+            let hit = i.entries.borrow().iter().find_map(|entry| {
+                let w = entry.widgets.as_ref()?;
+                let bounds = w.button.compute_bounds(&i.scroller)?;
+                ((x as f32) >= bounds.x()
+                    && (x as f32) <= bounds.x() + bounds.width()
+                    && (y as f32) >= bounds.y()
+                    && (y as f32) <= bounds.y() + bounds.height())
+                    .then_some(entry.index.get())
+            });
+            trace_click(&format!(
+                "press-at-strip x={x:.0} y={y:.0} hit-button={hit:?} building={} cells={}",
+                i.building.borrow().is_some(),
+                i.entries.borrow().iter().filter(|e| e.widgets.is_some()).count(),
+            ));
         });
         inner.scroller.add_controller(press);
         Self(inner)

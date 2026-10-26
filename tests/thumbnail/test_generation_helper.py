@@ -29,7 +29,7 @@ GnomeDesktopThumbnailFactory *gnome_desktop_thumbnail_factory_new(GnomeDesktopTh
  (void)s; struct rlimit r;
  if(getrlimit(RLIMIT_AS,&r)||r.rlim_cur!=1024UL*1024*1024) _exit(20);
  if(getrlimit(RLIMIT_CPU,&r)||r.rlim_cur!=15) _exit(21);
- if(getrlimit(RLIMIT_FSIZE,&r)||r.rlim_cur!=4UL*1024*1024) _exit(22);
+ if(getrlimit(RLIMIT_FSIZE,&r)||r.rlim_cur!=256UL*1024*1024) _exit(22);
  return g_object_new(G_TYPE_OBJECT,NULL);
 }
 char *gnome_desktop_thumbnail_path_for_uri(const char *u,GnomeDesktopThumbnailSize s) { (void)u;(void)s;return g_strdup(getenv("STAMP")); }

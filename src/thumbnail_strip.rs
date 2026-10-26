@@ -69,6 +69,7 @@ struct Inner {
     validation: RefCell<Option<gio::Cancellable>>,
     warming: RefCell<Option<gio::Cancellable>>,
     warm_again: Cell<bool>,
+    button_clicks: Cell<u64>,
     cell_size: Cell<(i32, i32)>,
 }
 #[derive(Debug, Default)]
@@ -109,6 +110,7 @@ impl ThumbnailStrip {
             validation: RefCell::new(None),
             warming: RefCell::new(None),
             warm_again: Cell::new(false),
+            button_clicks: Cell::new(0),
             cell_size: Cell::new((CELL_WIDTH, CELL_HEIGHT)),
         });
         let weak = Rc::downgrade(&inner);
@@ -177,9 +179,12 @@ impl ThumbnailStrip {
             }
         });
         let weak = Rc::downgrade(&inner);
+        let dragged = Rc::new(Cell::new(false));
+        let drag_flag = dragged.clone();
         drag.connect_drag_update(move |gesture, dx, _| {
             if let Some(i) = weak.upgrade() {
                 if !dx.is_finite() { return; }
+                drag_flag.set(true);
                 i.initial.set(None);
                 let adj = i.scroller.hadjustment();
                 let limit = (adj.upper() - adj.page_size()).max(adj.lower());
@@ -194,8 +199,11 @@ impl ThumbnailStrip {
         press.set_button(1);
         press.set_propagation_phase(gtk::PropagationPhase::Capture);
         let weak = Rc::downgrade(&inner);
+        let pressed = Rc::new(Cell::new(None::<(usize, u64)>));
+        let press_state = pressed.clone();
+        let press_dragged = dragged.clone();
         press.connect_pressed(move |_, _, x, y| {
-            if std::env::var_os("PIVRA_TRACE_CLICKS").is_none_or(|v| v != "1") { return; }
+            press_dragged.set(false);
             let Some(i) = weak.upgrade() else { return; };
             let hit = i.entries.borrow().iter().find_map(|entry| {
                 let w = entry.widgets.as_ref()?;
@@ -206,11 +214,28 @@ impl ThumbnailStrip {
                     && (y as f32) <= bounds.y() + bounds.height())
                     .then_some(entry.index.get())
             });
+            press_state.set(hit.map(|index| (index, i.button_clicks.get())));
             trace_click(&format!(
                 "press-at-strip x={x:.0} y={y:.0} hit-button={hit:?} building={} cells={}",
                 i.building.borrow().is_some(),
                 i.entries.borrow().iter().filter(|e| e.widgets.is_some()).count(),
             ));
+        });
+        let release_weak = Rc::downgrade(&inner);
+        press.connect_released(move |_, _, _, _| {
+            let Some((index, count)) = pressed.take() else { return; };
+            if dragged.get() { return; }
+            let weak = release_weak.clone();
+            // Let the native GtkButton click callback run first. If GTK's
+            // scroll/drag gesture swallowed the click, deliver it once.
+            glib::idle_add_local_once(move || {
+                let Some(i) = weak.upgrade() else { return; };
+                if i.closed.get() || i.button_clicks.get() != count { return; }
+                trace_click(&format!("native-click-missed fallback index={index}"));
+                if let Some(callback) = i.select.borrow().as_ref() {
+                    callback(index);
+                }
+            });
         });
         inner.scroller.add_controller(press);
         Self(inner)
@@ -688,6 +713,9 @@ impl Inner {
                 let weak = Rc::downgrade(&i);
                 let index = entry.index.clone();
                 button.connect_clicked(move |_| {
+                    if let Some(i) = weak.upgrade() {
+                        i.button_clicks.set(i.button_clicks.get().wrapping_add(1));
+                    }
                     trace_click(&format!("button-click index={}", index.get()));
                     if let Some(i) = weak.upgrade() {
                         if let Some(callback) = i.select.borrow().as_ref() {

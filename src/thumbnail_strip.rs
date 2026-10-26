@@ -208,7 +208,7 @@ impl ThumbnailStrip {
         press.set_button(1);
         press.set_propagation_phase(gtk::PropagationPhase::Capture);
         let weak = Rc::downgrade(&inner);
-        let pressed = Rc::new(Cell::new(None::<(usize, u64)>));
+        let pressed = Rc::new(RefCell::new(None::<(usize, u64, u64, PathBuf)>));
         let press_state = pressed.clone();
         let press_dragged = dragged.clone();
         press.connect_pressed(move |_, _, x, y| {
@@ -221,11 +221,14 @@ impl ThumbnailStrip {
                     && (x as f32) <= bounds.x() + bounds.width()
                     && (y as f32) >= bounds.y()
                     && (y as f32) <= bounds.y() + bounds.height())
-                    .then_some(entry.index.get())
+                    .then_some((entry.index.get(), entry.path.clone()))
             });
-            press_state.set(hit.map(|index| (index, i.button_clicks.get())));
+            *press_state.borrow_mut() = hit.as_ref().map(|(index, path)| {
+                (*index, i.button_clicks.get(), i.epoch.get(), path.clone())
+            });
             trace_click(&format!(
-                "press-at-strip x={x:.0} y={y:.0} hit-button={hit:?} building={} cells={}",
+                "press-at-strip x={x:.0} y={y:.0} hit-button={:?} building={} cells={}",
+                hit.as_ref().map(|(index, _)| *index),
                 i.building.borrow().is_some(),
                 i.entries.borrow().iter().filter(|e| e.widgets.is_some()).count(),
             ));
@@ -233,7 +236,7 @@ impl ThumbnailStrip {
         let release_weak = Rc::downgrade(&inner);
         press.connect_released(move |_, _, _, _| {
             trace_click("press-released");
-            let Some((index, count)) = pressed.take() else { return; };
+            let Some((index, count, epoch, path)) = pressed.borrow_mut().take() else { return; };
             if dragged.get() { return; }
             let weak = release_weak.clone();
             // Let the native GtkButton click callback run first. If GTK's
@@ -241,6 +244,9 @@ impl ThumbnailStrip {
             glib::idle_add_local_once(move || {
                 let Some(i) = weak.upgrade() else { return; };
                 if i.closed.get() || i.button_clicks.get() != count { return; }
+                if !fallback_target_valid(
+                    epoch, i.epoch.get(), index, &path, &i.entries.borrow(),
+                ) { return; }
                 trace_click(&format!("native-click-missed fallback index={index}"));
                 if let Some(callback) = i.select.borrow().as_ref() {
                     callback(index);
@@ -1239,6 +1245,18 @@ fn display_size(width: i32, height: i32, scale: i32) -> (i32, i32) {
 }
 
 // User-facing click diagnosis is opt-in and independent of thumbnail decode logs.
+// A deferred click must still address the very same catalog item.
+fn fallback_target_valid(
+    pressed_epoch: u64,
+    current_epoch: u64,
+    index: usize,
+    pressed_path: &std::path::Path,
+    entries: &[Entry],
+) -> bool {
+    pressed_epoch == current_epoch
+        && entries.iter().any(|entry| entry.index.get() == index && entry.path == pressed_path)
+}
+
 fn trace_click(event: &str) {
     if std::env::var_os("PIVRA_TRACE_CLICKS").is_some_and(|value| value == "1") {
         eprintln!("[pivra-click] {event}");
@@ -1296,6 +1314,23 @@ mod tests {
         reconsider_evicted(&mut entries, &(1..65), &last, None);
         assert!(entries[1..].iter().all(|e| e.phase == Phase::Pending));
         assert!(entries[0].phase == Phase::Evicted);
+    }
+    #[test]
+    fn deferred_click_rejects_catalog_replacement_and_index_reuse() {
+        let entries = vec![Entry {
+            index: Rc::new(Cell::new(2)),
+            path: PathBuf::from("/pictures/new.jpg"),
+            widgets: None,
+            phase: Phase::Pending,
+            texture: None,
+            keys: None,
+            cost: 0,
+            used: 0,
+        }];
+        assert!(!fallback_target_valid(10, 11, 2, std::path::Path::new("/pictures/old.jpg"), &entries));
+        assert!(!fallback_target_valid(10, 10, 2, std::path::Path::new("/pictures/old.jpg"), &entries));
+        assert!(fallback_target_valid(10, 10, 2, std::path::Path::new("/pictures/new.jpg"), &entries));
+        assert!(!fallback_target_valid(10, 10, 3, std::path::Path::new("/pictures/new.jpg"), &entries));
     }
     #[test]
     fn rgba8_density_and_conservative_upload_charge_fit_both_caps() {

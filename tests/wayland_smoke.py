@@ -128,6 +128,8 @@ def main():
                         args.append("--synthetic")
                     if "--controlled-navigation" in sys.argv[2:]:
                         args.append("--controlled-navigation")
+                    if "--thumbnail-scrollbar" in sys.argv[2:]:
+                        args.append("--thumbnail-scrollbar-regression")
                     if "--thumbnail-scheduler" in sys.argv[2:]:
                         args.append("--thumbnail-scheduler-regression")
                         env["XDG_CURRENT_DESKTOP"] = "GNOME"

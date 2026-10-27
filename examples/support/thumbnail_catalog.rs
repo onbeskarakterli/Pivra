@@ -1131,3 +1131,114 @@ fn widgets_with_picture(widget: &gtk::Widget) -> bool {
     }
     false
 }
+
+// Real GTK scrolling/targeting, synthetic TEST cache pixels only.
+pub(super) fn scrollbar(app: &adw::Application) {
+    use std::{cell::Cell, rc::Rc};
+    let root = tempfile::tempdir().unwrap();
+    let photos: Vec<_> = (0..20)
+        .map(|n| {
+            let path = root.path().join(format!("scrollbar-{n}.png"));
+            std::fs::write(
+                &path,
+                include_bytes!("../../tests/fixtures/images/wide.png"),
+            )
+            .unwrap();
+            cache(&path);
+            (n, path)
+        })
+        .collect();
+    let (window, view, picture) = open(app);
+    let before = image_bytes(&window, &picture);
+    let viewport = (picture.width(), picture.height());
+    view.set_thumbnail_catalog(&photos, Some(0));
+    view.finish_initial_thumbnail_catalog(Some(0));
+    set_enabled(&view, true);
+    let row: gtk::Box = find(view.widget().upcast_ref(), "thumbnail-items");
+    let strip: gtk::ScrolledWindow = find(view.widget().upcast_ref(), "thumbnail-strip");
+    until(|| {
+        count(&row) == 20
+            && strip.is_mapped()
+            && strip.hadjustment().upper() > strip.hadjustment().page_size()
+    });
+    image_bytes(&window, &picture);
+    let requested_height = strip.height_request();
+    let allocated_height = strip.height();
+    let bar = strip.hscrollbar();
+    assert_eq!(strip.hscrollbar_policy(), gtk::PolicyType::External);
+    assert!(
+        !bar.is_visible() && !bar.is_mapped() && !bar.can_target(),
+        "visible={} mapped={} target={}",
+        bar.is_visible(),
+        bar.is_mapped(),
+        bar.can_target()
+    );
+    let check_hit_area = || {
+        for x in (1..strip.width()).step_by(12) {
+            for y in [strip.height() - 1, strip.height() - 5, strip.height() - 10] {
+                let mut hit = strip.pick(x as f64, y as f64, gtk::PickFlags::DEFAULT);
+                while let Some(widget) = hit {
+                    assert_ne!(
+                        widget, bar,
+                        "invisible scrollbar intercepts bottom hit at {x},{y}"
+                    );
+                    hit = widget.parent();
+                }
+            }
+        }
+    };
+    check_hit_area();
+    let adjustment = strip.hadjustment();
+    adjustment.set_value(100.);
+    let wheel = controller::<gtk::EventControllerScroll>(&strip);
+    let old = adjustment.value();
+    assert!(wheel.emit_by_name::<bool>("scroll", &[&0f64, &1f64]));
+    assert!(
+        adjustment.value() > old,
+        "vertical wheel no longer scrolls horizontally"
+    );
+    let old = adjustment.value();
+    assert!(wheel.emit_by_name::<bool>("scroll", &[&1.25f64, &0f64]));
+    assert!(
+        adjustment.value() > old,
+        "horizontal touchpad-axis callback no longer scrolls"
+    );
+    let drag = controller::<gtk::GestureDrag>(&strip);
+    let old = adjustment.value();
+    drag.emit_by_name::<()>("drag-begin", &[&100f64, &40f64]);
+    drag.emit_by_name::<()>("drag-update", &[&-80f64, &0f64]);
+    drag.emit_by_name::<()>("drag-end", &[&-80f64, &0f64]);
+    assert!(
+        adjustment.value() > old,
+        "left-button horizontal drag stopped scrolling"
+    );
+    let selected = Rc::new(Cell::new(None));
+    let clicked = selected.clone();
+    view.on_thumbnail_select(move |index| clicked.set(Some(index)));
+    adjustment.set_value(0.);
+    drag.emit_by_name::<()>("drag-begin", &[&20f64, &20f64]);
+    drag.emit_by_name::<()>("drag-update", &[&0f64, &0f64]);
+    drag.emit_by_name::<()>("drag-end", &[&0f64, &0f64]);
+    button(&row, 1).emit_clicked();
+    assert_eq!(
+        selected.get(),
+        Some(1),
+        "zero-motion drag blocked thumbnail selection"
+    );
+    assert_eq!((picture.width(), picture.height()), viewport);
+    assert_eq!(strip.height_request(), requested_height);
+    assert_eq!(strip.height(), allocated_height);
+    assert_eq!(
+        image_bytes(&window, &picture),
+        before,
+        "overlay changed main image pixels"
+    );
+    resize_until(&window, &picture, 480, 420, || picture.width() < 550);
+    assert_eq!(strip.height_request(), requested_height);
+    assert!(!bar.is_mapped() && !bar.can_target());
+    check_hit_area();
+    window.close();
+    println!(
+        "PASS GTK scrollbar absent/unmapped/non-targetable, bottom-band pick, wheel/both touchpad axes, left drag/zero-motion selection, viewport/height/pixels and resize; NOT TESTED physical GNOME devices"
+    );
+}

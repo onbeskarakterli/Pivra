@@ -446,6 +446,10 @@ fn main() {
         assert!(std::env::args().any(|s| s == "--require-freedesktop"));
         return;
     }
+    if std::env::args().any(|s| s == "--thumbnail-scrollbar-regression") {
+        catalog_probe::scrollbar(&app);
+        return;
+    }
     if std::env::args().any(|s| s == "--thumbnail-scheduler-regression") {
         catalog_probe::scheduler(&app);
         return;

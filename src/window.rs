@@ -265,6 +265,7 @@ pub(super) fn build(app: &adw::Application, settings: &Settings, file: Option<Op
         .default_height(settings.window_height)
         .content(&content)
         .build();
+    pivra::settings::window_state::install(&window, settings);
     if let Some(opened) = file {
         let context = Rc::new(RefCell::new(FileContext {
             collection: MediaCollection::new(vec![opened.item.clone()]),

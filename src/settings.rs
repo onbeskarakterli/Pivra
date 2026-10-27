@@ -16,8 +16,11 @@ impl Default for Settings {
     }
 }
 
-// Only the tiny thumbnail preference is persisted. No schema installation or
+// Small preferences are persisted. No schema installation or
 // new dependency is required by native source builds. UI visibility is not saved.
+#[path = "window_state.rs"]
+pub mod window_state;
+
 use gtk::{gio, glib, prelude::*};
 use std::{
     cell::{Cell, RefCell},

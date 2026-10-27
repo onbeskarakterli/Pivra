@@ -5,6 +5,7 @@ edition = "2024"
 rust-version = "1.85"
 description = "A lightweight GNOME image viewer with seamless photo and video navigation"
 repository = "https://github.com/onbeskarakterli/Pivra"
+license = "GPL-3.0-only"
 publish = false
 
 # Glycin 3.0 gdk integration requires native GTK >= 4.16; libadwaita >= 1.2.

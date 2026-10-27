@@ -1,7 +1,61 @@
-# Pivra
+# Pivra 0.1.0
+
+Pivra is a native Linux image viewer built with GTK4 and libadwaita for GNOME.
+The v0.1.0 scope is **JPEG and PNG still images**; it is full-resolution-only,
+without an early low-resolution preview pipeline.
+
+- Open one local JPEG/PNG path or file URI; decode through secure Glycin/Bubblewrap,
+  with EXIF orientation handling and controlled media errors.
+- Fit, Fill and 100% modes; 100% means one source pixel per GTK logical unit,
+  rather than necessarily one physical display pixel on HiDPI.
+- Cursor-anchored zoom and bounded drag pan. Enable wheel zoom with the Zoom
+  control or `Z`; the default wheel behavior navigates media. Smooth/Nearest
+  filtering reuses the decoded texture.
+- Naturally sorted, nonrecursive folder catalogs; Left/Right navigation stops
+  at the boundaries. Each window has independent selection and loading state.
+- An overlay thumbnail strip with selection/navigation, scrolling, pinning,
+  resizing and saved visibility preferences; GNOME-first provider selection,
+  with Freedesktop fallback and bounded in-memory thumbnail storage.
+- Folder monitoring updates catalog membership. Changes to the selected file
+  produce a Refresh notice; the file is not automatically reloaded.
+- Cancellable asynchronous loading, per-window image cache and adjacent-image
+  preload. Cache accounting is bounded, but is not a hard process-RSS/VRAM cap.
+- Per-window fullscreen through the existing GTK window.
+
+Video entries can appear in the folder catalog, but **video playback and image
+editing are not available**. GIF/WebP/APNG animation is not supported. Other
+catalog candidates do not imply display/decoder support.
+
+This is release preparation on `dev`, not an announcement of a published tag,
+package or GitHub Release. Current Codex checks cover Rust and controlled
+X11/Xvfb and headless Sway regressions; they do **not** establish real GNOME or
+secure Glycin decode acceptance. Historical user-reported Arch results remain
+attributed to the user. Clean native installation and Nautilus acceptance remain
+separate open gates.
+
+See [v0.1.0 release notes](docs/releases/PIVRA_V0.1_RELEASE_NOTES.md),
+[dependency license audit](docs/releases/PIVRA_V0.1_DEPENDENCY_LICENSE_AUDIT.md),
+[roadmap](docs/PIVRA_DEVELOPMENT_ROADMAP.md),
+[technical capabilities](docs/PIVRA_TECHNICAL_CAPABILITIES.md), and
+[historical validation/commit tracker](docs/PIVRA_COMMIT_TRACKER.md).
+
+## License
+
+Pivra is licensed under **GPL-3.0-only**, not GPL-3.0-or-later.
+See the complete, unmodified [GNU GPL version 3 text](LICENSE).
+Dependencies retain their own licenses and distribution notices; see the audit.
+No project copyright holder or contributor ownership has been inferred.
+
+## Retained development history
+
+The following records and links are preserved as historical evidence. Their
+milestone-specific capability, status and license statements are not the
+current release scope.
+
+### Original development introduction
 A fast, lightweight GNOME image viewer with seamless photo and video navigation, smart zoom, and basic editing.
 
-## Development status
+## Historical development snapshot — before release licensing
 
 **PIV-01–17: DONE (PIV-17 user-reported native/manual acceptance); PIV-18: TESTING, on `dev`.**
 Pivra accepts one local JPEG/PNG path or file URI and discovers a naturally ordered
@@ -45,7 +99,7 @@ PIV-09 DONE is backed by **user-reported Arch/GNOME Wayland tests**, including
 active secure-decode cancellation; see the tracker closure at `8991b78`/`c11c7b7`.
 Codex still cannot start the Bwrap decoder under its read-only `/proc` UID-map
 restriction. That environment limitation is separate from the native results.
-Earlier milestone descriptions below are historical; the current status is above.
+This retained development snapshot is historical; use the v0.1.0 introduction and release notes above for current scope.
 
 See [technical capabilities and open prerequisites](docs/PIVRA_TECHNICAL_CAPABILITIES.md) and [verified results and commit evidence](docs/PIVRA_COMMIT_TRACKER.md). PIV-05 is DONE; Phase 0 remains INCOMPLETE because a fresh native environment installation has not been independently reproduced. A clean Cargo target build and the existing headless regressions passed.
 
@@ -187,7 +241,7 @@ The validated source is commit `86a54f7094639d6a75a0c8798d8b48e7a65e8f12`; this 
 
 Earlier audits on 2026-10-20 were BLOCKED by the unavailable execution environment; those historical results are preserved in the tracker and are superseded by the successful run above. The feature specification and roadmap also contain historical pre-code wording; their accepted product decisions remain unchanged.
 
-See the [development roadmap](docs/PIVRA_DEVELOPMENT_ROADMAP.md), [feature specification](docs/PIVRA_FEATURE_SPEC_TR.md), and [commit tracker](docs/PIVRA_COMMIT_TRACKER.md). License selection remains open; no license is assumed. The PIV-01 results above describe the earlier CLI-only bootstrap; PIV-02 intentionally replaces its no-argument placeholder with the GTK window.
+See the [development roadmap](docs/PIVRA_DEVELOPMENT_ROADMAP.md), [feature specification](docs/PIVRA_FEATURE_SPEC_TR.md), and [commit tracker](docs/PIVRA_COMMIT_TRACKER.md). At that historical milestone license selection remained open; the current project license is GPL-3.0-only (see the introduction above). The PIV-01 results above describe the earlier CLI-only bootstrap; PIV-02 intentionally replaces its no-argument placeholder with the GTK window.
 
 
 ### PIV-06 local file input — 2026-10-21

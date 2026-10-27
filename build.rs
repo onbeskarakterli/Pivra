@@ -5,6 +5,14 @@ fn main() {
     println!("cargo:rerun-if-changed=native/thumbnail_factory.c");
     println!("cargo:rerun-if-env-changed=PKG_CONFIG_PATH");
     println!("cargo:rerun-if-env-changed=PKG_CONFIG_SYSROOT_DIR");
+    println!("cargo:rerun-if-env-changed=PIVRA_DISTRIBUTION_BUILD");
+    // Packages compile/install the mandatory sidecar separately. Never bake
+    // their temporary OUT_DIR into the installed viewer's runtime fallback.
+    if env::var_os("PIVRA_DISTRIBUTION_BUILD").is_some_and(|value| value == "1") {
+        println!("cargo:rustc-env=PIVRA_BUILT_THUMBNAIL_FACTORY=");
+        println!("cargo:warning=Distribution build: thumbnail helper resolved at runtime");
+        return;
+    }
     let output = PathBuf::from(env::var_os("OUT_DIR").unwrap()).join("pivra-thumbnail-factory");
     for module in ["gnome-desktop-4", "gnome-desktop-3.0"] {
         let Ok(flags) = Command::new("pkg-config")

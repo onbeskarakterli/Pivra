@@ -123,8 +123,8 @@ still require final delivery review; merely copying a GPL text is insufficient.
 
 - Approved main source/archive/hash; actual generated .SRCINFO.
 - Verified Arch runtime and helper API package ownership; makepkg clean build.
-- Current absolute OUT_DIR fallback can affect binary byte reproducibility;
-  sibling installation solves discovery, not bit-identical builds.
+- Distribution builds now suppress the OUT_DIR helper fallback as described
+  below; whole-artifact bit reproducibility still requires two clean builds.
 - Real GNOME menu/Nautilus/icon acceptance, secure JPEG/PNG/EXIF decode and
   GNOME generation / independent Freedesktop fallback.
 - Actual pacman install/upgrade/remove: package-owned /usr files only;
@@ -156,3 +156,79 @@ native helper compile is claimed in Codex; the reported Arch result is the
 user's evidence. Release source approval, actual .SRCINFO/makepkg artifact,
 remaining native provider ownership and install/remove/upgrade gates remain
 open. B5 remains NO-GO.
+
+## Distribution-only helper-path policy — after Arch OUT_DIR finding
+
+The user reports real Arch makepkg PASS and 186 Rust tests PASS, but an absolute
+`.../out/pivra-thumbnail-factory` path embedded in the installed viewer. This
+report is user-provided native evidence, not an independent Codex package build.
+
+`PIVRA_DISTRIBUTION_BUILD=1` is now exported in both build() and check(). In
+build.rs this explicit value emits an empty PIVRA_BUILT_THUMBNAIL_FACTORY and
+skips the optional development-side helper compilation. The PKGBUILD's separate
+mandatory real-GNOME4 C helper build remains in place. check() uses the same
+policy so test compilation cannot silently restore a development-path binary.
+The flag is registered with cargo:rerun-if-env-changed; switching back to a
+normal development build reruns the policy without requiring cargo clean.
+
+Normal builds (unset or non-1 flag) keep the existing optional API-checked
+helper and absolute development fallback. Runtime generation_helper() is
+unchanged: explicit PIVRA_THUMBNAIL_GENERATOR override, then current_exe sibling,
+then a nonempty compiled development fallback. Installed `/usr/bin/pivra` thus
+still finds `/usr/bin/pivra-thumbnail-factory`; no libexec or security fallback
+is added. No loader, provider priority, sandbox, C helper or cancellation code
+changes are made.
+
+After release Cargo build, the recipe reads the actual viewer bytes and fails
+if `/out/pivra-thumbnail-factory` is found. This detects the concrete Cargo
+OUT_DIR helper leak; it is not a guarantee that all debug/source paths or every
+possible reproducibility difference have disappeared. Whole-package source
+materials intentionally retain source code and packaging documents mentioning
+the helper; scanning those is not the same as scanning the executable.
+
+Targeted tests compile the actual build.rs with controlled pkg-config/cc tools,
+then compile the exact generation_helper() body read from production source.
+They verify development fallback bytes/precedence, empty distribution fallback,
+absence of its path in that test binary, sibling/override behavior, missing-API
+behavior and explicit opt-in. These controlled tools do not claim GNOME API,
+real factory generation or secure decode PASS. A real Cargo distribution-mode
+debug viewer is also built and byte-scanned in Codex; it is not an Arch release
+artifact. Current results are recorded in the task delivery report.
+
+### Required Arch revalidation (not performed in Codex)
+
+1. Use the newly approved source revision/hash in the real local packaging
+   workflow; do not bypass the existing source approval or SHA-256 checks.
+   Clean-build the updated recipe on Arch with mandatory helper compilation and
+   package checks enabled. Verify check() does not re-embed the fallback.
+2. Inspect **the viewer executable**, first in the release target, then extracted
+   from the actual pivra package, and finally installed at /usr/bin/pivra.
+   The recipe's byte guard must pass in each relevant artifact. For the installed
+   binary a read-only equivalent is:
+
+   ```bash
+   python - /usr/bin/pivra <<'PY'
+   import pathlib, sys
+   binary = pathlib.Path(sys.argv[1]).read_bytes()
+   if b'/out/pivra-thumbnail-factory' in binary:
+       sys.exit('FAIL: Cargo OUT_DIR helper path embedded')
+   print('PASS: no Cargo OUT_DIR helper path')
+   PY
+   test -x /usr/bin/pivra-thumbnail-factory
+   ```
+
+3. Remove/move only the private build tree or test in a fresh VM without it;
+   unset PIVRA_THUMBNAIL_GENERATOR and other SDK overrides. Launch installed
+   Pivra from the menu/terminal and prove GNOME generation through its installed
+   sibling with private test media/cache. A present executable is not generation
+   PASS. Keep normal error/cancellation/other-window regressions.
+4. Repeat install/remove/upgrade and data-preservation acceptance; compare two
+   clean artifacts if claiming full bit reproducibility. This small path fix
+   does not close all B5/native release gates.
+
+Local result (2026-10-28): fmt/check PASS; cargo test --locked 186 PASS;
+thumbnail Python suite 41 PASS (four new build/resolver policy tests included).
+Real Cargo distribution-mode debug build and byte scan PASS. The exact recipe
+artifact guard accepts a clean controlled file and rejects a leaked-path file;
+Bash syntax and missing-source-approval negative checks PASS. Actual updated
+Arch release package bytes and installed-helper generation remain NOT RUN here.

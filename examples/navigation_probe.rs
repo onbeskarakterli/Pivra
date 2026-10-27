@@ -10,7 +10,7 @@ mod input;
 mod window;
 
 use adw::prelude::*;
-use gtk::{gdk, glib};
+use gtk::{gdk, gio, glib};
 use std::{
     path::Path,
     sync::atomic::{AtomicBool, Ordering},
@@ -97,7 +97,17 @@ fn key(window: &adw::ApplicationWindow, right: bool) {
 
 fn open(app: &adw::Application, path: &Path, count: usize) -> adw::ApplicationWindow {
     let previous = app.windows();
-    let input = input::OpenedFile::from_argument(path.as_os_str()).unwrap();
+    let input = if path.extension().is_some_and(|e| e == "mp4") {
+        // Exercise the existing window video state directly. The CLI still
+        // rejects video arguments; do not broaden its photo-only boundary.
+        assert!(input::OpenedFile::from_argument(path.as_os_str()).is_err());
+        input::OpenedFile {
+            file: gio::File::for_path(path),
+            item: pivra::media::MediaItem::new(path, pivra::media::MediaKind::Video),
+        }
+    } else {
+        input::OpenedFile::from_argument(path.as_os_str()).unwrap()
+    };
     assert_eq!(input.file.path().as_deref(), Some(path));
     window::build(app, &pivra::settings::Settings::default(), Some(input));
     let result = app
@@ -305,10 +315,10 @@ fn main() {
     key(&second, true);
     assert_eq!(picture(&second).paintable(), survivor);
     assert_eq!(status(&second).text(), survivor_status);
-    // Scanner snapshot intentionally retains this now-deleted private file.
-    key(&first, false);
-    title(&first, "2.mp4", 6);
-    video(&first);
+    let direct_video = open(&app, &root.join("2.mp4"), 6);
+    video(&direct_video);
+    direct_video.close();
+    wait(|| !direct_video.is_visible());
     key(&first, false);
     title(&first, "1.png", 6);
     image(&first, blocked, (1600, 1200));
@@ -324,9 +334,13 @@ fn main() {
     }
     title(&first, "1.png", 6);
     image(&first, blocked, (1600, 1200));
-    key(&first, true);
-    video(&first);
-    key(&first, true);
+    let next_button = widgets(first.upcast_ref())
+        .into_iter()
+        .filter_map(|widget| widget.downcast::<gtk::Button>().ok())
+        .find(|button| button.action_name().as_deref() == Some("win.next-media"))
+        .expect("production next-media arrow");
+    assert!(next_button.is_sensitive());
+    next_button.emit_clicked();
     title(&first, "10.jpg", 6);
     image(&first, blocked, (64, 32));
     key(&first, true);

@@ -77,6 +77,37 @@ impl MediaCollection {
         self.selected.and_then(|index| self.items.get(index))
     }
 
+    /// Find the next displayable v0.1 photo without changing catalog order or
+    /// selection. A bounded scan stops at the edge; navigation never wraps.
+    pub fn photo_target(&self, forward: bool) -> Option<usize> {
+        let supported = |index: &usize| {
+            let item = &self.items[*index];
+            item.kind() == crate::media::MediaKind::Image
+                && item
+                    .path()
+                    .extension()
+                    .and_then(|e| e.to_str())
+                    .is_some_and(|e| {
+                        ["jpg", "jpeg", "png"]
+                            .iter()
+                            .any(|s| e.eq_ignore_ascii_case(s))
+                    })
+        };
+        if forward {
+            let start = self.selected.map_or(0, |index| index + 1);
+            (start..self.items.len()).find(supported)
+        } else {
+            (0..self.selected.unwrap_or(self.items.len()))
+                .rev()
+                .find(supported)
+        }
+    }
+
+    pub fn select_photo(&mut self, forward: bool) -> bool {
+        self.photo_target(forward)
+            .is_some_and(|index| self.select(index))
+    }
+
     /// Move one step without wrapping. False means selection did not change.
     pub fn select_previous(&mut self) -> bool {
         if self.selected.is_none() {
@@ -300,5 +331,57 @@ mod neighbor_tests {
                 .photo_neighbors()
                 .is_empty()
         );
+    }
+}
+
+#[cfg(test)]
+mod photo_navigation_tests {
+    use super::*;
+    use crate::media::MediaKind::{Image, Video};
+
+    #[test]
+    fn skips_consecutive_videos_and_unsupported_images_without_removing_entries() {
+        let items = vec![
+            MediaItem::new("1.png", Image),
+            MediaItem::new("2.mp4", Video),
+            MediaItem::new("3.webm", Video),
+            MediaItem::new("4.webp", Image),
+            MediaItem::new("10.JPEG", Image),
+            MediaItem::new("11.mp4", Video),
+        ];
+        let mut c = MediaCollection::new(items.clone());
+        assert!(c.select_photo(true));
+        assert_eq!(c.selected_index(), Some(4));
+        assert!(!c.select_photo(true));
+        assert_eq!(c.selected_index(), Some(4));
+        assert!(c.select_photo(false));
+        assert_eq!(c.selected_index(), Some(0));
+        assert!(!c.select_photo(false));
+        assert_eq!(c.items(), items);
+        // Direct opening/selection is unchanged, including unsupported video.
+        assert!(c.select(2));
+        assert_eq!(c.current().unwrap().kind(), Video);
+        assert!(c.select_photo(false));
+        assert_eq!(c.selected_index(), Some(0));
+    }
+
+    #[test]
+    fn no_supported_neighbor_preserves_selection_and_finishes() {
+        for items in [
+            vec![],
+            vec![MediaItem::new("only.png", Image)],
+            vec![
+                MediaItem::new("1.mp4", Video),
+                MediaItem::new("2.mp4", Video),
+            ],
+        ] {
+            let mut c = MediaCollection::new(items);
+            let initial = c.selected_index();
+            for _ in 0..100 {
+                assert!(!c.select_photo(true));
+                assert!(!c.select_photo(false));
+                assert_eq!(c.selected_index(), initial);
+            }
+        }
     }
 }

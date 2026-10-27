@@ -66,13 +66,14 @@ fn update_title(window: &adw::ApplicationWindow, title: &adw::WindowTitle, conte
 // Keep the on-image arrow buttons in sync with the same catalog actions as
 // the Left/Right keyboard shortcuts, including asynchronous folder updates.
 fn update_navigation_actions(window: &adw::ApplicationWindow, context: &FileContext) {
-    let selected = context.collection.selected_index();
-    let count = context.collection.items().len();
     for (name, enabled) in [
-        ("previous-media", selected.is_some_and(|index| index > 0)),
+        (
+            "previous-media",
+            context.collection.photo_target(false).is_some(),
+        ),
         (
             "next-media",
-            selected.is_some_and(|index| index + 1 < count),
+            context.collection.photo_target(true).is_some(),
         ),
     ] {
         if let Some(action) = window
@@ -440,11 +441,7 @@ pub(super) fn build(app: &adw::Application, settings: &Settings, file: Option<Op
                     return;
                 };
                 let mut context = context.borrow_mut();
-                let changed = if forward {
-                    context.collection.select_next()
-                } else {
-                    context.collection.select_previous()
-                };
+                let changed = context.collection.select_photo(forward);
                 if changed {
                     context.revision = context.revision.wrapping_add(1);
                     banner.set_reveal_child(false);

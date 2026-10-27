@@ -49,17 +49,14 @@ def main():
                 first, second = windows
                 press(first, 'Tab')  # focus traversal must not disable window capture
                 press(first, 'Left'); selected(processes[0], first, '1.png')
-                press(first, 'Right'); selected(processes[0], first, '2.mp4')
                 press(first, 'Right'); selected(processes[0], first, '10.jpg')
                 press(first, 'Right'); selected(processes[0], first, '10.jpg')
                 press(first, 'ctrl+Left'); selected(processes[0], first, '10.jpg')
                 for _ in range(6):
-                    press(first, 'Left'); selected(processes[0], first, '2.mp4')
                     press(first, 'Left'); selected(processes[0], first, '1.png')
-                    press(first, 'Right'); selected(processes[0], first, '2.mp4')
                     press(first, 'Right'); selected(processes[0], first, '10.jpg')
                 selected(processes[1], second, '10.jpg')
-                press(second, 'Left'); selected(processes[1], second, '2.mp4')
+                press(second, 'Left'); selected(processes[1], second, '1.png')
                 selected(processes[0], first, '10.jpg')
                 for index, (process, window) in enumerate(zip(processes, windows)):
                     request_close(window)
@@ -72,7 +69,7 @@ def main():
                 assert not any(s in diagnostics for s in ('panicked', 'CRITICAL', 'Image worker failed')), diagnostics
                 for name, payload in original.items():
                     assert (root / name).read_bytes() == payload
-                print('PASS real X11 arrow events after Tab: 1/photo -> 2/video -> 10/photo, boundaries, Ctrl filtering, rapid alternation, independent windows, normal close')
+                print('PASS real X11 arrow events after Tab: 1/photo -> skip 2/video -> 10/photo, boundaries, Ctrl filtering, rapid alternation, independent windows, normal close')
                 print('NOT TESTED real image pixels/Fit; controlled loader errors permitted in this scoped test')
             finally:
                 for process in processes:

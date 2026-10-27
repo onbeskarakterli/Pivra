@@ -32,6 +32,8 @@ pub enum Outcome {
     SourceUnavailable(String),
     Cancelled,
     Busy,
+    /// A completed helper attempt exceeded its bounded deadline, not admission.
+    TimedOut,
     UnsupportedDesktop,
 }
 #[derive(Debug)]
@@ -316,7 +318,18 @@ pub fn generation_helper() -> Option<PathBuf> {
 /// Worker-only, cache first. A failed attempt is terminal until source/catalog
 /// invalidation; no implicit retries and no persistent failure marker on sandbox errors.
 pub fn query_or_generate(provider: &Provider, path: &Path, cancel: &gio::Cancellable) -> Outcome {
+    crate::thumbnail_diagnostics::trace("gnome-query", Some(path), "cache lookup");
     let outcome = provider.query(path, cancel);
+    match &outcome {
+        Outcome::Hit(_) => {
+            crate::thumbnail_diagnostics::trace("gnome-query-result", Some(path), "cache-hit")
+        }
+        _ => crate::thumbnail_diagnostics::trace(
+            "gnome-query-result",
+            Some(path),
+            format_args!("{outcome:?}"),
+        ),
+    }
     // Corrupt PNG caches are recoverable via the GNOME factory. Do not
     // regenerate for unrelated validation failures (unsafe path, oversized
     // cache, unavailable source, etc.).
@@ -326,9 +339,6 @@ pub fn query_or_generate(provider: &Provider, path: &Path, cancel: &gio::Cancell
             "PNG CRC bounds" | "PNG CRC" | "PNG IHDR" | "thumbnail edge bound" |
             "duplicate IHDR" | "PNG ending" | "PNG chunk count" | "PNG overflow"));
     if !matches!(outcome, Outcome::Missing | Outcome::Stale) && !corrupt_png {
-        if std::env::var_os("PIVRA_TRACE_GNOME_THUMB").is_some() {
-            eprintln!("PIVRA_GNOME_THUMB skip generation: {outcome:?}");
-        }
         return outcome;
     }
     // GIO may classify malformed existing normal-cache PNGs as Missing.
@@ -349,17 +359,18 @@ pub fn query_or_generate(provider: &Provider, path: &Path, cancel: &gio::Cancell
     };
     let force = matches!(outcome, Outcome::Stale) || corrupt_png || existing_normal;
     let Some(helper) = generation_helper() else {
-        if std::env::var_os("PIVRA_TRACE_GNOME_THUMB").is_some() {
-            eprintln!("PIVRA_GNOME_THUMB missing GNOME helper; outcome={outcome:?}");
-        }
+        crate::thumbnail_diagnostics::trace(
+            "helper-missing",
+            Some(path),
+            format_args!("outcome={outcome:?}"),
+        );
         return outcome;
     };
-    if std::env::var_os("PIVRA_TRACE_GNOME_THUMB").is_some() {
-        eprintln!(
-            "PIVRA_GNOME_THUMB invoke helper={} force={force} outcome={outcome:?}",
-            helper.display()
-        );
-    }
+    crate::thumbnail_diagnostics::trace(
+        "helper-invoke",
+        Some(path),
+        format_args!("helper={} force={force}", helper.display()),
+    );
     let source = match FileKey::read(path) {
         Ok(key) => key,
         Err(e) => return Outcome::SourceUnavailable(e.to_string()),
@@ -382,25 +393,23 @@ pub fn query_or_generate(provider: &Provider, path: &Path, cancel: &gio::Cancell
     else {
         return Outcome::Missing;
     };
-    match generate(
+    let result = generate(
         &helper,
         file.uri().as_str(),
         &mime,
         info.attribute_uint64("time::modified"),
         force,
         cancel,
-    ) {
+    );
+    crate::thumbnail_diagnostics::trace("helper-result", Some(path), format_args!("{result:?}"));
+    match result {
         Ok(()) if FileKey::read(path).ok().as_ref() == Some(&source) => {
             provider.query(path, cancel)
         }
         Ok(()) => Outcome::Stale,
         Err(_) if cancel.is_cancelled() => Outcome::Cancelled,
-        Err(error) => {
-            if std::env::var_os("PIVRA_TRACE_GNOME_THUMB").is_some() {
-                eprintln!("PIVRA_GNOME_THUMB helper failed: {error}");
-            }
-            Outcome::Invalid(error)
-        }
+        Err(error) if error == "GNOME factory timed out" => Outcome::TimedOut,
+        Err(error) => Outcome::Invalid(error),
     }
 }
 struct FactoryScratch(PathBuf);
@@ -473,7 +482,12 @@ fn generate(
                 .status();
             let _ = child.kill();
             let _ = child.wait();
-            return Err("GNOME factory cancelled/timed out".into());
+            return Err(if cancel.is_cancelled() {
+                "GNOME factory cancelled"
+            } else {
+                "GNOME factory timed out"
+            }
+            .into());
         }
         match child.try_wait() {
             Ok(Some(status)) => {

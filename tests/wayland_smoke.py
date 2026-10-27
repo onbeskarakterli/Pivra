@@ -128,6 +128,10 @@ def main():
                         args.append("--synthetic")
                     if "--controlled-navigation" in sys.argv[2:]:
                         args.append("--controlled-navigation")
+                    if "--thumbnail-scheduler" in sys.argv[2:]:
+                        args.append("--thumbnail-scheduler-regression")
+                        env["XDG_CURRENT_DESKTOP"] = "GNOME"
+                        env["PIVRA_THUMBNAIL_GENERATOR"] = str(root / "config" / "fixture-helper.py")
                     if "--thumbnail-catalog" in sys.argv[2:]:
                         args.append("--catalog-regression")
                     if "--thumbnail-retention" in sys.argv[2:]:

@@ -21,6 +21,7 @@ mod render_frame;
 mod window;
 static CORRUPT_DURING_LOAD: std::sync::atomic::AtomicBool =
     std::sync::atomic::AtomicBool::new(false);
+static THUMB_FAIL_PATH: std::sync::Mutex<Option<std::path::PathBuf>> = std::sync::Mutex::new(None);
 static THUMB_LOADS: AtomicUsize = AtomicUsize::new(0);
 static THUMB_ORDER: std::sync::Mutex<Vec<std::path::PathBuf>> = std::sync::Mutex::new(Vec::new());
 struct ThumbAttempt {
@@ -132,7 +133,9 @@ mod image_loader {
             });
             index
         };
-        let result = if std::env::args().any(|s| s == "--native-thumbnails") {
+        let result = if THUMB_FAIL_PATH.lock().unwrap().as_deref() == Some(p) {
+            Err("controlled terminal thumbnail decode error".into())
+        } else if std::env::args().any(|s| s == "--native-thumbnails") {
             native_image_loader::preload(p, c, budget)
                 .await
                 .map(LoadedFrame::Native)
@@ -441,6 +444,10 @@ fn main() {
     }
     if std::env::args().any(|s| s == "--fd06-overlay-regression") {
         assert!(std::env::args().any(|s| s == "--require-freedesktop"));
+        return;
+    }
+    if std::env::args().any(|s| s == "--thumbnail-scheduler-regression") {
+        catalog_probe::scheduler(&app);
         return;
     }
     if std::env::args().any(|s| s == "--catalog-regression") {

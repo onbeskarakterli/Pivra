@@ -998,3 +998,136 @@ mod attempt_tests {
         );
     }
 }
+
+// Controlled GTK/GIO/admission test, no helper generation or native decode.
+pub(super) fn scheduler(app: &adw::Application) {
+    use pivra::thumbnail_manager::{Manager, Permit};
+    assert_eq!(
+        Manager::session().id(),
+        pivra::thumbnail_provider::ProviderId::Gnome,
+        "run this controlled cache/failure scenario with XDG_CURRENT_DESKTOP=GNOME"
+    );
+    let root = tempfile::tempdir().unwrap();
+    let photos: Vec<_> = (0..24)
+        .map(|index| {
+            let path = root.path().join(format!("scheduler-{index}.png"));
+            std::fs::write(
+                &path,
+                include_bytes!("../../tests/fixtures/images/wide.png"),
+            )
+            .unwrap();
+            cache(&path);
+            (index, path)
+        })
+        .collect();
+    let first = Permit::take(&root.path().join("occupied-1")).unwrap();
+    let second = Permit::take(&root.path().join("occupied-2")).unwrap();
+    *THUMB_FAIL_PATH.lock().unwrap() = Some(cache_path(&photos[15].1));
+    // Helper fixture times out once, then publishes a test-only prebuilt cache.
+    // No real GNOME API or decoder success is claimed.
+    let helper = PathBuf::from(
+        std::env::var_os("PIVRA_THUMBNAIL_GENERATOR")
+            .expect("private helper fixture path required"),
+    );
+    assert_eq!(helper.parent(), Some(glib::user_config_dir().as_path()));
+    let backup = root.path().join("recovered-cache.png");
+    std::fs::rename(cache_path(&photos[16].1), &backup).unwrap();
+    let stamp = root.path().join("helper-attempts");
+    let script = format!(
+        "#!/usr/bin/python3\nfrom pathlib import Path\nimport time, shutil\ns=Path({:?})\nif not s.exists():\n s.write_text('1')\n time.sleep(30)\nelse:\n s.write_text('2')\n shutil.copyfile({:?}, {:?})\n print('generated')\n",
+        stamp.to_str().unwrap(),
+        backup.to_str().unwrap(),
+        cache_path(&photos[16].1).to_str().unwrap()
+    );
+    use std::io::Write;
+    use std::os::unix::fs::PermissionsExt;
+    let mut file = std::fs::OpenOptions::new()
+        .write(true)
+        .create_new(true)
+        .open(&helper)
+        .unwrap();
+    file.write_all(script.as_bytes()).unwrap();
+    file.set_permissions(std::fs::Permissions::from_mode(0o700))
+        .unwrap();
+    drop(file);
+    let (window, view, picture) = open(app);
+    view.set_thumbnail_catalog(&photos, Some(0));
+    view.finish_initial_thumbnail_catalog(Some(0));
+    set_enabled(&view, true);
+    let row: gtk::Box = find(view.widget().upcast_ref(), "thumbnail-items");
+    let strip: gtk::ScrolledWindow = find(view.widget().upcast_ref(), "thumbnail-strip");
+    until(|| count(&row) == 24 && view.thumbnail_stats().started >= 2);
+    assert_eq!(
+        THUMB_LOADS.load(Ordering::SeqCst),
+        0,
+        "Busy must not start decoders"
+    );
+    assert_eq!(Permit::active_count(), 2);
+    drop(first);
+    drop(second);
+    let has_pixels = |index| {
+        let content = button(&row, index).child().unwrap();
+        widgets_with_picture(&content)
+    };
+    until(|| has_pixels(0) && has_pixels(1));
+    let adjustment = strip.hadjustment();
+    adjustment.set_value((adjustment.upper() - adjustment.page_size()).max(0.));
+    image_bytes(&window, &picture);
+    until(|| has_pixels(23));
+    until(|| view.thumbnail_stats().completed == 24 && !view.thumbnail_stats().running);
+    assert_eq!(view.thumbnail_stats().failed, 1);
+    for index in (0..24).filter(|n| *n != 15) {
+        assert!(has_pixels(index), "lost thumbnail {index}");
+    }
+    let failures = || {
+        THUMB_ATTEMPTS
+            .lock()
+            .unwrap()
+            .iter()
+            .filter(|a| a.path == cache_path(&photos[15].1))
+            .count()
+    };
+    assert_eq!(failures(), 1);
+    assert_eq!(
+        std::fs::read_to_string(&stamp).unwrap(),
+        "2",
+        "transient helper timeout must retry exactly once"
+    );
+    assert_eq!(
+        THUMB_ATTEMPTS
+            .lock()
+            .unwrap()
+            .iter()
+            .filter(|a| a.path == cache_path(&photos[16].1))
+            .count(),
+        1,
+        "timed-out generation must not start a cache decoder"
+    );
+    view.set_thumbnail_catalog(&photos, Some(15));
+    pause(180);
+    assert_eq!(
+        failures(),
+        1,
+        "permanent error entered an automatic retry loop"
+    );
+    assert_eq!(Permit::active_count(), 0);
+    assert!(view.thumbnail_stats().bytes <= 16 * 1024 * 1024);
+    window.close();
+    *THUMB_FAIL_PATH.lock().unwrap() = None;
+    println!(
+        "PASS controlled thumbnail scheduler: Busy holds no decode, visible completion, scroll-to-new-viewport, one transient retry, permanent error once, permits drained; NOT TESTED real GNOME generation/Glycin"
+    );
+}
+fn widgets_with_picture(widget: &gtk::Widget) -> bool {
+    if let Ok(picture) = widget.clone().downcast::<gtk::Picture>() {
+        return picture.paintable().is_some();
+    }
+    let mut child = widget.first_child();
+    while let Some(w) = child {
+        if widgets_with_picture(&w) {
+            return true;
+        }
+        child = w.next_sibling();
+    }
+    false
+}

@@ -143,8 +143,32 @@ impl Manager {
             return Err(Error::Cancelled);
         }
         let deadline = Instant::now() + Duration::from_secs(90);
-        let permit = Permit::take(path).ok_or(Error::Busy)?;
-        let resolved = self.resolve_admitted(path, cancel, &permit, deadline)?;
+        crate::thumbnail_diagnostics::trace(
+            "resolve-start",
+            Some(path),
+            format_args!("provider={:?} active={}", self.id, Permit::active_count()),
+        );
+        let permit = Permit::take(path).ok_or_else(|| {
+            crate::thumbnail_diagnostics::trace(
+                "admission-busy",
+                Some(path),
+                format_args!("active={}", Permit::active_count()),
+            );
+            Error::Busy
+        })?;
+        let resolved = self.resolve_admitted(path, cancel, &permit, deadline);
+        crate::thumbnail_diagnostics::trace(
+            "resolve-result",
+            Some(path),
+            match &resolved {
+                Ok(Resolved::Cache(_)) => "cache".to_string(),
+                Ok(Resolved::Memory(_)) => "memory".into(),
+                Ok(Resolved::Published(..)) => "published".into(),
+                Ok(Resolved::Unavailable(o)) => format!("unavailable: {o:?}"),
+                Err(e) => format!("error: {e:?}"),
+            },
+        );
+        let resolved = resolved?;
         Ok(Response {
             resolved,
             _permit: permit,
@@ -171,6 +195,7 @@ impl Manager {
                 CacheOutcome::Hit(c) => Ok(Resolved::Cache(c)),
                 CacheOutcome::Cancelled => Err(Error::Cancelled),
                 CacheOutcome::Busy => Err(Error::Busy),
+                CacheOutcome::TimedOut => Err(Error::TimedOut),
                 outcome => Ok(Resolved::Unavailable(outcome)),
             };
         }

@@ -40,6 +40,7 @@ struct Entry {
     keys: Option<(FileKey, Option<FileKey>)>,
     cost: usize,
     used: u64,
+    failure_retries: u8,
 }
 type Selection = Box<dyn Fn(usize)>;
 struct Active {
@@ -68,9 +69,11 @@ struct Inner {
     frames: RefCell<Option<(gdk::FrameClock, glib::SignalHandlerId)>>,
     validation: RefCell<Option<gio::Cancellable>>,
     warming: RefCell<Option<gio::Cancellable>>,
+    warming_paths: RefCell<Vec<PathBuf>>,
     warm_again: Cell<bool>,
     button_clicks: Cell<u64>,
     cell_size: Cell<(i32, i32)>,
+    diagnostic_blocked: Cell<Option<&'static str>>,
 }
 #[derive(Debug, Default)]
 pub(crate) struct ThumbnailStats {
@@ -109,9 +112,11 @@ impl ThumbnailStrip {
             frames: RefCell::new(None),
             validation: RefCell::new(None),
             warming: RefCell::new(None),
+            warming_paths: RefCell::new(Vec::new()),
             warm_again: Cell::new(false),
             button_clicks: Cell::new(0),
             cell_size: Cell::new((CELL_WIDTH, CELL_HEIGHT)),
+            diagnostic_blocked: Cell::new(None),
         });
         let weak = Rc::downgrade(&inner);
         inner.scroller.connect_map(move |strip| {
@@ -362,6 +367,16 @@ impl ThumbnailStrip {
     /// revealing a hidden strip or disturbing already-visible thumbnails.
     pub(crate) fn set_catalog(&self, photos: &[(usize, PathBuf)], selected: Option<usize>) {
         let i = &self.0;
+        pivra::thumbnail_diagnostics::trace(
+            "catalog",
+            None,
+            format_args!(
+                "strip={:p} entries={} selected={selected:?} mapped={}",
+                Rc::as_ptr(i),
+                photos.len(),
+                i.scroller.is_mapped()
+            ),
+        );
         let changed = i.selected.replace(selected) != selected;
         if changed {
             i.last_visible.set(None);
@@ -402,6 +417,7 @@ impl ThumbnailStrip {
                     keys: None,
                     cost: 0,
                     used: 0,
+                    failure_retries: 0,
                 });
                 entry.index.set(*index);
                 if entry.phase == Phase::Loading {
@@ -509,6 +525,10 @@ impl Inner {
         }
         let token = gio::Cancellable::new();
         self.warming.replace(Some(token.clone()));
+        self.warming_paths.replace(paths.clone());
+        for path in &paths {
+            trace("hidden-owned", path);
+        }
         let worker_token = token.clone();
         let scale = self.scroller.scale_factor().clamp(1, 2);
         let epoch = self.epoch.get();
@@ -541,8 +561,19 @@ impl Inner {
                     }
                     Err(Error::Busy) => Work::Busy,
                     Err(Error::Cancelled) => Work::Cancelled,
-                    Err(_) => Work::Failed("Thumbnail unavailable".into()),
+                    Err(error) => provider_failure(error),
                 };
+                pivra::thumbnail_diagnostics::trace(
+                    "hidden-result",
+                    Some(&path),
+                    match &work {
+                        Work::Hit(..) => "hit".to_string(),
+                        Work::Busy => "busy; visible admission may retry".into(),
+                        Work::Cancelled => "cancelled".into(),
+                        Work::Failed(e) => format!("permanent/unknown failure: {e}"),
+                        Work::TransientFailure(e) => format!("transient failure: {e}"),
+                    },
+                );
                 results.push((path, work));
             }
             results
@@ -558,15 +589,50 @@ impl Inner {
                 // A completed worker must release ONLY its own admission, even
                 // when revalidation has advanced the catalog epoch.
                 i.warming.borrow_mut().take();
+                i.warming_paths.borrow_mut().clear();
                 if token.is_cancelled() || i.closed.get() || i.epoch.get() != epoch {
                     i.warm_again.set(false);
                     if !i.closed.get() && !i.scroller.is_mapped() && i.initialized.get() {
                         i.warm_hidden();
+                    } else if !i.closed.get() && i.scroller.is_mapped() {
+                        i.scroller.queue_draw();
+                        i.drive();
                     }
                     return;
                 }
                 let mut entries = i.entries.borrow_mut();
                 for (path, work) in results {
+                    if !matches!(work, Work::Hit(..)) {
+                        if let Some(entry) = entries
+                            .iter_mut()
+                            .find(|e| e.path == path && e.phase == Phase::Pending)
+                        {
+                            match &work {
+                                Work::TransientFailure(error) => {
+                                    if !retry_failure_once(&mut entry.failure_retries) {
+                                        entry.phase = Phase::Failed;
+                                    }
+                                    pivra::thumbnail_diagnostics::trace(
+                                        "hidden-transient",
+                                        Some(&path),
+                                        error,
+                                    );
+                                }
+                                Work::Failed(error) => {
+                                    entry.phase = Phase::Failed;
+                                    pivra::thumbnail_diagnostics::trace(
+                                        "hidden-terminal-failure",
+                                        Some(&path),
+                                        error,
+                                    );
+                                }
+                                // Admission and cancellation are not failed generation.
+                                Work::Busy | Work::Cancelled => {}
+                                Work::Hit(..) => unreachable!(),
+                            }
+                        }
+                        continue;
+                    }
                     if let Work::Hit(texture, source, cache, decoded_cost) = work {
                         let cost =
                             display_cost(texture.width(), texture.height()).unwrap_or(usize::MAX);
@@ -681,6 +747,7 @@ impl Inner {
                 .filter(|e| dirty.contains(&e.path))
             {
                 e.phase = Phase::Pending;
+                e.failure_retries = 0;
                 e.texture = None;
                 e.keys = None;
                 e.cost = 0;
@@ -902,13 +969,29 @@ impl Inner {
     }
 
     fn drive(self: &Rc<Self>) {
-        if self.closed.get()
-            || !self.scroller.is_mapped()
-            || self.building.borrow().is_some()
-            || self.initial.get().is_some()
-            || self.retry.borrow().is_some()
-            || self.validation.borrow().is_some()
-        {
+        let blocked = if self.closed.get() {
+            Some("closed")
+        } else if !self.scroller.is_mapped() {
+            Some("unmapped")
+        } else if self.building.borrow().is_some() {
+            Some("building-cells")
+        } else if self.initial.get().is_some() {
+            Some("initial-alignment")
+        } else if self.retry.borrow().is_some() {
+            Some("retry-yield")
+        } else if self.validation.borrow().is_some() {
+            Some("validation")
+        } else {
+            None
+        };
+        if self.diagnostic_blocked.replace(blocked) != blocked {
+            pivra::thumbnail_diagnostics::trace(
+                "scheduler-state",
+                None,
+                format_args!("strip={:p} blocked={blocked:?}", Rc::as_ptr(self)),
+            );
+        }
+        if blocked.is_some() {
             return;
         }
         let mut entries = self.entries.borrow_mut();
@@ -932,15 +1015,20 @@ impl Inner {
                 }
             }
         }
+        // Hidden work owns these requests until its outcomes (and retry budget)
+        // are published. Do not issue a duplicate visible attempt in that gap.
+        let warming = self.warming.borrow().is_some();
+        let warming_paths = self.warming_paths.borrow();
+        let pending = |n: usize| {
+            entries[n].phase == Phase::Pending
+                && (!warming || !warming_paths.contains(&entries[n].path))
+        };
         let next = selected
-            .filter(|&n| entries[n].phase == Phase::Pending)
-            .or_else(|| {
-                visible
-                    .clone()
-                    .find(|&n| entries[n].phase == Phase::Pending)
-            })
-            .or_else(|| near.clone().find(|&n| entries[n].phase == Phase::Pending))
-            .or_else(|| entries.iter().position(|e| e.phase == Phase::Pending));
+            .filter(|&n| pending(n))
+            .or_else(|| visible.clone().find(|&n| pending(n)))
+            .or_else(|| near.clone().find(|&n| pending(n)))
+            .or_else(|| (0..entries.len()).find(|&n| pending(n)));
+        drop(warming_paths);
         if let Some(active) = self.active.borrow().as_ref() {
             if let Some(next) = next {
                 if !active.token.is_cancelled()
@@ -984,6 +1072,7 @@ impl Inner {
         let worker_path = path.clone();
         let worker_token = token.clone();
         let job = gio::spawn_blocking(move || {
+            trace("worker-start", &worker_path);
             if worker_token.is_cancelled() {
                 return Work::Cancelled;
             }
@@ -991,7 +1080,7 @@ impl Inner {
                 Ok(response) => response,
                 Err(Error::Busy) => return Work::Busy,
                 Err(Error::Cancelled) => return Work::Cancelled,
-                Err(_) => return Work::Failed("Thumbnail unavailable".into()),
+                Err(error) => return provider_failure(error),
             };
             if let Some(candidate) = response.candidate() {
                 let cached = cache_work(candidate, &worker_token, response.deadline(), scale);
@@ -1012,7 +1101,9 @@ impl Inner {
                         }
                         Err(Error::Cancelled) => Work::Cancelled,
                         Err(Error::Busy) => Work::Busy,
-                        Err(_) => Work::Failed("Thumbnail unavailable".into()),
+                        Err(error) => {
+                            Work::Failed(format!("thumbnail resolve/recovery: {error:?}"))
+                        }
                     };
                 }
                 return cached;
@@ -1020,13 +1111,30 @@ impl Inner {
             if let Some(generated) = response.memory() {
                 return memory_work(generated, &worker_token, response.deadline(), scale);
             }
-            Work::Failed("Thumbnail unavailable".into())
+            let detail = match response.resolved() {
+                pivra::thumbnail_manager::Resolved::Unavailable(outcome) => {
+                    format!("provider unavailable: {outcome:?}")
+                }
+                _ => "provider returned no cache or pixels".into(),
+            };
+            Work::Failed(detail)
         });
         let weak = Rc::downgrade(self);
         glib::MainContext::default().spawn_local(async move {
             let result = job
                 .await
                 .unwrap_or_else(|_| Work::Failed("thumbnail worker failed".into()));
+            pivra::thumbnail_diagnostics::trace(
+                "worker-result",
+                Some(&path),
+                match &result {
+                    Work::Hit(..) => "hit".to_string(),
+                    Work::Busy => "busy".into(),
+                    Work::Cancelled => "cancelled".into(),
+                    Work::Failed(e) => format!("permanent/unknown failure: {e}"),
+                    Work::TransientFailure(e) => format!("transient failure: {e}"),
+                },
+            );
             let Some(i) = weak.upgrade() else {
                 return;
             };
@@ -1036,12 +1144,14 @@ impl Inner {
                 .as_ref()
                 .is_some_and(|a| a.token == token && a.epoch == epoch);
             if !valid {
+                trace("discard-worker-identity", &path);
                 return;
             }
             i.active.borrow_mut().take();
             if i.closed.get() {
                 return;
             }
+            let mut retry_delay = 30;
             let mut entries = i.entries.borrow_mut();
             if let Some(entry) = entries.iter_mut().find(|e| e.path == path) {
                 let stale = token.is_cancelled() || epoch != i.epoch.get();
@@ -1075,10 +1185,37 @@ impl Inner {
                         }
                         entry.keys = Some((source, cache));
                     }
-                    Work::Busy => entry.phase = Phase::Pending,
-                    Work::Cancelled => entry.phase = Phase::Failed,
-                    Work::Failed(_error) => {
-                        trace("thumbnail-failed", &path);
+                    Work::Busy => {
+                        trace("busy-deferred", &path);
+                        entry.phase = Phase::Pending;
+                    }
+                    Work::Cancelled => {
+                        trace("terminal-cancelled", &path);
+                        entry.phase = Phase::Failed;
+                    }
+                    Work::Failed(error) => {
+                        pivra::thumbnail_diagnostics::trace(
+                            "terminal-failure",
+                            Some(&path),
+                            &error,
+                        );
+                    }
+                    Work::TransientFailure(error) => {
+                        if retry_failure_once(&mut entry.failure_retries) {
+                            entry.phase = Phase::Pending;
+                            retry_delay = 250;
+                            pivra::thumbnail_diagnostics::trace(
+                                "failure-retry",
+                                Some(&path),
+                                format_args!("attempt=2/2 delay_ms=250 error={error}"),
+                            );
+                        } else {
+                            pivra::thumbnail_diagnostics::trace(
+                                "terminal-failure",
+                                Some(&path),
+                                &error,
+                            );
+                        }
                     }
                 }
                 if let Some(w) = &entry.widgets {
@@ -1119,13 +1256,15 @@ impl Inner {
             drop(entries);
             // Yield even on Busy; no unbounded idle retry loop or queued decoders.
             let weak = Rc::downgrade(&i);
-            let id =
-                glib::timeout_add_local_once(std::time::Duration::from_millis(30), move || {
+            let id = glib::timeout_add_local_once(
+                std::time::Duration::from_millis(retry_delay),
+                move || {
                     if let Some(i) = weak.upgrade() {
                         i.retry.borrow_mut().take();
                         i.drive();
                     }
-                });
+                },
+            );
             i.retry.replace(Some(id));
         });
     }
@@ -1164,7 +1303,8 @@ fn cache_work(
     if let Err(error) = request.check_control(std::time::Instant::now()) {
         return match error {
             Error::Cancelled => Work::Cancelled,
-            _ => Work::Failed("Thumbnail timed out".into()),
+            Error::TimedOut => Work::TransientFailure("Thumbnail timed out".into()),
+            error => provider_failure(error),
         };
     }
     match frame {
@@ -1192,7 +1332,7 @@ fn cache_work(
         }
         Ok(_) if worker_token.is_cancelled() => Work::Cancelled,
         Ok(_) => Work::Failed("thumbnail identity changed during decode".into()),
-        Err(_) => Work::Failed("Thumbnail decode failed".into()),
+        Err(error) => Work::Failed(format!("Thumbnail decode failed: {error}")),
     }
 }
 fn memory_work(
@@ -1325,14 +1465,35 @@ fn trace_click(event: &str) {
 
 // Explicit opt-in diagnostics only; never an unbounded in-memory event history.
 fn trace(event: &str, path: &std::path::Path) {
-    if std::env::var_os("PIVRA_TRACE_THUMBNAILS").is_some_and(|v| v == "1") {
-        eprintln!("Pivra thumbnail {event}: {}", path.display());
+    pivra::thumbnail_diagnostics::trace(event, Some(path), "");
+}
+
+// Only typed, explicitly transient failures may spend the single retry.
+// Busy is admission, while unknown decoder/format/permission errors stay terminal.
+fn provider_failure(error: Error) -> Work {
+    match error {
+        Error::Busy => Work::Busy,
+        Error::Cancelled => Work::Cancelled,
+        Error::TimedOut | Error::ProviderTemporarilyUnavailable => {
+            Work::TransientFailure(format!("{error:?}"))
+        }
+        _ => Work::Failed(format!("{error:?}")),
+    }
+}
+// One bounded retry for a current failed request. Paint/scroll never resets it.
+fn retry_failure_once(retries: &mut u8) -> bool {
+    if *retries == 0 {
+        *retries = 1;
+        true
+    } else {
+        false
     }
 }
 
 enum Work {
     Hit(gdk::Texture, FileKey, Option<FileKey>, usize),
     Failed(String),
+    TransientFailure(String),
     Cancelled,
     Busy,
 }
@@ -1350,6 +1511,40 @@ impl Drop for Inner {
 mod tests {
     use super::*;
     #[test]
+    fn admission_cancellation_and_permanent_failures_are_not_retryable() {
+        assert!(matches!(provider_failure(Error::Busy), Work::Busy));
+        assert!(matches!(
+            provider_failure(Error::Cancelled),
+            Work::Cancelled
+        ));
+        for error in [
+            Error::Ineligible,
+            Error::InvalidSource("bad data".into()),
+            Error::SourceUnavailable("permission denied".into()),
+            Error::GenerationFailed("unknown decoder error".into()),
+            Error::ProviderUnavailable,
+        ] {
+            assert!(matches!(provider_failure(error), Work::Failed(_)));
+        }
+        assert!(matches!(
+            provider_failure(Error::TimedOut),
+            Work::TransientFailure(_)
+        ));
+        assert!(matches!(
+            provider_failure(Error::ProviderTemporarilyUnavailable),
+            Work::TransientFailure(_)
+        ));
+    }
+    #[test]
+    fn automatic_failure_retry_is_bounded_to_one_without_reset() {
+        let mut retries = 0;
+        assert!(retry_failure_once(&mut retries));
+        for _ in 0..1000 {
+            assert!(!retry_failure_once(&mut retries));
+        }
+        assert_eq!(retries, 1);
+    }
+    #[test]
     fn over_budget_visible_entries_do_not_spin_until_viewport_changes() {
         let mut entries: Vec<_> = (0..65)
             .map(|index| Entry {
@@ -1361,6 +1556,7 @@ mod tests {
                 keys: None,
                 cost: 0,
                 used: 0,
+                failure_retries: 0,
             })
             .collect();
         let last = Cell::new(None);
@@ -1386,6 +1582,7 @@ mod tests {
             keys: None,
             cost: 0,
             used: 0,
+            failure_retries: 0,
         }];
         assert!(!fallback_target_valid(
             10,
@@ -1446,6 +1643,7 @@ mod tests {
                 keys: None,
                 cost: 0,
                 used: 0,
+                failure_retries: 0,
             })
             .collect();
         let last = Cell::new(None);

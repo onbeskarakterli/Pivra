@@ -21,3 +21,5 @@ pub mod freedesktop_writer;
 pub mod thumbnail;
 pub mod thumbnail_manager;
 pub mod thumbnail_provider;
+
+pub mod thumbnail_diagnostics;

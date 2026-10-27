@@ -12,6 +12,38 @@
 #include <unistd.h>
 #include <fcntl.h>
 #include <time.h>
+/* GNOME 51 captures the thumbnailer stderr internally and only exposes it in
+ * GnomeDesktop DEBUG logs. Route those opt-in logs to bounded stderr, never to
+ * stdout: stdout is the adapter's cached/generated protocol. */
+static gint diagnostic_events;
+static void diagnostic_log(const gchar *domain, GLogLevelFlags level,
+                           const gchar *message, gpointer data) {
+    (void)level; (void)data;
+    if (!message || (!g_str_has_prefix(message,"About to launch script:") &&
+                     !g_str_has_prefix(message,"Failed to launch script:"))) return;
+    gint count=g_atomic_int_get(&diagnostic_events);
+    for (;;) {
+        if (count>=16) return;
+        if (g_atomic_int_compare_and_exchange(&diagnostic_events,count,count+1)) break;
+        count=g_atomic_int_get(&diagnostic_events);
+    }
+    gchar *short_message=g_strndup(message?message:"",2048);
+    gchar *escaped=g_strescape(short_message,NULL);
+    fprintf(stderr,"GNOME_FACTORY_LOG domain=%s detail=%s\n",domain?domain:"",escaped);
+    g_free(escaped); g_free(short_message);
+}
+static int diagnostics_enabled(void) {
+    const char *all=g_getenv("PIVRA_TRACE_THUMBNAILS");
+    return g_getenv("PIVRA_TRACE_GNOME_THUMB")!=NULL || (all && !strcmp(all,"1"));
+}
+static void diagnostic_error(const char *phase, const GError *error) {
+    if (!diagnostics_enabled()) return;
+    gchar *message=g_strndup(error?error->message:"no GError",2048);
+    gchar *escaped=g_strescape(message,NULL);
+    fprintf(stderr,"GNOME_FACTORY_ERROR phase=%s domain=%s code=%d detail=%s\n",
+            phase,error?g_quark_to_string(error->domain):"none",error?error->code:0,escaped);
+    g_free(escaped); g_free(message);
+}
 static int same(const struct stat *a, const struct stat *b) {
     return a->st_dev==b->st_dev && a->st_ino==b->st_ino && a->st_size==b->st_size &&
         a->st_mtim.tv_sec==b->st_mtim.tv_sec && a->st_mtim.tv_nsec==b->st_mtim.tv_nsec &&
@@ -26,6 +58,12 @@ int main(int argc, char **argv) {
      * and their expanded image frames (the previous 4MiB killed 33MiB frames). */
     struct rlimit cpu={15,15}, output={256UL*1024*1024,256UL*1024*1024};
     if (setrlimit(RLIMIT_AS,&memory) || setrlimit(RLIMIT_CPU,&cpu) || setrlimit(RLIMIT_FSIZE,&output)) return 2;
+    if (diagnostics_enabled()) {
+        g_log_set_handler("GnomeDesktop",G_LOG_LEVEL_DEBUG,diagnostic_log,NULL);
+        gchar *escaped_mime=g_strescape(argv[2],NULL);
+        fprintf(stderr,"GNOME_FACTORY_CONTEXT mime=%s limits_as=1073741824 limits_cpu=15 limits_fsize=268435456\n",escaped_mime);
+        g_free(escaped_mime);
+    }
     int nice_result = nice(10);
     (void)nice_result; /* Best effort; preserve the original nonfatal behavior. */
     errno=0; char *end=NULL;
@@ -48,12 +86,14 @@ int main(int argc, char **argv) {
     GError *error=NULL;
     GdkPixbuf *thumbnail=gnome_desktop_thumbnail_factory_generate_thumbnail(factory,argv[1],argv[2],NULL,&error);
     if (!thumbnail) {
+        diagnostic_error("generate",error);
         printf("failed:%.160s\n",error?error->message:"factory returned no thumbnail");
         return 4;
     }
     if (gdk_pixbuf_get_width(thumbnail)>1024 || gdk_pixbuf_get_height(thumbnail)>1024 ||
         stat(path,&after) || !same(&before,&after)) { puts("source changed or output bound"); return 5; }
     if (!gnome_desktop_thumbnail_factory_save_thumbnail(factory,thumbnail,argv[1],(time_t)mtime,NULL,&error)) {
+        diagnostic_error("save",error);
         printf("failed:%.160s\n",error?error->message:"cache save failed"); return 6;
     }
     /* Seconds-only Thumb::MTime cannot detect a same-second source replacement.

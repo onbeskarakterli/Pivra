@@ -393,6 +393,15 @@ pub fn query_or_generate(provider: &Provider, path: &Path, cancel: &gio::Cancell
     else {
         return Outcome::Missing;
     };
+    crate::thumbnail_diagnostics::trace(
+        "helper-input",
+        Some(path),
+        format_args!(
+            "mime={mime} bytes={} mtime={}",
+            info.size(),
+            info.attribute_uint64("time::modified")
+        ),
+    );
     let result = generate(
         &helper,
         file.uri().as_str(),
@@ -448,7 +457,7 @@ fn generate(
         return Err("cancelled".into());
     }
     let scratch = FactoryScratch::new()?;
-    let diagnostic = std::env::var_os("PIVRA_TRACE_GNOME_THUMB").is_some();
+    let diagnostic = crate::thumbnail_diagnostics::enabled();
     // Write to a private file instead of a pipe to avoid child stderr backpressure.
     let stderr_path = scratch.0.join("factory-stderr.log");
     let stderr = if diagnostic {
@@ -502,13 +511,21 @@ fn generate(
                     Ok(())
                 } else {
                     let details = if diagnostic {
-                        fs::File::open(&stderr_path)
-                            .and_then(|file| {
-                                let mut bytes = Vec::new();
-                                file.take(4096).read_to_end(&mut bytes)?;
-                                Ok(String::from_utf8_lossy(&bytes).into_owned())
-                            })
-                            .unwrap_or_default()
+                        let details = read_factory_diagnostics(&stderr_path);
+                        let source_path = gio::File::for_uri(uri).path();
+                        // The regular helper-result event is capped at 512 chars;
+                        // emit bounded chunks so the actual child error is not
+                        // silently lost behind the expanded bwrap command.
+                        for (index, chunk) in
+                            details.chars().collect::<Vec<_>>().chunks(384).enumerate()
+                        {
+                            crate::thumbnail_diagnostics::trace(
+                                "helper-stderr",
+                                source_path.as_deref(),
+                                format_args!("part={index} {}", chunk.iter().collect::<String>()),
+                            );
+                        }
+                        details
                     } else {
                         String::new()
                     };
@@ -525,6 +542,26 @@ fn generate(
             }
         }
     }
+}
+
+// Native log handler emits at most sixteen bounded lines; cap arbitrary helper
+// stderr as well. Invalid UTF-8 is diagnostic data, not a protocol failure.
+fn read_factory_diagnostics(path: &Path) -> String {
+    use std::io::{Seek, SeekFrom};
+    fs::File::open(path)
+        .and_then(|mut file| {
+            let mut bytes = Vec::new();
+            if file.metadata()?.len() > 16384 {
+                (&mut file).take(8192).read_to_end(&mut bytes)?;
+                bytes.extend_from_slice(b"\n[stderr middle omitted]\n");
+                file.seek(SeekFrom::End(-8192))?;
+                file.take(8192).read_to_end(&mut bytes)?;
+            } else {
+                file.take(16384).read_to_end(&mut bytes)?;
+            }
+            Ok(String::from_utf8_lossy(&bytes).into_owned())
+        })
+        .unwrap_or_default()
 }
 
 fn cache_preflight(uri: &str) -> Result<(), String> {
@@ -773,6 +810,22 @@ mod tests {
 mod generation_tests {
     use super::*;
     use std::os::unix::fs::PermissionsExt;
+    #[test]
+    fn factory_stderr_is_bounded_and_accepts_non_utf8() {
+        let root = tempfile::tempdir().unwrap();
+        let path = root.path().join("stderr");
+        fs::write(&path, b"GNOME child failed: \xff").unwrap();
+        assert!(read_factory_diagnostics(&path).contains("GNOME child failed:"));
+        fs::write(&path, vec![b'x'; 20000]).unwrap();
+        let details = read_factory_diagnostics(&path);
+        assert!(details.len() <= 16448);
+        assert!(details.contains("[stderr middle omitted]"));
+        let mut bytes = vec![b'x'; 20000];
+        bytes.extend_from_slice(b"final underlying failure");
+        fs::write(&path, bytes).unwrap();
+        assert!(read_factory_diagnostics(&path).ends_with("final underlying failure"));
+        assert_eq!(read_factory_diagnostics(&root.path().join("absent")), "");
+    }
     #[test]
     fn helper_protocol_failure_and_cancelled_process_group() {
         let root = tempfile::tempdir().unwrap();

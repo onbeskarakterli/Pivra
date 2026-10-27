@@ -41,6 +41,15 @@ gboolean gnome_desktop_thumbnail_factory_can_thumbnail(GnomeDesktopThumbnailFact
 }
 GdkPixbuf *gnome_desktop_thumbnail_factory_generate_thumbnail(GnomeDesktopThumbnailFactory *f,const char *u,const char *m,GCancellable *c,GError **e) {
  (void)f;(void)m;(void)c;
+ if(getenv("DEBUG_SCRIPT")) {
+  g_log("GnomeDesktop",G_LOG_LEVEL_DEBUG,"About to launch script: bwrap --unshare-all /usr/bin/test-thumbnailer");
+  if(getenv("FAIL")) g_log("GnomeDesktop",G_LOG_LEVEL_DEBUG,"Failed to launch script: underlying decoder error\\nsecond line");
+ }
+ if(getenv("DEBUG_FLOOD")) {
+  char *large=g_strnfill(10000,'x');
+  for(int i=0;i<100;i++) g_log("GnomeDesktop",G_LOG_LEVEL_DEBUG,"Failed to launch script: %s",large);
+  g_free(large);
+ }
  if(getenv("FAIL")) { g_set_error_literal(e,G_IO_ERROR,G_IO_ERROR_FAILED,"controlled error");return NULL; }
  if(getenv("CHANGE")) {GFile *file=g_file_new_for_uri(u);char *path=g_file_get_path(file);g_file_set_contents(path,"replacement",-1,NULL);g_free(path);g_object_unref(file);}
  return gdk_pixbuf_new(GDK_COLORSPACE_RGB,TRUE,8,getenv("OVERSIZED")?1025:64,32);
@@ -88,6 +97,26 @@ class Generation(unittest.TestCase):
  def test_cache_save_failure_is_not_generation_success(self):
   p,saved=self.run_case(SAVE_FAIL='1');self.assertEqual((p.returncode,saved),(6,False))
   self.assertIn('controlled save error',p.stdout)
+ def test_debug_capture_does_not_corrupt_success_protocol(self):
+  p,saved=self.run_case(DEBUG_SCRIPT='1',PIVRA_TRACE_GNOME_THUMB='1')
+  self.assertEqual((p.returncode,p.stdout,saved),(0,'generated\n',True))
+  self.assertIn('GNOME_FACTORY_CONTEXT mime=image/png',p.stderr)
+  self.assertIn('About to launch script: bwrap --unshare-all',p.stderr)
+ def test_debug_capture_preserves_underlying_failure_and_domain(self):
+  p,saved=self.run_case(DEBUG_SCRIPT='1',FAIL='1',PIVRA_TRACE_THUMBNAILS='1')
+  self.assertEqual((p.returncode,saved),(4,False))
+  self.assertIn('underlying decoder error',p.stderr)
+  self.assertIn('GNOME_FACTORY_ERROR phase=generate domain=g-io-error-quark code=',p.stderr)
+  self.assertNotIn('second line',p.stderr.splitlines())
+ def test_diagnostics_are_bounded_even_for_verbose_library_messages(self):
+  p,saved=self.run_case(DEBUG_FLOOD='1',PIVRA_TRACE_GNOME_THUMB='1')
+  self.assertEqual((p.returncode,p.stdout,saved),(0,'generated\n',True))
+  self.assertEqual(p.stderr.count('GNOME_FACTORY_LOG'),16)
+  self.assertLess(len(p.stderr),34000)
+ def test_normal_failure_retains_existing_protocol_without_extra_diagnostics(self):
+  p,saved=self.run_case(FAIL='1')
+  self.assertEqual((p.returncode,p.stdout,saved),(4,'failed:controlled error\n',False))
+  self.assertEqual(p.stderr,'')
  def test_source_change_during_save_discards_own_cache_artifact(self):
   p,saved=self.run_case(CHANGE_ON_SAVE='1');self.assertEqual((p.returncode,saved),(5,False))
   self.assertIn('source changed during cache save',p.stdout)

@@ -1,4 +1,4 @@
-# DRAFT ONLY. Arch package providers and native install acceptance remain open.
+# DRAFT ONLY. Source approval and native package install acceptance remain open.
 # Source/checksum approval is required before even metadata generation proceeds.
 pkgname=pivra
 pkgver=0.1.0
@@ -7,11 +7,12 @@ pkgdesc='Native GNOME JPEG/PNG image viewer'
 arch=('x86_64')
 url='https://github.com/onbeskarakterli/Pivra'
 license=('GPL-3.0-only')
-# Candidate Arch names, NOT verified package ownership: see README.md.
+# GNOME4/glycin and toolkit evidence includes user-reported Arch validation.
+# Remaining provider ownership is still open: see README.md.
 depends=('gtk4>=4.16' 'libadwaita>=1.2' 'glib2' 'gdk-pixbuf2'
          'gnome-desktop-4' 'glycin' 'bubblewrap' 'libseccomp' 'lcms2'
          'fontconfig' 'cairo' 'graphene' 'glibc' 'gcc-libs' 'hicolor-icon-theme')
-makedepends=('rust>=1.85' 'pkgconf' 'python>=3.11')
+makedepends=('cargo' 'pkgconf' 'python>=3.11')
 checkdepends=('desktop-file-utils')
 _target='x86_64-unknown-linux-gnu'
 _recipe_dir=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
@@ -54,17 +55,19 @@ build() {
     return 1
   fi
   local flags
-  local -a compiler cppflags cflags ldflags pkgflags
+  local -a compiler cppflags cflags ldflags pkg_cflags pkg_libs
   read -r -a compiler <<< "${CC:-cc}"
   read -r -a cppflags <<< "${CPPFLAGS:-}"
   read -r -a cflags <<< "${CFLAGS:-}"
   read -r -a ldflags <<< "${LDFLAGS:-}"
-  flags=$(pkg-config --cflags --libs gnome-desktop-4 gio-2.0 gobject-2.0 gdk-pixbuf-2.0) || return 1
-  read -r -a pkgflags <<< "$flags"
+  flags=$(pkg-config --cflags gnome-desktop-4 gio-2.0 gobject-2.0 gdk-pixbuf-2.0) || return 1
+  read -r -a pkg_cflags <<< "$flags"
+  flags=$(pkg-config --libs gnome-desktop-4 gio-2.0 gobject-2.0 gdk-pixbuf-2.0) || return 1
+  read -r -a pkg_libs <<< "$flags"
   mkdir -p "$srcdir/build" || return 1
-  "${compiler[@]}" "${cppflags[@]}" "${cflags[@]}" -Wall -Wextra -Werror \
+  "${compiler[@]}" "${cppflags[@]}" "${cflags[@]}" "${pkg_cflags[@]}" -Wall -Wextra -Werror \
     native/thumbnail_factory.c -o "$srcdir/build/pivra-thumbnail-factory" \
-    "${ldflags[@]}" "${pkgflags[@]}" || return 1
+    "${ldflags[@]}" "${pkg_libs[@]}" || return 1
   cargo build --release --locked --offline --target "$_target" --bin pivra || return 1
   test -x "$srcdir/build/pivra-thumbnail-factory" || return 1
   readelf -d "target/$_target/release/pivra" > "$srcdir/build/pivra.dynamic" || return 1

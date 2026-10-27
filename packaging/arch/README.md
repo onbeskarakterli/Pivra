@@ -38,24 +38,58 @@ Later, **only after owner approval of the immutable main release commit**:
 
 These steps are a future gate, not instructions that were executed here.
 
-## Unverified Arch dependencies and build contract
+## Arch evidence and build dependency decisions — release-08
 
-`gnome-desktop-4`, `glycin` and all other Arch names in the recipe are candidate
-package names based on the prior design, **not** verified pacman ownership.
-The Arch API/mirrors were inaccessible and pacman/makepkg are absent here.
-Do not assume glycin supplies the required JPEG/PNG **2+** loader config and
-Exec solely because of its name/version. Verify with pacman -Si/-Fl/-Ql/-Qo
-and real secure decode. Only then finalize depends and generate .SRCINFO.
-Rust crate glycin 3.0.8 is not the OS loader package version.
+The user reports actual Arch Linux x86_64 / GNOME Wayland validation:
+GTK4 4.24.1, libadwaita 1.10.0, gnome-desktop-4 51.0, glycin 2.2.4 owning the
+JPEG/PNG loader files, Bubblewrap 0.13.1, Rust/Cargo 1.99.1 and GCC 16.2.1.
+The user also reports a real `-Wall -Wextra -Werror` helper build and
+`libgnome-desktop-4.so.2` linkage. This is user-provided native evidence,
+not an independently repeated Codex/Arch test. gnome-desktop-4 and glycin remain
+mandatory runtime dependencies. Existing toolkit minimums are retained rather
+than raised to the user's installed versions. Rust crate glycin 3.0.8 is not
+the OS loader version. Actual package install/remove acceptance is still open.
+
+`makedepends=('cargo' 'pkgconf' 'python>=3.11')` requests Arch's Cargo provider,
+rather than hard-coding `rust>=1.85`. This follows the Arch Rust package
+provider convention ([Rust package guidelines](https://wiki.archlinux.org/title/Rust_package_guidelines)).
+The current ArchWiki fetch returned HTTP 403; no fresh pacman provider query
+is claimed. A Cargo provider can be
+supplied by the system Rust package or an already configured alternative;
+the recipe does not initialize rustup or download a toolchain. The project's
+Cargo.toml still requires Rust >=1.85 and edition 2024. A usable toolchain must
+exist before prepare/build; requesting `cargo` is not a lower-MSRV claim.
+
+Dependency classification:
+
+- User-validated Arch runtime names: gtk4, libadwaita, gnome-desktop-4, glycin,
+  bubblewrap. Keep the existing >=4.16 / >=1.2 toolkit bounds.
+- Remaining native runtime providers: glib2, gdk-pixbuf2, libseccomp, lcms2,
+  fontconfig, cairo, graphene, glibc, gcc-libs. Previous ELF/API evidence justifies
+  these libraries, but their exact Arch split-package ownership was not supplied
+  in this message or independently verified here. They are retained pending
+  pacman/namcap review, not relabeled as confirmed. Duplicate transitive coverage
+  alone is not evidence a directly linked library is unnecessary.
+- hicolor-icon-theme: icon integration dependency; exact Arch hook/theme
+  ownership remains pending. Not a new rendering/decoder engine.
+- cargo, pkgconf, Python: build tools only. C compiler/binutils/basic tools are
+  expected from base-devel, not new viewer runtime requirements.
+- desktop-file-utils: check dependency; no new GUI/test runtime packages added.
+- Removed redundant hard pin: `rust>=1.85` in makedepends, replaced by `cargo`.
+  No runtime library was arbitrarily removed and no separate unverified Cargo
+  package implementation, Qt/KDE stack or service was added.
 
 The helper links the real `gnome-desktop-4`, gio-2.0, gobject-2.0 and
- gdk-pixbuf-2.0 API. Missing headers/module/linkage fail build(); Cargo's optional
+gdk-pixbuf-2.0 API. Missing headers/module/linkage fail build(); Cargo's optional
 helper warning is not accepted as package success. The required separately
 compiled helper is installed alongside pivra at `/usr/bin/pivra-thumbnail-factory`.
 No OUT_DIR glob, environment override or libexec path workaround is installed.
-Makepkg compiler/linker flags are retained. Rust/pkgconf/Python are build tools;
+Makepkg compiler/linker flags are retained. Cargo-provider/pkgconf/Python are build tools;
 C compiler/binutils and other standard tools are expected from base-devel.
-The lcms2 and libseccomp shared-library contract is checked on the release ELF.
+pkg-config --cflags and --libs are now queried separately. Header/preprocessor
+flags precede native/thumbnail_factory.c; makepkg LDFLAGS and pkg-config libraries
+follow the source/output arguments. Both queries fail closed. The lcms2 and
+libseccomp shared-library contract is checked on the release ELF.
 
 CARGO_HOME and CARGO_TARGET_DIR are private to `$srcdir`; Cargo fetches only in
 prepare(), then build/check are offline and locked. Use a clean build tree:
@@ -100,3 +134,25 @@ still require final delivery review; merely copying a GPL text is insufficient.
 B5 remains **NO-GO** until real Arch installation/removal and native gates pass.
 No AUR publication, tag, release, main change, security change or decoder fallback
 is part of this draft.
+
+## Release-08 targeted validation
+
+Bash syntax and a controlled argument-capture test validate the exact helper
+command ordering and preservation of CC/CPPFLAGS/CFLAGS/LDFLAGS. The capture
+uses a mock compiler/pkg-config under /tmp: it is **not** native API/link proof.
+The user's Arch helper compile/link result above remains separately attributed.
+Missing source approval still returns the same BLOCKED/exit 1; source/URL/hash
+validation and collector checksum lines are unchanged. ShellCheck is NOT RUN
+because it is absent. Rust sources, tests, Cargo.lock, icons and security code
+are unchanged; the existing Rust suite is rerun and reported in this delivery.
+No makepkg -si, installation, main merge, tag or AUR publication occurs.
+
+Validation results (2026-10-28, baseline 83af397): Bash syntax PASS;
+exact helper flag ordering PASS; cflags/libs query-failure negative scenarios
+PASS; absent-source-approval negative scenario PASS; unchanged source/hash gate
+comparison PASS; `CARGO_INCREMENTAL=0 cargo test --locked` PASS — 186 tests,
+zero failures. ShellCheck NOT RUN (not installed). No fresh GNOME/Wayland or
+native helper compile is claimed in Codex; the reported Arch result is the
+user's evidence. Release source approval, actual .SRCINFO/makepkg artifact,
+remaining native provider ownership and install/remove/upgrade gates remain
+open. B5 remains NO-GO.

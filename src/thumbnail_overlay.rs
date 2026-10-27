@@ -189,8 +189,16 @@ pub(crate) fn install(
         }
         if let Some(pin) = pin_click.pin.upgrade() {
             pin.set_active(pinned);
-            pin.set_icon_name(if pinned { "bookmark-new-symbolic" } else { "bookmark-new-symbolic" });
-            if pinned { pin.add_css_class("pivra-pinned"); } else { pin.remove_css_class("pivra-pinned"); }
+            pin.set_icon_name(if pinned {
+                "bookmark-new-symbolic"
+            } else {
+                "bookmark-new-symbolic"
+            });
+            if pinned {
+                pin.add_css_class("pivra-pinned");
+            } else {
+                pin.remove_css_class("pivra-pinned");
+            }
             pin.set_tooltip_text(Some(if pinned {
                 "Unpin thumbnail strip"
             } else {
@@ -208,12 +216,21 @@ pub(crate) fn install(
     let begin_state = state.clone();
     let begin_height = start_height.clone();
     resize.connect_drag_begin(move |gesture, _, y| {
-        let Some(strip) = begin_state.strip.upgrade() else { return; };
-        let Some(overlay) = begin_state.overlay.upgrade() else { return; };
-        let top = strip.compute_bounds(&overlay)
-            .map_or(f64::from(overlay.height() - strip.height_request()), |b| f64::from(b.y()));
-        if !begin_state.shown.get() || !begin_state.preference.enabled()
-            || y < top - 10.0 || y > top + 10.0
+        let Some(strip) = begin_state.strip.upgrade() else {
+            return;
+        };
+        let Some(overlay) = begin_state.overlay.upgrade() else {
+            return;
+        };
+        let top = strip
+            .compute_bounds(&overlay)
+            .map_or(f64::from(overlay.height() - strip.height_request()), |b| {
+                f64::from(b.y())
+            });
+        if !begin_state.shown.get()
+            || !begin_state.preference.enabled()
+            || y < top - 10.0
+            || y > top + 10.0
         {
             gesture.set_state(gtk::EventSequenceState::Denied);
             return;
@@ -226,10 +243,15 @@ pub(crate) fn install(
     let drag_state = state.clone();
     let resize_thumbnails = thumbnails.clone();
     resize.connect_drag_update(move |gesture, _, delta_y| {
-        if !drag_state.resizing.get() || !delta_y.is_finite() { return; }
-        if let (Some(strip), Some(overlay)) = (drag_state.strip.upgrade(), drag_state.overlay.upgrade()) {
+        if !drag_state.resizing.get() || !delta_y.is_finite() {
+            return;
+        }
+        if let (Some(strip), Some(overlay)) =
+            (drag_state.strip.upgrade(), drag_state.overlay.upgrade())
+        {
             let ceiling = (overlay.height() - 48).clamp(128, 560);
-            let height = (f64::from(start_height.get()) - delta_y).round()
+            let height = (f64::from(start_height.get()) - delta_y)
+                .round()
                 .clamp(128.0, f64::from(ceiling)) as i32;
             if strip.height_request() != height {
                 strip.set_height_request(height);
@@ -249,12 +271,16 @@ pub(crate) fn install(
         }
         end_state.resizing.set(false);
         end_state.place_toggle();
-        if !end_state.pinned.get() && !end_state.near.get() { end_state.schedule(3000); }
+        if !end_state.pinned.get() && !end_state.near.get() {
+            end_state.schedule(3000);
+        }
     });
     let cancel_state = state.clone();
     resize.connect_cancel(move |_, _| {
         cancel_state.resizing.set(false);
-        if !cancel_state.pinned.get() && !cancel_state.near.get() { cancel_state.schedule(3000); }
+        if !cancel_state.pinned.get() && !cancel_state.near.get() {
+            cancel_state.schedule(3000);
+        }
     });
     resize.set_propagation_phase(gtk::PropagationPhase::Capture);
     overlay.add_controller(resize);
@@ -332,8 +358,8 @@ pub(crate) fn install(
                             // on-screen height when the viewport shrinks.
                             if !state.resizing.get() {
                                 if let Some(strip) = state.strip.upgrade() {
-                                    let effective = state.preferred_height.get()
-                                        .min((height - 48).max(128));
+                                    let effective =
+                                        state.preferred_height.get().min((height - 48).max(128));
                                     if strip.height_request() != effective {
                                         strip.set_height_request(effective);
                                         cells.resize_cells(effective);
@@ -403,7 +429,9 @@ impl Visibility {
         }
     }
     fn render(&self, show: bool) {
-        let show = (show || self.pinned.get() || self.resizing.get()) && self.available && !self.closed.get();
+        let show = (show || self.pinned.get() || self.resizing.get())
+            && self.available
+            && !self.closed.get();
         self.shown.set(show);
         if let Some(strip) = self.strip.upgrade() {
             strip.set_visible(show && self.preference.enabled());
@@ -433,7 +461,9 @@ impl Visibility {
         if let Some(edge) = self.resize_edge.upgrade() {
             edge.set_visible(show && self.preference.enabled());
         }
-        if !show { self.update_resize_cursor(None); }
+        if !show {
+            self.update_resize_cursor(None);
+        }
         self.place_toggle();
     }
     fn place_toggle(&self) {
@@ -472,10 +502,15 @@ impl Visibility {
         }
     }
     fn update_resize_cursor(&self, y: Option<f64>) {
-        let (Some(overlay), Some(strip)) = (self.overlay.upgrade(), self.strip.upgrade()) else { return; };
-        let top = strip.compute_bounds(&overlay)
-            .map_or(f64::from(overlay.height() - strip.height_request()), |bounds| f64::from(bounds.y()));
-        let on_border = self.shown.get() && self.preference.enabled()
+        let (Some(overlay), Some(strip)) = (self.overlay.upgrade(), self.strip.upgrade()) else {
+            return;
+        };
+        let top = strip.compute_bounds(&overlay).map_or(
+            f64::from(overlay.height() - strip.height_request()),
+            |bounds| f64::from(bounds.y()),
+        );
+        let on_border = self.shown.get()
+            && self.preference.enabled()
             && y.is_some_and(|position| (position - top).abs() <= 10.0);
         let cursor = if on_border { Some("ns-resize") } else { None };
         overlay.set_cursor_from_name(cursor);
@@ -506,7 +541,9 @@ impl Visibility {
         }
     }
     fn away(self: &Rc<Self>) {
-        if self.resizing.get() { return; }
+        if self.resizing.get() {
+            return;
+        }
         self.near.set(false);
         if self.shown.get() && !self.pinned.get() && self.timeout.borrow().is_none() {
             self.schedule(3000);

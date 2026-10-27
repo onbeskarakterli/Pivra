@@ -355,7 +355,10 @@ pub fn query_or_generate(provider: &Provider, path: &Path, cancel: &gio::Cancell
         return outcome;
     };
     if std::env::var_os("PIVRA_TRACE_GNOME_THUMB").is_some() {
-        eprintln!("PIVRA_GNOME_THUMB invoke helper={} force={force} outcome={outcome:?}", helper.display());
+        eprintln!(
+            "PIVRA_GNOME_THUMB invoke helper={} force={force} outcome={outcome:?}",
+            helper.display()
+        );
     }
     let source = match FileKey::read(path) {
         Ok(key) => key,
@@ -495,7 +498,9 @@ fn generate(
                     } else {
                         String::new()
                     };
-                    Err(format!("GNOME factory exit={status}: {text}; stderr={details}"))
+                    Err(format!(
+                        "GNOME factory exit={status}: {text}; stderr={details}"
+                    ))
                 };
             }
             Ok(None) => std::thread::sleep(Duration::from_millis(10)),

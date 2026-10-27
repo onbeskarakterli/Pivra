@@ -65,7 +65,10 @@ fn main() {
             let default_seen = had_default_app.clone();
             let window_counter = max_windows.clone();
             let main_counter = main_pictures.clone();
-            eprintln!("APP_OPEN_BEGIN name={name} uri={uri} path={}", path.display());
+            eprintln!(
+                "APP_OPEN_BEGIN name={name} uri={uri} path={}",
+                path.display()
+            );
             let end = Instant::now() + Duration::from_secs(30);
             glib::timeout_add_local(Duration::from_millis(10), move || {
                 poll_counter.set(poll_counter.get() + 1);
@@ -83,7 +86,9 @@ fn main() {
                                     .parent()
                                     .and_downcast::<gtk::Overlay>()
                                     .and_then(|overlay| overlay.child())
-                                    .is_some_and(|child| child == p.clone().upcast::<gtk::Widget>());
+                                    .is_some_and(|child| {
+                                        child == p.clone().upcast::<gtk::Widget>()
+                                    });
                                 if !is_main {
                                     continue;
                                 }
@@ -97,11 +102,7 @@ fn main() {
                                         size,
                                     );
                                     let snapshot = gtk::Snapshot::new();
-                                    paintable.snapshot(
-                                        &snapshot,
-                                        size.0 as f64,
-                                        size.1 as f64,
-                                    );
+                                    paintable.snapshot(&snapshot, size.0 as f64, size.1 as f64);
                                     assert!(snapshot.to_node().is_some(), "no rendered image node");
                                     if let Ok(texture) = paintable.downcast::<gdk::Texture>() {
                                         let mut pixels = vec![0; (size.0 * size.1 * 4) as usize];
@@ -135,7 +136,14 @@ fn main() {
                 glib::ControlFlow::Continue
             });
             let status = app::launch(Some(opened));
-            eprintln!("APP_OPEN_END name={name} uri={uri} exit={status:?} polls={} default_app_seen={} max_windows={} main_picture_hits={} observed={:?}", polls.get(), had_default_app.get(), max_windows.get(), main_pictures.get(), result.get());
+            eprintln!(
+                "APP_OPEN_END name={name} uri={uri} exit={status:?} polls={} default_app_seen={} max_windows={} main_picture_hits={} observed={:?}",
+                polls.get(),
+                had_default_app.get(),
+                max_windows.get(),
+                main_pictures.get(),
+                result.get()
+            );
             assert_eq!(status, glib::ExitCode::SUCCESS);
             let code = result
                 .get()

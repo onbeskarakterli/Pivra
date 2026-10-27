@@ -184,10 +184,14 @@ impl ThumbnailStrip {
         let drag_flag = dragged.clone();
         drag.connect_drag_update(move |gesture, dx, _| {
             if let Some(i) = weak.upgrade() {
-                if !dx.is_finite() { return; }
+                if !dx.is_finite() {
+                    return;
+                }
                 // GTK can emit drag-update(0, 0) during an ordinary click.
                 // Do not claim the sequence until there is real horizontal movement.
-                if dx.abs() < 6.0 { return; }
+                if dx.abs() < 6.0 {
+                    return;
+                }
                 drag_flag.set(true);
                 trace_click(&format!("drag-update dx={dx:.1}"));
                 i.initial.set(None);
@@ -213,7 +217,9 @@ impl ThumbnailStrip {
         let press_dragged = dragged.clone();
         press.connect_pressed(move |_, _, x, y| {
             press_dragged.set(false);
-            let Some(i) = weak.upgrade() else { return; };
+            let Some(i) = weak.upgrade() else {
+                return;
+            };
             let hit = i.entries.borrow().iter().find_map(|entry| {
                 let w = entry.widgets.as_ref()?;
                 let bounds = w.button.compute_bounds(&i.scroller)?;
@@ -221,32 +227,44 @@ impl ThumbnailStrip {
                     && (x as f32) <= bounds.x() + bounds.width()
                     && (y as f32) >= bounds.y()
                     && (y as f32) <= bounds.y() + bounds.height())
-                    .then_some((entry.index.get(), entry.path.clone()))
+                .then_some((entry.index.get(), entry.path.clone()))
             });
-            *press_state.borrow_mut() = hit.as_ref().map(|(index, path)| {
-                (*index, i.button_clicks.get(), i.epoch.get(), path.clone())
-            });
+            *press_state.borrow_mut() = hit
+                .as_ref()
+                .map(|(index, path)| (*index, i.button_clicks.get(), i.epoch.get(), path.clone()));
             trace_click(&format!(
                 "press-at-strip x={x:.0} y={y:.0} hit-button={:?} building={} cells={}",
                 hit.as_ref().map(|(index, _)| *index),
                 i.building.borrow().is_some(),
-                i.entries.borrow().iter().filter(|e| e.widgets.is_some()).count(),
+                i.entries
+                    .borrow()
+                    .iter()
+                    .filter(|e| e.widgets.is_some())
+                    .count(),
             ));
         });
         let release_weak = Rc::downgrade(&inner);
         press.connect_released(move |_, _, _, _| {
             trace_click("press-released");
-            let Some((index, count, epoch, path)) = pressed.borrow_mut().take() else { return; };
-            if dragged.get() { return; }
+            let Some((index, count, epoch, path)) = pressed.borrow_mut().take() else {
+                return;
+            };
+            if dragged.get() {
+                return;
+            }
             let weak = release_weak.clone();
             // Let the native GtkButton click callback run first. If GTK's
             // scroll/drag gesture swallowed the click, deliver it once.
             glib::idle_add_local_once(move || {
-                let Some(i) = weak.upgrade() else { return; };
-                if i.closed.get() || i.button_clicks.get() != count { return; }
-                if !fallback_target_valid(
-                    epoch, i.epoch.get(), index, &path, &i.entries.borrow(),
-                ) { return; }
+                let Some(i) = weak.upgrade() else {
+                    return;
+                };
+                if i.closed.get() || i.button_clicks.get() != count {
+                    return;
+                }
+                if !fallback_target_valid(epoch, i.epoch.get(), index, &path, &i.entries.borrow()) {
+                    return;
+                }
                 trace_click(&format!("native-click-missed fallback index={index}"));
                 if let Some(callback) = i.select.borrow().as_ref() {
                     callback(index);
@@ -264,10 +282,12 @@ impl ThumbnailStrip {
     }
     pub(crate) fn resize_cells(&self, panel_height: i32) {
         let height = (panel_height - 34).max(CELL_HEIGHT);
-        let width = (f64::from(CELL_WIDTH) * f64::from(height) / f64::from(CELL_HEIGHT))
-            .round() as i32;
+        let width =
+            (f64::from(CELL_WIDTH) * f64::from(height) / f64::from(CELL_HEIGHT)).round() as i32;
         let size = (width, height);
-        if self.0.cell_size.replace(size) == size { return; }
+        if self.0.cell_size.replace(size) == size {
+            return;
+        }
         for entry in self.0.entries.borrow().iter() {
             if let Some(w) = &entry.widgets {
                 w.button.set_size_request(width, height);
@@ -318,7 +338,9 @@ impl ThumbnailStrip {
             self.0.initial.set(selected);
             self.0.restore.set(None);
             self.0.scroller.queue_draw();
-            if !self.0.scroller.is_mapped() { self.0.warm_hidden(); }
+            if !self.0.scroller.is_mapped() {
+                self.0.warm_hidden();
+            }
         }
     }
     pub(crate) fn on_select(&self, callback: impl Fn(usize) + 'static) {
@@ -328,7 +350,9 @@ impl ThumbnailStrip {
         self.0.select.borrow_mut().take();
         self.0.closed.set(true);
         self.0.pause();
-        if let Some(token) = self.0.warming.borrow_mut().take() { token.cancel(); }
+        if let Some(token) = self.0.warming.borrow_mut().take() {
+            token.cancel();
+        }
         self.0.disconnect();
         if let Some(id) = self.0.building.borrow_mut().take() {
             id.remove();
@@ -356,7 +380,9 @@ impl ThumbnailStrip {
             i.last_visible.set(None);
             i.epoch.set(i.epoch.get().wrapping_add(1));
             i.pause();
-            if let Some(token) = i.warming.borrow_mut().take() { token.cancel(); }
+            if let Some(token) = i.warming.borrow_mut().take() {
+                token.cancel();
+            }
             let first = i.entries.borrow().is_empty();
             let offset = i.scroller.hadjustment().value();
             let mut old: HashMap<_, _> = i
@@ -418,7 +444,9 @@ impl ThumbnailStrip {
             }
         }
         i.scroller.queue_draw();
-        if i.initialized.get() && !i.scroller.is_mapped() { i.warm_hidden(); }
+        if i.initialized.get() && !i.scroller.is_mapped() {
+            i.warm_hidden();
+        }
     }
     /// Called on a real source-folder rescan, not on photo selection.
     pub(crate) fn invalidate(&self) {
@@ -430,20 +458,26 @@ impl Inner {
     // the overlay is hidden. Bound to a small initial batch and one worker;
     // visible-cell decoding remains owned by the normal viewport scheduler.
     fn warm_hidden(self: &Rc<Self>) {
-        if self.closed.get() || self.scroller.is_mapped() { return; }
+        if self.closed.get() || self.scroller.is_mapped() {
+            return;
+        }
         if self.warming.borrow().is_some() {
             self.warm_again.set(true);
             return;
         }
         let entries = self.entries.borrow();
-        let selected = entries.iter().position(|e| Some(e.index.get()) == self.selected.get());
+        let selected = entries
+            .iter()
+            .position(|e| Some(e.index.get()) == self.selected.get());
         // Match the initial strip alignment: selected item stays visible,
         // scrolling just enough to reveal it. Hidden widgets have no measured
         // viewport, so estimate the cell pitch from the fixed width + spacing.
         // Hidden scrollers and their intermediate parents report width 0.
         // Use the allocated window viewport rather than treating zero as one
         // cell; otherwise only the selected image gets warmed on startup.
-        let viewport_width = self.scroller.root()
+        let viewport_width = self
+            .scroller
+            .root()
             .and_then(|root| root.downcast::<gtk::Window>().ok())
             .map(|window| window.width())
             .filter(|&width| width > 0)
@@ -460,7 +494,9 @@ impl Inner {
         // Prioritize the selected image, then the neighbors actually expected
         // in the initial viewport, not unrelated images at the folder start.
         if let Some(n) = selected {
-            if entries[n].phase == Phase::Pending { paths.push(entries[n].path.clone()); }
+            if entries[n].phase == Phase::Pending {
+                paths.push(entries[n].path.clone());
+            }
         }
         for e in &entries[start..end] {
             if e.phase == Phase::Pending && !paths.contains(&e.path) {
@@ -468,7 +504,9 @@ impl Inner {
             }
         }
         drop(entries);
-        if paths.is_empty() { return; }
+        if paths.is_empty() {
+            return;
+        }
         let token = gio::Cancellable::new();
         self.warming.replace(Some(token.clone()));
         let worker_token = token.clone();
@@ -477,21 +515,29 @@ impl Inner {
         let job = gio::spawn_blocking(move || {
             let mut results = Vec::new();
             for path in paths {
-                if worker_token.is_cancelled() { break; }
+                if worker_token.is_cancelled() {
+                    break;
+                }
                 // The hidden pass uses the SAME verified decode/resize path as
                 // the visible scheduler. Merely resolving disk cache entries
                 // leaves the GTK cells pending and forces a second decode.
                 let work = match Manager::session().resolve(&path, &worker_token) {
                     Ok(response) => {
                         if let Some(candidate) = response.candidate() {
-                            let cached = cache_work(candidate, &worker_token, response.deadline(), scale);
-                            if matches!(cached, Work::Hit(..)) { cached }
-                            else if let Some(generated) = response.memory() {
+                            let cached =
+                                cache_work(candidate, &worker_token, response.deadline(), scale);
+                            if matches!(cached, Work::Hit(..)) {
+                                cached
+                            } else if let Some(generated) = response.memory() {
                                 memory_work(generated, &worker_token, response.deadline(), scale)
-                            } else { cached }
+                            } else {
+                                cached
+                            }
                         } else if let Some(generated) = response.memory() {
                             memory_work(generated, &worker_token, response.deadline(), scale)
-                        } else { Work::Failed("Thumbnail unavailable".into()) }
+                        } else {
+                            Work::Failed("Thumbnail unavailable".into())
+                        }
                     }
                     Err(Error::Busy) => Work::Busy,
                     Err(Error::Cancelled) => Work::Cancelled,
@@ -506,7 +552,9 @@ impl Inner {
             let results = job.await.unwrap_or_default();
             if let Some(i) = weak.upgrade() {
                 let current = i.warming.borrow().as_ref().is_some_and(|t| t == &token);
-                if !current { return; }
+                if !current {
+                    return;
+                }
                 // A completed worker must release ONLY its own admission, even
                 // when revalidation has advanced the catalog epoch.
                 i.warming.borrow_mut().take();
@@ -520,10 +568,17 @@ impl Inner {
                 let mut entries = i.entries.borrow_mut();
                 for (path, work) in results {
                     if let Work::Hit(texture, source, cache, decoded_cost) = work {
-                        let cost = display_cost(texture.width(), texture.height()).unwrap_or(usize::MAX);
-                        if cost > BUDGET { continue; }
-                        let Some(entry) = entries.iter_mut().find(|e| e.path == path) else { continue; };
-                        if entry.phase != Phase::Pending { continue; }
+                        let cost =
+                            display_cost(texture.width(), texture.height()).unwrap_or(usize::MAX);
+                        if cost > BUDGET {
+                            continue;
+                        }
+                        let Some(entry) = entries.iter_mut().find(|e| e.path == path) else {
+                            continue;
+                        };
+                        if entry.phase != Phase::Pending {
+                            continue;
+                        }
                         i.decoded_max.set(i.decoded_max.get().max(decoded_cost));
                         entry.cost = cost;
                         entry.texture = Some(texture.clone());
@@ -546,12 +601,16 @@ impl Inner {
                 while entries.iter().map(|e| e.cost).sum::<usize>() > BUDGET
                     || entries.iter().filter(|e| e.texture.is_some()).count() > LIMIT
                 {
-                    let victim = entries.iter().enumerate()
+                    let victim = entries
+                        .iter()
+                        .enumerate()
                         .filter(|(_, e)| e.texture.is_some())
                         .filter(|(_, e)| Some(e.index.get()) != i.selected.get())
                         .min_by_key(|(_, e)| e.used)
                         .map(|(n, _)| n);
-                    let Some(n) = victim else { break; };
+                    let Some(n) = victim else {
+                        break;
+                    };
                     let entry = &mut entries[n];
                     entry.texture = None;
                     entry.cost = 0;
@@ -685,7 +744,6 @@ impl Inner {
                 button.set_valign(gtk::Align::Center);
                 button.set_focus_on_click(false);
                 button.set_widget_name(&format!("thumbnail-cell-{}", entry.index.get()));
-
 
                 let content = gtk::Overlay::new();
                 let selection = gtk::Frame::new(None);
@@ -1254,7 +1312,9 @@ fn fallback_target_valid(
     entries: &[Entry],
 ) -> bool {
     pressed_epoch == current_epoch
-        && entries.iter().any(|entry| entry.index.get() == index && entry.path == pressed_path)
+        && entries
+            .iter()
+            .any(|entry| entry.index.get() == index && entry.path == pressed_path)
 }
 
 fn trace_click(event: &str) {
@@ -1327,10 +1387,34 @@ mod tests {
             cost: 0,
             used: 0,
         }];
-        assert!(!fallback_target_valid(10, 11, 2, std::path::Path::new("/pictures/old.jpg"), &entries));
-        assert!(!fallback_target_valid(10, 10, 2, std::path::Path::new("/pictures/old.jpg"), &entries));
-        assert!(fallback_target_valid(10, 10, 2, std::path::Path::new("/pictures/new.jpg"), &entries));
-        assert!(!fallback_target_valid(10, 10, 3, std::path::Path::new("/pictures/new.jpg"), &entries));
+        assert!(!fallback_target_valid(
+            10,
+            11,
+            2,
+            std::path::Path::new("/pictures/old.jpg"),
+            &entries
+        ));
+        assert!(!fallback_target_valid(
+            10,
+            10,
+            2,
+            std::path::Path::new("/pictures/old.jpg"),
+            &entries
+        ));
+        assert!(fallback_target_valid(
+            10,
+            10,
+            2,
+            std::path::Path::new("/pictures/new.jpg"),
+            &entries
+        ));
+        assert!(!fallback_target_valid(
+            10,
+            10,
+            3,
+            std::path::Path::new("/pictures/new.jpg"),
+            &entries
+        ));
     }
     #[test]
     fn rgba8_density_and_conservative_upload_charge_fit_both_caps() {

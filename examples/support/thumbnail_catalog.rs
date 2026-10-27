@@ -364,7 +364,11 @@ pub(super) fn run(app: &adw::Application) {
             }
             child = widget.next_sibling();
         }
-        assert!(selected_frame.expect("thumbnail selection frame").has_css_class("selected"));
+        assert!(
+            selected_frame
+                .expect("thumbnail selection frame")
+                .has_css_class("selected")
+        );
         assert!(!button(&row, 103).gets_focus_on_click());
         for n in [104, 105, 106, 105, 104, 103] {
             view.set_thumbnail_catalog(&photos, Some(n));
@@ -387,7 +391,10 @@ pub(super) fn run(app: &adw::Application) {
             let bounds = button(&row, n).compute_bounds(&row).unwrap();
             assert_eq!(
                 (bounds.width() as i32, bounds.height() as i32),
-                (image_view::thumbnail_overlay::CELL_WIDTH, image_view::thumbnail_overlay::CELL_HEIGHT),
+                (
+                    image_view::thumbnail_overlay::CELL_WIDTH,
+                    image_view::thumbnail_overlay::CELL_HEIGHT
+                ),
                 "thumbnail cell geometry must match the configured dimensions"
             );
         }
@@ -579,10 +586,7 @@ fn production_windows(app: &adw::Application, photos: &[(usize, PathBuf)]) {
         let deadline = Instant::now() + Duration::from_secs(20);
         while !contains(window.upcast_ref(), "thumbnail-cell-118") {
             if !strip.is_mapped() {
-                motion.emit_by_name::<()>(
-                    "motion",
-                    &[&20f64, &(overlay.height() as f64 - 4.)],
-                );
+                motion.emit_by_name::<()>("motion", &[&20f64, &(overlay.height() as f64 - 4.)]);
             }
             assert!(
                 Instant::now() < deadline,

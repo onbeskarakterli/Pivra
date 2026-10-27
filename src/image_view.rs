@@ -459,9 +459,12 @@ impl ImageView {
                     slot.suppress();
                     return;
                 }
-                let (Some(window), Some(picture), Some(status), Some(loading_spinner)) =
-                    (window.upgrade(), picture.upgrade(), status.upgrade(), loading_spinner.upgrade())
-                else {
+                let (Some(window), Some(picture), Some(status), Some(loading_spinner)) = (
+                    window.upgrade(),
+                    picture.upgrade(),
+                    status.upgrade(),
+                    loading_spinner.upgrade(),
+                ) else {
                     return;
                 };
                 if !window.is_visible() {
@@ -607,11 +610,17 @@ pub(super) fn install_interaction(
     let scroll_filter = filter.clone();
     scroll.connect_scroll(move |controller, _, dy| {
         let zoom = zoom_wheel.get()
-            || controller.current_event_state().contains(gtk::gdk::ModifierType::BUTTON1_MASK);
+            || controller
+                .current_event_state()
+                .contains(gtk::gdk::ModifierType::BUTTON1_MASK);
         if !zoom {
             if let Some(picture) = weak.upgrade() {
                 if let Some(window) = picture.root().and_downcast::<adw::ApplicationWindow>() {
-                    let action = if dy > 0.0 { "next-media" } else { "previous-media" };
+                    let action = if dy > 0.0 {
+                        "next-media"
+                    } else {
+                        "previous-media"
+                    };
                     if dy != 0.0 {
                         gio::prelude::ActionGroupExt::activate_action(&window, action, None);
                     }

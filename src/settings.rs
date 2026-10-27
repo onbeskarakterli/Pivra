@@ -99,7 +99,8 @@ pub fn thumbnail_preference() -> Rc<ThumbnailPreference> {
 /// Persistent thumbnail strip height, independent from whether it is visible.
 pub fn load_thumbnail_height() -> i32 {
     let path = glib::user_config_dir().join("pivra/thumbnail-height.conf");
-    std::fs::read_to_string(path).ok()
+    std::fs::read_to_string(path)
+        .ok()
         .and_then(|value| value.trim().parse::<i32>().ok())
         .filter(|&height| (128..=560).contains(&height))
         .unwrap_or(128)
@@ -111,7 +112,8 @@ pub fn save_thumbnail_height(height: i32) {
         std::fs::create_dir_all(&dir)?;
         gio::File::for_path(dir.join("thumbnail-height.conf")).replace_contents(
             format!("{}\n", height.clamp(128, 560)).as_bytes(),
-            None, false,
+            None,
+            false,
             gio::FileCreateFlags::PRIVATE | gio::FileCreateFlags::REPLACE_DESTINATION,
             None::<&gio::Cancellable>,
         )?;
@@ -134,7 +136,9 @@ pub fn save_thumbnail_pinned(pinned: bool) {
         std::fs::create_dir_all(&dir)?;
         let bytes: &[u8] = if pinned { b"true\n" } else { b"false\n" };
         gio::File::for_path(dir.join("thumbnail-pinned.conf")).replace_contents(
-            bytes, None, false,
+            bytes,
+            None,
+            false,
             gio::FileCreateFlags::PRIVATE | gio::FileCreateFlags::REPLACE_DESTINATION,
             None::<&gio::Cancellable>,
         )?;

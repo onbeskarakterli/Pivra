@@ -211,7 +211,10 @@ fn main() {
     // Foreground loading no longer displays text. The first image has no
     // retained paintable, so its viewport remains empty until decode completes.
     assert_eq!(target.status.text().as_str(), "");
-    assert!(!target.status.is_visible(), "first-load status should be hidden");
+    assert!(
+        !target.status.is_visible(),
+        "first-load status should be hidden"
+    );
     let weak_window = target.window.downgrade();
     let weak_picture = target.picture.downgrade();
     let weak_status = target.status.downgrade();

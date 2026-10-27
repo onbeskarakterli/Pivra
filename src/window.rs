@@ -70,7 +70,10 @@ fn update_navigation_actions(window: &adw::ApplicationWindow, context: &FileCont
     let count = context.collection.items().len();
     for (name, enabled) in [
         ("previous-media", selected.is_some_and(|index| index > 0)),
-        ("next-media", selected.is_some_and(|index| index + 1 < count)),
+        (
+            "next-media",
+            selected.is_some_and(|index| index + 1 < count),
+        ),
     ] {
         if let Some(action) = window
             .lookup_action(name)
@@ -87,7 +90,9 @@ fn install_navigation_arrows(overlay: &gtk::Overlay) {
         ".pivra-navigation-glass { background-image: none; background-color: alpha(@window_bg_color, 0.50); border: 0; border-radius: 0; box-shadow: none; padding: 0; min-width: 0; min-height: 0; color: @window_fg_color; } .pivra-navigation-glass image { -gtk-icon-size: 48px; } .pivra-navigation-glass:hover { background-color: alpha(@window_bg_color, 0.56); }"
     );
     gtk::style_context_add_provider_for_display(
-        &overlay.display(), &css, gtk::STYLE_PROVIDER_PRIORITY_APPLICATION
+        &overlay.display(),
+        &css,
+        gtk::STYLE_PROVIDER_PRIORITY_APPLICATION,
     );
     // Draw open-wing chevrons explicitly: GTK symbolic icons have a fixed,
     // narrower silhouette regardless of their requested icon size.
@@ -111,8 +116,16 @@ fn install_navigation_arrows(overlay: &gtk::Overlay) {
                 .clamp(0.35, 1.0);
             let cx = f64::from(width) / 2.0;
             let cy = f64::from(height) / 2.0;
-            let tip_x = if left { cx - 32.0 * scale } else { cx + 32.0 * scale };
-            let ends_x = if left { cx + 32.0 * scale } else { cx - 32.0 * scale };
+            let tip_x = if left {
+                cx - 32.0 * scale
+            } else {
+                cx + 32.0 * scale
+            };
+            let ends_x = if left {
+                cx + 32.0 * scale
+            } else {
+                cx - 32.0 * scale
+            };
             cr.set_source_rgba(1.0, 1.0, 1.0, 0.94);
             cr.set_line_width(5.0 * scale);
             cr.set_line_cap(gtk::cairo::LineCap::Round);
@@ -162,7 +175,9 @@ fn install_navigation_arrows(overlay: &gtk::Overlay) {
     let left = previous.downgrade();
     let right = next.downgrade();
     motion.connect_motion(move |controller, x, _| {
-        let Some(widget) = controller.widget() else { return; };
+        let Some(widget) = controller.widget() else {
+            return;
+        };
         let width = widget.width() as f64;
         if let Some(button) = left.upgrade() {
             let edge = f64::from(button.width_request()) + 44.0;
@@ -328,8 +343,15 @@ pub(super) fn build(app: &adw::Application, settings: &Settings, file: Option<Op
         zoom_key.set_propagation_phase(gtk::PropagationPhase::Capture);
         zoom_key.connect_key_pressed(move |_, key, _, modifiers| {
             if !matches!(key, gdk::Key::z | gdk::Key::Z)
-                || modifiers.intersects(gdk::ModifierType::CONTROL_MASK | gdk::ModifierType::ALT_MASK | gdk::ModifierType::SUPER_MASK | gdk::ModifierType::META_MASK)
-            { return glib::Propagation::Proceed; }
+                || modifiers.intersects(
+                    gdk::ModifierType::CONTROL_MASK
+                        | gdk::ModifierType::ALT_MASK
+                        | gdk::ModifierType::SUPER_MASK
+                        | gdk::ModifierType::META_MASK,
+                )
+            {
+                return glib::Propagation::Proceed;
+            }
             zoom_for_key.set_active(!zoom_for_key.is_active());
             glib::Propagation::Stop
         });
@@ -374,20 +396,27 @@ pub(super) fn build(app: &adw::Application, settings: &Settings, file: Option<Op
             glib::Propagation::Proceed
         });
         view.on_thumbnail_select(move |index| {
-            let diagnose = std::env::var_os("PIVRA_TRACE_CLICKS")
-                .is_some_and(|value| value == "1");
-            if diagnose { eprintln!("[pivra-click] window-received index={index}"); }
+            let diagnose = std::env::var_os("PIVRA_TRACE_CLICKS").is_some_and(|value| value == "1");
+            if diagnose {
+                eprintln!("[pivra-click] window-received index={index}");
+            }
             let Some(window) = select_window.upgrade() else {
-                if diagnose { eprintln!("[pivra-click] window-gone"); }
+                if diagnose {
+                    eprintln!("[pivra-click] window-gone");
+                }
                 return;
             };
             let mut context = select_context.borrow_mut();
             if context.collection.selected_index() == Some(index) {
-                if diagnose { eprintln!("[pivra-click] already-selected index={index}"); }
+                if diagnose {
+                    eprintln!("[pivra-click] already-selected index={index}");
+                }
                 return;
             }
             if context.collection.select(index) {
-                if diagnose { eprintln!("[pivra-click] selected index={index}"); }
+                if diagnose {
+                    eprintln!("[pivra-click] selected index={index}");
+                }
                 context.revision = context.revision.wrapping_add(1);
                 select_banner.set_reveal_child(false);
                 update_title(&window, &select_title, &context);

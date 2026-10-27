@@ -126,3 +126,11 @@ If native output still lacks child detail, retain that as an evidence gap.
 - Shell and embedded Python syntax checks: PASS.
 - Real Arch failure cause and native correction acceptance remain OPEN pending
   this diagnostic output.
+
+## Follow-up: resource-limit origin and causal experiment
+
+The user subsequently supplied real native allocation/mmap ENOMEM errors.
+The 1 GiB ceiling is explicitly installed by Pivra's helper; the file-specific
+causal comparison is tracked in
+[GNOME_FACTORY_ADDRESS_SPACE_COMPARISON.md](GNOME_FACTORY_ADDRESS_SPACE_COMPARISON.md).
+The original trace and diagnostic history above remains applicable.

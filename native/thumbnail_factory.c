@@ -61,7 +61,8 @@ int main(int argc, char **argv) {
     if (diagnostics_enabled()) {
         g_log_set_handler("GnomeDesktop",G_LOG_LEVEL_DEBUG,diagnostic_log,NULL);
         gchar *escaped_mime=g_strescape(argv[2],NULL);
-        fprintf(stderr,"GNOME_FACTORY_CONTEXT mime=%s limits_as=1073741824 limits_cpu=15 limits_fsize=268435456\n",escaped_mime);
+        fprintf(stderr,"GNOME_FACTORY_CONTEXT mime=%s limits_as=%" G_GUINT64_FORMAT " limits_cpu=%" G_GUINT64_FORMAT " limits_fsize=%" G_GUINT64_FORMAT "\n",
+                escaped_mime,(guint64)memory.rlim_cur,(guint64)cpu.rlim_cur,(guint64)output.rlim_cur);
         g_free(escaped_mime);
     }
     int nice_result = nice(10);

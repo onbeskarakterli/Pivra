@@ -1,5 +1,10 @@
 # GNOME factory JPEG failure investigation
 
+> Follow-up: the user has confirmed RLIMIT_AS causality by native A/B/A.
+> Production now uses a bounded 2 GiB AS limit; see the production correction
+> in [the address-space record](GNOME_FACTORY_ADDRESS_SPACE_COMPARISON.md).
+> The original evidence and diagnostic history below is preserved.
+
 ## Status and evidence
 
 User-reported Arch/GNOME failure: `2023-08-12_15petq5_1.jpg`, baseline 8-bit

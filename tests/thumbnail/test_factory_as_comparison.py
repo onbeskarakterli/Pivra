@@ -13,9 +13,9 @@ from test_generation_helper import HEADER, STUB
 class Comparison(unittest.TestCase):
     def test_only_address_space_initializer_changes(self):
         source = (ROOT/'native/thumbnail_factory.c').read_text()
-        self.assertEqual(diagnostic_source(source, 1024), source)
-        higher = diagnostic_source(source, 2048)
-        self.assertEqual(higher.replace('struct rlimit memory={2048UL*1024*1024,2048UL*1024*1024};', LIMIT_LINE), source)
+        self.assertEqual(diagnostic_source(source, 2048), source)
+        lower = diagnostic_source(source, 1024)
+        self.assertEqual(lower.replace('struct rlimit memory={1024UL*1024*1024,1024UL*1024*1024};', LIMIT_LINE), source)
         for invalid in (0, 4096, -1):
             with self.assertRaises(ValueError):
                 diagnostic_source(source, invalid)
@@ -45,7 +45,7 @@ class Comparison(unittest.TestCase):
             # GNOME stub checks actual installed limits and reserves virtual
             # address space PROT_NONE: no 1.2GiB physical allocation or decoder.
             stub = '#include <sys/mman.h>\n#include <errno.h>\n' + STUB
-            stub = stub.replace('r.rlim_cur!=1024UL*1024*1024', 'r.rlim_cur!=EXPECTED_MIB*1024UL*1024')
+            stub = stub.replace('2048UL*1024*1024', 'EXPECTED_MIB*1024UL*1024')
             stub = stub.replace('(void)f;(void)m;(void)c;', '''(void)f;(void)m;(void)c;
  void *reservation=mmap(NULL,1200UL*1024*1024,PROT_NONE,MAP_PRIVATE|MAP_ANONYMOUS,-1,0);
  if(reservation==MAP_FAILED) {g_set_error_literal(e,G_IO_ERROR,G_IO_ERROR_FAILED,"controlled mmap ENOMEM");return NULL;}

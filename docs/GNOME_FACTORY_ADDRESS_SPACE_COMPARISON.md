@@ -1,5 +1,8 @@
 # GNOME factory RLIMIT_AS investigation
 
+> Current policy: 2 GiB soft/hard AS, following the user-reported native A/B/A
+> result below. The original investigation and experiment history is retained.
+
 ## Confirmed origin; remaining causal test
 
 The 1 GiB limit is **Pivra policy**, not a GNOME factory default:
@@ -110,3 +113,63 @@ native GNOME/non-GNOME regressions. It is **researched, not implemented** here.
 
 Native causality and permanent remediation remain OPEN until the comparison
 report is available. Do not interpret these controlled tests as Arch acceptance.
+
+
+## Production correction — 2026-10-28
+
+**User-reported real Arch/GNOME Wayland acceptance of the causal experiment**:
+1024 MiB fails with `mmap() failed: Cannot allocate memory`, 2048 MiB generates
+the thumbnail, then 1024 MiB fails again. The user confirmed identical JPEG,
+MIME, thumbnailer and sandbox command; CPU=15s, FSIZE=256MiB and deadline=20s
+were unchanged, and source integrity was preserved. Reported helper-tree max
+RSS was approximately 27 MiB. These are user-supplied results, not a Codex native
+run. That high-water metric is not evidence of a simultaneous RSS sum or a
+universal memory bound for other images.
+
+The production initializer now sets **AS soft=hard=2147483648 bytes** instead
+of 1073741824. This is a bounded increase in virtual mapping allowance, not a
+2 GiB physical allocation or RSS limit. It addresses the demonstrated mapping
+compatibility issue on Arch x86_64 while allowing a greater per-process address
+space and, potentially, greater memory use. The cap remains finite; this is
+not a new aggregate process-tree memory guarantee. Larger inputs still depend
+on existing admission/source/output/time controls. No automatic retry increase
+or decoder/provider fallback is introduced.
+
+Unchanged: CPU soft/hard 15s, FSIZE soft/hard 256MiB, parent 20s deadline,
+process-group cancellation/reap, admission/dedup/concurrency, source identity,
+output checks, GNOME-first selection and Freedesktop selection rules, native
+GNOME Bubblewrap/seccomp sandbox. `setrlimit` still fails closed: any failure
+returns exit 2 before creating a GNOME factory. No privileged attempt to raise
+an inherited hard limit or fallback to unbounded operation is made.
+
+The diagnostic A/B/A driver was adjusted to the new production source: 2048
+MiB is now the unmodified case and 1024 MiB the isolated lower-limit copy.
+It still refuses arbitrary limits and still runs 1024→2048→1024 for historical
+reproduction without editing the installed helper.
+
+Controlled Codex verification:
+
+- C helper built with real GLib/GIO/GdkPixbuf, stub GNOME API, `-Wall -Wextra
+  -Werror`: verifies actual soft **and** hard AS=2GiB, CPU=15s, FSIZE=256MiB.
+- Three real-kernel negative tests lower inherited hard AS/CPU/FSIZE separately;
+  helper exits 2, creates no cache and never enters the stub GNOME API.
+- Existing debug protocol, source-change, output-size and controlled VM A/B/A
+  tests retained. These are not native JPEG decode acceptance.
+- Python thumbnail suite: 52 PASS; Rust: 197 PASS. fmt/check/Clippy: PASS with
+  pre-existing warnings. No GUI/render/decoder implementation is changed.
+- Updated installed helper on real Arch and the 665-photo cold-cache/stress
+  acceptance: **NOT RUN in Codex / pending user verification**. Rebuild and
+  reinstall the native package so `/usr/bin/pivra-thumbnail-factory` is updated;
+  pulling Rust sources alone does not replace that installed binary.
+
+For a source-built native verification of the now-production 2GiB helper:
+
+```bash
+bash tests/run_gnome_factory_diagnostic.sh "/absolute/path/2023-08-12_15petq5_1.jpg" >factory-2gib.log 2>&1
+```
+
+Confirm `limits_as=2147483648`, retained CPU/FSIZE, and `generated` / exit 0.
+Then validate the rebuilt installed application with the same JPEG and the
+large mixed-size photo folder: visible thumbnail completion, scroll to new
+items, cancellation/close and unchanged source files. Do not delete the user's
+shared thumbnail cache to arrange a test; use a private test cache if needed.

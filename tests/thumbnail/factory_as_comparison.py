@@ -13,13 +13,13 @@ import tempfile
 import time
 
 ROOT = Path(__file__).resolve().parents[2]
-LIMIT_LINE = 'struct rlimit memory={1024UL*1024*1024,1024UL*1024*1024};'
+LIMIT_LINE = 'struct rlimit memory={2048UL*1024*1024,2048UL*1024*1024};'
 
 
 def diagnostic_source(source, mib):
     if mib not in (1024, 2048) or source.count(LIMIT_LINE) != 1:
         raise ValueError('unsupported experiment or changed helper source; review required')
-    return source.replace(LIMIT_LINE, f'struct rlimit memory={{{mib}UL*1024*1024,{mib}UL*1024*1024}};') if mib != 1024 else source
+    return source.replace(LIMIT_LINE, f'struct rlimit memory={{{mib}UL*1024*1024,{mib}UL*1024*1024}};') if mib != 2048 else source
 
 
 def classify(trials, stable):

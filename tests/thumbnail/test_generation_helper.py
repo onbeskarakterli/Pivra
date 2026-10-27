@@ -2,6 +2,7 @@
 This certifies IPC/limits/identity guards, NOT GNOME generation or source decode.
 """
 import os
+import resource
 from pathlib import Path
 import shlex
 import subprocess
@@ -27,9 +28,10 @@ STUB='''#include <libgnome-desktop/gnome-desktop-thumbnail.h>
 #include <unistd.h>
 GnomeDesktopThumbnailFactory *gnome_desktop_thumbnail_factory_new(GnomeDesktopThumbnailSize s) {
  (void)s; struct rlimit r;
- if(getrlimit(RLIMIT_AS,&r)||r.rlim_cur!=1024UL*1024*1024) _exit(20);
- if(getrlimit(RLIMIT_CPU,&r)||r.rlim_cur!=15) _exit(21);
- if(getrlimit(RLIMIT_FSIZE,&r)||r.rlim_cur!=256UL*1024*1024) _exit(22);
+ if(getenv("FACTORY_ENTERED")) g_file_set_contents(getenv("FACTORY_ENTERED"),"entered",-1,NULL);
+ if(getrlimit(RLIMIT_AS,&r)||r.rlim_cur!=2048UL*1024*1024||r.rlim_max!=2048UL*1024*1024) _exit(20);
+ if(getrlimit(RLIMIT_CPU,&r)||r.rlim_cur!=15||r.rlim_max!=15) _exit(21);
+ if(getrlimit(RLIMIT_FSIZE,&r)||r.rlim_cur!=256UL*1024*1024||r.rlim_max!=256UL*1024*1024) _exit(22);
  return g_object_new(G_TYPE_OBJECT,NULL);
 }
 char *gnome_desktop_thumbnail_path_for_uri(const char *u,GnomeDesktopThumbnailSize s) { (void)u;(void)s;return g_strdup(getenv("STAMP")); }
@@ -73,16 +75,34 @@ class Generation(unittest.TestCase):
   flags=shlex.split(subprocess.check_output(['pkg-config','--cflags','--libs','gio-2.0','gobject-2.0','gdk-pixbuf-2.0'],text=True))
   cls.binary=cls.root/'helper'
   subprocess.run(['cc','-O2','-Wall','-Wextra','-Werror',f'-I{cls.root}',str(ROOT/'native/thumbnail_factory.c'),str(stub),'-o',str(cls.binary),*flags],check=True)
- def run_case(self,mode='missing',**extra):
+ def run_case(self,mode='missing',limits=None,**extra):
   with tempfile.TemporaryDirectory(dir=self.root) as tmp:
    source=Path(tmp)/'source.png';source.write_bytes(b'synthetic API input; not decoded')
    stamp=Path(tmp)/'saved'
-   result=subprocess.run([str(self.binary),source.as_uri(),'image/png',str(int(source.stat().st_mtime)),mode],env={**os.environ,**extra,'STAMP':str(stamp)},capture_output=True,text=True,timeout=5)
+   def apply_limits():
+    for which,value in (limits or []):
+     resource.setrlimit(which,(value,value))
+   result=subprocess.run([str(self.binary),source.as_uri(),'image/png',str(int(source.stat().st_mtime)),mode],env={**os.environ,**extra,'STAMP':str(stamp)},capture_output=True,text=True,timeout=5,preexec_fn=apply_limits if limits else None)
    self.source_ctime=source.stat().st_ctime_ns
    self.cache_mtime=stamp.stat().st_mtime_ns if stamp.exists() else 0
    return result,stamp.exists()
  def test_generate_limits_and_save(self):
   p,saved=self.run_case();self.assertEqual((p.returncode,p.stdout,saved),(0,'generated\n',True))
+ def test_2gib_address_space_and_other_limits_are_reported(self):
+  p,saved=self.run_case(PIVRA_TRACE_GNOME_THUMB='1')
+  self.assertEqual((p.returncode,saved),(0,True))
+  self.assertIn('limits_as=2147483648 limits_cpu=15 limits_fsize=268435456',p.stderr)
+ def assert_limit_failure_stops_before_factory(self,which,value):
+  marker=self.root/f'entered-{which}'
+  p,saved=self.run_case(limits=[(which,value)],FACTORY_ENTERED=str(marker))
+  self.assertEqual((p.returncode,p.stdout,saved),(2,'',False))
+  self.assertFalse(marker.exists(),'GNOME factory entered after limit failure')
+ def test_inherited_address_space_hard_limit_fails_closed(self):
+  self.assert_limit_failure_stops_before_factory(resource.RLIMIT_AS,1024**3)
+ def test_inherited_cpu_hard_limit_fails_closed(self):
+  self.assert_limit_failure_stops_before_factory(resource.RLIMIT_CPU,10)
+ def test_inherited_output_hard_limit_fails_closed(self):
+  self.assert_limit_failure_stops_before_factory(resource.RLIMIT_FSIZE,128*1024**2)
  def test_cache_hit_does_not_regenerate(self):
   p,saved=self.run_case(CACHED='1');self.assertEqual((p.returncode,p.stdout,saved),(0,'cached\n',False))
  def test_stale_forces_generation_despite_seconds_cache_match(self):

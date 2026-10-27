@@ -26,7 +26,8 @@ int main(int argc, char **argv) {
      * and their expanded image frames (the previous 4MiB killed 33MiB frames). */
     struct rlimit cpu={15,15}, output={256UL*1024*1024,256UL*1024*1024};
     if (setrlimit(RLIMIT_AS,&memory) || setrlimit(RLIMIT_CPU,&cpu) || setrlimit(RLIMIT_FSIZE,&output)) return 2;
-    (void)nice(10);
+    int nice_result = nice(10);
+    (void)nice_result; /* Best effort; preserve the original nonfatal behavior. */
     errno=0; char *end=NULL;
     gint64 mtime=g_ascii_strtoll(argv[3],&end,10);
     if (errno || !end || *end || mtime<0 || (gint64)(time_t)mtime!=mtime) return 2;

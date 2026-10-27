@@ -1,0 +1,7 @@
+# DRAFT: copy to release-source.conf ONLY after the owner approves the main
+# release commit and the downloaded archive is independently verified.
+# No dev HEAD, tag-name-only source, fabricated digest, or checksum bypass.
+release_commit=''
+release_url=''
+release_sha256=''
+# URL must be https://github.com/onbeskarakterli/Pivra/archive/<full-commit>.tar.gz

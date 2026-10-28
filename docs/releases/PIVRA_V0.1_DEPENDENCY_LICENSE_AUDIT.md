@@ -1,5 +1,11 @@
 # Pivra 0.1.0 dependency license audit
 
+> B6 recheck (2026-10-29): project license, Cargo.lock and the 184-package
+> inventory still match this audit; exact crate archives/notices were collected
+> again offline with checksum verification. This is source-license consistency,
+> not a fresh CVE audit or a binary-install verification. See the
+> [B6 report](PIVRA_V0.1_B6_READINESS_AUDIT.md).
+
 Date: 2026-10-27 (Europe/Istanbul). Baseline: `be2b9e1a6cbd4880e54b5546bb5ec7727bd25e86`.
 Project license decision: **GPL-3.0-only**.
 

@@ -1,5 +1,11 @@
 # PIV-RELEASE-01 — Pivra v0.1.0 final yayın denetimi
 
+> Historical release-01 audit: the five-blocker decision below describes its
+> original source and test date. Current B1/B2 GUI results, B3/B4 closure, B5
+> user-reported package acceptance and remaining B6 issues are recorded in the
+> [B6 readiness audit](PIVRA_V0.1_B6_READINESS_AUDIT.md). Retained FAIL evidence
+> below is not a claim that those same regressions still fail today.
+
 Tarih: 26.10.2026 · Europe/Istanbul · Dal: dev.
 
 ## 1. Yönetici özeti

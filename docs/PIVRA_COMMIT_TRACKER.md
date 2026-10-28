@@ -1,5 +1,27 @@
 # Pivra — Planlı Commit ve İlerleme Takibi
 
+## B6 — Güncel yayın hazırlığı kaydı — 29.10.2026
+
+Denetlenen ve kullanıcı tarafından native paketi kabul edilen kaynak:
+`e8fc9ec011ad6759bc6eef018b9a6f71465f80f1`. **B5 native paket kabulü PASS
+(kullanıcı bildirimi)**: temiz makepkg/SHA-256, kurulu paket bütünlüğü,
+kaldırma/yeniden kurulum, GNOME thumbnail stress, scrollbar, video atlama,
+pencere ölçüsü/maximize ve 2 GiB helper. Bunlar Codex'te yeniden native
+çalıştırılmış gibi sunulmaz. Tarihsel B5 NO-GO/NOT RUN kayıtları korunur.
+
+**B6: PARTIAL.** Yeni Codex: 197 Rust, Python thumbnail 52 + observer/report 33
++ bellek sürücüsü 9 PASS; dört GUI kapısı X11 ve Sway üzerinde PASS. fmt/check ve
+normal Clippy PASS; strict `--all-targets -- -D warnings` mevcut uyarılardan FAIL.
+`Preload exceeds cache entry budget` tek gözlemi OPEN OBSERVATION; neden/fix
+kanıtlanmadı. Final onaylı release-source/.SRCINFO/yayın kapısı BLOCKED; gerçek
+Nautilus/bağımsız Codex Arch kabulü NOT RUN. Faz 0/PIV-18/TH/FD kapsam kapıları
+bu kayıtla topluca DONE yapılmadı; PIV-19 ve sonrası başlamadı.
+
+Tam komutlar, kanıt ayrımı, değişiklik SHA'ları ve kalan kararlar:
+[B6 audit](releases/PIVRA_V0.1_B6_READINESS_AUDIT.md).
+Bu görev yalnız dokümandır; main/tag/release/AUR/CI değiştirilmedi.
+
+
 **Kaynak:** [Özellik Şartnamesi](PIVRA_FEATURE_SPEC_TR.md) · [Yol Haritası](PIVRA_DEVELOPMENT_ROADMAP.md)  
 **Branch:** `dev` · **Durum:** PIV-01 **DONE (21.10.2026)**; PIV-02 **DONE (21.10.2026, Xvfb GTK pencere doğrulaması)**; PIV-03 **DONE (21.10.2026)**; PIV-04 **DONE (21.10.2026; grafik test kategorileri ayrı)**; PIV-05 **DONE (21.10.2026; belgeleme/probe kapsamı)**; PIV-06 **DONE (21.10.2026; dosya/URI ve desktop giriş altyapısı; gerçek Nautilus NOT RUN)**; PIV-07 **DONE (21.10.2026; sırasız komşu medya keşfi)**; PIV-08 **DONE (21.10.2026; deterministik doğal sıra)**; PIV-09 **DONE (21.10.2026; Arch gerçek JPEG/PNG/EXIF, otomatik geometri ve güvenli aktif-decode kapanış PASS)**; PIV-10 **DONE (22.10.2026; native piksel/Fit/gezinti PASS ve kullanıcı fiziksel sol/sağ doğrulaması)**; PIV-11 **DONE (22.10.2026; Arch native probe exit0 ve gerçek GNOME Yenile PASS)**; PIV-12 **DONE (24.10.2026; Arch secure medya hata testi ve manuel iki pencere izolasyonu PASS)**; PIV-13 **DONE (24.10.2026; Arch gerçek secure Fit/Fill/%100 probe exit0 ve GNOME manuel kontrol PASS)**; PIV-14 **DONE (24.10.2026; Arch secure zoom/pan probe exit0 ve GNOME gerçek fare kabulü PASS)**; PIV-15 **DONE (24.10.2026; Arch secure resampling probe exit0 ve GNOME manuel Smooth/Nearest PASS)**; PIV-16 **DONE (24.10.2026; Arch secure async/aktif decoder kapanış exit0 ve GNOME manuel hızlı gezinme PASS)**; PIV-17 **DONE (kullanıcı native/manuel kabul kaydı)**; PIV-18 **TESTING**; PIV-19–60 TODO, başlatılmadı. Faz 0 **INCOMPLETE** (temiz native kurulum yeniden üretimi NOT RUN). Güncel kapanış kanıtı son bölümde; 20.10.2026 kayıtları tarihçedir. Burada listelenen `PIV-xx` kimlikleri gerçek Git commit SHA'sı **değildir**.
 
@@ -32,7 +54,7 @@
 | PIV-09 | `feat: render JPEG PNG with orientation` | Arch gerçek JPEG/PNG/EXIF, iki görüntü/otomatik geometri ve aktif secure-decode kapanış/temizlik PASS; iki decoder zaman çakışması NOT MEASURED | **DONE — 21.10.2026** | İlk uygulama: `1685139d47afdd55ac47699726f49a66aa270bfc`; yeni probe: `66af846ae4b153ad1415c7d8ff7f2612896817e7`; Arch kanıtı: `c42774da2b0448a4014500dc4545a4b399d58d28` |
 | PIV-10 | `feat: navigate previous and next media` | 54 Rust + 30 Python, otomatik native pixel/Fit/rapid/error/independent window PASS (exit0); gerçek GNOME fiziksel sol/sağ PASS, Loading image securely mesajı yükleme sonrasında kayboluyor; Tab için odaklanacak düğme yok | **DONE — 22.10.2026** | `028b747`, `b69ba2c`, `8403d12`, `80e501d`; tam SHA ve kanıt son bölümde |
 | PIV-11 | `feat: watch folder changes and external modifications` | Arch gerçek GIO ve Glycin Yenile probe exit0; GNOME Yenile yeni görüntü PASS | **DONE — 22.10.2026** | `078d028`, `5dd8f14`; tam SHA aşağıda |
-| PIV-12 | `test: harden media failures and window isolation` | 57 Rust + 30 Python, 18 scoped GTK/GIO PASS; native decoder kabulü NOT RUN | **TESTING** | `7b48e94`, `2b76543`; tam SHA aşağıda |
+| PIV-12 | `test: harden media failures and window isolation` | İlk Codex kaydı tarihsel; Arch secure/manuel iki pencere kabulü kullanıcı tarafından PASS, [kapanış kanıtı](PIV12_VALIDATION.md#piv-12-native-ve-manuel-kabul-kapanışı--24102026--done) | **DONE — 24.10.2026, kullanıcı native/manuel kabulü** | `b12970f6a3a7ea2dddc890a747977d5d68437a63`; önceki SHA/kayıtlar aşağıda |
 
 ## Faz 2 — Zoom, pan, ağır medya ve kaynak yönetimi
 

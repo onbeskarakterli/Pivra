@@ -1,7 +1,14 @@
 # Arch packaging draft — NOT ready for AUR publication
 
 Only `pivra` 0.1.0-1 / x86_64 is designed here. There is no approved main release
-commit/tag/archive digest yet. No package was built or installed by makepkg.
+commit/tag/archive digest recorded in this checkout yet. Clean makepkg,
+checksum validation, installed integrity and removal/reinstallation at
+`e8fc9ec011ad6759bc6eef018b9a6f71465f80f1` are now **user-reported native PASS**.
+They were not independently repeated by Codex. Older NOT RUN/B5 NO-GO text
+below records its date; current status is in the
+[B6 audit](../../docs/releases/PIVRA_V0.1_B6_READINESS_AUDIT.md).
+This checkout still has no approved `release-source.conf` or `.SRCINFO`; the
+fail-closed source gate remains intentional. No AUR publication is claimed.
 Read [implementation evidence](../../docs/releases/PIVRA_V0.1_ARCH_PACKAGE_IMPLEMENTATION.md)
 and [dependency evidence](../../docs/releases/PIVRA_V0.1_ARCH_DEPENDENCIES.md).
 
@@ -131,7 +138,9 @@ still require final delivery review; merely copying a GPL text is insufficient.
   photos, ~/.config, ~/.cache, shared thumbnails and user MIME defaults survive.
 - Icon provenance/owner visual acceptance beyond controlled rendering.
 
-B5 remains **NO-GO** until real Arch installation/removal and native gates pass.
+Historical gate: B5 required real Arch installation/removal and native gates.
+Those package checks are now user-reported PASS at `e8fc9ec`; final release
+source approval/publication remains open (see the B6 audit).
 No AUR publication, tag, release, main change, security change or decoder fallback
 is part of this draft.
 

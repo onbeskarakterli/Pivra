@@ -1,5 +1,27 @@
 # Pivra — Geliştirme Yol Haritası
 
+## B6 — Güncel yayın hazırlığı kaydı — 29.10.2026
+
+Denetlenen ve kullanıcı tarafından native paketi kabul edilen kaynak:
+`e8fc9ec011ad6759bc6eef018b9a6f71465f80f1`. **B5 native paket kabulü PASS
+(kullanıcı bildirimi)**: temiz makepkg/SHA-256, kurulu paket bütünlüğü,
+kaldırma/yeniden kurulum, GNOME thumbnail stress, scrollbar, video atlama,
+pencere ölçüsü/maximize ve 2 GiB helper. Bunlar Codex'te yeniden native
+çalıştırılmış gibi sunulmaz. Tarihsel B5 NO-GO/NOT RUN kayıtları korunur.
+
+**B6: PARTIAL.** Yeni Codex: 197 Rust, Python thumbnail 52 + observer/report 33
++ bellek sürücüsü 9 PASS; dört GUI kapısı X11 ve Sway üzerinde PASS. fmt/check ve
+normal Clippy PASS; strict `--all-targets -- -D warnings` mevcut uyarılardan FAIL.
+`Preload exceeds cache entry budget` tek gözlemi OPEN OBSERVATION; neden/fix
+kanıtlanmadı. Final onaylı release-source/.SRCINFO/yayın kapısı BLOCKED; gerçek
+Nautilus/bağımsız Codex Arch kabulü NOT RUN. Faz 0/PIV-18/TH/FD kapsam kapıları
+bu kayıtla topluca DONE yapılmadı; PIV-19 ve sonrası başlamadı.
+
+Tam komutlar, kanıt ayrımı, değişiklik SHA'ları ve kalan kararlar:
+[B6 audit](releases/PIVRA_V0.1_B6_READINESS_AUDIT.md).
+Bu görev yalnız dokümandır; main/tag/release/AUR/CI değiştirilmedi.
+
+
 **Durum:** PIV-01–08 DONE (giriş, keşif ve doğal sıra); PIV-09 DONE (Arch gerçek JPEG/PNG/EXIF, geometri ve aktif-decode kapanış/temizlik PASS); PIV-10 DONE (native gerçek secure piksel/Fit ve fiziksel sol/sağ gezinme PASS); PIV-11 DONE (Arch native ve GNOME Yenile PASS); PIV-12 DONE (24.10.2026 native + manuel kabul); PIV-13 DONE (24.10.2026 Arch native ve manuel kabul); PIV-14 DONE (24.10.2026 Arch native + gerçek fare kabulü); PIV-15 DONE (24.10.2026 Arch native ve manuel Smooth/Nearest kabulü); PIV-16 DONE (24.10.2026 Arch native + manuel kabul); PIV-17 DONE (Arch native + manuel kabul); PIV-18 TESTING; PIV-19–60 TODO. Faz 0 INCOMPLETE: temiz native kurulumun bağımsız yeniden üretimi NOT RUN; temiz Cargo target derlemesi ve headless regresyonlar geçti. [PIV-05 kanıtı ve ayrı faz kapısı](PIVRA_TECHNICAL_CAPABILITIES.md#102-piv-05-ve-faz-0-kapanışını-ayrı-değerlendirme).
 **Başlangıç branch:** `dev` · **Kararlı sürümler:** `main`  
 **Kaynak şartname:** [PIVRA_FEATURE_SPEC_TR.md](PIVRA_FEATURE_SPEC_TR.md)  

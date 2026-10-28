@@ -12,26 +12,34 @@ without an early low-resolution preview pipeline.
   control or `Z`; the default wheel behavior navigates media. Smooth/Nearest
   filtering reuses the decoded texture.
 - Naturally sorted, nonrecursive folder catalogs; Left/Right navigation stops
-  at the boundaries. Each window has independent selection and loading state.
+  at the boundaries and skips video/unsupported candidates to the next JPEG/PNG.
+  Catalog entries are retained; each window has independent selection/loading.
 - An overlay thumbnail strip with selection/navigation, scrolling, pinning,
   resizing and saved visibility preferences; GNOME-first provider selection,
-  with Freedesktop fallback and bounded in-memory thumbnail storage.
+  with a Freedesktop alternative when GNOME is unavailable/disabled at session
+  selection, and bounded in-memory thumbnail storage. File errors do not switch
+  the session provider.
 - Folder monitoring updates catalog membership. Changes to the selected file
   produce a Refresh notice; the file is not automatically reloaded.
 - Cancellable asynchronous loading, per-window image cache and adjacent-image
   preload. Cache accounting is bounded, but is not a hard process-RSS/VRAM cap.
-- Per-window fullscreen through the existing GTK window.
+- Per-window fullscreen through the existing GTK window. Normal window size
+  and maximized state persist; fullscreen dimensions do not overwrite normal size.
 
 Video entries can appear in the folder catalog, but **video playback and image
 editing are not available**. GIF/WebP/APNG animation is not supported. Other
 catalog candidates do not imply display/decoder support.
 
-This is release preparation on `dev`, not an announcement of a published tag,
-package or GitHub Release. Current Codex checks cover Rust and controlled
-X11/Xvfb and headless Sway regressions; they do **not** establish real GNOME or
-secure Glycin decode acceptance. Historical user-reported Arch results remain
-attributed to the user. Clean native installation and Nautilus acceptance remain
-separate open gates.
+This remains release preparation on `dev`, not a published tag or AUR package.
+The user reports clean Arch build/checksum/package integrity, removal/reinstall,
+GNOME/Wayland thumbnail stress, video skipping, window persistence and the 2 GiB
+GNOME-helper correction PASS at `e8fc9ec`. These are **user-reported native
+results**, separate from Codex's controlled checks. See the
+[B6 readiness audit](docs/releases/PIVRA_V0.1_B6_READINESS_AUDIT.md).
+Final approved release source/metadata and real Nautilus acceptance remain open.
+The one-off `Preload exceeds cache entry budget` observation remains unresolved;
+subsequent successful tests do not establish a fix. Strict all-target Clippy
+with `-D warnings` also remains failing on existing warnings.
 
 See [v0.1.0 release notes](docs/releases/PIVRA_V0.1_RELEASE_NOTES.md),
 [dependency license audit](docs/releases/PIVRA_V0.1_DEPENDENCY_LICENSE_AUDIT.md),

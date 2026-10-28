@@ -36,7 +36,9 @@ GNOME/Wayland thumbnail stress, video skipping, window persistence and the 2 GiB
 GNOME-helper correction PASS at `e8fc9ec`. These are **user-reported native
 results**, separate from Codex's controlled checks. See the
 [B6 readiness audit](docs/releases/PIVRA_V0.1_B6_READINESS_AUDIT.md).
-Final approved release source/metadata and real Nautilus acceptance remain open.
+The user additionally reports JPEG-default/Nautilus double-click and PNG
+Open With rendering PASS; Loupe remains the PNG default. These physical checks
+were not run by Codex. Final approved release source/metadata remain separate.
 The one-off `Preload exceeds cache entry budget` observation remains unresolved;
 subsequent successful tests do not establish a fix. B6-W1 now passes strict
 all-target Clippy with `-D warnings` and zero warnings; other release gates

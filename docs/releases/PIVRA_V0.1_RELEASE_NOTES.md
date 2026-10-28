@@ -55,7 +55,8 @@ content type and resource limits are checked by the secure loading path.
 - Clean Arch makepkg, source SHA-256, installed package integrity and
   removal/reinstallation are user-reported PASS at the audited source.
   Final release-source approval, generated .SRCINFO and publication remain
-  separate; actual Nautilus integration is not explicitly accepted by this report.
+  separate. The user reports Nautilus JPEG double-click and PNG Open With
+  rendering PASS. Pivra is the JPEG default; Loupe remains the PNG default.
 - One unreproduced `Preload exceeds cache entry budget` during main-image
   loading remains OPEN OBSERVATION, with no confirmed cause or fix.
 - B6-W1 closes the strict all-target Clippy warning gate without changing
@@ -107,3 +108,16 @@ No project copyright owner is inferred, and no release is published here.
 [technical capabilities](../PIVRA_TECHNICAL_CAPABILITIES.md),
 [release-01 audit](PIVRA_V0.1_FINAL_RELEASE_AUDIT.md) and milestone validation
 records remain available; prior open/closed statements describe their dates.
+
+
+## B6-F1 native desktop acceptance
+
+Received 2026-10-29 as user-reported Arch/GNOME results: Pivra is registered for
+JPEG/PNG, selected as JPEG default; Loupe remains PNG default. Nautilus JPEG
+double-click and PNG Open With → Pivra render real images: PASS. Existing B5
+package install/remove and W1 strict all-target Clippy (zero warnings) are
+reported PASS. The new physical-test message does not specify a binary SHA;
+B5's earlier source remains pinned to `e8fc9ec`, not silently reassigned.
+Codex did not perform these physical tests or change MIME associations.
+The RC is preparatory only; final source/risk approval and publication are
+separate. The preload observation remains open, not fixed or silently accepted.

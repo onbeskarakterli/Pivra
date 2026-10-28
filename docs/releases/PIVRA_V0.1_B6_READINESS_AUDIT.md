@@ -17,10 +17,42 @@ B6-W1 strict all-target Clippy now PASSes with zero warnings; no lint policy
 was relaxed. Release preparation still needs approved final immutable
 source/archive SHA-256 and generated release metadata. The one-off preload observation must remain visible for a
 release-risk decision; it is neither a reproduced confirmed defect nor fixed.
-Explicit Nautilus acceptance has not been supplied by this report. No newly
+Explicit Nautilus acceptance has now been supplied by the user in B6-F1 below. No newly
 confirmed product crash was found by these checks. PIV-18's wider historical
 scope, TH-03/FD native gates and independent phase acceptance are not silently
 marked DONE; v0.1.0 is the stated full-only JPEG/PNG scope below.
+
+## B6-F1 — native desktop acceptance and candidate snapshot
+
+Received 2026-10-29. Starting/reviewed code commit:
+`eabc0e51eb9434c72a0b08ab1c7fbfbba5eaf2a7`. The following are **user-reported
+native Arch/GNOME acceptance**, not Codex physical tests:
+
+| Acceptance | User result |
+|---|---|
+| JPEG association | Pivra registered and selected as default |
+| PNG association | Pivra registered; **Loupe remains default** |
+| Nautilus JPEG double-click | PASS |
+| Nautilus PNG Open With → Pivra | PASS |
+| Actual JPEG and PNG rendering | PASS |
+| Existing B5 package installation/removal | PASS (earlier package source `e8fc9ec`) |
+| B6-W1 strict all-target Clippy | PASS, zero warnings |
+
+The F1 physical-test message does not separately identify its binary commit;
+no invented SHA is attached to those desktop results. B5's earlier exact source
+and W1's Codex command evidence retain their original references. Pivra is not
+claimed as the PNG default or a video handler; no association is changed here.
+The explicit Nautilus gate is now satisfied by the user report, without turning
+it into an independently repeated Codex native test.
+
+This documentation snapshot records acceptance before freezing a full-SHA RC.
+A follow-up records the real source archive hash, separate RC-only packaging
+workspace and tooling/test results. It does not approve a final main source,
+create a tag, publish anything, or claim `.SRCINFO` has been generated.
+`Preload exceeds cache entry budget` remains OPEN and unfixed. The project
+owner's blocker-versus-accepted-risk disposition is requested separately; until
+explicitly answered, it remains an unresolved release decision, not implicitly
+accepted. Overall B6 remains PARTIAL pending that decision and candidate gates.
 
 ## B6-W1 — strict warning cleanup — 2026-10-29
 
@@ -136,8 +168,8 @@ output or native transcript was attached to this request; none is fabricated.
 
 **B5 native package acceptance: PASS (user-reported at this exact source).**
 This does not mean a main release commit/tag is approved, an AUR package exists,
-or bit-identical artifacts were reproduced twice. Actual Nautilus/Open With,
-explicit user-data-preservation assertions on removal, 32-bit platforms, Rust
+or bit-identical artifacts were reproduced twice. Actual Nautilus/Open With
+is now user-reported PASS in F1; explicit user-data-preservation assertions on removal, 32-bit platforms, Rust
 1.85 compilation and independent Codex Arch installation remain **NOT RUN /
 not separately evidenced**. Removal/reinstall PASS is not silently expanded
 into all those additional claims. The historical B5 NO-GO records are retained

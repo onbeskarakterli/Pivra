@@ -10,7 +10,7 @@ fn main() {
     // their temporary OUT_DIR into the installed viewer's runtime fallback.
     if env::var_os("PIVRA_DISTRIBUTION_BUILD").is_some_and(|value| value == "1") {
         println!("cargo:rustc-env=PIVRA_BUILT_THUMBNAIL_FACTORY=");
-        println!("cargo:warning=Distribution build: thumbnail helper resolved at runtime");
+        println!("cargo::metadata=gnome-helper-status=runtime-sibling");
         return;
     }
     let output = PathBuf::from(env::var_os("OUT_DIR").unwrap()).join("pivra-thumbnail-factory");
@@ -50,7 +50,7 @@ fn main() {
                     "cargo:rustc-env=PIVRA_BUILT_THUMBNAIL_FACTORY={}",
                     output.display()
                 );
-                println!("cargo:warning=GNOME thumbnail generation helper: {module}");
+                println!("cargo::metadata=gnome-helper-status=built:{module}");
                 return;
             }
             println!(
@@ -60,5 +60,8 @@ fn main() {
         }
     }
     println!("cargo:rustc-env=PIVRA_BUILT_THUMBNAIL_FACTORY=");
-    println!("cargo:warning=GNOME factory development API unavailable; thumbnail cache-only mode");
+    // Missing optional development headers is an expected capability, not a
+    // compiler warning. Cargo -vv retains this status; real link failures above
+    // still emit warnings, and runtime discovery/cache-only behavior is unchanged.
+    println!("cargo::metadata=gnome-helper-status=cache-only:no-development-api");
 }

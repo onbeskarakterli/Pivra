@@ -26,6 +26,14 @@ fn wait(mut condition: impl FnMut() -> bool) {
     }
 }
 
+// Border-box bounds retain the old allocation's CSS-border semantics without
+// using deprecated allocation(), raw surface shadows, or content-only width.
+fn normal_size(window: &gtk::Window, width: i32, height: i32) -> bool {
+    window
+        .compute_bounds(window)
+        .is_some_and(|bounds| bounds.width() == width as f32 && bounds.height() == height as f32)
+}
+
 fn record() -> String {
     std::fs::read_to_string(glib::user_config_dir().join("pivra/window.conf")).unwrap()
 }
@@ -88,10 +96,16 @@ fn main() {
         .flags(gio::ApplicationFlags::NON_UNIQUE)
         .build();
     app.register(None::<&gio::Cancellable>).unwrap();
+    // Exercise the included production input boundary without starting a decode;
+    // the window-state scenario remains the real no-file production window.
+    let fixture =
+        std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/images/wide.png");
+    let opened = input::OpenedFile::from_argument(fixture.as_os_str()).unwrap();
+    assert_eq!(opened.file.path().as_deref(), Some(fixture.as_path()));
     window::build(&app, &pivra::settings::Settings::default(), None);
     let window = app.windows().into_iter().next().unwrap();
     wait(|| window.is_mapped() && window.width() > 0);
-    // allocation includes CSS borders on X11, but excludes the external
+    // Border-box bounds include CSS borders on X11, but exclude the external
     // Wayland shadow. Content width / raw surface width are not portable sizes.
     match phase.as_str() {
         "resize" => {
@@ -122,14 +136,14 @@ fn main() {
             } else {
                 window.set_default_size(880, 620);
             }
-            wait(|| window.allocation().width() == 880 && window.allocation().height() == 620);
+            wait(|| normal_size(&window, 880, 620));
             assert_eq!(window.default_size(), (880, 620));
         }
         "restart-normal" => {
             assert_eq!(window.default_size(), (880, 620));
             assert!(!window.is_maximized());
             window.set_default_size(900, 660);
-            wait(|| window.allocation().width() == 900 && window.allocation().height() == 660);
+            wait(|| normal_size(&window, 900, 660));
         }
         "verify-normal" => {
             assert!(!window.is_maximized());
@@ -146,12 +160,9 @@ fn main() {
             wait(|| window.is_maximized());
             assert_eq!(window.default_size(), (880, 620));
             window.unmaximize();
-            wait(|| {
-                !window.is_maximized()
-                    && (window.allocation().width() == 880 && window.allocation().height() == 620)
-            });
+            wait(|| !window.is_maximized() && normal_size(&window, 880, 620));
             window.set_default_size(900, 660);
-            wait(|| window.allocation().width() == 900 && window.allocation().height() == 660);
+            wait(|| normal_size(&window, 900, 660));
         }
         "fullscreen" => {
             assert!(!window.is_maximized());
@@ -160,10 +171,7 @@ fn main() {
             wait(|| window.is_fullscreen());
             assert_eq!(window.default_size(), (900, 660));
             window.unfullscreen();
-            wait(|| {
-                !window.is_fullscreen()
-                    && (window.allocation().width() == 900 && window.allocation().height() == 660)
-            });
+            wait(|| !window.is_fullscreen() && normal_size(&window, 900, 660));
             window.fullscreen();
             wait(|| window.is_fullscreen());
         }
@@ -185,10 +193,7 @@ fn main() {
             assert!(!window.is_fullscreen());
             assert_eq!(window.default_size(), (900, 660));
             window.unmaximize();
-            wait(|| {
-                !window.is_maximized()
-                    && (window.allocation().width() == 900 && window.allocation().height() == 660)
-            });
+            wait(|| !window.is_maximized() && normal_size(&window, 900, 660));
         }
         _ => panic!("unknown phase"),
     }

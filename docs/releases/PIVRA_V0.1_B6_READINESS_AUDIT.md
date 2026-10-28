@@ -2,24 +2,120 @@
 
 Date: 2026-10-29 (Europe/Istanbul). Audited application and latest user-verified
 package source: **`e8fc9ec011ad6759bc6eef018b9a6f71465f80f1`** on `dev`.
-B6 changes documentation only. No main change, tag, release, AUR upload or CI.
+Original B6 changed documentation only. The B6-W1 follow-up below is a minimal
+warning cleanup; no main change, tag, release, AUR upload or CI.
 
 ## Decision: PARTIAL; publication remains BLOCKED
 
 The application/package acceptance listed by the user is **PASS, user-reported**.
 It is no longer correct to describe those B5 installation checks as unperformed.
-Fresh controlled Rust/GUI/packaging consistency checks below also pass, except
-for the existing strict warning gate. This audit is complete as an assessment,
+The original controlled Rust/GUI/packaging consistency checks passed except
+for the strict warning gate, now closed by B6-W1 below. This audit is complete as an assessment,
 not a declaration that every release gate passed or permission to publish.
 
-Release preparation still needs an explicit warning-policy resolution (strict
-Clippy is FAIL), approved final immutable source/archive SHA-256 and generated
-release metadata. The one-off preload observation must remain visible for a
+B6-W1 strict all-target Clippy now PASSes with zero warnings; no lint policy
+was relaxed. Release preparation still needs approved final immutable
+source/archive SHA-256 and generated release metadata. The one-off preload observation must remain visible for a
 release-risk decision; it is neither a reproduced confirmed defect nor fixed.
 Explicit Nautilus acceptance has not been supplied by this report. No newly
 confirmed product crash was found by these checks. PIV-18's wider historical
 scope, TH-03/FD native gates and independent phase acceptance are not silently
 marked DONE; v0.1.0 is the stated full-only JPEG/PNG scope below.
+
+## B6-W1 — strict warning cleanup — 2026-10-29
+
+Starting commit: **`2f13309ba07950c94ed1efc6fbb6aa7247e2ee6f`**.
+**Strict gate: PASS / exit 0 / zero warnings.** Overall B6 remains PARTIAL;
+release-source approval, preload observation and native evidence boundaries
+above are not closed by warning cleanup. Native user acceptance remains pinned
+to `e8fc9ec`; W1 is not independently accepted on physical Arch/GNOME here.
+
+### Every warning addressed
+
+| Warning/source | Minimal resolution and retained behavior |
+|---|---|
+| Unused `ImageView::load_stats` (`src/image_view.rs`) | Retain useful queue diagnostics, consumed by async/preload/overlay probes. Add only a method-level `allow(dead_code)` with explicit reason for unused production/some-probe copies. No crate/module/impl blanket allowance, no diagnostics removed |
+| Identical pin icon branches (`src/thumbnail_overlay.rs`) | Set the same `bookmark-new-symbolic` icon directly. Active state, pinned CSS class, tooltip, persistence and visibility branches unchanged |
+| Deprecated GTK `allocation()` (`examples/window_state_probe.rs`) | Use supported `compute_bounds(window)` border-box bounds in a small size predicate, keeping exact width/height checks and deadlines. Do not substitute content-only width or raw shadow-including surface size; no assertion/tolerance weakened |
+| Unused included `OpenedFile.file`, `from_argument` / `from_file` in no-file probe | Actually validate the existing PNG fixture with the included production input boundary and assert its Gio path, without starting decode. Then run the same production no-file window. No unused-code allowance or stub input module |
+| Expected helper build-mode Cargo warnings (`build.rs`) | Successful built/distribution/cache-only modes become `cargo::metadata=gnome-helper-status=...`, retained in verbose build output (`cargo -vv`). Real compile/link failures still emit `cargo:warning` and retain the safe empty-fallback policy |
+
+The initial strict run reproduced the dead-code/identical-branch failures.
+After minimal changes, the full all-target command revealed no further Rust
+warnings. The normal Cargo status warning was then reclassified as metadata
+rather than discarded or globally suppressed. Build-policy regression verifies
+all three expected metadata modes, retained resolver/fallback behavior and a
+new real-compile-failure fixture that still reports a warning. That test uses a
+mock compiler/pkg-config with real build.rs/resolver execution, not native
+GNOME API proof. Cargo's metadata syntax is supported before declared Rust/Cargo
+1.85; no dependency upgrade or Cargo.lock change was made.
+
+### Fresh required verification
+
+| Command/suite | B6-W1 result |
+|---|---|
+| `cargo fmt --check` | PASS / exit 0 |
+| `cargo check --locked` | PASS / exit 0 / no warnings |
+| `cargo clippy --locked --all-targets -- -D warnings` | PASS / exit 0 / **zero warnings** |
+| `CARGO_INCREMENTAL=0 cargo test --locked` | PASS, 197 tests, 0 failures, no warnings |
+| Build thumbnail-provider/four GUI/window-state examples | PASS, no warnings |
+| Thumbnail Python discovery (`tests/thumbnail`, `test_*.py`) | PASS, **53 tests**, including 5 build-policy cases |
+| Observer/report Python discovery (`tests`, `test_*.py`) | PASS, **33 tests** |
+| Memory-driver Python discovery (`tests/fd05a`, `test_*.py`) | PASS, **9 tests** |
+| `git diff --check`; Cargo.lock hash comparison | PASS; lock hash unchanged from B6 |
+
+The one new Python test ensures helper compile failures remain visible rather
+than being silenced. Existing assertions remain; pin selection/style branches,
+geometry pixel assertions and security/resource policies were not relaxed.
+
+| Existing GUI gate | X11/Xvfb | Headless Sway/Wayland |
+|---|---|---|
+| `thumbnail_overlay_probe --catalog-regression` | PASS / exit 0 | PASS / exit 0 |
+| `view_modes_probe --synthetic --zoom-pan` | PASS / exit 0 | Initial FAIL; isolated repeat PASS / exit 0; details below |
+| `async_cancel_probe --controlled` | PASS / exit 0 | PASS / exit 0 |
+| `window_failure_race_probe` | PASS / exit 0 | PASS / exit 0 |
+
+Same private-XDG drivers as B6, `G_DEBUG=fatal-criticals`, Cairo renderer. X11
+pointer verified at `(1279,1023)` before all tests, Xlib connection held. Sway
+has XWayland disabled. Catalog regression exercises both pin/unpin paths in
+addition to existing click/scroll/navigation/visibility and window isolation.
+
+Additional directly affected window-state probe:
+
+- X11/Xvfb + Xfwm4, `bash tests/run_window_state_probe.sh --external-resize`:
+  **PASS**. Separate processes, external xdotool resize, maximize/restore,
+  fullscreen roundtrip and close/restart preserve exact border-box size checks.
+- Sway, `window_state_probe --normal-only` through the existing Wayland driver:
+  **PASS** for resize/restart/fullscreen. Maximize/restore remains **NOT RUN**
+  under this compositor, as before. Full maximize coverage is the X11 run.
+- Physical GNOME, real secure pixels, actual decoder cancellation and updated
+  Arch package installation: **NOT RUN** in W1. GTK/controller runs use synthetic
+  pixels/controlled workers; window-state/input checks start no decoder.
+
+### Retained transient Sway observation (not fixed)
+
+During the first, concurrently scheduled Sway zoom/pan run the unchanged pixel
+assertion failed at `examples/support/zoom_pan_cases.rs:57`; probe exit 101,
+Wayland driver exit 1:
+
+```text
+zoom/pan snapshot pixel mismatch Geometry { x: -84.47999999999996, y: -517.1199999999999, width: 691.1999999999999, height: 1382.3999999999999 } at 121,120
+```
+
+One isolated rerun **after the other gates completed** passed unchanged,
+exit 0. This is an observed non-reproduced GUI-test failure, not a confirmed
+production regression, nor a confirmed harness-timing diagnosis. No render,
+zoom/pan, frame synchronization, source geometry, tolerance or assertion was
+changed to obtain the rerun PASS. Warning-only changes do not establish its
+cause. Preserve both runs; do not describe this as four first-run Sway passes
+or claim a fix. This is distinct from the existing open preload observation.
+
+W1 changed code/test files: `build.rs`, `src/image_view.rs`,
+`src/thumbnail_overlay.rs`, `examples/window_state_probe.rs`,
+`tests/thumbnail/test_build_helper_policy.py`. Directly related status updates:
+this report, README, release notes, roadmap and commit tracker. No Cargo files,
+security limits, sandbox, provider priority, cache/preload policy, main, tag,
+release, AUR or CI changed. The delivery response pins the W1 commit SHA.
 
 ## Evidence classes and B5 correction
 
@@ -147,7 +243,7 @@ it does not disable provider priority or decoder security. These probes test
 production GTK actions/controllers/lifecycle with synthetic pixels or controlled
 workers, **not real decoder pixels/physical hardware/active Glycin cleanup**.
 
-### Warning debt (not fixed in this audit)
+### Original B6 warning debt (closed by B6-W1 below)
 
 Observed strict Clippy errors:
 
@@ -162,8 +258,9 @@ deprecated since 4.12 (e.g. `examples/window_state_probe.rs:125`), unused includ
 is an SDK build warning, not proof of Arch factory failure. Ordinary Clippy's
 exit 0 must not be presented as a strict-gate PASS. `tests/check.sh` includes
 that strict all-target gate and therefore cannot be called wholly green.
-No code cleanup or lint suppression was authorized here; resolve warning policy
-or authorize a separate minimal cleanup before claiming warning-clean readiness.
+No code cleanup was authorized in the original B6 audit. The separately
+authorized B6-W1 cleanup and its fresh gate evidence are recorded below;
+these original FAIL records are retained as history.
 
 ## Distribution, licenses, artifacts and unresolved risks
 
@@ -216,7 +313,7 @@ or authorize a separate minimal cleanup before claiming warning-clean readiness.
   CPU=15s, FSIZE=256MiB and deadline=20s remain. Sandbox and provider priorities
   are unchanged. Image-cache accounting similarly is not a global memory cap.
 
-## Changed files (documentation only)
+## Original B6 changed files (documentation only)
 
 - `README.md`
 - `docs/PIVRA_COMMIT_TRACKER.md`
@@ -244,8 +341,9 @@ No source, tests, Cargo files, recipe, icons, licenses or security code changed.
 | Controlled RLIMIT_AS comparison | `d2dd5641c6bd7ffbfc92e1d330ba89815842388d` |
 | Production 2 GiB fix / latest user-verified package source | `e8fc9ec011ad6759bc6eef018b9a6f71465f80f1` |
 
-Recommend a bounded next step: decide how to handle the strict warning gate and
-the open preload observation; obtain any missing Nautilus/data-preservation
+The strict warning gate is closed by B6-W1. Next decide how to handle the open
+preload observation (and the W1 transient Sway observation below); obtain any
+missing Nautilus/data-preservation
 acceptance explicitly; approve the exact immutable final release source and
 checksum, then regenerate/review metadata and package against that source.
 Do not infer publication permission from this report. B6 documentation commit

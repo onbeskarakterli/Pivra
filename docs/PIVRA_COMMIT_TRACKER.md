@@ -1,5 +1,22 @@
 # Pivra — Planlı Commit ve İlerleme Takibi
 
+## B6-W1 — Strict Clippy uyarı temizliği — 29.10.2026
+
+Başlangıç `2f13309ba07950c94ed1efc6fbb6aa7247e2ee6f`. Strict all-target
+`cargo clippy --locked --all-targets -- -D warnings` **PASS / exit0 / sıfır uyarı**.
+197 Rust, Python thumbnail 53 + observer/report 33 + bellek sürücüsü 9 PASS;
+fmt/check PASS. X11 dört GUI kapısı PASS; Sway zoom/pan ilk pixel assertion FAIL,
+diğer kapılar PASS, değişmeyen tek izole zoom/pan tekrarı PASS. İki sonuç da
+korunur, neden/fix iddiası yok. Pencere ölçü probe'u X11 tam ve Sway normal-only PASS.
+
+Üretim davranışı, bağımlılıklar, güvenlik/sağlayıcı/cache politikaları korunur;
+metot düzeyinde gerekçeli diagnostic dead-code istisnası dışında genel lint
+susturma yok. Normal build durumları metadata; gerçek helper link hataları
+uyarı kalır. **B6 PARTIAL**, preload gözlemi açık, native kabul e8fc9ec'e ait,
+final source/metadata/yayın kapıları ayrı. Önceki B6 FAIL kaydı tarihseldir.
+[Her uyarı, değişiklik, gerçek komut ve sınırlamalar](releases/PIVRA_V0.1_B6_READINESS_AUDIT.md#b6-w1--strict-warning-cleanup--2026-10-29).
+
+
 ## B6 — Güncel yayın hazırlığı kaydı — 29.10.2026
 
 Denetlenen ve kullanıcı tarafından native paketi kabul edilen kaynak:

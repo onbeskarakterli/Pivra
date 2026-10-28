@@ -58,8 +58,9 @@ content type and resource limits are checked by the secure loading path.
   separate; actual Nautilus integration is not explicitly accepted by this report.
 - One unreproduced `Preload exceeds cache entry budget` during main-image
   loading remains OPEN OBSERVATION, with no confirmed cause or fix.
-- Normal Clippy passes with warnings; strict all-target `-D warnings` fails on
-  existing dead-code/identical-branch warnings (see B6).
+- B6-W1 closes the strict all-target Clippy warning gate without changing
+  product behavior. One Sway zoom/pan pixel check failed once and passed an
+  unchanged isolated rerun; both results remain recorded, with no cause/fix claim.
 - Binary distributions must retain third-party notices and satisfy GPL/LGPL
   source/relinking duties. Source license closure does not complete packaging.
 
@@ -81,10 +82,12 @@ stress, scrollbar removal, video skipping, saved window state and the formerly
 failing JPEG under the bounded 2 GiB helper. No raw package/hash/transcript was
 supplied with this B6 report; attribution is retained rather than inventing it.
 
-Fresh Codex Debian/SDK checks: 197 Rust tests; Python thumbnail 52, observer/report
-33 and memory-benchmark 9; fmt/check and normal Clippy PASS (existing warnings).
-Four controlled GUI gates pass on both X11/Xvfb and headless Sway. Strict
-all-target Clippy fails; complete commands and limits are in the B6 audit.
+Original B6 Codex checks: 197 Rust tests; Python thumbnail 52, observer/report
+33 and memory-driver 9, with the then-failing strict lint gate. B6-W1 reruns:
+197 Rust, thumbnail 53, observer/report 33, memory-driver 9 PASS; fmt/check and
+strict all-target Clippy PASS with zero warnings. Four controlled GUI gates pass
+on X11; Sway gates pass with one initial zoom/pan FAIL and successful unchanged
+isolated rerun. Complete commands, warning fixes and limits are in the B6 audit.
 These GUI paths use synthetic pixels/controlled workers. Physical GNOME,
 real secure decode and Arch installation were **NOT RUN by Codex in B6**.
 Historical release-03/04 test results remain in their retained records.

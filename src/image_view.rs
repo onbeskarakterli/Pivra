@@ -205,6 +205,8 @@ impl ImageView {
         self.zoom_wheel.set(enabled);
     }
 
+    // Lifecycle probes consume this diagnostic; production has no stats UI.
+    #[allow(dead_code, reason = "Used by selected standalone lifecycle probes")]
     pub(super) fn load_stats(&self) -> image_requests::LoadStats {
         self.slot.stats()
     }

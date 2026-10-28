@@ -193,11 +193,7 @@ pub(crate) fn install(
         }
         if let Some(pin) = pin_click.pin.upgrade() {
             pin.set_active(pinned);
-            pin.set_icon_name(if pinned {
-                "bookmark-new-symbolic"
-            } else {
-                "bookmark-new-symbolic"
-            });
+            pin.set_icon_name("bookmark-new-symbolic");
             if pinned {
                 pin.add_css_class("pivra-pinned");
             } else {

@@ -38,8 +38,9 @@ results**, separate from Codex's controlled checks. See the
 [B6 readiness audit](docs/releases/PIVRA_V0.1_B6_READINESS_AUDIT.md).
 Final approved release source/metadata and real Nautilus acceptance remain open.
 The one-off `Preload exceeds cache entry budget` observation remains unresolved;
-subsequent successful tests do not establish a fix. Strict all-target Clippy
-with `-D warnings` also remains failing on existing warnings.
+subsequent successful tests do not establish a fix. B6-W1 now passes strict
+all-target Clippy with `-D warnings` and zero warnings; other release gates
+remain open. Its non-reproduced Sway zoom/pan test failure is retained in the audit.
 
 See [v0.1.0 release notes](docs/releases/PIVRA_V0.1_RELEASE_NOTES.md),
 [dependency license audit](docs/releases/PIVRA_V0.1_DEPENDENCY_LICENSE_AUDIT.md),

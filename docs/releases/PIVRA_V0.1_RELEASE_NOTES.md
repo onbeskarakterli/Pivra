@@ -131,3 +131,18 @@ PASS with zero warnings; 197 Rust and Python 53 + 33 + 9 PASS. Four controlled
 GUI gates PASS on both X11/Xvfb and Sway, all first F1 attempts. Physical tests
 remain user-reported; makepkg/.SRCINFO for the new candidate are NOT RUN in
 Codex. No release/tag/main/AUR/CI action is authorized by these results.
+
+
+## Frozen F1 candidate reference
+
+Reviewed dev RC: `7e26e780acffdb1f2db0f37e8cf6485eba0baa63` (same application
+code as W1 `eabc0e5`, including subsequent acceptance/risk documentation).
+Actual source archive SHA-256:
+`828a97503173f4fef568345e2d8b2334fcf35b6b587928692ac2261ef3b68277`.
+All 211 tracked files/modes and the manifest were verified against Git.
+[RC receipt and native metadata commands](PIVRA_V0.1_RELEASE_CANDIDATE.md).
+Private RC source config exists outside the repo; `.SRCINFO` generation and
+consistency remain NOT RUN (no makepkg here). Later receipt documentation
+commits are not silently substituted as this candidate source. Final main/tag/
+publication approval remains separate; B6 PARTIAL. Preload is explicitly
+accepted as a v0.1.0 risk, open/unfixed. Nautilus acceptance is user-reported PASS.

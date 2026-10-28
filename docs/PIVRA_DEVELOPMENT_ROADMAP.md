@@ -14,7 +14,14 @@ sonraki sürümlere genel risk kabulü veya yayın yetkisi değildir. Yeni Codex
 197 Rust, Python 53+33+9, fmt/check/strict Clippy ve X11/Sway dört kontrollü GUI
 kapısı PASS. B6 PARTIAL; makepkg/.SRCINFO mevcut ortamda NOT RUN, final main
 kaynağı/yayın onayı ayrı. Yalnız doküman; main/tag/release/AUR/CI yok.
-Tam SHA/arşiv doğrulaması ve ayrı RC workspace kaydı F1 sonuç belgesine işlenir.
+Final incelenen dev RC: `7e26e780acffdb1f2db0f37e8cf6485eba0baa63`.
+Gerçek GitHub arşivi SHA-256:
+`828a97503173f4fef568345e2d8b2334fcf35b6b587928692ac2261ef3b68277`.
+211 dosya içeriği/izinleri Git ile eşit, SHA256SUMS PASS. Ayrı RC workspace
+kaynak config'i gerçek PKGBUILD ile yüklendi; `.SRCINFO` üretimi ve tutarlılığı
+NOT RUN (makepkg yok). Yeni yayına onay verilmedi; B6 PARTIAL.
+[Gerçek kayıt ve native Arch komutları](releases/PIVRA_V0.1_RELEASE_CANDIDATE.md).
+Sonuç dokümanı commit'i bu sabit aday SHA'sının yerine geçirilmez.
 
 
 ## B6-W1 — Strict Clippy uyarı temizliği — 29.10.2026

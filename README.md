@@ -36,6 +36,9 @@ GNOME/Wayland thumbnail stress, video skipping, window persistence and the 2 GiB
 GNOME-helper correction PASS at `e8fc9ec`. These are **user-reported native
 results**, separate from Codex's controlled checks. See the
 [B6 readiness audit](docs/releases/PIVRA_V0.1_B6_READINESS_AUDIT.md).
+The [F1 candidate record](docs/releases/PIVRA_V0.1_RELEASE_CANDIDATE.md) pins a
+verified full-commit source archive and checksum; native `.SRCINFO` generation
+is still NOT RUN in Codex. It is not a published or approved final main release.
 The user additionally reports JPEG-default/Nautilus double-click and PNG
 Open With rendering PASS; Loupe remains the PNG default. These physical checks
 were not run by Codex. Final approved release source/metadata remain separate.

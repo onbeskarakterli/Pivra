@@ -1,6 +1,6 @@
 # B6 — Pivra 0.1.0 release readiness audit
 
-Date: 2026-10-29 (Europe/Istanbul). Audited application and latest user-verified
+Date: 2026-10-29 (Europe/Istanbul). Original B6 application/latest user-verified
 package source: **`e8fc9ec011ad6759bc6eef018b9a6f71465f80f1`** on `dev`.
 Original B6 changed documentation only. The B6-W1 follow-up below is a minimal
 warning cleanup; no main change, tag, release, AUR upload or CI.
@@ -45,9 +45,14 @@ claimed as the PNG default or a video handler; no association is changed here.
 The explicit Nautilus gate is now satisfied by the user report, without turning
 it into an independently repeated Codex native test.
 
-This documentation snapshot records acceptance before freezing a full-SHA RC.
-A follow-up records the real source archive hash, separate RC-only packaging
-workspace and tooling/test results. It does not approve a final main source,
+Final reviewed full-SHA RC: `7e26e780acffdb1f2db0f37e8cf6485eba0baa63`.
+The actual 627,913-byte archive SHA-256 is
+`828a97503173f4fef568345e2d8b2334fcf35b6b587928692ac2261ef3b68277`.
+All 211 archive file contents/executable bits match Git; SHA256SUMS verification
+PASS. Actual RC-only source config was prepared outside the repository and
+loaded by the unmodified PKGBUILD. makepkg/.SRCINFO generation and consistency
+are NOT RUN, since Arch tooling is unavailable. Full receipt, exact native
+commands and all tests: [F1 candidate record](PIVRA_V0.1_RELEASE_CANDIDATE.md). It does not approve a final main source,
 create a tag, publish anything, or claim `.SRCINFO` has been generated.
 `Preload exceeds cache entry budget` remains OPEN and unfixed. After the first
 acceptance snapshot, the project owner explicitly answered **“Accept as a
@@ -88,9 +93,10 @@ Fresh execution in the existing Codex SDK, no test assertions changed:
   generated binaries, source config, `.SRCINFO` or CI files. Limited scan is not
   a secret-free-history certification. No Cargo manifest/lock or license changed.
 
-The exact full-SHA RC and real archive digest are recorded after freezing this
-accepted-risk snapshot; the configuration stays in a separate RC-only workspace.
-It is not an approved final main source or permission to publish.
+The exact full-SHA RC/digest above refer to the frozen accepted-risk snapshot;
+configuration remains in a separate RC-only workspace. The later receipt
+commit does not change that candidate reference. This is not an approved final
+main source or permission to publish.
 
 ## B6-W1 — strict warning cleanup — 2026-10-29
 
@@ -412,11 +418,13 @@ No source, tests, Cargo files, recipe, icons, licenses or security code changed.
 | Controlled RLIMIT_AS comparison | `d2dd5641c6bd7ffbfc92e1d330ba89815842388d` |
 | Production 2 GiB fix / latest user-verified package source | `e8fc9ec011ad6759bc6eef018b9a6f71465f80f1` |
 
-The strict warning gate is closed by B6-W1. Next decide how to handle the open
-preload observation (and the W1 transient Sway observation below); obtain any
-missing Nautilus/data-preservation
-acceptance explicitly; approve the exact immutable final release source and
-checksum, then regenerate/review metadata and package against that source.
+The strict warning gate is closed by B6-W1. F1 adds user Nautilus acceptance
+and the owner's explicit acceptance of the still-open preload observation for
+v0.1.0 only. W1's transient Sway test failure remains recorded; F1 first runs
+passed unchanged. Next execute native RC metadata/package checks and any
+separately required data-preservation assertions; approve the exact final
+stable source/checksum and publication explicitly. If final source differs
+from the RC, re-verify its archive and regenerate metadata.
 Do not infer publication permission from this report. B6 documentation commit
 is provided in the delivery response; this file does not invent a self-referential
 commit hash. No next feature or release action is started.

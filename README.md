@@ -39,7 +39,8 @@ results**, separate from Codex's controlled checks. See the
 The user additionally reports JPEG-default/Nautilus double-click and PNG
 Open With rendering PASS; Loupe remains the PNG default. These physical checks
 were not run by Codex. Final approved release source/metadata remain separate.
-The one-off `Preload exceeds cache entry budget` observation remains unresolved;
+The one-off `Preload exceeds cache entry budget` observation remains open and
+unfixed. The owner explicitly accepts it as a documented v0.1.0 release risk;
 subsequent successful tests do not establish a fix. B6-W1 now passes strict
 all-target Clippy with `-D warnings` and zero warnings; other release gates
 remain open. Its non-reproduced Sway zoom/pan test failure is retained in the audit.

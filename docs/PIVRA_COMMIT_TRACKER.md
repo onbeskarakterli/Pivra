@@ -1,5 +1,22 @@
 # Pivra — Planlı Commit ve İlerleme Takibi
 
+## B6-F1 — Yayın adayı ve kullanıcı kabulü — 29.10.2026
+
+İncelenen uygulama kodu `eabc0e51eb9434c72a0b08ab1c7fbfbba5eaf2a7`.
+Kullanıcı Arch/GNOME bildirimi: JPEG kaydı/varsayılan Pivra, PNG kaydı ve
+varsayılan Loupe; Nautilus JPEG çift tıklama, PNG Open With→Pivra ve gerçek
+JPEG/PNG render PASS. B5 kurulum/kaldırma ve W1 sıfır-uyarı strict Clippy PASS
+kullanıcı kanıtı olarak kaydedildi, Codex fiziksel testi sayılmadı.
+
+Proje sahibi `Preload exceeds cache entry budget` gözlemini **v0.1.0 için
+belgelenmiş yayın riski olarak açıkça kabul etti**. Gözlem hâlâ açık/unfixed;
+sonraki sürümlere genel risk kabulü veya yayın yetkisi değildir. Yeni Codex:
+197 Rust, Python 53+33+9, fmt/check/strict Clippy ve X11/Sway dört kontrollü GUI
+kapısı PASS. B6 PARTIAL; makepkg/.SRCINFO mevcut ortamda NOT RUN, final main
+kaynağı/yayın onayı ayrı. Yalnız doküman; main/tag/release/AUR/CI yok.
+Tam SHA/arşiv doğrulaması ve ayrı RC workspace kaydı F1 sonuç belgesine işlenir.
+
+
 ## B6-W1 — Strict Clippy uyarı temizliği — 29.10.2026
 
 Başlangıç `2f13309ba07950c94ed1efc6fbb6aa7247e2ee6f`. Strict all-target

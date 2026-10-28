@@ -15,8 +15,8 @@ not a declaration that every release gate passed or permission to publish.
 
 B6-W1 strict all-target Clippy now PASSes with zero warnings; no lint policy
 was relaxed. Release preparation still needs approved final immutable
-source/archive SHA-256 and generated release metadata. The one-off preload observation must remain visible for a
-release-risk decision; it is neither a reproduced confirmed defect nor fixed.
+source/archive SHA-256 and generated release metadata. The one-off preload observation remains visible and unfixed;
+the owner explicitly accepted it as a documented v0.1.0 release risk in F1.
 Explicit Nautilus acceptance has now been supplied by the user in B6-F1 below. No newly
 confirmed product crash was found by these checks. PIV-18's wider historical
 scope, TH-03/FD native gates and independent phase acceptance are not silently
@@ -49,10 +49,48 @@ This documentation snapshot records acceptance before freezing a full-SHA RC.
 A follow-up records the real source archive hash, separate RC-only packaging
 workspace and tooling/test results. It does not approve a final main source,
 create a tag, publish anything, or claim `.SRCINFO` has been generated.
-`Preload exceeds cache entry budget` remains OPEN and unfixed. The project
-owner's blocker-versus-accepted-risk disposition is requested separately; until
-explicitly answered, it remains an unresolved release decision, not implicitly
-accepted. Overall B6 remains PARTIAL pending that decision and candidate gates.
+`Preload exceeds cache entry budget` remains OPEN and unfixed. After the first
+acceptance snapshot, the project owner explicitly answered **“Accept as a
+documented v0.1.0 release risk”** on 2026-10-29. It is therefore not a v0.1.0
+release blocker by owner decision; no cause/fix or acceptance for later versions
+is claimed. This is risk acceptance only, not publication/main/tag authorization.
+Overall B6 remains PARTIAL pending native candidate metadata and final source/
+publication approval. The final candidate snapshot includes this decision;
+the preliminary `f91c298` snapshot predates it and is not the final RC.
+
+### B6-F1 fresh candidate checks
+
+Application/build/test/packaging blobs are unchanged from reviewed code commit
+`eabc0e51eb9434c72a0b08ab1c7fbfbba5eaf2a7`; F1 edits are documentation only.
+Fresh execution in the existing Codex SDK, no test assertions changed:
+
+- `cargo fmt --check`, `cargo check --locked`,
+  `cargo clippy --locked --all-targets -- -D warnings`: PASS, zero warnings.
+- `CARGO_INCREMENTAL=0 cargo test --locked`: PASS, 197 tests.
+- Python discovery: thumbnail 53, observer/report 33, memory-driver 9 PASS.
+- Existing catalog, synthetic zoom/pan, controlled async cancellation and
+  window-failure race probes: all four PASS on X11/Xvfb and headless Sway,
+  first F1 attempts. X11 pointer verified at `(1279,1023)` before testing.
+  These are controlled/synthetic GTK tests, not real secure-decoder or
+  physical GNOME acceptance. The earlier W1 single-run Sway failure remains
+  historical evidence, not a newly claimed fix.
+- Both fixture integrity scripts, desktop-file-validate, SVG XML/path checks,
+  package Bash syntax, version/license/Cargo.lock checks: PASS.
+- Offline metadata + corresponding-source/notice collection: PASS, all 184
+  checksum-matched locked external crates (185 packages including Pivra).
+- Distribution-mode debug build and byte guard: PASS, no Cargo OUT_DIR helper
+  fallback string. This does not independently inspect a final native package.
+- Native GNOME4 helper compilation is mandatory in the actual PKGBUILD; its
+  sibling install/discovery, dependencies, source delivery and security limits
+  are unchanged. No makepkg/pacman available in Codex; `.SRCINFO` and new RC
+  package creation are NOT RUN, and no generated metadata is invented.
+- Current tracked-tree credential/artifact scan: no matching keys/tokens,
+  generated binaries, source config, `.SRCINFO` or CI files. Limited scan is not
+  a secret-free-history certification. No Cargo manifest/lock or license changed.
+
+The exact full-SHA RC and real archive digest are recorded after freezing this
+accepted-risk snapshot; the configuration stays in a separate RC-only workspace.
+It is not an approved final main source or permission to publish.
 
 ## B6-W1 — strict warning cleanup — 2026-10-29
 
@@ -206,8 +244,9 @@ that particular main-image flow. No reproduction fixture/stack/timing evidence
 was supplied for this occurrence. Unit/GUI PASS does not establish its cause
 or a fix. No assertion, cache policy, source code, error classification or
 retry behavior is changed. Record filename/dimensions, foreground/background
-selection, memory pressure and logs if it recurs. Keep it in release notes and
-obtain an explicit release-risk disposition; do not label it resolved.
+selection, memory pressure and logs if it recurs. Keep it in release notes; do not label it resolved. In B6-F1 the owner explicitly
+accepted this as a documented v0.1.0 release risk. The observation stays open;
+that decision does not establish a fix or authorize publication.
 
 ## Fresh Codex execution at the audited source
 

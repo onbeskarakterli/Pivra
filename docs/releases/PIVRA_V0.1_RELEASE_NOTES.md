@@ -58,7 +58,9 @@ content type and resource limits are checked by the secure loading path.
   separate. The user reports Nautilus JPEG double-click and PNG Open With
   rendering PASS. Pivra is the JPEG default; Loupe remains the PNG default.
 - One unreproduced `Preload exceeds cache entry budget` during main-image
-  loading remains OPEN OBSERVATION, with no confirmed cause or fix.
+  loading remains OPEN OBSERVATION, with no confirmed cause or fix. The owner
+  explicitly accepts it as a documented v0.1.0 release risk; not a blocker for
+  this version by that decision, and not authorization to publish.
 - B6-W1 closes the strict all-target Clippy warning gate without changing
   product behavior. One Sway zoom/pan pixel check failed once and passed an
   unchanged isolated rerun; both results remain recorded, with no cause/fix claim.
@@ -120,4 +122,12 @@ reported PASS. The new physical-test message does not specify a binary SHA;
 B5's earlier source remains pinned to `e8fc9ec`, not silently reassigned.
 Codex did not perform these physical tests or change MIME associations.
 The RC is preparatory only; final source/risk approval and publication are
-separate. The preload observation remains open, not fixed or silently accepted.
+separate. The preload observation remains open and unfixed; the owner explicitly accepts
+it as a documented v0.1.0 release risk (2026-10-29), without publication approval.
+
+
+F1 fresh checks on unchanged `eabc0e5` application code: fmt/check/strict Clippy
+PASS with zero warnings; 197 Rust and Python 53 + 33 + 9 PASS. Four controlled
+GUI gates PASS on both X11/Xvfb and Sway, all first F1 attempts. Physical tests
+remain user-reported; makepkg/.SRCINFO for the new candidate are NOT RUN in
+Codex. No release/tag/main/AUR/CI action is authorized by these results.

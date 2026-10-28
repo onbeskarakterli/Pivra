@@ -1,13 +1,14 @@
 # Pivra 0.1.0 — Arch paketleme taslağı uygulaması
 
-> **B6 current status — 2026-10-29:** B5 native package acceptance is
-> **PASS (user-reported)** at `e8fc9ec011ad6759bc6eef018b9a6f71465f80f1`:
-> clean makepkg, source SHA-256, installed integrity, removal/reinstallation,
-> GNOME stress and the 2 GiB helper. Original NO-GO/NOT RUN statements and
-> missing-file tables below are dated history, not current acceptance status.
-> Final approved release-source config/.SRCINFO/publication and explicit
-> Nautilus acceptance remain separate. B6 is PARTIAL; see the
-> [current audit](PIVRA_V0.1_B6_READINESS_AUDIT.md) for exact evidence boundaries.
+> **B6-F2 current status — 2026-10-29: technical GO** for accepted RC
+> `7e26e780acffdb1f2db0f37e8cf6485eba0baa63`. User-reported Arch source/hash
+> verification, actual `.SRCINFO` consistency, clean makepkg, installation,
+> Qkk 1309 files/0 altered and GNOME acceptance PASS. Older B5 NO-GO/NOT RUN
+> tables below are dated history. Codex did not independently run native Arch.
+> No main/tag/publication approval; machine-local RC config/generated metadata
+> remain outside the application repo. Preload risk is open and explicitly accepted
+> for v0.1.0; source/license duties remain. See the
+> [F2 assessment](PIVRA_V0.1_B6_READINESS_AUDIT.md).
 
 Tarih: 28.10.2026 (Europe/Istanbul). Kaynak/ikon baseline:
 `07ef59795bb154a57e419d8efff1008a9610e326` (`dev`).

@@ -5,7 +5,87 @@ package source: **`e8fc9ec011ad6759bc6eef018b9a6f71465f80f1`** on `dev`.
 Original B6 changed documentation only. The B6-W1 follow-up below is a minimal
 warning cleanup; no main change, tag, release, AUR upload or CI.
 
-## Decision: PARTIAL; publication remains BLOCKED
+## B6-F2 — current technical decision: GO; publication not authorized
+
+2026-10-29. Accepted **RC source**:
+`7e26e780acffdb1f2db0f37e8cf6485eba0baa63`.
+Archive SHA-256:
+`828a97503173f4fef568345e2d8b2334fcf35b6b587928692ac2261ef3b68277`.
+Prior receipt/documentation commit: `dd67a2117d5bdc66f0212b7221018713526d5f59`.
+Documentation commits, including this F2 record, do not replace the accepted
+source, archive or metadata. The original PARTIAL decisions below describe
+their dates; F2 closes the native RC acceptance gates using the user evidence.
+
+### Verified user-reported native Arch/GNOME RC acceptance
+
+| Native check at the accepted RC | User-reported result |
+|---|---|
+| `makepkg --verifysource --force` | PASS; both source files verified |
+| `makepkg --printsrcinfo` | PASS, exit 0 |
+| `.SRCINFO` version, immutable URL and both expected SHA-256 values | PASS; `0.1.0-1`, full-SHA RC URL, archive hash above and collector hash below match |
+| `makepkg --cleanbuild --force` | PASS, exit 0 |
+| Package produced | `pivra-0.1.0-1-x86_64.pkg.tar.zst`, approximately 22 MB (not an exact byte count) |
+| pacman installation | PASS |
+| Installed `pivra --version` | `Pivra 0.1.0` |
+| `pacman -Qkk pivra` | PASS; 1309 total files, 0 altered files |
+| Previously problematic JPEG | Opens correctly |
+| Thumbnail loading | PASS; user reports no missing thumbnails |
+| Previous/next photo navigation | PASS |
+| Normal dimensions and maximize persistence | PASS |
+| Nautilus JPEG double-click and PNG Open With | PASS; prior user acceptance retained |
+
+Expected collector SHA-256:
+`e0bad72c99f4629b0668f59450e53a75022ea746efe57191ab8da34fb5cf1201`.
+These are **user-reported native results, not independent Codex executions**.
+The native `.SRCINFO`, package binary and raw pacman log were not attached;
+no extra binary/package digest or source-contents audit is invented. Qkk is
+installed files versus pacman metadata, not a replacement for license/source
+obligations. Prior B5 removal/reinstallation acceptance remains recorded at
+its original source, not falsely claimed as a new F2 removal run.
+
+### Consistency and automated evidence
+
+- Application 0.1.0, package 0.1.0-1, x86_64 and GPL-3.0-only are consistent.
+- Current application/build/test/assets/recipe blobs equal accepted RC `7e26e78`.
+  F2 source comparison, version/license/lock, retained real archive checksum,
+  desktop validation, SVG parsing and `cargo fmt --check`: PASS.
+- Locked graph and corresponding-source/notice collector are unchanged;
+  retained F1 checks verified all 184 external crate archives/notices. Preserve
+  GPL source and LGPL/permissive notice/replacement obligations in distribution.
+- Retained F1 controlled results: strict all-target Clippy PASS/zero warnings,
+  check PASS, 197 Rust tests, Python 53+33+9, four GUI gates PASS on both X11 and
+  Sway (first F1 attempts). Logs were reviewed for unchanged RC code in F2;
+  full suites were **not rerun** in this documentation-only task.
+- F1's actual GitHub archive matches 211 Git file contents/modes; F2 rechecked
+  its retained actual bytes against the exact checksum. No new archive or tag.
+- No application source, tests, Cargo.lock, PKGBUILD or source config changed.
+  No machine-local `.SRCINFO`/release-source.conf or binary is committed.
+
+### Risk, limitations and recommendation
+
+**Technical GO for Pivra 0.1.0 at this exact accepted RC.** The formerly pending
+native source/metadata/build/install/integrity and desktop gates now have
+explicit user PASS evidence, alongside warning-clean automated/controlled
+checks. No unaccepted technical blocker is identified for the agreed JPEG/PNG
+v0.1.0 scope. This is not an assertion that all planned PIV/FD/TH work is DONE.
+
+`Preload exceeds cache entry budget`: **OPEN — explicitly accepted by the owner
+as a documented v0.1.0 release risk.** Not fixed, not silently dropped, and no
+preload/cache change. The earlier W1 isolated Sway test mismatch also stays
+recorded as unclassified; its rerun and all first F1 runs passed, without a fix
+claim. Not every platform, Rust 1.85, GPU/backend, memory pressure or race case
+is covered; cache accounting and per-process AS are not whole-system RSS caps.
+
+**Publication authorization: NOT GRANTED.** This task is technical acceptance,
+not permission to change main, create a tag, publish GitHub/AUR artifacts or
+enable CI. Those actions remain on hold for explicit owner authorization.
+If publishing a different commit/archive (even a docs-only successor), verify
+its own source SHA-256 and regenerate/review package metadata rather than
+reusing the accepted RC checksum. Retain required licenses/corresponding source.
+No independent Codex Arch/native execution is claimed or required to rename
+this explicit user acceptance as a technical NO-GO.
+
+## Historical B6/F1 decision: PARTIAL; no publication authorization
 
 The application/package acceptance listed by the user is **PASS, user-reported**.
 It is no longer correct to describe those B5 installation checks as unperformed.
@@ -21,6 +101,20 @@ Explicit Nautilus acceptance has now been supplied by the user in B6-F1 below. N
 confirmed product crash was found by these checks. PIV-18's wider historical
 scope, TH-03/FD native gates and independent phase acceptance are not silently
 marked DONE; v0.1.0 is the stated full-only JPEG/PNG scope below.
+
+### F2 documentation changes and verification boundary
+
+Changed: `README.md`, `docs/PIVRA_COMMIT_TRACKER.md`,
+`docs/PIVRA_DEVELOPMENT_ROADMAP.md`,
+`docs/releases/PIVRA_V0.1_B6_READINESS_AUDIT.md`,
+`docs/releases/PIVRA_V0.1_RELEASE_CANDIDATE.md`,
+`docs/releases/PIVRA_V0.1_RELEASE_NOTES.md`,
+`docs/releases/PIVRA_V0.1_ARCH_PACKAGING_PLAN.md`,
+`docs/releases/PIVRA_V0.1_ARCH_DEPENDENCIES.md`,
+`docs/releases/PIVRA_V0.1_ARCH_PACKAGE_IMPLEMENTATION.md`,
+`packaging/arch/README.md`. Only documentation; full test/native evidence is
+retained, not overwritten. This record's final documentation SHA is delivered
+in the response, not used as a new RC source or embedded self-referentially.
 
 ## B6-F1 — native desktop acceptance and candidate snapshot
 
@@ -416,15 +510,19 @@ No source, tests, Cargo files, recipe, icons, licenses or security code changed.
 | Window-state persistence | `fa6a3a2d2167d623b2e3110a6889b6d7a5ec2b45` |
 | GNOME failure diagnostics | `304742fc64018f221fe139bc370e28808721d4f4` |
 | Controlled RLIMIT_AS comparison | `d2dd5641c6bd7ffbfc92e1d330ba89815842388d` |
-| Production 2 GiB fix / latest user-verified package source | `e8fc9ec011ad6759bc6eef018b9a6f71465f80f1` |
+| Production 2 GiB fix / original B5 package source | `e8fc9ec011ad6759bc6eef018b9a6f71465f80f1` |
+| W1 strict warning cleanup | `eabc0e51eb9434c72a0b08ab1c7fbfbba5eaf2a7` |
+| Accepted native RC source | `7e26e780acffdb1f2db0f37e8cf6485eba0baa63` |
+| F1 documentation/receipt, not replacement source | `dd67a2117d5bdc66f0212b7221018713526d5f59` |
 
-The strict warning gate is closed by B6-W1. F1 adds user Nautilus acceptance
-and the owner's explicit acceptance of the still-open preload observation for
-v0.1.0 only. W1's transient Sway test failure remains recorded; F1 first runs
-passed unchanged. Next execute native RC metadata/package checks and any
-separately required data-preservation assertions; approve the exact final
-stable source/checksum and publication explicitly. If final source differs
-from the RC, re-verify its archive and regenerate metadata.
+F2 closes native RC metadata/build/install/integrity acceptance using explicit
+user reports; the strict gate and controlled automation remain PASS for
+unchanged code. The preload observation remains open with owner acceptance
+for v0.1.0. **Recommendation: technical GO for the fixed RC.** The next decision
+is explicit owner authorization for any main/tag/publication action, not an
+automatically initiated release or an invented remaining technical failure.
+If a different source is selected, verify its archive and regenerate/review
+metadata rather than reuse this RC checksum.
 Do not infer publication permission from this report. B6 documentation commit
 is provided in the delivery response; this file does not invent a self-referential
 commit hash. No next feature or release action is started.

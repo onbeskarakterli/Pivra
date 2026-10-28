@@ -1,4 +1,4 @@
-# Arch packaging draft — NOT ready for AUR publication
+# Arch packaging — native RC accepted; publication not authorized
 
 Only `pivra` 0.1.0-1 / x86_64 is designed here. There is no approved main release
 commit/tag/archive digest recorded in this checkout yet. Clean makepkg,
@@ -9,8 +9,25 @@ below records its date; current status is in the
 [B6 audit](../../docs/releases/PIVRA_V0.1_B6_READINESS_AUDIT.md).
 This checkout still has no approved `release-source.conf` or `.SRCINFO`; the
 fail-closed source gate remains intentional. No AUR publication is claimed.
+The unchanged PKGBUILD's earlier draft/native-pending comments are historical;
+F2 native acceptance is recorded below. This documentation task does not alter
+the recipe or add the successful native workspace's config/metadata to Git.
 Read [implementation evidence](../../docs/releases/PIVRA_V0.1_ARCH_PACKAGE_IMPLEMENTATION.md)
 and [dependency evidence](../../docs/releases/PIVRA_V0.1_ARCH_DEPENDENCIES.md).
+
+## B6-F2 current acceptance
+
+**Technical GO** for RC `7e26e780acffdb1f2db0f37e8cf6485eba0baa63` and archive
+`828a97503173f4fef568345e2d8b2334fcf35b6b587928692ac2261ef3b68277`.
+User-reported native Arch source verification, actual makepkg `.SRCINFO`
+generation/consistency (0.1.0-1/full-SHA URL/both hashes), clean build, install
+and Qkk 1309 files / 0 altered PASS. The native package is approximately 22 MB
+`pivra-0.1.0-1-x86_64.pkg.tar.zst`. These were not independently run by Codex;
+F1's Codex NOT RUN status below remains dated evidence, not a current missing
+native gate. No source config or generated metadata is added to this repo.
+Preload observation remains open and explicitly accepted for v0.1.0.
+No main/tag/GitHub/AUR/CI action or final publication approval. A different
+source commit requires fresh archive/metadata validation; retain source/notices.
 
 ## Files and deliberate source gate
 

@@ -1,5 +1,27 @@
 # Pivra — Geliştirme Yol Haritası
 
+## B6-F2 — Son RC kabulü: teknik GO — 29.10.2026
+
+Kabul edilen RC kaynak `7e26e780acffdb1f2db0f37e8cf6485eba0baa63`;
+arşiv SHA-256 `828a97503173f4fef568345e2d8b2334fcf35b6b587928692ac2261ef3b68277`.
+Son önceki belge commit'i `dd67a2117d5bdc66f0212b7221018713526d5f59` kaynak
+adayının yerine geçirilmez. Kullanıcı gerçek Arch/GNOME bildirimi: iki kaynak
+`makepkg --verifysource --force` PASS; `.SRCINFO` exit0, 0.1.0-1/URL/iki hash
+uyumlu; `makepkg --cleanbuild --force` exit0, yaklaşık 22 MB
+`pivra-0.1.0-1-x86_64.pkg.tar.zst`; pacman kurulum PASS, sürüm 0.1.0,
+Qkk 1309 dosya / 0 değişmiş. Sorunlu JPEG, eksiksiz thumbnail, gezinme,
+pencere ölçüsü/maximize ve önceki Nautilus kabulü PASS. Codex native testi değildir.
+
+**B6 teknik kabul GO**; F1 native metadata/paket kapıları kullanıcı kanıtıyla
+kapandı. F1 strict Clippy sıfır uyarı, 197 Rust, Python 53+33+9 ve X11/Sway dört GUI
+PASS sonuçları aynı kod için korunur, F2'de yeniden çalıştırılmış sayılmaz.
+`Preload exceeds cache entry budget` **OPEN — sahibin v0.1.0 için açıkça kabul
+ettiği belgelenmiş risk**, fix yok. W1 tekil Sway gözlemi/tarihçe korunur.
+Yayın yetkisi YOK; main/tag/GitHub Release/AUR/CI yapılmadı. Başka kaynak SHA
+seçilirse yeni arşiv/hash/metadata doğrulanmalı. Diğer PIV/FD/TH kapsamları topluca
+DONE yapılmaz. [Tam F2 değerlendirmesi](releases/PIVRA_V0.1_B6_READINESS_AUDIT.md).
+
+
 ## B6-F1 — Yayın adayı ve kullanıcı kabulü — 29.10.2026
 
 İncelenen uygulama kodu `eabc0e51eb9434c72a0b08ab1c7fbfbba5eaf2a7`.

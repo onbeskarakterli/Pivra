@@ -1,7 +1,9 @@
 # Pivra 0.1.0 — release scope and preparation notes
 
-Updated: 2026-10-29 (Europe/Istanbul). Audited application/package source:
+Updated: 2026-10-29 (Europe/Istanbul). Accepted RC application/package source:
+`7e26e780acffdb1f2db0f37e8cf6485eba0baa63`; original B5 package source was
 `e8fc9ec011ad6759bc6eef018b9a6f71465f80f1`.
+**B6-F2: technical GO for this exact RC; no publication authorization.**
 These are preparation notes on `dev`, not a published release/tag. B4 source
 licensing remains PASS. Current evidence and remaining gates are in the
 [B6 audit](PIVRA_V0.1_B6_READINESS_AUDIT.md); earlier release-04 evidence used
@@ -54,8 +56,9 @@ content type and resource limits are checked by the secure loading path.
   path; a large thumbnail does not prove that its full photo can be opened.
 - Clean Arch makepkg, source SHA-256, installed package integrity and
   removal/reinstallation are user-reported PASS at the audited source.
-  Final release-source approval, generated .SRCINFO and publication remain
-  separate. The user reports Nautilus JPEG double-click and PNG Open With
+  RC `.SRCINFO` generation/consistency and clean build/install/integrity are
+  now user-reported PASS in F2. Permission for main/tag/publication remains
+  separate; a different source requires a fresh checksum/metadata review. The user reports Nautilus JPEG double-click and PNG Open With
   rendering PASS. Pivra is the JPEG default; Loupe remains the PNG default.
 - One unreproduced `Preload exceeds cache entry budget` during main-image
   loading remains OPEN OBSERVATION, with no confirmed cause or fix. The owner
@@ -146,3 +149,30 @@ consistency remain NOT RUN (no makepkg here). Later receipt documentation
 commits are not silently substituted as this candidate source. Final main/tag/
 publication approval remains separate; B6 PARTIAL. Preload is explicitly
 accepted as a v0.1.0 risk, open/unfixed. Nautilus acceptance is user-reported PASS.
+
+
+## B6-F2 — native accepted RC and technical GO
+
+User-reported actual Arch/GNOME at `7e26e780acffdb1f2db0f37e8cf6485eba0baa63`:
+source verification (`--verifysource --force`) PASS for both files;
+`--printsrcinfo` exit0 and exact 0.1.0-1/full-SHA URL/two hashes PASS;
+`--cleanbuild --force` exit0. Package `pivra-0.1.0-1-x86_64.pkg.tar.zst`
+approximately 22 MB, installed with pacman PASS, `Pivra 0.1.0`,
+`pacman -Qkk`: 1309 files, 0 altered. Problematic JPEG, complete thumbnail
+loading, navigation, window dimensions/maximize and prior Nautilus acceptance
+PASS. This is not independently executed Codex evidence or a new removal test.
+
+Archive SHA-256 remains
+`828a97503173f4fef568345e2d8b2334fcf35b6b587928692ac2261ef3b68277`.
+Expected collector hash remains
+`e0bad72c99f4629b0668f59450e53a75022ea746efe57191ab8da34fb5cf1201`.
+Strict Clippy zero warnings, Rust197/Python53+33+9 and eight controlled GUI
+passes are retained verified F1 results for unchanged code, not rerun in F2.
+Source/license/recipe consistency and the retained archive hash were rechecked.
+
+**Recommendation: technical GO.** `Preload exceeds cache entry budget` remains
+**OPEN — explicitly accepted by the owner as a documented v0.1.0 release risk**,
+not fixed. Prior W1 transient Sway observation and untested platforms remain
+recorded. This is no authorization to merge main, tag or publish GitHub/AUR.
+License/notices/corresponding-source duties still apply. Later documentation
+commits do not replace the accepted RC; different source needs new metadata.

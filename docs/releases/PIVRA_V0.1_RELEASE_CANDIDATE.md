@@ -1,6 +1,41 @@
-# B6-F1 — Pivra 0.1.0 immutable release candidate
+# B6-F1/F2 — Pivra 0.1.0 immutable release candidate and acceptance
 
-2026-10-29 (Europe/Istanbul). **Prepared, not published. B6 remains PARTIAL.**
+2026-10-29 (Europe/Istanbul). **F2 technical GO for the accepted RC;
+publication is not authorized and has not occurred.** F1's pending native
+metadata/package checks below are retained as dated history, now superseded
+by explicit user-reported F2 PASS evidence.
+
+## B6-F2 native RC acceptance
+
+The user confirms the exact source/archive below on actual Arch/GNOME:
+
+- `makepkg --verifysource --force`: PASS, both files verified.
+- `makepkg --printsrcinfo`: PASS / exit 0; `.SRCINFO` matches 0.1.0-1,
+  immutable full-SHA URL and both expected hashes (archive below; collector
+  `e0bad72c99f4629b0668f59450e53a75022ea746efe57191ab8da34fb5cf1201`).
+- `makepkg --cleanbuild --force`: PASS / exit 0; produced
+  `pivra-0.1.0-1-x86_64.pkg.tar.zst`, approximately 22 MB.
+- pacman install PASS; `pivra --version` prints `Pivra 0.1.0`.
+- `pacman -Qkk pivra`: 1309 total files, 0 altered files.
+- Problematic JPEG opens; thumbnail loading has no missing entries reported;
+  previous/next navigation and size/maximize persistence PASS.
+- Prior native Nautilus JPEG double-click/PNG Open With PASS retained; JPEG
+  default Pivra, PNG default Loupe. Prior B5 removal/reinstall PASS remains
+  historical evidence, not a newly inferred RC uninstall test.
+
+All native results are **user-reported**, not run by Codex. No native package,
+.SRCINFO or complete transcript was attached for independent inspection.
+Current application/recipe equals the accepted RC and prior F1 automation
+remains applicable (strict zero-warning Clippy, 197 Rust, Python 53+33+9,
+all four controlled X11/Sway gates PASS). F2 rechecked identity/checksum and
+consistency, not the full automated/native suites again.
+
+**GO recommendation is technical readiness for the fixed RC only.**
+`Preload exceeds cache entry budget` remains OPEN/unfixed and explicitly
+accepted by the owner as a v0.1.0 risk. Final owner permission to merge, tag or
+publish is absent; no such action is initiated. A different source commit
+requires its own archive/metadata review, not reuse of this checksum.
+See the [F2 assessment](PIVRA_V0.1_B6_READINESS_AUDIT.md#b6-f2--current-technical-decision-go-publication-not-authorized).
 
 ## Exact reviewed reference and actual archive
 
@@ -99,8 +134,9 @@ GPL-3.0-only, exact source URL/alias and archive digest; collector digest remain
 `e0bad72c99f4629b0668f59450e53a75022ea746efe57191ab8da34fb5cf1201`.
 This is **Bash/source-configuration validation**, not makepkg or SRCINFO proof.
 
-**`.SRCINFO generation: NOT RUN. Consistency: NOT RUN.** `makepkg` and `pacman`
-are absent in Codex. No `.SRCINFO` was synthesized, copied from a template or
+**F1 Codex `.SRCINFO` generation/consistency: NOT RUN.** `makepkg` and `pacman`
+are absent in Codex. **F2 native generation/consistency: PASS, user-reported**
+as detailed above; these are separate evidence classes. No `.SRCINFO` was synthesized, copied from a template or
 created empty. No machine-local config/archive/checksum receipt/generated
 packaging metadata is tracked in the application repo. Local artifacts are
 not a published release asset, approved AUR submission or retention guarantee.
@@ -171,8 +207,9 @@ printf 'RC-only metadata workspace: %s\n' "$rc_workspace"
 
 These exact metadata commands are provided for native execution and **not
 reported as executed here**. `makepkg --printsrcinfo` does not create a tested
-package. A final native RC makepkg/install/removal/integrity test remains a
-separate validation if the owner intends to distribute this exact snapshot.
+package. F2 now records native RC makepkg/install/integrity PASS from the user. The
+native commands above remain a reproduction recipe, not a newly executed
+Codex test; a separate F2 removal run is not inferred from install success.
 Do not copy the generated source config/.SRCINFO into the application repository
 without an explicitly approved tracked-file policy.
 
@@ -241,11 +278,11 @@ real native decode, hardware input or sandboxed active-process cleanup.
 - Corresponding-source collection is necessary, not blanket approval of all
   future binary bundles; retain actual third-party notices, native LGPL
   source/replacement duties and archive/build inputs when distributing.
-- **B6 status: PARTIAL.** RC source/archive/config are prepared and verified.
-  `.SRCINFO` generation/consistency and native packaging of this exact RC remain
-  unexecuted here. Final approved stable/main source selection, any new digest
-  for a different source, metadata review and explicit publication authorization
-  remain separate gates. No main merge, tag, GitHub Release, AUR or CI was done.
+- **F1 status was PARTIAL; F2 technical status is GO** for the accepted RC.
+  Native `.SRCINFO` generation/consistency, build/install/integrity are now
+  user-reported PASS, still not independently executed by Codex. Explicit
+  permission for main/tag/publication remains separate. A different stable
+  source requires its own archive digest and regenerated/reviewed metadata. No main merge, tag, GitHub Release, AUR or CI was done.
 - Preload is an **accepted v0.1.0 risk, not a blocker by owner decision**, and
   remains open/unfixed. Missing exact Rust 1.85/32-bit testing and bounded
   accounting not equaling global RSS/VRAM remain known validation limitations.

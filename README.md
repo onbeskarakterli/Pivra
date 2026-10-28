@@ -36,12 +36,14 @@ GNOME/Wayland thumbnail stress, video skipping, window persistence and the 2 GiB
 GNOME-helper correction PASS at `e8fc9ec`. These are **user-reported native
 results**, separate from Codex's controlled checks. See the
 [B6 readiness audit](docs/releases/PIVRA_V0.1_B6_READINESS_AUDIT.md).
-The [F1 candidate record](docs/releases/PIVRA_V0.1_RELEASE_CANDIDATE.md) pins a
-verified full-commit source archive and checksum; native `.SRCINFO` generation
-is still NOT RUN in Codex. It is not a published or approved final main release.
-The user additionally reports JPEG-default/Nautilus double-click and PNG
-Open With rendering PASS; Loupe remains the PNG default. These physical checks
-were not run by Codex. Final approved release source/metadata remain separate.
+The [F1/F2 candidate record](docs/releases/PIVRA_V0.1_RELEASE_CANDIDATE.md) pins
+accepted source `7e26e780acffdb1f2db0f37e8cf6485eba0baa63` and its real checksum.
+The user reports native RC source verification, `.SRCINFO`, clean build,
+installation and `pacman -Qkk` (1309 files, 0 altered) PASS. Nautilus JPEG
+double-click and PNG Open With rendering PASS; Loupe remains PNG default.
+These are user-reported native results, not Codex physical tests.
+**Technical readiness: GO for this RC.** No main/tag/publication is authorized
+or performed. A different stable source needs its own checksum/metadata review.
 The one-off `Preload exceeds cache entry budget` observation remains open and
 unfixed. The owner explicitly accepts it as a documented v0.1.0 release risk;
 subsequent successful tests do not establish a fix. B6-W1 now passes strict

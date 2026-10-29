@@ -1,0 +1,1 @@
+PIVRA model-only video placeholder. NOT playable media; no codec or decoder claim.

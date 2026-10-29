@@ -1,0 +1,15 @@
+# Rust/Cargo build output
+/target/
+
+# Local editor/IDE state
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Python smoke-test caches
+/tests/**/__pycache__/

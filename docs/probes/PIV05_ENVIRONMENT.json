@@ -1,0 +1,439 @@
+{
+  "scope": "PIV-05 inventory, not codec or rendering certification",
+  "architecture": "x86_64",
+  "rustc": {
+    "exit": 0,
+    "stdout": "rustc 1.99.1 (58cf8f9c3 2026-10-13)",
+    "stderr": ""
+  },
+  "cargo": {
+    "exit": 0,
+    "stdout": "cargo 1.99.1 (5f94df478 2026-08-27)",
+    "stderr": ""
+  },
+  "pkg_config_modules": [
+    "Lerc",
+    "adwaita-icon-theme",
+    "applewmproto",
+    "appstream",
+    "bigreqsproto",
+    "blkid",
+    "bzip2",
+    "cairo",
+    "cairo-fc",
+    "cairo-ft",
+    "cairo-gobject",
+    "cairo-pdf",
+    "cairo-png",
+    "cairo-ps",
+    "cairo-script",
+    "cairo-script-interpreter",
+    "cairo-svg",
+    "cairo-tee",
+    "cairo-xcb",
+    "cairo-xcb-shm",
+    "cairo-xlib",
+    "cairo-xlib-xrender",
+    "com_err",
+    "compositeproto",
+    "damageproto",
+    "datrie-0.2",
+    "default-icon-theme",
+    "dmxproto",
+    "dpmsproto",
+    "dri2proto",
+    "dri3proto",
+    "egl",
+    "epoxy",
+    "expat",
+    "fixesproto",
+    "fontconfig",
+    "fontsproto",
+    "fontutil",
+    "freetype2",
+    "fribidi",
+    "gdk-pixbuf-2.0",
+    "gio-2.0",
+    "gio-unix-2.0",
+    "gl",
+    "glesv1_cm",
+    "glesv2",
+    "glib-2.0",
+    "glproto",
+    "glx",
+    "gmodule-2.0",
+    "gmodule-export-2.0",
+    "gmodule-no-export-2.0",
+    "gmp",
+    "gmpxx",
+    "gnutls",
+    "gnutls-dane",
+    "gobject-2.0",
+    "graphene-1.0",
+    "graphene-gobject-1.0",
+    "graphite2",
+    "gssrpc",
+    "gthread-2.0",
+    "gtk4",
+    "gtk4-atspi",
+    "gtk4-broadway",
+    "gtk4-unix-print",
+    "gtk4-wayland",
+    "gtk4-x11",
+    "harfbuzz",
+    "harfbuzz-cairo",
+    "harfbuzz-gobject",
+    "harfbuzz-icu",
+    "harfbuzz-subset",
+    "hogweed",
+    "ice",
+    "icu-i18n",
+    "icu-io",
+    "icu-uc",
+    "inputproto",
+    "iso-codes",
+    "kadm-client",
+    "kadm-server",
+    "kbproto",
+    "kdb",
+    "krb5",
+    "krb5-gssapi",
+    "lber",
+    "ldap",
+    "libadwaita-1",
+    "libbrotlicommon",
+    "libbrotlidec",
+    "libbrotlienc",
+    "libcrypt",
+    "libcrypto",
+    "libcurl",
+    "libdeflate",
+    "libffi",
+    "libglvnd",
+    "libidn2",
+    "libjpeg",
+    "liblzma",
+    "libnghttp2",
+    "libnghttp3",
+    "libpcre2-16",
+    "libpcre2-32",
+    "libpcre2-8",
+    "libpcre2-posix",
+    "libpng",
+    "libpng16",
+    "libpsl",
+    "librtmp",
+    "libselinux",
+    "libsepol",
+    "libsharpyuv",
+    "libssh2",
+    "libssl",
+    "libtasn1",
+    "libthai",
+    "libtiff-4",
+    "libwebp",
+    "libwebpdecoder",
+    "libwebpdemux",
+    "libwebpmux",
+    "libxcrypt",
+    "libzstd",
+    "mit-krb5",
+    "mit-krb5-gssapi",
+    "mount",
+    "nettle",
+    "numpy",
+    "opengl",
+    "openssl",
+    "p11-kit-1",
+    "pango",
+    "pangocairo",
+    "pangofc",
+    "pangoft2",
+    "pangoot",
+    "pangoxft",
+    "pixman-1",
+    "poppler-data",
+    "presentproto",
+    "randrproto",
+    "recordproto",
+    "renderproto",
+    "resourceproto",
+    "scrnsaverproto",
+    "shared-mime-info",
+    "sm",
+    "sysprof-capture-4",
+    "uuid",
+    "videoproto",
+    "vulkan",
+    "wayland-client",
+    "wayland-cursor",
+    "wayland-egl",
+    "wayland-protocols",
+    "wayland-scanner",
+    "wayland-server",
+    "x11",
+    "xau",
+    "xcb",
+    "xcb-render",
+    "xcb-shm",
+    "xcmiscproto",
+    "xcomposite",
+    "xcursor",
+    "xdamage",
+    "xdmcp",
+    "xext",
+    "xextproto",
+    "xf86bigfontproto",
+    "xf86dgaproto",
+    "xf86driproto",
+    "xf86vidmodeproto",
+    "xfixes",
+    "xft",
+    "xi",
+    "xinerama",
+    "xineramaproto",
+    "xkbcommon",
+    "xkbcomp",
+    "xkeyboard-config",
+    "xorg-sgml-doctools",
+    "xproto",
+    "xrandr",
+    "xrender",
+    "xtrans",
+    "xwaylandproto",
+    "zlib"
+  ],
+  "pkg_config_versions": {
+    "gtk4": {
+      "exit": 0,
+      "stdout": "4.18.6",
+      "stderr": ""
+    },
+    "gtk4-wayland": {
+      "exit": 0,
+      "stdout": "4.18.6",
+      "stderr": ""
+    },
+    "gtk4-x11": {
+      "exit": 0,
+      "stdout": "4.18.6",
+      "stderr": ""
+    },
+    "libadwaita-1": {
+      "exit": 0,
+      "stdout": "1.7.6",
+      "stderr": ""
+    },
+    "glib-2.0": {
+      "exit": 0,
+      "stdout": "2.84.4",
+      "stderr": ""
+    },
+    "gstreamer-1.0": {
+      "exit": 1,
+      "stdout": "",
+      "stderr": "Package gstreamer-1.0 was not found in the pkg-config search path.\nPerhaps you should add the directory containing `gstreamer-1.0.pc'\nto the PKG_CONFIG_PATH environment variable\nPackage 'gstreamer-1.0', required by 'virtual:world', not found"
+    },
+    "gstreamer-video-1.0": {
+      "exit": 1,
+      "stdout": "",
+      "stderr": "Package gstreamer-video-1.0 was not found in the pkg-config search path.\nPerhaps you should add the directory containing `gstreamer-video-1.0.pc'\nto the PKG_CONFIG_PATH environment variable\nPackage 'gstreamer-video-1.0', required by 'virtual:world', not found"
+    },
+    "glycin-1": {
+      "exit": 1,
+      "stdout": "",
+      "stderr": "Package glycin-1 was not found in the pkg-config search path.\nPerhaps you should add the directory containing `glycin-1.pc'\nto the PKG_CONFIG_PATH environment variable\nPackage 'glycin-1', required by 'virtual:world', not found"
+    },
+    "glycin-2": {
+      "exit": 1,
+      "stdout": "",
+      "stderr": "Package glycin-2 was not found in the pkg-config search path.\nPerhaps you should add the directory containing `glycin-2.pc'\nto the PKG_CONFIG_PATH environment variable\nPackage 'glycin-2', required by 'virtual:world', not found"
+    },
+    "libwebp": {
+      "exit": 0,
+      "stdout": "1.5.0",
+      "stderr": ""
+    },
+    "libtiff-4": {
+      "exit": 0,
+      "stdout": "4.7.0",
+      "stderr": ""
+    },
+    "lcms2": {
+      "exit": 1,
+      "stdout": "",
+      "stderr": "Package lcms2 was not found in the pkg-config search path.\nPerhaps you should add the directory containing `lcms2.pc'\nto the PKG_CONFIG_PATH environment variable\nPackage 'lcms2', required by 'virtual:world', not found"
+    },
+    "libheif": {
+      "exit": 1,
+      "stdout": "",
+      "stderr": "Package libheif was not found in the pkg-config search path.\nPerhaps you should add the directory containing `libheif.pc'\nto the PKG_CONFIG_PATH environment variable\nPackage 'libheif', required by 'virtual:world', not found"
+    },
+    "libjxl": {
+      "exit": 1,
+      "stdout": "",
+      "stderr": "Package libjxl was not found in the pkg-config search path.\nPerhaps you should add the directory containing `libjxl.pc'\nto the PKG_CONFIG_PATH environment variable\nPackage 'libjxl', required by 'virtual:world', not found"
+    },
+    "vips": {
+      "exit": 1,
+      "stdout": "",
+      "stderr": "Package vips was not found in the pkg-config search path.\nPerhaps you should add the directory containing `vips.pc'\nto the PKG_CONFIG_PATH environment variable\nPackage 'vips', required by 'virtual:world', not found"
+    },
+    "fontconfig": {
+      "exit": 0,
+      "stdout": "2.15.0",
+      "stderr": ""
+    },
+    "libseccomp": {
+      "exit": 1,
+      "stdout": "",
+      "stderr": "Package libseccomp was not found in the pkg-config search path.\nPerhaps you should add the directory containing `libseccomp.pc'\nto the PKG_CONFIG_PATH environment variable\nPackage 'libseccomp', required by 'virtual:world', not found"
+    },
+    "gdk-pixbuf-2.0": {
+      "exit": 0,
+      "stdout": "2.42.12",
+      "stderr": ""
+    }
+  },
+  "gstreamer": {
+    "status": "REGISTRY INSPECTED ONLY",
+    "version": [
+      1,
+      26,
+      2,
+      0
+    ],
+    "factories": {
+      "playbin3": {
+        "present": true,
+        "plugin_version": "1.26.2",
+        "plugin_file": "/usr/lib/x86_64-linux-gnu/gstreamer-1.0/libgstplayback.so"
+      },
+      "decodebin3": {
+        "present": true,
+        "plugin_version": "1.26.2",
+        "plugin_file": "/usr/lib/x86_64-linux-gnu/gstreamer-1.0/libgstplayback.so"
+      },
+      "uridecodebin3": {
+        "present": true,
+        "plugin_version": "1.26.2",
+        "plugin_file": "/usr/lib/x86_64-linux-gnu/gstreamer-1.0/libgstplayback.so"
+      },
+      "appsink": {
+        "present": true,
+        "plugin_version": "1.26.2",
+        "plugin_file": "/usr/lib/x86_64-linux-gnu/gstreamer-1.0/libgstapp.so"
+      },
+      "videoconvert": {
+        "present": true,
+        "plugin_version": "1.26.2",
+        "plugin_file": "/usr/lib/x86_64-linux-gnu/gstreamer-1.0/libgstvideoconvertscale.so"
+      },
+      "gtk4paintablesink": {
+        "present": false
+      },
+      "waylandsink": {
+        "present": true,
+        "plugin_version": "1.26.2",
+        "plugin_file": "/usr/lib/x86_64-linux-gnu/gstreamer-1.0/libgstwaylandsink.so"
+      },
+      "glimagesink": {
+        "present": false
+      },
+      "ximagesink": {
+        "present": false
+      },
+      "autoaudiosink": {
+        "present": true,
+        "plugin_version": "1.26.2",
+        "plugin_file": "/usr/lib/x86_64-linux-gnu/gstreamer-1.0/libgstautodetect.so"
+      },
+      "pulsesink": {
+        "present": true,
+        "plugin_version": "1.26.2",
+        "plugin_file": "/usr/lib/x86_64-linux-gnu/gstreamer-1.0/libgstpulseaudio.so"
+      },
+      "pipewiresink": {
+        "present": false
+      },
+      "volume": {
+        "present": true,
+        "plugin_version": "1.26.2",
+        "plugin_file": "/usr/lib/x86_64-linux-gnu/gstreamer-1.0/libgstvolume.so"
+      },
+      "scaletempo": {
+        "present": true,
+        "plugin_version": "1.26.2",
+        "plugin_file": "/usr/lib/x86_64-linux-gnu/gstreamer-1.0/libgstaudiofx.so"
+      },
+      "subparse": {
+        "present": true,
+        "plugin_version": "1.26.2",
+        "plugin_file": "/usr/lib/x86_64-linux-gnu/gstreamer-1.0/libgstsubparse.so"
+      },
+      "textoverlay": {
+        "present": false
+      },
+      "assrender": {
+        "present": true,
+        "plugin_version": "1.26.2",
+        "plugin_file": "/usr/lib/x86_64-linux-gnu/gstreamer-1.0/libgstassrender.so"
+      },
+      "avdec_h264": {
+        "present": false
+      },
+      "openh264dec": {
+        "present": true,
+        "plugin_version": "1.26.2",
+        "plugin_file": "/usr/lib/x86_64-linux-gnu/gstreamer-1.0/libgstopenh264.so"
+      },
+      "avdec_h265": {
+        "present": false
+      },
+      "libde265dec": {
+        "present": true,
+        "plugin_version": "1.26.2",
+        "plugin_file": "/usr/lib/x86_64-linux-gnu/gstreamer-1.0/libgstde265.so"
+      },
+      "vp9dec": {
+        "present": true,
+        "plugin_version": "1.26.2",
+        "plugin_file": "/usr/lib/x86_64-linux-gnu/gstreamer-1.0/libgstvpx.so"
+      },
+      "av1dec": {
+        "present": true,
+        "plugin_version": "1.26.2",
+        "plugin_file": "/usr/lib/x86_64-linux-gnu/gstreamer-1.0/libgstaom.so"
+      },
+      "dav1ddec": {
+        "present": false
+      },
+      "vah264dec": {
+        "present": false
+      },
+      "v4l2h264dec": {
+        "present": false
+      },
+      "nvh264dec": {
+        "present": false
+      },
+      "jpegdec": {
+        "present": true,
+        "plugin_version": "1.26.2",
+        "plugin_file": "/usr/lib/x86_64-linux-gnu/gstreamer-1.0/libgstjpeg.so"
+      },
+      "pngdec": {
+        "present": true,
+        "plugin_version": "1.26.2",
+        "plugin_file": "/usr/lib/x86_64-linux-gnu/gstreamer-1.0/libgstpng.so"
+      },
+      "webpdec": {
+        "present": true,
+        "plugin_version": "1.26.2",
+        "plugin_file": "/usr/lib/x86_64-linux-gnu/gstreamer-1.0/libgstwebp.so"
+      }
+    },
+    "pipelines_created": 0,
+    "media_decoded": false
+  }
+}

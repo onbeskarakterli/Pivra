@@ -1,0 +1,25 @@
+{
+  "result": "NOT RUN",
+  "decoder_time_overlap": "NOT MEASURED",
+  "method": "owned descendant pidfd; partial RGB memfd; SIGSTOP/recheck/close/SIGCONT",
+  "width": 8000,
+  "height": 4000,
+  "output_bytes": 96000000,
+  "candidate_loader_origin": "not_observed",
+  "certified_loader_origin": "not_certified",
+  "reuse_observed": null,
+  "observer_version": 3,
+  "diagnostics": {
+    "counts": {},
+    "first_events": {},
+    "first_sample": null,
+    "last_sample": null,
+    "last_partial_sample": null,
+    "errors": []
+  },
+  "driver_sha256": "8df24a11d2649696e69a4991951eff0dadc4380cad99b853a9d2e71da9ebccee",
+  "binary_sha256": "fce75495b975cfae06f9d37c2559c347da787f946058040c5710937a1629d0e9",
+  "reason": "BLOCKED baseline secure decode: Unable to display image.",
+  "first_uncompleted_stage": "baseline_decoded",
+  "elapsed_seconds": 0.5223353910000696
+}

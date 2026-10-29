@@ -1,0 +1,11 @@
+[Desktop Entry]
+Type=Application
+Name=Pivra
+Icon=io.github.onbeskarakterli.Pivra
+Comment=Open a local JPEG or PNG photo using a sandboxed image loader
+Exec=pivra %u
+Terminal=false
+Categories=Graphics;Viewer;
+MimeType=image/jpeg;image/png;
+StartupNotify=true
+DBusActivatable=false

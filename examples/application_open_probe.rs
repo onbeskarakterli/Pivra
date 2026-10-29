@@ -1,0 +1,160 @@
+//! Actual app::launch/GIO-open path. No mock decoder, no automatic MIME override.
+#[path = "../src/app.rs"]
+mod app;
+#[path = "../src/image_loader.rs"]
+mod image_loader;
+#[path = "../src/image_view.rs"]
+mod image_view;
+#[path = "../src/input.rs"]
+mod input;
+#[path = "../src/window.rs"]
+mod window;
+use adw::prelude::*;
+use gtk::{gdk, gio, glib};
+use std::{
+    cell::Cell,
+    rc::Rc,
+    time::{Duration, Instant},
+};
+fn descendants(w: &gtk::Widget) -> Vec<gtk::Widget> {
+    let mut result = vec![w.clone()];
+    let mut child = w.first_child();
+    while let Some(widget) = child {
+        result.extend(descendants(&widget));
+        child = widget.next_sibling();
+    }
+    result
+}
+fn main() {
+    let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/images");
+    for (name, size) in [
+        ("wide.png", (64, 32)),
+        ("large.png", (1600, 1200)),
+        ("no-exif.jpg", (64, 32)),
+    ] {
+        // The app scans the opened file's parent directory asynchronously.
+        // Keep each admission fixture in its own directory: the shared fixtures
+        // include deliberately corrupt files that must not contaminate this
+        // single-file open/URI test through catalog navigation or callbacks.
+        // Keep the isolate under the same source tree whose GIO/Glycin
+        // admission is already native-proven. The filesystem boundary matters:
+        // an arbitrary system tempdir is not equivalent to the fixture mount.
+        let isolated = tempfile::Builder::new()
+            .prefix(".pivra-app-open-")
+            .tempdir_in(&root)
+            .unwrap();
+        let path = isolated.path().join(name);
+        std::fs::copy(root.join(name), &path).unwrap();
+        let original = std::fs::read(&path).unwrap();
+        // Exercise both the original fixture directory and URI admission.
+        for uri in [false, true] {
+            let argument = if uri {
+                gio::File::for_path(&path).uri().to_string().into()
+            } else {
+                path.clone().into_os_string()
+            };
+            let opened = input::OpenedFile::from_argument(&argument).unwrap();
+            assert_eq!(opened.file.path().as_ref(), Some(&path));
+            let result = Rc::new(Cell::new(None));
+            let observed = result.clone();
+            let polls = Rc::new(Cell::new(0_u32));
+            let had_default_app = Rc::new(Cell::new(false));
+            let max_windows = Rc::new(Cell::new(0_usize));
+            let main_pictures = Rc::new(Cell::new(0_usize));
+            let poll_counter = polls.clone();
+            let default_seen = had_default_app.clone();
+            let window_counter = max_windows.clone();
+            let main_counter = main_pictures.clone();
+            eprintln!(
+                "APP_OPEN_BEGIN name={name} uri={uri} path={}",
+                path.display()
+            );
+            let end = Instant::now() + Duration::from_secs(30);
+            glib::timeout_add_local(Duration::from_millis(10), move || {
+                poll_counter.set(poll_counter.get() + 1);
+                let application = gio::Application::default().and_downcast::<adw::Application>();
+                if let Some(application) = application {
+                    default_seen.set(true);
+                    window_counter.set(window_counter.get().max(application.windows().len()));
+                    for w in application.windows() {
+                        for widget in descendants(w.upcast_ref()) {
+                            if let Ok(p) = widget.downcast::<gtk::Picture>() {
+                                // Thumbnail cells also contain Pictures. Only the
+                                // main image is the direct child of its Overlay;
+                                // never treat a 64x32 thumbnail as the opened file.
+                                let is_main = p
+                                    .parent()
+                                    .and_downcast::<gtk::Overlay>()
+                                    .and_then(|overlay| overlay.child())
+                                    .is_some_and(|child| {
+                                        child == p.clone().upcast::<gtk::Widget>()
+                                    });
+                                if !is_main {
+                                    continue;
+                                }
+                                main_counter.set(main_counter.get() + 1);
+                                if let Some(paintable) = p.paintable() {
+                                    // Actual mode wraps the decoded GDK texture in
+                                    // ActualPaintable. Inspect the main paintable,
+                                    // not only the direct Texture implementation.
+                                    assert_eq!(
+                                        (paintable.intrinsic_width(), paintable.intrinsic_height()),
+                                        size,
+                                    );
+                                    let snapshot = gtk::Snapshot::new();
+                                    paintable.snapshot(&snapshot, size.0 as f64, size.1 as f64);
+                                    assert!(snapshot.to_node().is_some(), "no rendered image node");
+                                    if let Ok(texture) = paintable.downcast::<gdk::Texture>() {
+                                        let mut pixels = vec![0; (size.0 * size.1 * 4) as usize];
+                                        texture.download(&mut pixels, size.0 as usize * 4);
+                                        assert!(pixels.chunks_exact(4).any(|p| p[3] != 0));
+                                    }
+                                    observed.set(Some(0));
+                                    w.close();
+                                    return glib::ControlFlow::Break;
+                                }
+                                if let Some(label) = p.next_sibling().and_downcast::<gtk::Label>() {
+                                    if label.text().starts_with("Unable") {
+                                        let message = label.text();
+                                        eprintln!("FAIL normal application entry: {message}");
+                                        observed.set(Some(
+                                            if message.contains("Loader process exited early") {
+                                                77
+                                            } else {
+                                                1
+                                            },
+                                        ));
+                                        w.close();
+                                        return glib::ControlFlow::Break;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+                assert!(Instant::now() < end, "normal application open timeout");
+                glib::ControlFlow::Continue
+            });
+            let status = app::launch(Some(opened));
+            eprintln!(
+                "APP_OPEN_END name={name} uri={uri} exit={status:?} polls={} default_app_seen={} max_windows={} main_picture_hits={} observed={:?}",
+                polls.get(),
+                had_default_app.get(),
+                max_windows.get(),
+                main_pictures.get(),
+                result.get()
+            );
+            assert_eq!(status, glib::ExitCode::SUCCESS);
+            let code = result
+                .get()
+                .expect("application exited before image observation");
+            if code != 0 {
+                std::process::exit(code);
+            }
+            assert_eq!(std::fs::read(&path).unwrap(), original);
+            println!(
+                "PASS normal app entry {name}, URI={uri}: dimensions, nonempty rendered texture, source integrity"
+            );
+        }
+    }
+}

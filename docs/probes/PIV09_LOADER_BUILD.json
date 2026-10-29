@@ -1,0 +1,16 @@
+{
+  "source": "https://github.com/GNOME/glycin.git",
+  "tag": "2.0.0",
+  "commit": "724f18c5f3519885995428a7e2e6e5df9ca2ab27",
+  "loader": "glycin-image-rs",
+  "version": "2.0.0",
+  "config_protocol_family": "2+",
+  "configured_loader_mimes": [
+    "image/jpeg",
+    "image/png"
+  ],
+  "configured_editors": [],
+  "binary_sha256": "9b93831143bfe83e9a9d87aea4c2d94dab4f657bb0c853a60517c295172a416b",
+  "upstream_lock_sha256": "2c3d4499d74fc8efcdeced2ec50aa4880f2deb4096e967cad183d61ca4c594ee",
+  "scope": "Unmodified upstream image-rs bundle only; discovery, sandbox and pixels need separate probes"
+}

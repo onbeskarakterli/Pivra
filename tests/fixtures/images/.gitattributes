@@ -1,0 +1,3 @@
+# Preserve image payload bytes, including deliberately truncated fixtures.
+*.png binary
+*.jpg binary

@@ -1,0 +1,12 @@
+{
+  "result": "NOT RUN",
+  "decoder_time_overlap": "NOT MEASURED",
+  "method": "owned descendant pidfd; partial RGB memfd; SIGSTOP/recheck/close/SIGCONT",
+  "width": 8000,
+  "height": 4000,
+  "output_bytes": 96000000,
+  "driver_sha256": "7ba4c982148bd2a989abfe7c7fa193669fe98c890f7e6f690d80136d8d7fa488",
+  "binary_sha256": "06b61e589dea854063ea5621e06cd54150e5b12c5302f4bd4bc01611cbaf5ec6",
+  "reason": "BLOCKED baseline secure decode: Unable to display image.",
+  "elapsed_seconds": 0.7872503510006936
+}

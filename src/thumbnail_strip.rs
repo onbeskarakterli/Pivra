@@ -535,12 +535,7 @@ impl Inner {
                 // The hidden pass uses the SAME verified decode/resize path as
                 // the visible scheduler. Merely resolving disk cache entries
                 // leaves the GTK cells pending and forces a second decode.
-                let work = if pivra::discovery::candidate_kind(&path)
-                    == Some(pivra::media::MediaKind::Video)
-                {
-                    video_thumbnail_work(&path, &worker_token, scale)
-                } else {
-                    match Manager::session().resolve(&path, &worker_token) {
+                let work = match Manager::session().resolve(&path, &worker_token) {
                     Ok(response) => {
                         if let Some(candidate) = response.candidate() {
                             let cached =
@@ -561,7 +556,6 @@ impl Inner {
                     Err(Error::Busy) => Work::Busy,
                     Err(Error::Cancelled) => Work::Cancelled,
                     Err(error) => provider_failure(error),
-                    }
                 };
                 pivra::thumbnail_diagnostics::trace(
                     "hidden-result",
@@ -1124,11 +1118,6 @@ impl Inner {
             if worker_token.is_cancelled() {
                 return Work::Cancelled;
             }
-            if pivra::discovery::candidate_kind(&worker_path)
-                == Some(pivra::media::MediaKind::Video)
-            {
-                return video_thumbnail_work(&worker_path, &worker_token, scale);
-            }
             let response = match Manager::session().resolve(&worker_path, &worker_token) {
                 Ok(response) => response,
                 Err(Error::Busy) => return Work::Busy,
@@ -1319,95 +1308,6 @@ impl Inner {
 // A viewport wider than the RAM budget must not endlessly decode/evict the
 // same visible images. Budget-evicted entries are reconsidered on viewport or
 // catalog change, not on every paint/worker completion.
-// Extract one static video preview outside the GTK main context. This optional
-// path requires FFmpeg; an absent decoder leaves the existing VIDEO badge intact.
-fn video_thumbnail_work(
-    path: &std::path::Path,
-    cancel: &gio::Cancellable,
-    scale: i32,
-) -> Work {
-    use std::process::{Command, Stdio};
-    use std::time::{Duration, Instant};
-    if cancel.is_cancelled() {
-        return Work::Cancelled;
-    }
-    let source = match FileKey::read(path) {
-        Ok(key) => key,
-        Err(error) => return Work::Failed(format!("Video source unavailable: {error}")),
-    };
-    let temp = std::env::temp_dir().join(format!(
-        "pivra-video-thumb-{}-{:?}-{}.png",
-        std::process::id(),
-        std::thread::current().id(),
-        std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .unwrap_or_default()
-            .as_nanos()
-    ));
-    let mut child = match Command::new("ffmpeg")
-        .args(["-hide_banner", "-loglevel", "error", "-nostdin", "-y",
-            "-ss", "0.5", "-i"])
-        .arg(path)
-        .args(["-frames:v", "1", "-an", "-sn", "-vf",
-            "scale=256:256:force_original_aspect_ratio=decrease",
-            "-f", "image2", "-vcodec", "png"])
-        .arg(&temp)
-        .stdin(Stdio::null())
-        .stdout(Stdio::null())
-        .stderr(Stdio::null())
-        .spawn()
-    {
-        Ok(child) => child,
-        Err(error) => return Work::Failed(format!("FFmpeg video preview unavailable: {error}")),
-    };
-    let deadline = Instant::now() + Duration::from_secs(12);
-    let result = loop {
-        if cancel.is_cancelled() || Instant::now() >= deadline {
-            let _ = child.kill();
-            let _ = child.wait();
-            break if cancel.is_cancelled() {
-                Work::Cancelled
-            } else {
-                Work::TransientFailure("Video preview timed out".into())
-            };
-        }
-        match child.try_wait() {
-            Ok(Some(status)) if status.success() => {
-                let decoded = std::fs::read(&temp)
-                    .map_err(|e| e.to_string())
-                    .and_then(|png| {
-                        gdk::Texture::from_bytes(&glib::Bytes::from(&png))
-                            .map_err(|e| e.to_string())
-                    });
-                break match decoded {
-                    Ok(texture) if !cancel.is_cancelled()
-                        && FileKey::read(path).ok().as_ref() == Some(&source) =>
-                    {
-                        let cost = display_cost(texture.width(), texture.height())
-                            .unwrap_or(usize::MAX);
-                        match display_texture(&texture, scale) {
-                            Ok(small) => Work::Hit(small, source, None, cost),
-                            Err(error) => Work::Failed(error),
-                        }
-                    }
-                    Ok(_) => Work::Cancelled,
-                    Err(error) => Work::Failed(format!("Video preview decode: {error}")),
-                };
-            }
-            Ok(Some(status)) => {
-                break Work::Failed(format!("FFmpeg exited with {status}"));
-            }
-            Ok(None) => std::thread::sleep(Duration::from_millis(40)),
-            Err(error) => {
-                let _ = child.kill();
-                let _ = child.wait();
-                break Work::Failed(format!("Video preview process: {error}"));
-            }
-        }
-    };
-    let _ = std::fs::remove_file(&temp);
-    result
-}
 fn cache_work(
     candidate: &pivra::thumbnail_provider::Candidate,
     worker_token: &gio::Cancellable,

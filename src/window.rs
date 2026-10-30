@@ -106,15 +106,16 @@ fn install_navigation_arrows(overlay: &gtk::Overlay) {
             "Sonraki fotoğraf"
         }));
         let arrow = gtk::DrawingArea::new();
-        arrow.set_content_width(48);
-        arrow.set_content_height(72);
+        arrow.set_content_width(32);
+        arrow.set_content_height(48);
         arrow.set_can_target(false);
         arrow.set_draw_func(move |_, cr, width, height| {
             // Preserve the 4K/fullscreen silhouette; scale only down in a
             // smaller viewport, including the chevron stroke and wing length.
             let scale = (f64::from(width) / 112.0)
                 .min(f64::from(height) / 900.0)
-                .clamp(0.35, 1.0);
+                .clamp(0.35, 1.0)
+                * 0.5;
             let cx = f64::from(width) / 2.0;
             let cy = f64::from(height) / 2.0;
             let tip_x = if left {
@@ -140,7 +141,7 @@ fn install_navigation_arrows(overlay: &gtk::Overlay) {
         button.set_action_name(Some(action));
         button.set_halign(align);
         button.set_valign(gtk::Align::Fill);
-        button.set_size_request(112, -1);
+        button.set_size_request(80, -1);
         button.set_focus_on_click(false);
         button.set_visible(false);
         overlay.add_overlay(&button);
@@ -183,14 +184,14 @@ fn install_navigation_arrows(overlay: &gtk::Overlay) {
     }
     // GTK reports logical viewport size after allocation (including HiDPI).
     // Resize the glass panels as one piece with their arrows; no increase
-    // beyond the approved 112px fullscreen width.
+    // beyond the reduced 80px fullscreen width.
     let prev_size = previous.downgrade();
     let next_size = next.downgrade();
     let resize = move |viewport: &gtk::Overlay| {
         let scale = (f64::from(viewport.width()) / 1600.0)
             .min(f64::from(viewport.height()) / 900.0)
             .clamp(0.5, 1.0);
-        let panel_width = (112.0 * scale).round() as i32;
+        let panel_width = (80.0 * scale).round() as i32;
         for panel in [&prev_size, &next_size] {
             if let Some(panel) = panel.upgrade() {
                 if panel.width_request() != panel_width {

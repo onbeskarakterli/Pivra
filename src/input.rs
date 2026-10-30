@@ -55,9 +55,8 @@ impl OpenedFile {
         if !metadata.is_file() {
             return Err("input must be a regular file, not a directory or special file".into());
         }
-        if !pivra::discovery::supported_photo(&path) {
-            return Err("unsupported photo extension".into());
-        }
+        let kind = pivra::discovery::candidate_kind(&path)
+            .ok_or("unsupported media extension")?;
         // Open read-only and inspect the descriptor; never read file contents.
         // This is a point-in-time check, not a promise against later replacement.
         let handle = fs::File::open(&path).map_err(|e| format!("cannot read local file: {e}"))?;
@@ -70,7 +69,7 @@ impl OpenedFile {
         }
         Ok(Self {
             file: file.clone(),
-            item: MediaItem::new(path, MediaKind::Image),
+            item: MediaItem::new(path, kind),
         })
     }
 }
@@ -173,9 +172,20 @@ mod tests {
         ] {
             assert!(OpenedFile::from_argument(path.as_os_str()).is_err());
         }
-        for name in ["text.txt", "video.mp4", "no-extension"] {
+        for name in ["text.txt", "no-extension"] {
             let path = fixture(dir.path(), OsStr::new(name));
             assert!(OpenedFile::from_argument(path.as_os_str()).is_err());
+        }
+    }
+
+    #[test]
+    fn accepts_supported_video_extensions_as_video_media() {
+        let dir = tempfile::tempdir().unwrap();
+        for name in ["clip.mp4", "clip.mkv", "clip.webm", "clip.mov", "clip.avi"] {
+            let path = fixture(dir.path(), OsStr::new(name));
+            let opened = OpenedFile::from_argument(path.as_os_str()).unwrap();
+            assert_eq!(opened.item.kind(), MediaKind::Video, "{name}");
+            assert_eq!(opened.item.path(), path);
         }
     }
 

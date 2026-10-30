@@ -118,7 +118,15 @@ async fn load_limited(
     })?;
     if !matches!(
         image.mime_type().to_string().as_str(),
-        "image/jpeg" | "image/png" | "image/webp" | "image/gif" | "image/bmp" | "image/tiff" | "image/avif" | "image/heic" | "image/heif"
+        "image/jpeg"
+            | "image/png"
+            | "image/webp"
+            | "image/gif"
+            | "image/bmp"
+            | "image/tiff"
+            | "image/avif"
+            | "image/heic"
+            | "image/heif"
     ) {
         return Err("Decoded image format is not enabled".into());
     }

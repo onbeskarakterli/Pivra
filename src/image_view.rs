@@ -708,7 +708,7 @@ impl ImageView {
                         );
                     }
                     Err(error) => {
-                        eprintln!("Pivra: image load failed: {error}");
+                        eprintln!("Pivra: image load failed for {target_name}: {error}");
                         let summary = error.lines().next().unwrap_or("Secure loading failed.");
                         let retained = if texture.borrow().is_some() {
                             "\nPrevious photo is still displayed."

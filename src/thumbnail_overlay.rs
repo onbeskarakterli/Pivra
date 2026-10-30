@@ -435,7 +435,7 @@ impl Visibility {
             && self.video.upgrade().is_some_and(|v| v.is_visible())
     }
     fn idle_delay(&self) -> u64 {
-        if self.fullscreen_video() { 1000 } else { 3000 }
+        1000
     }
     fn refresh_idle(self: &Rc<Self>) {
         if self.shown.get() && !self.near.get() && !self.pinned.get() {

@@ -346,9 +346,6 @@ impl ImageView {
     pub(super) fn video_key(&self, key: gtk::gdk::Key, ctrl: bool) -> bool {
         self.video_controls.handle_key(key, ctrl)
     }
-    pub(super) fn video_pointer_motion(&self) {
-        self.video_controls.reveal();
-    }
     pub(super) fn load_video(&self, path: &std::path::Path) {
         self.prepare("", true);
         let media = gtk::MediaFile::for_filename(path);

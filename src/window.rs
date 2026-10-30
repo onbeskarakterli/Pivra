@@ -25,6 +25,28 @@ struct FileContext {
     revision: u64,
 }
 
+// Identify the exact newly trashed entry rather than restoring an unrelated
+// older item with the same original path.
+fn trash_entries(original: &std::path::Path) -> Vec<gio::File> {
+    let root = gio::File::for_uri("trash:///");
+    let Ok(enumerator) = root.enumerate_children(
+        "standard::name,trash::orig-path",
+        gio::FileQueryInfoFlags::NONE,
+        None::<&gio::Cancellable>,
+    ) else {
+        return vec![];
+    };
+    let mut entries = vec![];
+    while let Ok(Some(info)) = enumerator.next_file(None::<&gio::Cancellable>) {
+        if info.attribute_string("trash::orig-path")
+            .is_some_and(|value| std::path::Path::new(value.as_str()) == original)
+        {
+            entries.push(enumerator.child(&info));
+        }
+    }
+    entries
+}
+
 fn update_title(window: &adw::ApplicationWindow, title: &adw::WindowTitle, context: &FileContext) {
     update_navigation_actions(window, context);
     let Some(selected) = context.collection.current() else {
@@ -449,7 +471,9 @@ pub(super) fn build(app: &adw::Application, settings: &Settings, file: Option<Op
             }
         });
         install_navigation_arrows(view.widget());
-        viewport.prepend(view.widget());
+        let toast_overlay = adw::ToastOverlay::new();
+        toast_overlay.set_child(Some(view.widget()));
+        viewport.prepend(&toast_overlay);
         placeholder.set_vexpand(false);
         update_title(&window, &title, &context.borrow());
         display_selected(&view, &context.borrow());
@@ -480,6 +504,67 @@ pub(super) fn build(app: &adw::Application, settings: &Settings, file: Option<Op
             window.add_action(&action);
         }
         update_navigation_actions(&window, &context.borrow());
+
+        // Delete moves the selected photo or video to the system Trash.
+        // Undo is bound to the specific new trash entry, never a path guess.
+        let delete = gio::SimpleAction::new("trash-selected", None);
+        let trash_context = context.clone();
+        let trash_view = view.clone();
+        let trash_title = title.clone();
+        let trash_banner = banner.clone();
+        let trash_window = window.downgrade();
+        let toasts = toast_overlay.clone();
+        delete.connect_activate(move |_, _| {
+            let Some(window) = trash_window.upgrade() else { return; };
+            let mut context = trash_context.borrow_mut();
+            let Some(selected) = context.collection.current().cloned() else { return; };
+            let path = selected.path().to_owned();
+            let old_index = context.collection.selected_index().unwrap_or(0);
+            let old_entries = trash_entries(&path);
+            let file = gio::File::for_path(&path);
+            if let Err(error) = file.trash(None::<&gio::Cancellable>) {
+                toasts.add_toast(adw::Toast::new(&format!("Could not move to Trash: {error}")));
+                return;
+            }
+            let trashed = trash_entries(&path).into_iter()
+                .find(|entry| !old_entries.iter().any(|old| old.equal(entry)));
+            let remaining: Vec<_> = context.collection.items().iter()
+                .filter(|item| item.path() != path)
+                .cloned().collect();
+            context.collection = MediaCollection::new(remaining);
+            if !context.collection.items().is_empty() {
+                context.collection.select(old_index.min(context.collection.items().len() - 1));
+            }
+            context.revision = context.revision.wrapping_add(1);
+            trash_banner.set_reveal_child(false);
+            update_title(&window, &trash_title, &context);
+            display_selected(&trash_view, &context);
+            drop(context);
+
+            let name = path.file_name().unwrap_or_default().to_string_lossy();
+            let toast = adw::Toast::new(&format!("Moved to Trash: {name}"));
+            if let Some(trashed) = trashed {
+                toast.set_button_label(Some("Undo"));
+                let toasts = toasts.clone();
+                toast.connect_button_clicked(move |_| {
+                    // Move never overwrites an existing path.
+                    if path.exists() {
+                        toasts.add_toast(adw::Toast::new("Undo failed: destination already exists"));
+                        return;
+                    }
+                    if let Err(error) = trashed.move_(
+                        &gio::File::for_path(&path),
+                        gio::FileCopyFlags::NONE,
+                        None::<&gio::Cancellable>,
+                        None,
+                    ) {
+                        toasts.add_toast(adw::Toast::new(&format!("Undo failed: {error}")));
+                    }
+                });
+            }
+            toasts.add_toast(toast);
+        });
+        window.add_action(&delete);
         let keys = gtk::EventControllerKey::new();
         keys.set_propagation_phase(gtk::PropagationPhase::Capture);
         let weak_window = window.downgrade();
@@ -496,6 +581,12 @@ pub(super) fn build(app: &adw::Application, settings: &Settings, file: Option<Op
                     | gdk::ModifierType::SUPER_MASK,
             ) {
                 return glib::Propagation::Proceed;
+            }
+            if key == gdk::Key::Delete {
+                if let Some(window) = weak_window.upgrade() {
+                    gio::prelude::ActionGroupExt::activate_action(&window, "trash-selected", None);
+                }
+                return glib::Propagation::Stop;
             }
             let mode = match key {
                 gdk::Key::F6 => Some("fit"),

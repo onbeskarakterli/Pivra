@@ -2,6 +2,8 @@
 
 #[path = "animation.rs"]
 mod animation;
+#[path = "video_controls.rs"]
+mod video_controls;
 #[path = "actual_paintable.rs"]
 mod actual_paintable;
 #[path = "thumbnail_overlay.rs"]
@@ -28,6 +30,7 @@ pub(super) struct ImageView {
     thumbnail_strip: thumbnail_overlay::ThumbnailStrip,
     picture: gtk::Picture,
     video: gtk::Video,
+    video_controls: video_controls::Controls,
     status: gtk::Label,
     loading_spinner: gtk::Spinner,
     slot: Rc<LoadSlot>,
@@ -109,6 +112,9 @@ impl ImageView {
         let animation_controls = animation::Controls::new();
         overlay.add_overlay(&animation_controls.bar);
         overlay.set_measure_overlay(&animation_controls.bar, false);
+        let video_controls = video_controls::Controls::new();
+        overlay.add_overlay(&video_controls.bar);
+        overlay.set_measure_overlay(&video_controls.bar, false);
         // The thumbnail controls are bottom-aligned overlay siblings. Their
         // bottom margin already accounts for the strip's visible height.
         // Keep the timeline directly above their allocated button height.
@@ -117,6 +123,7 @@ impl ImageView {
             if widget.widget_name() == "thumbnail-controls" {
                 if let Ok(thumbnail_controls) = widget.downcast::<gtk::Box>() {
                     let bar = animation_controls.bar.downgrade();
+                    let video_bar = video_controls.bar.downgrade();
                     let align = move |controls: &gtk::Box| {
                         if let Some(bar) = bar.upgrade() {
                             let button_height = controls.height().max(30);
@@ -127,6 +134,9 @@ impl ImageView {
                             };
                             if bar.margin_bottom() != offset {
                                 bar.set_margin_bottom(offset);
+                            }
+                            if let Some(video_bar) = video_bar.upgrade() {
+                                video_bar.set_margin_bottom(offset);
                             }
                         }
                     };
@@ -251,6 +261,7 @@ impl ImageView {
         window.add_action(&quality_action);
         Self {
             animation_controls,
+            video_controls,
             animation_generation,
             thumbnail_strip,
             video,
@@ -323,8 +334,10 @@ impl ImageView {
         self.prepare("", true);
         self.video.set_filename(Some(path));
         self.video.set_visible(true);
+        self.video_controls.attach(self.video.media_stream());
     }
     fn stop_video(&self) {
+        self.video_controls.attach(None);
         if let Some(stream) = self.video.media_stream() {
             stream.pause();
         }

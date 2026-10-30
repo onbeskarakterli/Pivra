@@ -298,8 +298,6 @@ pub(super) fn start(
                             let mut found = None;
                             for step in 0..steps {
                                 if generation.get() != expected { cancelled.cancel(); return; }
-                                // A new drag position supersedes this request.
-                                if controls.seek.get().is_some() { break; }
                                 match image.next_frame().await {
                                     Ok(next) => found = Some(next),
                                     Err(_) => break,
@@ -308,7 +306,7 @@ pub(super) fn start(
                                     glib::timeout_future(Duration::from_millis(1)).await;
                                 }
                             }
-                            if controls.seek.get().is_none() {
+                            {
                                 if let Some(next) = found {
                                     if frame_is_valid(&next)
                                         && (!webp || (next.width() == canvas_width

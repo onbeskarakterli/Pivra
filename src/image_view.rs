@@ -276,7 +276,7 @@ impl ImageView {
             .into_iter()
             .filter(|p| {
                 p.extension().and_then(|e| e.to_str()).is_some_and(|e| {
-                    ["jpg", "jpeg", "png"]
+                    ["jpg", "jpeg", "png", "webp", "gif", "bmp", "tif", "tiff", "avif", "heic", "heif"]
                         .iter()
                         .any(|s| e.eq_ignore_ascii_case(s))
                 })
@@ -336,11 +336,11 @@ impl ImageView {
         self.prefetch.borrow().cache.lock().unwrap().peek(path)
     }
 
-    /// Retarget only an unfinished JPEG/PNG request after a paired folder rename.
+    /// Retarget only an unfinished supported-image request after a paired folder rename.
     #[allow(dead_code)] // Standalone view probes omit the folder-monitor integration.
     pub(super) fn retarget_pending(&self, old: &std::path::Path, new: &std::path::Path) {
         let supported = new.extension().and_then(|s| s.to_str()).is_some_and(|ext| {
-            ["jpg", "jpeg", "png"]
+            ["jpg", "jpeg", "png", "webp", "gif", "bmp", "tif", "tiff", "avif", "heic", "heif"]
                 .iter()
                 .any(|s| ext.eq_ignore_ascii_case(s))
         });

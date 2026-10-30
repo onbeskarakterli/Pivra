@@ -301,6 +301,10 @@ impl ImageView {
         }
     }
 
+    pub(super) fn video_widget(&self) -> &gtk::Picture {
+        &self.video
+    }
+
     /// Bounded queue diagnostics for native/controlled probes; no product UI.
     #[allow(dead_code)]
     pub(super) fn set_zoom_wheel_enabled(&self, enabled: bool) {

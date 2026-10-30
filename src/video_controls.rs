@@ -272,6 +272,17 @@ impl Controls {
                 let offset = if key == gtk::gdk::Key::Left { -5_000_000 } else { 5_000_000 };
                 media.seek((media.timestamp() + offset).clamp(0, media.duration().max(0)));
             }
+            (gtk::gdk::Key::comma, false) | (gtk::gdk::Key::period, false) => {
+                // GTK MediaStream does not expose source FPS or frame stepping.
+                // Approximate a frame at 30 FPS without adding a decoder.
+                if !media.is_seekable() || media.is_playing() || media.duration() <= 0 {
+                    return false;
+                }
+                let step_us = 33_333_i64;
+                let delta = if key == gtk::gdk::Key::comma { -step_us } else { step_us };
+                media.seek(media.timestamp().saturating_add(delta)
+                    .clamp(0, media.duration()));
+            }
             (gtk::gdk::Key::m, false) | (gtk::gdk::Key::M, false) => {
                 self.mute.set_active(!self.mute.is_active());
             }

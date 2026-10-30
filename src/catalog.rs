@@ -307,7 +307,7 @@ mod neighbor_tests {
             c.photo_neighbors(),
             vec![
                 std::path::PathBuf::from("10.PNG"),
-                std::path::PathBuf::from("1.png")
+                std::path::PathBuf::from("3.webp")
             ]
         );
         c.select(4);

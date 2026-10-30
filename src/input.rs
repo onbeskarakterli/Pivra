@@ -55,12 +55,9 @@ impl OpenedFile {
         if !metadata.is_file() {
             return Err("input must be a regular file, not a directory or special file".into());
         }
-        let extension = path.extension().and_then(OsStr::to_str).unwrap_or_default();
-        if !["jpg", "jpeg", "png"]
-            .iter()
-            .any(|ext| extension.eq_ignore_ascii_case(ext))
+        if !pivra::discovery::supported_photo(&path)
         {
-            return Err("unsupported photo extension; expected .jpg, .jpeg or .png".into());
+            return Err("unsupported photo extension".into());
         }
         // Open read-only and inspect the descriptor; never read file contents.
         // This is a point-in-time check, not a promise against later replacement.
@@ -177,7 +174,7 @@ mod tests {
         ] {
             assert!(OpenedFile::from_argument(path.as_os_str()).is_err());
         }
-        for name in ["text.txt", "video.mp4", "photo.webp", "no-extension"] {
+        for name in ["text.txt", "video.mp4", "no-extension"] {
             let path = fixture(dir.path(), OsStr::new(name));
             assert!(OpenedFile::from_argument(path.as_os_str()).is_err());
         }

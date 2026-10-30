@@ -13,6 +13,7 @@ pub(super) struct Controls {
     stream: Rc<std::cell::RefCell<Option<gtk::MediaStream>>>,
     updating: Rc<Cell<bool>>,
     scrubbing: Rc<Cell<bool>>,
+    pointer_over: Rc<Cell<bool>>,
     alive: Rc<Cell<bool>>,
     last_activity: Rc<Cell<Instant>>,
 }
@@ -27,6 +28,7 @@ impl Controls {
         let stream: Rc<std::cell::RefCell<Option<gtk::MediaStream>>> = Rc::default();
         let updating = Rc::new(Cell::new(false));
         let scrubbing = Rc::new(Cell::new(false));
+        let pointer_over = Rc::new(Cell::new(false));
         let alive = Rc::new(Cell::new(true));
         let last_activity = Rc::new(Cell::new(Instant::now()));
         let bar = gtk::Box::new(gtk::Orientation::Horizontal, 8);
@@ -36,6 +38,16 @@ impl Controls {
         bar.set_margin_start(96);
         bar.set_margin_end(96);
         bar.set_visible(false);
+        let hover = gtk::EventControllerMotion::new();
+        let hovering = pointer_over.clone();
+        hover.connect_enter(move |_, _, _| hovering.set(true));
+        let hovering = pointer_over.clone();
+        let activity = last_activity.clone();
+        hover.connect_leave(move |_| {
+            hovering.set(false);
+            activity.set(Instant::now());
+        });
+        bar.add_controller(hover);
 
         let play = gtk::Button::from_icon_name("media-playback-pause-symbolic");
         play.add_css_class("flat");
@@ -173,12 +185,12 @@ impl Controls {
         ] {
             bar.append(child);
         }
-        let result = Self { bar, play, position, time, volume, mute, stream, updating, scrubbing, alive, last_activity };
+        let result = Self { bar, play, position, time, volume, mute, stream, updating, scrubbing, pointer_over, alive, last_activity };
         let refresh = result.clone();
         glib::MainContext::default().spawn_local(async move {
             while refresh.alive.get() {
                 glib::timeout_future(Duration::from_millis(150)).await;
-                if refresh.stream.borrow().is_some() && !refresh.scrubbing.get() && refresh.last_activity.get().elapsed() >= Duration::from_secs(2) {
+                if refresh.stream.borrow().is_some() && !refresh.scrubbing.get() && !refresh.pointer_over.get() && refresh.last_activity.get().elapsed() >= Duration::from_secs(2) {
                     refresh.bar.set_visible(false);
                 }
                 if let Some(media) = refresh.stream.borrow().as_ref() {

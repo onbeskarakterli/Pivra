@@ -862,17 +862,35 @@ impl Inner {
                     badge.add_css_class("pivra-thumbnail-gif-badge");
                     // Identical badge geometry for both media types, anchored
                     // to the fixed thumbnail cell rather than the image bounds.
-                    badge.set_halign(gtk::Align::End);
-                    badge.set_valign(gtk::Align::End);
                     badge.set_size_request(64, 24);
                     badge.set_xalign(0.5);
                     badge.set_yalign(0.5);
-                    badge.set_margin_end(6);
-                    badge.set_margin_bottom(6);
                     badge.set_can_target(false);
-                    content.add_overlay(&badge);
-                    content.set_measure_overlay(&badge, false);
-                    content.set_clip_overlay(&badge, true);
+                    // A full-cell anchor gives every badge the same coordinate
+                    // system, regardless of its label width or image aspect ratio.
+                    let badge_anchor = gtk::Box::new(gtk::Orientation::Vertical, 0);
+                    badge_anchor.set_hexpand(true);
+                    badge_anchor.set_vexpand(true);
+                    badge_anchor.set_halign(gtk::Align::Fill);
+                    badge_anchor.set_valign(gtk::Align::Fill);
+                    badge_anchor.set_can_target(false);
+                    let bottom = gtk::Box::new(gtk::Orientation::Horizontal, 0);
+                    bottom.set_halign(gtk::Align::Fill);
+                    bottom.set_valign(gtk::Align::End);
+                    bottom.set_margin_end(6);
+                    bottom.set_margin_bottom(6);
+                    bottom.set_can_target(false);
+                    let spacer = gtk::Box::new(gtk::Orientation::Horizontal, 0);
+                    spacer.set_hexpand(true);
+                    bottom.append(&spacer);
+                    bottom.append(&badge);
+                    let vertical_spacer = gtk::Box::new(gtk::Orientation::Vertical, 0);
+                    vertical_spacer.set_vexpand(true);
+                    badge_anchor.append(&vertical_spacer);
+                    badge_anchor.append(&bottom);
+                    content.add_overlay(&badge_anchor);
+                    content.set_measure_overlay(&badge_anchor, false);
+                    content.set_clip_overlay(&badge_anchor, true);
                 }
                 button.set_child(Some(&content));
                 let weak = Rc::downgrade(&i);

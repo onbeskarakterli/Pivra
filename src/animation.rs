@@ -238,7 +238,9 @@ pub(super) fn start(
         });
 
         let Ok(mut image) = open_image().load().await else { return; };
+        if generation.get() != expected { cancelled.cancel(); return; }
         let Ok(first_frame) = image.next_frame().await else { return; };
+        if generation.get() != expected { cancelled.cancel(); return; }
         let canvas_width = image.details().width();
         let canvas_height = image.details().height();
         let webp = path.extension().and_then(|extension| extension.to_str())
@@ -289,6 +291,7 @@ pub(super) fn start(
                         } else {
                             false
                         };
+                        if generation.get() != expected { cancelled.cancel(); return; }
                         if ready {
                             let steps = if forward {
                                 target_index - frame_index
@@ -306,6 +309,7 @@ pub(super) fn start(
                                     glib::timeout_future(Duration::from_millis(1)).await;
                                 }
                             }
+                            if generation.get() != expected { cancelled.cancel(); return; }
                             {
                                 if let Some(next) = found {
                                     if frame_is_valid(&next)
@@ -388,11 +392,13 @@ pub(super) fn start(
                     }
                 }
                 let Ok(reloaded) = open_image().load().await else { break; };
+                if generation.get() != expected { cancelled.cancel(); return; }
                 image = reloaded;
                 frame_index = 0;
                 elapsed = 0.0;
             }
             let Ok(next_frame) = image.next_frame().await else { break; };
+            if generation.get() != expected { cancelled.cancel(); return; }
             if !frame_is_valid(&next_frame) { break; }
             if webp && (next_frame.width() != canvas_width
                 || next_frame.height() != canvas_height)

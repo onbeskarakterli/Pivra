@@ -280,6 +280,10 @@ impl Provider {
             || FileKey::read(path).ok().as_ref() != Some(&source)
             || FileKey::read(&cache).ok().as_ref() != Some(&cache_key)
         {
+            crate::thumbnail_diagnostics::trace("cache-stale-validation", Some(path),
+                format_args!("gio_valid={valid} source_unchanged={} cache_unchanged={}",
+                    FileKey::read(path).ok().as_ref() == Some(&source),
+                    FileKey::read(&cache).ok().as_ref() == Some(&cache_key)));
             return Outcome::Stale;
         }
         // Reject same-path replacement even when seconds-resolution Thumb::MTime survives.
@@ -288,6 +292,9 @@ impl Provider {
             Err(_) => return Outcome::Stale,
         };
         if (src.ctime(), src.ctime_nsec()) > (metadata.mtime(), metadata.mtime_nsec()) {
+            crate::thumbnail_diagnostics::trace("cache-stale-ctime", Some(path),
+                format_args!("source_ctime={}.{} cache_mtime={}.{}",
+                    src.ctime(), src.ctime_nsec(), metadata.mtime(), metadata.mtime_nsec()));
             return Outcome::Stale;
         }
         Outcome::Hit(Candidate {

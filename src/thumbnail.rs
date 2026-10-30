@@ -384,8 +384,12 @@ pub fn query_or_generate(provider: &Provider, path: &Path, cancel: &gio::Cancell
         Ok(info) => info,
         Err(e) => return Outcome::SourceUnavailable(e.to_string()),
     };
-    if info.size() > 64 * 1024 * 1024 {
-        return Outcome::Invalid("source exceeds 64MiB".into());
+    // The desktop video thumbnailer reads compressed streams, not decoded image
+    // pixels. Keep the image limit unchanged and bound videos separately.
+    let is_video = crate::discovery::candidate_kind(path) == Some(crate::media::MediaKind::Video);
+    let max_size = if is_video { 8_i64 * 1024 * 1024 * 1024 } else { 64_i64 * 1024 * 1024 };
+    if info.size() > max_size {
+        return Outcome::Invalid("source exceeds thumbnail generation size limit".into());
     }
     let Some(mime) = info
         .content_type()

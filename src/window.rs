@@ -589,6 +589,7 @@ struct FolderWatch {
     cancelled: Arc<AtomicBool>,
     monitor: RefCell<Option<gio::FileMonitor>>,
     timer: RefCell<Option<glib::SourceId>>,
+    fallback_poll: RefCell<Option<glib::SourceId>>,
     running: Cell<bool>,
     dirty: Cell<bool>,
     initialized: Cell<bool>,
@@ -601,6 +602,9 @@ impl FolderWatch {
         self.cancelled.store(true, Ordering::Relaxed);
         if let Some(timer) = self.timer.borrow_mut().take() {
             timer.remove();
+        }
+        if let Some(poll) = self.fallback_poll.borrow_mut().take() {
+            poll.remove();
         }
         for monitor in self.link_monitors.borrow_mut().drain(..) {
             monitor.cancel();
@@ -804,6 +808,7 @@ fn watch(
         cancelled: Arc::new(AtomicBool::new(false)),
         monitor: RefCell::new(None),
         timer: RefCell::new(None),
+        fallback_poll: RefCell::new(None),
         running: Cell::new(false),
         dirty: Cell::new(false),
         initialized: Cell::new(false),
@@ -891,5 +896,21 @@ fn watch(
     });
     let destroying = state.clone();
     window.connect_destroy(move |_| destroying.stop());
+    // Some backends do not deliver directory notifications reliably.
+    // Periodically reconcile the catalog as a fallback while this window lives.
+    let weak = Rc::downgrade(&state);
+    let poll = glib::timeout_add_local(Duration::from_secs(5), move || {
+        let Some(state) = weak.upgrade() else {
+            return glib::ControlFlow::Break;
+        };
+        if state.cancelled.load(Ordering::Relaxed) {
+            return glib::ControlFlow::Break;
+        }
+        if !state.running.get() {
+            state.schedule();
+        }
+        glib::ControlFlow::Continue
+    });
+    state.fallback_poll.replace(Some(poll));
     state.scan();
 }

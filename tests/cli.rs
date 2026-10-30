@@ -88,7 +88,7 @@ fn valid_local_path_and_uri_reach_graphical_initialization_without_decoding() {
 #[test]
 fn invalid_file_inputs_fail_before_graphical_initialization() {
     let directory = support::temp_dir();
-    let unsupported = directory.path().join("video.mp4");
+    let unsupported = directory.path().join("unsupported.txt");
     std::fs::write(&unsupported, include_bytes!("fixtures/model-video.txt")).unwrap();
     let missing = directory.path().join("missing.png");
     for argument in [

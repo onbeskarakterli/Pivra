@@ -234,6 +234,10 @@ pub(super) fn start(
 
         let Ok(mut image) = open_image().load().await else { return; };
         let Ok(mut frame) = image.next_frame().await else { return; };
+        let canvas_width = image.details().width();
+        let canvas_height = image.details().height();
+        let webp = path.extension().and_then(|extension| extension.to_str())
+            .is_some_and(|extension| extension.eq_ignore_ascii_case("webp"));
         let Some(mut delay) = frame.delay() else {
             controls.bar.set_visible(false);
             return;
@@ -278,7 +282,10 @@ pub(super) fn start(
                             elapsed = offset;
                             delay = frame.delay().unwrap_or(Duration::from_millis(100));
                             if let Some(picture) = picture.upgrade() {
-                                if frame_is_valid(&frame) {
+                                if frame_is_valid(&frame)
+                                    && (!webp || (frame.width() == canvas_width
+                                        && frame.height() == canvas_height))
+                                {
                                     let next = frame.texture();
                                     let mode = mode_action.state()
                                         .and_then(|v| v.str().and_then(ViewMode::from_id))
@@ -346,6 +353,15 @@ pub(super) fn start(
             }
             let Ok(next_frame) = image.next_frame().await else { break; };
             if !frame_is_valid(&next_frame) { break; }
+            if webp && (next_frame.width() != canvas_width
+                || next_frame.height() != canvas_height)
+            {
+                eprintln!(
+                    "Pivra: WebP returned a partial frame ({}x{}, canvas {}x{});                      refusing to stretch a partial frame across the image",
+                    next_frame.width(), next_frame.height(), canvas_width, canvas_height
+                );
+                break;
+            }
             let Some(next_delay) = next_frame.delay() else { break; };
             let Some(picture) = picture.upgrade() else { break; };
             let next = next_frame.texture();

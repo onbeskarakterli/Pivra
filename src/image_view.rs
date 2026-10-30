@@ -370,6 +370,12 @@ impl ImageView {
                 }
             });
         }
+        if resume_at > 0 && media.is_prepared() && media.is_seekable() {
+            let duration = media.duration();
+            if duration > 0 && resume_at < duration {
+                media.seek(resume_at);
+            }
+        }
         self.video_path.replace(Some(path.to_owned()));
         self.video.set_paintable(Some(&media));
         self.video_stream.replace(Some(media.clone()));

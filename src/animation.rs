@@ -17,6 +17,8 @@ pub(super) struct Controls {
     pub bar: gtk::Box,
     pub play: gtk::Button,
     pub progress: gtk::Scale,
+    speed_button: gtk::MenuButton,
+    loop_button: gtk::ToggleButton,
 }
 
 impl Controls {
@@ -93,13 +95,24 @@ impl Controls {
         bar.append(&speed_button);
         bar.append(&loop_button);
         bar.set_visible(false);
-        Self { paused, speed, looping, bar, play, progress }
+        Self {
+            paused,
+            speed,
+            looping,
+            bar,
+            play,
+            progress,
+            speed_button,
+            loop_button,
+        }
     }
     pub fn reset(&self) {
         self.paused.set(false);
         self.speed.set(1.0);
         self.looping.set(true);
         self.progress.set_value(0.0);
+        self.speed_button.set_label("1×");
+        self.loop_button.set_active(true);
         self.bar.set_visible(false);
         self.play.set_icon_name("media-playback-pause-symbolic");
     }

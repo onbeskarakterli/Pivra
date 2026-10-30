@@ -274,9 +274,7 @@ impl ImageView {
     pub(super) fn set_neighbors(&self, paths: Vec<PathBuf>) {
         let paths: Vec<_> = paths
             .into_iter()
-            .filter(|p| {
-                pivra::discovery::supported_photo(p)
-            })
+            .filter(|p| pivra::discovery::supported_photo(p)
             .take(2)
             .collect();
         {

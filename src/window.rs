@@ -479,7 +479,13 @@ pub(super) fn build(app: &adw::Application, settings: &Settings, file: Option<Op
         let keys = gtk::EventControllerKey::new();
         keys.set_propagation_phase(gtk::PropagationPhase::Capture);
         let weak_window = window.downgrade();
+        let video_keys = view.clone();
         keys.connect_key_pressed(move |_, key, _, modifiers| {
+            if !modifiers.intersects(gdk::ModifierType::ALT_MASK | gdk::ModifierType::SUPER_MASK)
+                && video_keys.video_key(key, modifiers.contains(gdk::ModifierType::CONTROL_MASK))
+            {
+                return glib::Propagation::Stop;
+            }
             if modifiers.intersects(
                 gdk::ModifierType::CONTROL_MASK
                     | gdk::ModifierType::ALT_MASK

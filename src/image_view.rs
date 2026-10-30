@@ -118,7 +118,7 @@ impl ImageView {
         let animation_controls = animation::Controls::new();
         overlay.add_overlay(&animation_controls.bar);
         overlay.set_measure_overlay(&animation_controls.bar, false);
-        let video_controls = video_controls::Controls::new();
+        let video_controls = video_controls::Controls::new(window);
         let closing_controls = video_controls.clone();
         window.connect_destroy(move |_| closing_controls.shutdown());
         overlay.add_overlay(&video_controls.bar);

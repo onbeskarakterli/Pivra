@@ -858,6 +858,9 @@ impl Inner {
                 // Until video frame previews are implemented, video cells use
                 // one deterministic placeholder, regardless of cache state.
                 picture.set_visible(!is_video);
+                // The photo is the base child, not an unmeasured overlay.
+                // Badge, selection and loading indicators remain overlays.
+                content.set_child(Some(&picture));
                 let icon = gtk::Image::from_icon_name("image-x-generic-symbolic");
                 icon.set_halign(gtk::Align::Center);
                 icon.set_valign(gtk::Align::Center);
@@ -865,8 +868,7 @@ impl Inner {
                 icon.set_can_target(false);
                 spinner.set_can_target(false);
                 for child in [
-                    picture.upcast_ref::<gtk::Widget>(),
-                    icon.upcast_ref(),
+                    icon.upcast_ref::<gtk::Widget>(),
                     spinner.upcast_ref(),
                 ] {
                     content.add_overlay(child);

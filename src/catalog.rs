@@ -298,7 +298,10 @@ mod neighbor_tests {
             MediaItem::new("4.jpg", MediaKind::Image),
             MediaItem::new("10.PNG", MediaKind::Image),
         ]);
-        assert_eq!(c.photo_neighbors(), vec![std::path::PathBuf::from("3.webp")]);
+        assert_eq!(
+            c.photo_neighbors(),
+            vec![std::path::PathBuf::from("3.webp")]
+        );
         c.select(3);
         assert_eq!(
             c.photo_neighbors(),

@@ -860,12 +860,16 @@ impl Inner {
                 if is_gif || is_video {
                     let badge = gtk::Label::new(Some(if is_video { "VIDEO" } else { "GIF" }));
                     badge.add_css_class("pivra-thumbnail-gif-badge");
+                    // Identical badge geometry for both media types, anchored
+                    // to the fixed thumbnail cell rather than the image bounds.
                     badge.set_halign(gtk::Align::End);
                     badge.set_valign(gtk::Align::End);
-                    badge.set_margin_end(4);
-                    badge.set_margin_bottom(4);
+                    badge.set_size_request(64, 24);
+                    badge.set_xalign(0.5);
+                    badge.set_yalign(0.5);
+                    badge.set_margin_end(6);
+                    badge.set_margin_bottom(6);
                     badge.set_can_target(false);
-                    badge.set_max_width_chars(6);
                     content.add_overlay(&badge);
                     content.set_measure_overlay(&badge, false);
                     content.set_clip_overlay(&badge, true);

@@ -659,7 +659,7 @@ impl Inner {
                                 ((texture.height() as f64 * ratio).round() as i32).max(1),
                             );
                             w.picture.set_paintable(Some(&texture));
-                            w.icon.set_visible(false);
+                            w.icon.set_visible(pivra::discovery::candidate_kind(&entry.path) == Some(pivra::media::MediaKind::Video));
                         }
                     }
                 }
@@ -842,6 +842,9 @@ impl Inner {
                 spinner.set_valign(gtk::Align::Center);
                 let is_video = pivra::discovery::candidate_kind(&entry.path)
                     == Some(pivra::media::MediaKind::Video);
+                // Until video frame previews are implemented, video cells use
+                // one deterministic placeholder, regardless of cache state.
+                picture.set_visible(!is_video);
                 let icon = gtk::Image::from_icon_name(if is_video {
                     "video-x-generic-symbolic"
                 } else {
@@ -1032,8 +1035,13 @@ impl Inner {
             }
             if let Some(w) = &e.widgets {
                 if visible.contains(&n) && matches!(e.phase, Phase::Pending | Phase::Loading) {
-                    w.spinner.start();
-                    w.icon.set_visible(false);
+                    if pivra::discovery::candidate_kind(&e.path) == Some(pivra::media::MediaKind::Video) {
+                        w.spinner.stop();
+                        w.icon.set_visible(true);
+                    } else {
+                        w.spinner.start();
+                        w.icon.set_visible(false);
+                    }
                 } else {
                     w.spinner.stop();
                 }
@@ -1244,7 +1252,7 @@ impl Inner {
                 }
                 if let Some(w) = &entry.widgets {
                     w.spinner.stop();
-                    w.icon.set_visible(entry.phase == Phase::Failed);
+                    w.icon.set_visible(entry.phase == Phase::Failed || pivra::discovery::candidate_kind(&entry.path) == Some(pivra::media::MediaKind::Video));
                 }
             }
             // LRU bounds apply to widget paintables as well, not just a side map.

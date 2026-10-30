@@ -341,6 +341,8 @@ mod photo_navigation_tests {
         assert!(!c.select_photo(true));
         assert_eq!(c.selected_index(), Some(4));
         assert!(c.select_photo(false));
+        assert_eq!(c.selected_index(), Some(3));
+        assert!(c.select_photo(false));
         assert_eq!(c.selected_index(), Some(0));
         assert!(!c.select_photo(false));
         assert_eq!(c.items(), items);

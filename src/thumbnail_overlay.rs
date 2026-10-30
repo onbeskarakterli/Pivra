@@ -52,7 +52,6 @@ pub(crate) fn install(
     window: &impl IsA<gtk::Window>,
     overlay: &gtk::Overlay,
     available: bool,
-    video: &gtk::Picture,
 ) -> ThumbnailStrip {
     install_css(&overlay.display());
     let items = gtk::Box::new(gtk::Orientation::Horizontal, 8);
@@ -146,8 +145,6 @@ pub(crate) fn install(
     }
     let state = Rc::new(Visibility {
         available,
-        window: window.as_ref().downgrade(),
-        video: video.downgrade(),
         preference: preference.clone(),
         strip: strip.downgrade(),
         resize_edge: resize_edge.downgrade(),
@@ -181,11 +178,6 @@ pub(crate) fn install(
     preference.subscribe(&listener);
     state.listener.replace(Some(listener));
     state.render(saved_pinned);
-    // Re-evaluate the strip's idle timeout when fullscreen video starts/stops.
-    let mode = state.clone();
-    window.connect_fullscreened_notify(move |_| mode.refresh_idle());
-    let mode = state.clone();
-    video.connect_visible_notify(move |_| mode.refresh_idle());
     let click = state.clone();
     button.connect_clicked(move |_| {
         if click.available {
@@ -408,8 +400,6 @@ pub(crate) fn install(
 type PreferenceListener = Rc<dyn Fn(bool)>;
 struct Visibility {
     available: bool,
-    window: glib::WeakRef<gtk::Window>,
-    video: glib::WeakRef<gtk::Picture>,
     preference: Rc<pivra::settings::ThumbnailPreference>,
     strip: glib::WeakRef<gtk::ScrolledWindow>,
     resize_edge: glib::WeakRef<gtk::Box>,
@@ -430,17 +420,8 @@ struct Visibility {
     listener: RefCell<Option<PreferenceListener>>,
 }
 impl Visibility {
-    fn fullscreen_video(&self) -> bool {
-        self.window.upgrade().is_some_and(|w| w.is_fullscreen())
-            && self.video.upgrade().is_some_and(|v| v.is_visible())
-    }
     fn idle_delay(&self) -> u64 {
         1000
-    }
-    fn refresh_idle(self: &Rc<Self>) {
-        if self.shown.get() && !self.near.get() && !self.pinned.get() {
-            self.schedule(self.idle_delay());
-        }
     }
     fn disconnect_layout(&self) {
         if let Some((clock, handler)) = self.layout.borrow_mut().take() {

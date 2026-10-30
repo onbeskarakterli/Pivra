@@ -375,12 +375,11 @@ impl ImageView {
         if resume_at > 0 {
             // MediaFile prepares asynchronously; a seek before preparation
             // may be ignored. Apply the stored timestamp once prepared.
-            let stream = media.clone();
             media.connect_notify_local(Some("prepared"), move |media, _| {
-                if media.is_prepared() && stream.is_seekable() {
-                    let duration = stream.duration();
+                if media.is_prepared() && media.is_seekable() {
+                    let duration = media.duration();
                     if duration > 0 && resume_at < duration {
-                        stream.seek(resume_at);
+                        media.seek(resume_at);
                     }
                 }
             });

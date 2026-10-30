@@ -859,7 +859,12 @@ impl Inner {
                 content.set_measure_overlay(&selection, false);
                 content.set_clip_overlay(&selection, true);
                 // Filmstrip previews stay static; identify GIFs without playing frames.
-                if entry.path.extension().and_then(|ext| ext.to_str()).is_some_and(|ext| ext.eq_ignore_ascii_case("gif")) {
+                if entry
+                    .path
+                    .extension()
+                    .and_then(|ext| ext.to_str())
+                    .is_some_and(|ext| ext.eq_ignore_ascii_case("gif"))
+                {
                     let badge = gtk::Label::new(Some("GIF"));
                     badge.add_css_class("pivra-thumbnail-gif-badge");
                     badge.set_halign(gtk::Align::End);

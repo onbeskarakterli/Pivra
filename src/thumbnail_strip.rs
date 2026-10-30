@@ -456,6 +456,10 @@ impl ThumbnailStrip {
         i.scroller.queue_draw();
         if i.initialized.get() && !i.scroller.is_mapped() {
             i.warm_hidden();
+        } else if i.initialized.get() && i.scroller.is_mapped() {
+            // File restoration creates pending cells during an asynchronous
+            // folder reconciliation; kick the visible scheduler immediately.
+            i.drive();
         }
     }
     /// Called on a real source-folder rescan, not on photo selection.
@@ -750,7 +754,13 @@ impl Inner {
                 }
             }
             i.scroller.queue_draw();
-            i.drive();
+            if i.scroller.is_mapped() {
+                i.drive();
+            } else {
+                // Rescans can invalidate a hidden strip. Its pending entries
+                // must be warmed now, not on the next filesystem change.
+                i.warm_hidden();
+            }
         });
     }
     fn disconnect(&self) {

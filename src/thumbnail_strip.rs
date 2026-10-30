@@ -858,6 +858,19 @@ impl Inner {
                 content.add_overlay(&selection);
                 content.set_measure_overlay(&selection, false);
                 content.set_clip_overlay(&selection, true);
+                // Filmstrip previews stay static; identify GIFs without playing frames.
+                if entry.path.extension().and_then(|ext| ext.to_str()).is_some_and(|ext| ext.eq_ignore_ascii_case("gif")) {
+                    let badge = gtk::Label::new(Some("GIF"));
+                    badge.add_css_class("pivra-thumbnail-gif-badge");
+                    badge.set_halign(gtk::Align::End);
+                    badge.set_valign(gtk::Align::End);
+                    badge.set_margin_end(4);
+                    badge.set_margin_bottom(4);
+                    badge.set_can_target(false);
+                    content.add_overlay(&badge);
+                    content.set_measure_overlay(&badge, false);
+                    content.set_clip_overlay(&badge, true);
+                }
                 button.set_child(Some(&content));
                 let weak = Rc::downgrade(&i);
                 let index = entry.index.clone();

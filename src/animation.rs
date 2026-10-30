@@ -270,7 +270,15 @@ pub(super) fn start(
                     controls.show_progress(1.0);
                     controls.paused.set(true);
                     controls.play.set_icon_name("media-playback-start-symbolic");
-                    break;
+                    controls.play.set_tooltip_text(Some("Replay animation"));
+                    while controls.paused.get() && controls.seek.get().is_none() {
+                        if generation.get() != expected { cancelled.cancel(); return; }
+                        glib::timeout_future(Duration::from_millis(20)).await;
+                    }
+                    if controls.seek.get().is_some() {
+                        frame_index = frame_index.saturating_sub(1);
+                        continue;
+                    }
                 }
                 let Ok(reloaded) = loader.load().await else { break; };
                 image = reloaded;

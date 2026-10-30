@@ -526,8 +526,6 @@ pub(super) fn build(app: &adw::Application, settings: &Settings, file: Option<Op
                 toasts.add_toast(adw::Toast::new(&format!("Could not move to Trash: {error}")));
                 return;
             }
-            let trashed = trash_entries(&path).into_iter()
-                .find(|entry| !old_entries.iter().any(|old| old.equal(entry)));
             let remaining: Vec<_> = context.collection.items().iter()
                 .filter(|item| item.path() != path)
                 .cloned().collect();
@@ -544,25 +542,31 @@ pub(super) fn build(app: &adw::Application, settings: &Settings, file: Option<Op
 
             let name = path.file_name().unwrap_or_default().to_string_lossy();
             let toast = adw::Toast::new(&format!("Moved to Trash: {name}"));
-            if let Some(trashed) = trashed {
-                toast.set_button_label(Some("Undo"));
-                let toasts = toasts.clone();
-                toast.connect_button_clicked(move |_| {
-                    // Move never overwrites an existing path.
-                    if path.exists() {
-                        toasts.add_toast(adw::Toast::new("Undo failed: destination already exists"));
-                        return;
-                    }
-                    if let Err(error) = trashed.move_(
-                        &gio::File::for_path(&path),
-                        gio::FileCopyFlags::NONE,
-                        None::<&gio::Cancellable>,
-                        None,
-                    ) {
-                        toasts.add_toast(adw::Toast::new(&format!("Undo failed: {error}")));
-                    }
-                });
-            }
+            // The Trash backend may update its GIO directory asynchronously.
+            // Always expose Undo and resolve the new entry when clicked, not
+            // immediately after trash() returns.
+            toast.set_button_label(Some("Undo"));
+            let undo_toasts = toasts.clone();
+            toast.connect_button_clicked(move |_| {
+                if path.exists() {
+                    undo_toasts.add_toast(adw::Toast::new("Undo failed: destination already exists"));
+                    return;
+                }
+                let trashed = trash_entries(&path).into_iter()
+                    .find(|entry| !old_entries.iter().any(|old| old.equal(entry)));
+                let Some(trashed) = trashed else {
+                    undo_toasts.add_toast(adw::Toast::new("Undo failed: trashed file not found"));
+                    return;
+                };
+                if let Err(error) = trashed.move_(
+                    &gio::File::for_path(&path),
+                    gio::FileCopyFlags::NONE,
+                    None::<&gio::Cancellable>,
+                    None,
+                ) {
+                    undo_toasts.add_toast(adw::Toast::new(&format!("Undo failed: {error}")));
+                }
+            });
             toasts.add_toast(toast);
         });
         window.add_action(&delete);

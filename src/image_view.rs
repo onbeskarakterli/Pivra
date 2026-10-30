@@ -123,14 +123,25 @@ impl ImageView {
         window.connect_destroy(move |_| closing_controls.shutdown());
         overlay.add_overlay(&video_controls.bar);
         overlay.set_measure_overlay(&video_controls.bar, false);
+        // Only physical pointer movement may reset the controls' idle timer.
+        // GTK can dispatch repeated motion events while overlay children redraw;
+        // those must not keep fullscreen controls visible indefinitely.
         let motion = gtk::EventControllerMotion::new();
+        let last_pointer = Rc::new(Cell::new(None::<(f64, f64)>));
+        let previous = last_pointer.clone();
         let reveal = video_controls.clone();
-        motion.connect_motion(move |_, _, _| reveal.reveal());
+        motion.connect_motion(move |_, x, y| {
+            let moved = previous.get().is_none_or(|(px, py)| {
+                (x - px).abs() >= 2.0 || (y - py).abs() >= 2.0
+            });
+            if moved {
+                previous.set(Some((x, y)));
+                reveal.reveal();
+            }
+        });
+        let previous = last_pointer.clone();
+        motion.connect_leave(move |_| previous.set(None));
         overlay.add_controller(motion);
-        let leave = gtk::EventControllerMotion::new();
-        let reveal = video_controls.clone();
-        leave.connect_enter(move |_, _, _| reveal.reveal());
-        video_controls.bar.add_controller(leave);
         // The thumbnail controls are bottom-aligned overlay siblings. Their
         // bottom margin already accounts for the strip's visible height.
         // Keep the timeline directly above their allocated button height.

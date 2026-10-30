@@ -197,7 +197,7 @@ pub(super) fn start(
 
         // Start foreground playback immediately. Index frame durations in a
         // separate cooperative task so a long GIF never blocks first playback.
-        let timeline: Rc<RefCell<Option<Vec<f64>>>> = Rc::new(RefCell::new(None));
+        let timeline: Rc<RefCell<Option<(Rc<Vec<f64>>, f64)>>> = Rc::new(RefCell::new(None));
         let probe_timeline = timeline.clone();
         let probe_controls = controls.clone();
         let probe_generation = generation.clone();
@@ -226,7 +226,7 @@ pub(super) fn start(
             }
             if probe_generation.get() == expected && reached_end && durations.len() > 1 {
                 let total: f64 = durations.iter().sum();
-                probe_timeline.replace(Some(durations));
+                probe_timeline.replace(Some((Rc::new(durations), total)));
                 probe_controls.progress.set_sensitive(true);
                 probe_controls.show_time(0.0, total);
             }
@@ -247,10 +247,12 @@ pub(super) fn start(
         loop {
             if generation.get() != expected { cancelled.cancel(); return; }
 
+            // Clone just the Rc pointer, not the complete frame-duration index.
+            // The total is computed once after indexing, not at every frame.
             let timeline_snapshot = timeline.borrow().clone();
-            let durations = timeline_snapshot.as_deref().unwrap_or(&[]);
+            let durations = timeline_snapshot.as_ref().map(|(frames, _)| frames.as_slice()).unwrap_or(&[]);
             let timeline_ready = !durations.is_empty();
-            let total: f64 = durations.iter().sum();
+            let total = timeline_snapshot.as_ref().map_or(0.0, |(_, total)| *total);
             // Seeking is a decoder restart and bounded forward scan, never
             // an arbitrary seek in the sandboxed compressed byte stream.
             if let Some(fraction) = controls.seek.take() {

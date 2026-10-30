@@ -249,7 +249,7 @@ fn display_selected(view: &ImageView, context: &FileContext) {
     };
     if item.kind() == MediaKind::Video {
         view.set_neighbors(vec![]);
-        view.show_message("Video playback is not available yet.");
+        view.load_video(item.path());
     } else if pivra::discovery::supported_photo(item.path()) {
         view.load(item.path().to_owned());
         view.set_neighbors(context.collection.photo_neighbors());

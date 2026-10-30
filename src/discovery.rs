@@ -34,8 +34,7 @@ pub fn supported_photo(path: &Path) -> bool {
 
 pub fn candidate_kind(path: &Path) -> Option<MediaKind> {
     let extension = path.extension()?.to_str()?;
-    if supported_photo(path)
-    {
+    if supported_photo(path) {
         Some(MediaKind::Image)
     } else if ["mp4", "mkv", "webm", "mov", "avi"]
         .iter()

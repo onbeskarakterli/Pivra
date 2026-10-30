@@ -178,11 +178,7 @@ pub(super) fn start(
     transform: Rc<RefCell<Transform>>,
     filter: Rc<Cell<Resampling>>,
 ) {
-    let ext = path.extension().and_then(|e| e.to_str()).unwrap_or("");
-    if !["gif", "webp", "png", "apng"]
-        .iter()
-        .any(|s| ext.eq_ignore_ascii_case(s))
-    {
+    if !is_animated_file(&path) {
         return;
     }
     // Inspect frame durations without retaining frame textures. Seeking
@@ -375,4 +371,70 @@ fn frame_is_valid(frame: &glycin::Frame) -> bool {
         && width <= 32_768 && height <= 32_768
         && u64::from(width) * u64::from(height) <= 32_000_000
         && frame.buf_slice().len() <= 512 * 1024 * 1024
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum AnimationKind {
+    Gif,
+    Webp,
+    Apng,
+}
+
+/// Check animation-specific header information without decoding the media or
+/// allocating unbounded file data. GIF always uses the frame-based path;
+/// Glycin's first frame delay still determines whether playback is possible.
+fn animation_kind(path: &std::path::Path) -> Option<AnimationKind> {
+    use std::io::Read;
+    let ext = path.extension()?.to_str()?;
+    if ext.eq_ignore_ascii_case("gif") {
+        return Some(AnimationKind::Gif);
+    }
+    if ext.eq_ignore_ascii_case("webp") {
+        let mut file = std::fs::File::open(path).ok()?;
+        let mut header = [0u8; 21];
+        file.read_exact(&mut header).ok()?;
+        // Extended WebP declares animation in VP8X feature bit 1.
+        if &header[0..4] == b"RIFF"
+            && &header[8..12] == b"WEBP"
+            && &header[12..16] == b"VP8X"
+            && header[20] & 0x02 != 0
+        {
+            return Some(AnimationKind::Webp);
+        }
+        return None;
+    }
+    if !ext.eq_ignore_ascii_case("png") && !ext.eq_ignore_ascii_case("apng") {
+        return None;
+    }
+    let mut file = std::fs::File::open(path).ok()?;
+    let mut signature = [0u8; 8];
+    file.read_exact(&mut signature).ok()?;
+    if signature != [137, 80, 78, 71, 13, 10, 26, 10] {
+        return None;
+    }
+    // APNG's acTL chunk must precede the first IDAT. Limit the amount of
+    // metadata examined so malformed PNGs cannot trigger an unbounded scan.
+    let mut examined = 8u64;
+    while examined < 1024 * 1024 {
+        let mut chunk_header = [0u8; 8];
+        file.read_exact(&mut chunk_header).ok()?;
+        let len = u32::from_be_bytes(chunk_header[0..4].try_into().ok()?) as u64;
+        let kind = &chunk_header[4..8];
+        if kind == b"acTL" && len == 8 {
+            return Some(AnimationKind::Apng);
+        }
+        if kind == b"IDAT" || kind == b"IEND" {
+            return None;
+        }
+        examined = examined.checked_add(12)?.checked_add(len)?;
+        if examined > 1024 * 1024 {
+            return None;
+        }
+        std::io::copy(&mut std::io::Read::by_ref(&mut file).take(len + 4), &mut std::io::sink()).ok()?;
+    }
+    None
+}
+
+fn is_animated_file(path: &std::path::Path) -> bool {
+    animation_kind(path).is_some()
 }

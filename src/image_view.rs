@@ -98,28 +98,40 @@ impl ImageView {
         let animation_controls = animation::Controls::new();
         overlay.add_overlay(&animation_controls.bar);
         overlay.set_measure_overlay(&animation_controls.bar, false);
-        // The timeline occupies only the center, and follows the strip's
-        // visibility and user-resized height without overlapping thumbnails.
+        // The toggle/pin cluster floats just above the thumbnail strip.
+        // Position the animation controls above the cluster, not merely above
+        // the strip, so neither can overlap as the strip opens or resizes.
         let mut child = overlay.first_child();
         while let Some(widget) = child {
-            if widget.widget_name() == "thumbnail-strip" {
-                if let Ok(strip) = widget.downcast::<gtk::ScrolledWindow>() {
-                    let controls = animation_controls.bar.downgrade();
-                    let align = move |strip: &gtk::ScrolledWindow| {
-                        if let Some(bar) = controls.upgrade() {
-                            let offset = if strip.is_visible() {
-                                strip.height_request().max(0) + 8
+            if widget.widget_name() == "thumbnail-controls" {
+                if let Ok(thumbnail_controls) = widget.downcast::<gtk::Box>() {
+                    let bar = animation_controls.bar.downgrade();
+                    let align = move |controls: &gtk::Box| {
+                        if let Some(bar) = bar.upgrade() {
+                            let height = controls.measure(gtk::Orientation::Vertical, -1).1.max(0);
+                            let bottom = if controls.is_visible() {
+                                controls.margin_bottom() + height + 8
                             } else {
                                 8
                             };
-                            bar.set_margin_bottom(offset);
+                            if bar.margin_bottom() != bottom {
+                                bar.set_margin_bottom(bottom);
+                            }
                         }
                     };
-                    align(&strip);
+                    align(&thumbnail_controls);
                     let align = Rc::new(align);
-                    let visibility = align.clone();
-                    strip.connect_notify_local(Some("visible"), move |strip, _| visibility(strip));
-                    strip.connect_notify_local(Some("height-request"), move |strip, _| align(strip));
+                    let on_visibility = align.clone();
+                    thumbnail_controls.connect_notify_local(Some("visible"), move |controls, _| {
+                        on_visibility(controls);
+                    });
+                    let on_margin = align.clone();
+                    thumbnail_controls.connect_notify_local(Some("margin-bottom"), move |controls, _| {
+                        on_margin(controls);
+                    });
+                    thumbnail_controls.connect_notify_local(Some("height"), move |controls, _| {
+                        align(controls);
+                    });
                 }
                 break;
             }

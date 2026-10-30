@@ -55,8 +55,7 @@ impl OpenedFile {
         if !metadata.is_file() {
             return Err("input must be a regular file, not a directory or special file".into());
         }
-        if !pivra::discovery::supported_photo(&path)
-        {
+        if !pivra::discovery::supported_photo(&path) {
             return Err("unsupported photo extension".into());
         }
         // Open read-only and inspect the descriptor; never read file contents.

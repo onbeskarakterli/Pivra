@@ -27,6 +27,7 @@ pub(super) struct ImageView {
     overlay: gtk::Overlay,
     thumbnail_strip: thumbnail_overlay::ThumbnailStrip,
     picture: gtk::Picture,
+    video: gtk::Video,
     status: gtk::Label,
     loading_spinner: gtk::Spinner,
     slot: Rc<LoadSlot>,
@@ -59,6 +60,16 @@ impl ImageView {
         overlay.set_hexpand(true);
         overlay.set_vexpand(true);
         overlay.set_child(Some(&picture));
+        // Native GTK media playback is an intentionally small first video
+        // milestone. The backend depends on installed media codecs.
+        let video = gtk::Video::new();
+        video.set_hexpand(true);
+        video.set_vexpand(true);
+        video.set_autoplay(true);
+        video.set_loop(false);
+        video.set_visible(false);
+        overlay.add_overlay(&video);
+        overlay.set_measure_overlay(&video, false);
         overlay.add_overlay(&status);
         let loading_spinner = gtk::Spinner::new();
         loading_spinner.set_widget_name("photo-loading-spinner");
@@ -242,6 +253,7 @@ impl ImageView {
             animation_controls,
             animation_generation,
             thumbnail_strip,
+            video,
             mode_action,
             prefetch,
             phase,
@@ -307,7 +319,20 @@ impl ImageView {
     pub(super) fn show_message(&self, message: &str) {
         self.prepare(message, true);
     }
+    pub(super) fn load_video(&self, path: &std::path::Path) {
+        self.prepare("", true);
+        self.video.set_filename(Some(path));
+        self.video.set_visible(true);
+    }
+    fn stop_video(&self) {
+        if let Some(stream) = self.video.media_stream() {
+            stream.pause();
+        }
+        self.video.set_visible(false);
+        self.video.set_filename(None::<&std::path::Path>);
+    }
     fn prepare(&self, message: &str, cancel: bool) {
+        self.stop_video();
         self.animation_generation.set(self.animation_generation.get().wrapping_add(1));
         self.animation_controls.reset();
         if cancel {
@@ -444,6 +469,7 @@ impl ImageView {
         on_completion: impl FnOnce() + 'static,
         on_result: impl FnOnce(bool) + 'static,
     ) {
+        self.stop_video();
         self.animation_controls.reset();
         let animation_controls = self.animation_controls.clone();
         let generation = self.animation_generation.clone();

@@ -157,12 +157,6 @@ pub(crate) fn install(
             pending_click.replace(Some(id));
         }
     });
-    let pending_click = delayed.clone();
-    video_click.connect_stopped(move |_| {
-        // Do not cancel a scheduled single-click here: GTK ends the gesture
-        // sequence before the double-click timeout expires.
-        let _ = &pending_click;
-    });
     let cancel = delayed.clone();
     window.connect_destroy(move |_| {
         if let Some(id) = cancel.borrow_mut().take() {

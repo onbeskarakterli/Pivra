@@ -1,7 +1,7 @@
 //! Per-window fullscreen intent; compositor state owns presentation and chrome.
 use adw::prelude::*;
 use gtk::{gdk, gio, glib};
-use std::{cell::Cell, rc::Rc};
+use std::{cell::{Cell, RefCell}, rc::Rc, time::Duration};
 
 fn request(window: &adw::ApplicationWindow, pending: &Cell<Option<bool>>, target: bool) {
     pending.set(Some(target));
@@ -86,33 +86,87 @@ pub(crate) fn install(
     });
     window.add_controller(keys);
 
-    // Attach only to the media surfaces, not to playback controls or the
-    // thumbnail strip. Toggling fullscreen never calls play(), pause() or seek().
-    for surface in [picture, video] {
-        let click = gtk::GestureClick::new();
-        click.set_button(1);
-        click.set_propagation_phase(gtk::PropagationPhase::Capture);
-        let drag = surface
-            .observe_controllers()
-            .iter::<glib::Object>()
-            .filter_map(Result::ok)
-            .find_map(|c| c.downcast::<gtk::GestureDrag>().ok());
-        surface.add_controller(click.clone());
-        if let Some(drag) = &drag {
-            click.group_with(drag);
-        }
-        let weak = window.downgrade();
-        click.connect_pressed(move |gesture, count, _, _| {
-            if count != 2 {
-                return;
-            }
+    // Photo double-click: fullscreen only. Retain the pan gesture grouping.
+    let photo_click = gtk::GestureClick::new();
+    photo_click.set_button(1);
+    photo_click.set_propagation_phase(gtk::PropagationPhase::Capture);
+    let photo_drag = picture
+        .observe_controllers()
+        .iter::<glib::Object>()
+        .filter_map(Result::ok)
+        .find_map(|c| c.downcast::<gtk::GestureDrag>().ok());
+    picture.add_controller(photo_click.clone());
+    if let Some(drag) = &photo_drag {
+        photo_click.group_with(drag);
+    }
+    let weak = window.downgrade();
+    photo_click.connect_pressed(move |gesture, count, _, _| {
+        if count == 2 {
             if let Some(window) = weak.upgrade() {
                 gesture.set_state(gtk::EventSequenceState::Claimed);
-                if let Some(drag) = &drag {
+                if let Some(drag) = &photo_drag {
                     drag.reset();
                 }
                 gio::prelude::ActionGroupExt::activate_action(&window, "fullscreen", None);
             }
-        });
-    }
+        }
+    });
+
+    // Video single-click toggles playback only after the multi-click interval.
+    // A second click cancels it, so fullscreen never modifies playback state.
+    let video_click = gtk::GestureClick::new();
+    video_click.set_button(1);
+    video_click.set_propagation_phase(gtk::PropagationPhase::Capture);
+    video.add_controller(video_click.clone());
+    let delayed = Rc::new(RefCell::new(None::<glib::SourceId>));
+    let weak = window.downgrade();
+    let video_ref = video.downgrade();
+    let pending_click = delayed.clone();
+    video_click.connect_pressed(move |gesture, count, _, _| {
+        if let Some(id) = pending_click.borrow_mut().take() {
+            id.remove();
+        }
+        if count == 2 {
+            gesture.set_state(gtk::EventSequenceState::Claimed);
+            if let Some(window) = weak.upgrade() {
+                gio::prelude::ActionGroupExt::activate_action(&window, "fullscreen", None);
+            }
+        } else if count == 1 {
+            let video_ref = video_ref.clone();
+            let pending = pending_click.clone();
+            // GTK multi-click defaults are typically 400 ms; delaying beyond
+            // that interval prevents accidental pause during a double-click.
+            let id = glib::timeout_add_local_once(Duration::from_millis(450), move || {
+                pending.borrow_mut().take();
+                if let Some(video) = video_ref.upgrade() {
+                    if !video.is_visible() {
+                        return;
+                    }
+                    if let Some(stream) = video
+                        .paintable()
+                        .and_then(|paintable| paintable.downcast::<gtk::MediaStream>().ok())
+                    {
+                        if stream.is_playing() {
+                            stream.pause();
+                        } else {
+                            stream.play();
+                        }
+                    }
+                }
+            });
+            pending_click.replace(Some(id));
+        }
+    });
+    let pending_click = delayed.clone();
+    video_click.connect_stopped(move |_| {
+        // Do not cancel a scheduled single-click here: GTK ends the gesture
+        // sequence before the double-click timeout expires.
+        let _ = &pending_click;
+    });
+    let cancel = delayed.clone();
+    window.connect_destroy(move |_| {
+        if let Some(id) = cancel.borrow_mut().take() {
+            id.remove();
+        }
+    });
 }

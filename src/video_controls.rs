@@ -12,6 +12,7 @@ pub(super) struct Controls {
     mute: gtk::ToggleButton,
     stream: Rc<std::cell::RefCell<Option<gtk::MediaStream>>>,
     updating: Rc<Cell<bool>>,
+    scrubbing: Rc<Cell<bool>>,
     alive: Rc<Cell<bool>>,
     last_activity: Rc<Cell<Instant>>,
 }
@@ -25,6 +26,7 @@ impl Controls {
     pub fn new() -> Self {
         let stream: Rc<std::cell::RefCell<Option<gtk::MediaStream>>> = Rc::default();
         let updating = Rc::new(Cell::new(false));
+        let scrubbing = Rc::new(Cell::new(false));
         let alive = Rc::new(Cell::new(true));
         let last_activity = Rc::new(Cell::new(Instant::now()));
         let bar = gtk::Box::new(gtk::Orientation::Horizontal, 8);
@@ -91,6 +93,48 @@ impl Controls {
             }
         });
 
+        // Capture the drag at the slider, then keep receiving relative motion
+        // even after the pointer leaves its bounds. GTK's gesture sequence
+        // remains owned until the button is released.
+        let drag = gtk::GestureDrag::new();
+        drag.set_button(1);
+        drag.set_propagation_phase(gtk::PropagationPhase::Capture);
+        let start_x = Rc::new(Cell::new(0.0_f64));
+        let initial = start_x.clone();
+        let active = scrubbing.clone();
+        let slider = position.clone();
+        let media = stream.clone();
+        drag.connect_drag_begin(move |gesture, x, _| {
+            if !slider.is_sensitive() || media.borrow().is_none() {
+                return;
+            }
+            active.set(true);
+            initial.set(x);
+            gesture.set_state(gtk::EventSequenceState::Claimed);
+            slider.set_value((x / f64::from(slider.width().max(1))).clamp(0.0, 1.0));
+        });
+        let initial = start_x.clone();
+        let slider = position.clone();
+        let active = scrubbing.clone();
+        drag.connect_drag_update(move |_, dx, _| {
+            if active.get() {
+                slider.set_value(((initial.get() + dx) / f64::from(slider.width().max(1)))
+                    .clamp(0.0, 1.0));
+            }
+        });
+        let slider = position.clone();
+        let initial = start_x.clone();
+        let active = scrubbing.clone();
+        drag.connect_drag_end(move |_, dx, _| {
+            if active.replace(false) {
+                slider.set_value(((initial.get() + dx) / f64::from(slider.width().max(1)))
+                    .clamp(0.0, 1.0));
+            }
+        });
+        let active = scrubbing.clone();
+        drag.connect_cancel(move |_, _| active.set(false));
+        position.add_controller(drag);
+
         let time = gtk::Label::new(Some("0:00 / --:--"));
         time.add_css_class("dim-label");
         let mute = gtk::ToggleButton::new();
@@ -129,12 +173,12 @@ impl Controls {
         ] {
             bar.append(child);
         }
-        let result = Self { bar, play, position, time, volume, mute, stream, updating, alive, last_activity };
+        let result = Self { bar, play, position, time, volume, mute, stream, updating, scrubbing, alive, last_activity };
         let refresh = result.clone();
         glib::MainContext::default().spawn_local(async move {
             while refresh.alive.get() {
                 glib::timeout_future(Duration::from_millis(150)).await;
-                if refresh.stream.borrow().is_some() && refresh.last_activity.get().elapsed() >= Duration::from_secs(2) {
+                if refresh.stream.borrow().is_some() && !refresh.scrubbing.get() && refresh.last_activity.get().elapsed() >= Duration::from_secs(2) {
                     refresh.bar.set_visible(false);
                 }
                 if let Some(media) = refresh.stream.borrow().as_ref() {
@@ -150,11 +194,13 @@ impl Controls {
                         if duration > 0 { clock(duration) } else { "--:--".into() }
                     ));
                     refresh.position.set_sensitive(duration > 0 && media.is_seekable());
+                    if !refresh.scrubbing.get() {
                     refresh.updating.set(true);
                     refresh.position.set_value(if duration > 0 {
                         (media.timestamp() as f64 / duration as f64).clamp(0.0, 1.0)
                     } else { 0.0 });
                     refresh.updating.set(false);
+                    }
                 }
             }
         });
@@ -198,6 +244,7 @@ impl Controls {
         *self.stream.borrow_mut() = media;
         self.bar.set_visible(self.stream.borrow().is_some());
         self.last_activity.set(Instant::now());
+        self.scrubbing.set(false);
         self.position.set_sensitive(false);
         self.updating.set(true);
         self.position.set_value(0.0);

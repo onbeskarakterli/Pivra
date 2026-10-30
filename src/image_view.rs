@@ -40,6 +40,7 @@ pub(super) struct ImageView {
     prefetch: Rc<RefCell<preload::State>>,
     phase: Rc<Cell<Phase>>,
     animation_generation: Rc<Cell<u64>>,
+    animation_controls: animation::Controls,
 }
 
 impl ImageView {
@@ -94,6 +95,9 @@ impl ImageView {
         });
         let destroyed_prefetch = prefetch.clone();
         window.connect_destroy(move |_| destroyed_prefetch.borrow_mut().close());
+        let animation_controls = animation::Controls::new();
+        overlay.add_overlay(&animation_controls.bar);
+        overlay.set_measure_overlay(&animation_controls.bar, false);
         let animation_generation = Rc::new(Cell::new(0_u64));
         for signal in [false, true] {
             let generation = animation_generation.clone();
@@ -196,6 +200,7 @@ impl ImageView {
         });
         window.add_action(&quality_action);
         Self {
+            animation_controls,
             animation_generation,
             thumbnail_strip,
             mode_action,
@@ -265,6 +270,7 @@ impl ImageView {
     }
     fn prepare(&self, message: &str, cancel: bool) {
         self.animation_generation.set(self.animation_generation.get().wrapping_add(1));
+        self.animation_controls.reset();
         if cancel {
             self.slot.cancel();
             self.phase.set(Phase::Cancelled);
@@ -399,6 +405,8 @@ impl ImageView {
         on_completion: impl FnOnce() + 'static,
         on_result: impl FnOnce(bool) + 'static,
     ) {
+        self.animation_controls.reset();
+        let animation_controls = self.animation_controls.clone();
         let generation = self.animation_generation.clone();
         let expected = generation.get().wrapping_add(1);
         generation.set(expected);
@@ -540,6 +548,7 @@ impl ImageView {
                             animation_path,
                             generation,
                             expected,
+                            animation_controls,
                             animation_picture,
                             animation_texture,
                             animation_mode,

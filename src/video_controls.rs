@@ -311,13 +311,17 @@ impl Controls {
             media.set_muted(self.mute.is_active());
             // Handle EOS explicitly to work across GTK media backends.
             media.set_loop(false);
-            let repeat = self.loop_button.clone();
-            let current = self.stream.clone();
+            let repeat = self.loop_button.downgrade();
+            let current = Rc::downgrade(&self.stream);
             media.connect_notify_local(Some("ended"), move |ended, _| {
+                let (Some(repeat), Some(current)) = (repeat.upgrade(), current.upgrade()) else {
+                    return;
+                };
                 if !ended.is_ended() || !repeat.is_active() || !ended.is_seekable() {
                     return;
                 }
-                // Ignore notifications from a stream no longer displayed.
+                // Weak references prevent retired streams from retaining the
+                // playback controls and keeping native decoders alive.
                 let same = current.borrow().as_ref().is_some_and(|active| active == ended);
                 if same {
                     ended.seek(0);

@@ -46,15 +46,7 @@ impl MediaCollection {
         };
         let supported = |item: &&MediaItem| {
             item.kind() == crate::media::MediaKind::Image
-                && item
-                    .path()
-                    .extension()
-                    .and_then(|e| e.to_str())
-                    .is_some_and(|e| {
-                        ["jpg", "jpeg", "png"]
-                            .iter()
-                            .any(|s| e.eq_ignore_ascii_case(s))
-                    })
+                && crate::discovery::supported_photo(item.path())
         };
         self.items[index + 1..]
             .iter()
@@ -83,15 +75,7 @@ impl MediaCollection {
         let supported = |index: &usize| {
             let item = &self.items[*index];
             item.kind() == crate::media::MediaKind::Image
-                && item
-                    .path()
-                    .extension()
-                    .and_then(|e| e.to_str())
-                    .is_some_and(|e| {
-                        ["jpg", "jpeg", "png"]
-                            .iter()
-                            .any(|s| e.eq_ignore_ascii_case(s))
-                    })
+                && crate::discovery::supported_photo(item.path())
         };
         if forward {
             let start = self.selected.map_or(0, |index| index + 1);

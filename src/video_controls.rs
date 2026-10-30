@@ -96,8 +96,17 @@ impl Controls {
         loop_button.set_tooltip_text(Some("Repeat current video"));
         let current = stream.clone();
         loop_button.connect_toggled(move |button| {
+            // Native looping is backend-dependent. End-of-stream handling below
+            // performs the restart explicitly and preserves this toggle state.
+            if button.is_active() {
+                button.remove_css_class("flat");
+                button.add_css_class("suggested-action");
+            } else {
+                button.remove_css_class("suggested-action");
+                button.add_css_class("flat");
+            }
             if let Some(media) = current.borrow().as_ref() {
-                media.set_loop(button.is_active());
+                media.set_loop(false);
             }
         });
 
@@ -277,7 +286,21 @@ impl Controls {
         if let Some(media) = self.stream.borrow().as_ref() {
             media.set_volume(self.volume.value());
             media.set_muted(self.mute.is_active());
-            media.set_loop(self.loop_button.is_active());
+            // Handle EOS explicitly to work across GTK media backends.
+            media.set_loop(false);
+            let repeat = self.loop_button.clone();
+            let current = self.stream.clone();
+            media.connect_notify_local(Some("ended"), move |ended, _| {
+                if !ended.is_ended() || !repeat.is_active() || !ended.is_seekable() {
+                    return;
+                }
+                // Ignore notifications from a stream no longer displayed.
+                let same = current.borrow().as_ref().is_some_and(|active| active == ended);
+                if same {
+                    ended.seek(0);
+                    ended.play();
+                }
+            });
         } else {
             self.time.set_text("0:00 / --:--");
         }

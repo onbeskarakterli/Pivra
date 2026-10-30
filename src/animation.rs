@@ -33,7 +33,7 @@ pub(super) fn start(
         loader.cancellable(cancelled.clone());
         loader.apply_transformations(true);
         loader.use_expose_base_dir(false);
-        let Ok(mut image) = loader.load().await else {
+        let Ok(image) = loader.load().await else {
             return;
         };
         if generation.get() != expected {
@@ -64,7 +64,13 @@ pub(super) fn start(
                 cancelled.cancel();
                 break;
             }
-            if crate::image_loader::validate_dimensions(frame.width(), frame.height()).is_err()
+            let width = frame.width();
+            let height = frame.height();
+            if width == 0
+                || height == 0
+                || width > 32_768
+                || height > 32_768
+                || u64::from(width) * u64::from(height) > 32_000_000
                 || frame.buf_slice().len() > 512 * 1024 * 1024
             {
                 break;

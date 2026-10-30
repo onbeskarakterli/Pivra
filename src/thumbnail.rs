@@ -286,17 +286,11 @@ impl Provider {
                     FileKey::read(&cache).ok().as_ref() == Some(&cache_key)));
             return Outcome::Stale;
         }
-        // Reject same-path replacement even when seconds-resolution Thumb::MTime survives.
-        let src = match fs::metadata(path) {
-            Ok(m) => m,
-            Err(_) => return Outcome::Stale,
-        };
-        if (src.ctime(), src.ctime_nsec()) > (metadata.mtime(), metadata.mtime_nsec()) {
-            crate::thumbnail_diagnostics::trace("cache-stale-ctime", Some(path),
-                format_args!("source_ctime={}.{} cache_mtime={}.{}",
-                    src.ctime(), src.ctime_nsec(), metadata.mtime(), metadata.mtime_nsec()));
-            return Outcome::Stale;
-        }
+        // Moving a file to Trash and restoring it changes its inode ctime
+        // without changing its contents or mtime. GNOME's Thumb::URI/MTime
+        // validation above, the unchanged source key and cache key are the
+        // authoritative freshness checks; comparing source ctime to the
+        // thumbnail's filesystem mtime incorrectly rejects restored files.
         Outcome::Hit(Candidate {
             uri,
             source,

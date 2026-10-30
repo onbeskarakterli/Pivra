@@ -26,6 +26,7 @@ enum Phase {
 }
 struct CellWidgets {
     button: gtk::Button,
+    content: gtk::Overlay,
     selection: gtk::Frame,
     picture: gtk::Picture,
     spinner: gtk::Spinner,
@@ -296,6 +297,7 @@ impl ThumbnailStrip {
         for entry in self.0.entries.borrow().iter() {
             if let Some(w) = &entry.widgets {
                 w.button.set_size_request(width, height);
+                w.content.set_size_request(width, height);
                 w.selection.set_size_request(width, height);
                 w.picture.set_size_request(width, height);
             }
@@ -912,6 +914,7 @@ impl Inner {
                 i.items.append(&button);
                 entry.widgets = Some(CellWidgets {
                     button,
+                    content,
                     selection,
                     picture,
                     spinner,

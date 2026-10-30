@@ -44,6 +44,37 @@ impl Controls {
             }
         });
 
+        // Seek buttons share the same five-second step as Ctrl+Arrow.
+        let rewind = gtk::Button::from_icon_name("media-seek-backward-symbolic");
+        rewind.add_css_class("flat");
+        rewind.set_tooltip_text(Some("Back 5 seconds"));
+        let current = stream.clone();
+        rewind.connect_clicked(move |_| {
+            if let Some(media) = current.borrow().as_ref() {
+                if media.is_seekable() {
+                    media.seek(media.timestamp().saturating_sub(5_000_000).max(0));
+                }
+            }
+        });
+
+        let forward = gtk::Button::from_icon_name("media-seek-forward-symbolic");
+        forward.add_css_class("flat");
+        forward.set_tooltip_text(Some("Forward 5 seconds"));
+        let current = stream.clone();
+        forward.connect_clicked(move |_| {
+            if let Some(media) = current.borrow().as_ref() {
+                if media.is_seekable() {
+                    media.seek(media.timestamp().saturating_add(5_000_000)
+                        .min(media.duration().max(0)));
+                }
+            }
+        });
+
+        let fullscreen = gtk::Button::from_icon_name("view-fullscreen-symbolic");
+        fullscreen.add_css_class("flat");
+        fullscreen.set_tooltip_text(Some("Toggle fullscreen"));
+        fullscreen.set_action_name(Some("win.fullscreen"));
+
         let position = gtk::Scale::with_range(gtk::Orientation::Horizontal, 0.0, 1.0, 0.001);
         position.set_hexpand(true);
         position.set_draw_value(false);
@@ -87,11 +118,14 @@ impl Controls {
             }
         });
         for child in [
-            play.upcast_ref::<gtk::Widget>(),
+            rewind.upcast_ref::<gtk::Widget>(),
+            play.upcast_ref(),
+            forward.upcast_ref(),
             position.upcast_ref(),
             time.upcast_ref(),
             mute.upcast_ref(),
             volume.upcast_ref(),
+            fullscreen.upcast_ref(),
         ] {
             bar.append(child);
         }

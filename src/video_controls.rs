@@ -1,6 +1,6 @@
 //! Compact native video controls, separate from animated-image playback.
 use gtk::{glib, prelude::*};
-use std::{cell::Cell, rc::Rc, time::Duration};
+use std::{cell::Cell, rc::Rc, time::{Duration, Instant}};
 
 #[derive(Clone)]
 pub(super) struct Controls {
@@ -13,6 +13,7 @@ pub(super) struct Controls {
     stream: Rc<std::cell::RefCell<Option<gtk::MediaStream>>>,
     updating: Rc<Cell<bool>>,
     alive: Rc<Cell<bool>>,
+    last_activity: Rc<Cell<Instant>>,
 }
 
 fn clock(us: i64) -> String {
@@ -25,6 +26,7 @@ impl Controls {
         let stream: Rc<std::cell::RefCell<Option<gtk::MediaStream>>> = Rc::default();
         let updating = Rc::new(Cell::new(false));
         let alive = Rc::new(Cell::new(true));
+        let last_activity = Rc::new(Cell::new(Instant::now()));
         let bar = gtk::Box::new(gtk::Orientation::Horizontal, 8);
         bar.add_css_class("pivra-animation-controls");
         bar.set_halign(gtk::Align::Fill);
@@ -93,11 +95,14 @@ impl Controls {
         ] {
             bar.append(child);
         }
-        let result = Self { bar, play, position, time, volume, mute, stream, updating, alive };
+        let result = Self { bar, play, position, time, volume, mute, stream, updating, alive, last_activity };
         let refresh = result.clone();
         glib::MainContext::default().spawn_local(async move {
             while refresh.alive.get() {
                 glib::timeout_future(Duration::from_millis(150)).await;
+                if refresh.stream.borrow().is_some() && refresh.last_activity.get().elapsed() >= Duration::from_secs(2) {
+                    refresh.bar.set_visible(false);
+                }
                 if let Some(media) = refresh.stream.borrow().as_ref() {
                     refresh.play.set_icon_name(if media.is_playing() {
                         "media-playback-pause-symbolic"
@@ -122,6 +127,34 @@ impl Controls {
         result
     }
 
+    pub fn reveal(&self) {
+        if self.stream.borrow().is_some() {
+            self.last_activity.set(Instant::now());
+            self.bar.set_visible(true);
+        }
+    }
+
+    pub fn handle_key(&self, key: gtk::gdk::Key, ctrl: bool) -> bool {
+        let media = self.stream.borrow().clone();
+        let Some(media) = media else { return false; };
+        match (key, ctrl) {
+            (gtk::gdk::Key::space, false) => {
+                if media.is_playing() { media.pause(); } else { media.play(); }
+            }
+            (gtk::gdk::Key::Left, true) | (gtk::gdk::Key::Right, true) => {
+                if !media.is_seekable() { return false; }
+                let offset = if key == gtk::gdk::Key::Left { -5_000_000 } else { 5_000_000 };
+                media.seek((media.timestamp() + offset).clamp(0, media.duration().max(0)));
+            }
+            (gtk::gdk::Key::m, false) | (gtk::gdk::Key::M, false) => {
+                self.mute.set_active(!self.mute.is_active());
+            }
+            _ => return false,
+        }
+        self.reveal();
+        true
+    }
+
     pub fn shutdown(&self) {
         self.alive.set(false);
         self.attach(None);
@@ -130,6 +163,7 @@ impl Controls {
     pub fn attach(&self, media: Option<gtk::MediaStream>) {
         *self.stream.borrow_mut() = media;
         self.bar.set_visible(self.stream.borrow().is_some());
+        self.last_activity.set(Instant::now());
         self.position.set_sensitive(false);
         self.updating.set(true);
         self.position.set_value(0.0);

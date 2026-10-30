@@ -222,12 +222,17 @@ impl Controls {
                 // Fullscreen video controls disappear after inactivity even if
                 // the pointer is resting on the bar. Windowed hover keeps them
                 // visible, and active seek drags always take priority.
-                if refresh.stream.borrow().is_some()
-                    && !refresh.scrubbing.get()
-                    && (fullscreen || !refresh.pointer_over.get())
-                    && refresh.last_activity.get().elapsed() >= hide_after
-                {
-                    refresh.bar.set_visible(false);
+                let media = refresh.stream.borrow().clone();
+                if let Some(media) = media.as_ref() {
+                    // A paused fullscreen video keeps its controls visible.
+                    if fullscreen && !media.is_playing() {
+                        refresh.bar.set_visible(true);
+                    } else if !refresh.scrubbing.get()
+                        && (fullscreen || !refresh.pointer_over.get())
+                        && refresh.last_activity.get().elapsed() >= hide_after
+                    {
+                        refresh.bar.set_visible(false);
+                    }
                 }
                 if let Some(media) = refresh.stream.borrow().as_ref() {
                     refresh.play.set_icon_name(if media.is_playing() {

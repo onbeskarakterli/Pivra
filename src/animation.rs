@@ -98,9 +98,10 @@ impl Controls {
         bar.add_css_class("pivra-animation-controls");
         bar.set_halign(gtk::Align::Fill);
         bar.set_valign(gtk::Align::End);
-        bar.set_margin_start(16);
-        bar.set_margin_end(16);
-        bar.set_margin_bottom(12);
+        // Reserve side gutters for the navigation panels on every viewport.
+        bar.set_margin_start(96);
+        bar.set_margin_end(96);
+        bar.set_margin_bottom(0);
         bar.append(&play);
         bar.append(&progress);
         bar.append(&speed_button);

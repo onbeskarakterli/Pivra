@@ -17,6 +17,7 @@ pub(super) struct Controls {
     pub bar: gtk::Box,
     pub play: gtk::Button,
     pub progress: gtk::Scale,
+    time_label: gtk::Label,
     speed_button: gtk::MenuButton,
     loop_button: gtk::ToggleButton,
     seek: Rc<Cell<Option<f64>>>,
@@ -88,9 +89,15 @@ impl Controls {
         loop_button.set_active(true);
         loop_button.set_tooltip_text(Some("Loop on"));
         loop_button.add_css_class("flat");
+        loop_button.add_css_class("suggested-action");
         let loop_state = looping.clone();
         loop_button.connect_toggled(move |button| {
             loop_state.set(button.is_active());
+            if button.is_active() {
+                button.add_css_class("suggested-action");
+            } else {
+                button.remove_css_class("suggested-action");
+            }
             button.set_tooltip_text(Some(if button.is_active() { "Loop on" } else { "Loop off" }));
         });
 
@@ -102,8 +109,11 @@ impl Controls {
         bar.set_margin_start(96);
         bar.set_margin_end(96);
         bar.set_margin_bottom(0);
+        let time_label = gtk::Label::new(Some("0:00 / --:--"));
+        time_label.add_css_class("dim-label");
         bar.append(&play);
         bar.append(&progress);
+        bar.append(&time_label);
         bar.append(&speed_button);
         bar.append(&loop_button);
         bar.set_visible(false);
@@ -114,6 +124,7 @@ impl Controls {
             bar,
             play,
             progress,
+            time_label,
             speed_button,
             loop_button,
             seek,
@@ -126,11 +137,19 @@ impl Controls {
         self.looping.set(true);
         self.seek.set(None);
         self.progress.set_sensitive(false);
+        self.time_label.set_text("0:00 / --:--");
         self.show_progress(0.0);
         self.speed_button.set_label("1×");
         self.loop_button.set_active(true);
         self.bar.set_visible(false);
         self.play.set_icon_name("media-playback-pause-symbolic");
+    }
+    fn show_time(&self, current: f64, total: f64) {
+        let timestamp = |seconds: f64| {
+            let seconds = seconds.max(0.0).floor() as u64;
+            format!("{}:{:02}", seconds / 60, seconds % 60)
+        };
+        self.time_label.set_text(&format!("{} / {}", timestamp(current), timestamp(total)));
     }
     fn show_progress(&self, value: f64) {
         self.internal_update.set(true);
@@ -171,28 +190,42 @@ pub(super) fn start(
             loader
         };
 
-        // A bounded timeline pass is required for real percentage-based seeking.
-        // If the decoder exposes an endlessly repeating stream or more than
-        // 2048 frames, keep playback but leave seeking disabled.
-        let mut durations = Vec::new();
-        if let Ok(probe) = open_image().load().await {
-            for _ in 0..2048 {
-                if generation.get() != expected { cancelled.cancel(); return; }
+        // Start foreground playback immediately. Index frame durations in a
+        // separate cooperative task so a long GIF never blocks first playback.
+        let timeline: Rc<RefCell<Option<Vec<f64>>>> = Rc::new(RefCell::new(None));
+        let probe_timeline = timeline.clone();
+        let probe_controls = controls.clone();
+        let probe_generation = generation.clone();
+        let probe_path = path.clone();
+        glib::MainContext::default().spawn_local(async move {
+            let mut probe_loader = glycin::Loader::new(gio::File::for_path(&probe_path));
+            probe_loader.sandbox_selector(glycin::SandboxSelector::Bwrap);
+            probe_loader.apply_transformations(true);
+            probe_loader.use_expose_base_dir(false);
+            let Ok(probe) = probe_loader.load().await else { return; };
+            let mut durations = Vec::new();
+            let mut reached_end = false;
+            for index in 0..2048 {
+                if probe_generation.get() != expected { return; }
                 match probe.next_frame().await {
                     Ok(frame) => match frame.delay() {
                         Some(delay) => durations.push(delay.as_secs_f64().clamp(0.02, 10.0)),
-                        None => break,
+                        None => { reached_end = true; break; }
                     },
-                    Err(_) => break,
+                    Err(_) => { reached_end = true; break; }
+                }
+                // Give the foreground renderer and controls event-loop time.
+                if index % 8 == 7 {
+                    glib::timeout_future(Duration::from_millis(1)).await;
                 }
             }
-        }
-        if generation.get() != expected { cancelled.cancel(); return; }
-        let timeline_ready = !durations.is_empty() && durations.len() < 2048;
-        let total: f64 = durations.iter().sum();
-        if timeline_ready && total > 0.0 {
-            controls.progress.set_sensitive(true);
-        }
+            if probe_generation.get() == expected && reached_end && durations.len() > 1 {
+                let total: f64 = durations.iter().sum();
+                probe_timeline.replace(Some(durations));
+                probe_controls.progress.set_sensitive(true);
+                probe_controls.show_time(0.0, total);
+            }
+        });
 
         let Ok(mut image) = open_image().load().await else { return; };
         let Ok(mut frame) = image.next_frame().await else { return; };
@@ -205,6 +238,10 @@ pub(super) fn start(
         loop {
             if generation.get() != expected { cancelled.cancel(); return; }
 
+            let timeline_snapshot = timeline.borrow().clone();
+            let durations = timeline_snapshot.as_deref().unwrap_or(&[]);
+            let timeline_ready = !durations.is_empty();
+            let total: f64 = durations.iter().sum();
             // Seeking is a decoder restart and bounded forward scan, never
             // an arbitrary seek in the sandboxed compressed byte stream.
             if let Some(fraction) = controls.seek.take() {
@@ -246,6 +283,7 @@ pub(super) fn start(
                                 }
                             }
                             controls.show_progress(elapsed / total);
+                            controls.show_time(elapsed, total);
                         }
                     }
                 }
@@ -260,7 +298,9 @@ pub(super) fn start(
                     let rate = controls.speed.get();
                     remaining -= 0.020 * rate;
                     if timeline_ready {
-                        controls.show_progress((elapsed + (delay.as_secs_f64() - remaining.max(0.0)).min(delay.as_secs_f64())) / total);
+                        let current = elapsed + (delay.as_secs_f64() - remaining.max(0.0)).min(delay.as_secs_f64());
+                        controls.show_progress(current / total);
+                        controls.show_time(current, total);
                     }
                 }
             }
@@ -272,6 +312,7 @@ pub(super) fn start(
             if timeline_ready && frame_index >= durations.len() {
                 if !controls.looping.get() {
                     controls.show_progress(1.0);
+                    controls.show_time(total, total);
                     controls.paused.set(true);
                     controls.play.set_icon_name("media-playback-start-symbolic");
                     controls.play.set_tooltip_text(Some("Replay animation"));
@@ -300,7 +341,10 @@ pub(super) fn start(
             texture.replace(Some(next.clone()));
             present_filtered(&picture, Some(&next), mode.id(), transform.clone(), filter.clone());
             delay = next_delay;
-            if timeline_ready { controls.show_progress(elapsed / total); }
+            if timeline_ready {
+                controls.show_progress(elapsed / total);
+                controls.show_time(elapsed, total);
+            }
         }
         cancelled.cancel();
     });

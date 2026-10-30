@@ -98,31 +98,26 @@ impl ImageView {
         let animation_controls = animation::Controls::new();
         overlay.add_overlay(&animation_controls.bar);
         overlay.set_measure_overlay(&animation_controls.bar, false);
-        // The toggle/pin cluster floats just above the thumbnail strip.
-        // Position the animation controls above the cluster, not merely above
-        // the strip, so neither can overlap as the strip opens or resizes.
+        // Align to the ACTUAL top edge of the thumbnail toggle/pin cluster
+        // in overlay coordinates. Margin + measured height is not equivalent
+        // to its allocated geometry, especially during strip resizing.
         let mut child = overlay.first_child();
         while let Some(widget) = child {
             if widget.widget_name() == "thumbnail-controls" {
                 if let Ok(thumbnail_controls) = widget.downcast::<gtk::Box>() {
                     let bar = animation_controls.bar.downgrade();
+                    let viewport = overlay.downgrade();
                     let align = move |controls: &gtk::Box| {
-                        if let Some(bar) = bar.upgrade() {
-                            // Use the actual top edge of the toggle/pin cluster,
-                            // rather than its natural size (which overestimates the gap).
-                            let bottom = if controls.is_visible() {
-                                controls
-                                    .parent()
-                                    .and_then(|parent| controls.compute_bounds(&parent))
-                                    .map(|bounds| {
-                                        (controls.margin_bottom() as f32 + bounds.height()).ceil()
-                                            as i32
-                                            + 2
-                                    })
-                                    .unwrap_or(controls.margin_bottom() + 30)
-                            } else {
-                                2
-                            };
+                        let (Some(bar), Some(viewport)) = (bar.upgrade(), viewport.upgrade()) else {
+                            return;
+                        };
+                        if !controls.is_visible() {
+                            bar.set_margin_bottom(2);
+                            return;
+                        }
+                        if let Some(bounds) = controls.compute_bounds(&viewport) {
+                            let bottom = ((viewport.height() as f32 - bounds.y()).ceil() as i32 + 2)
+                                .max(2);
                             if bar.margin_bottom() != bottom {
                                 bar.set_margin_bottom(bottom);
                             }
@@ -138,8 +133,15 @@ impl ImageView {
                     thumbnail_controls.connect_notify_local(Some("margin-bottom"), move |controls, _| {
                         on_margin(controls);
                     });
+                    let on_height = align.clone();
                     thumbnail_controls.connect_notify_local(Some("height"), move |controls, _| {
-                        align(controls);
+                        on_height(controls);
+                    });
+                    let controls = thumbnail_controls.downgrade();
+                    overlay.connect_notify_local(Some("height"), move |_, _| {
+                        if let Some(controls) = controls.upgrade() {
+                            align(&controls);
+                        }
                     });
                 }
                 break;

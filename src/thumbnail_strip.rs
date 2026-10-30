@@ -659,7 +659,7 @@ impl Inner {
                                 ((texture.height() as f64 * ratio).round() as i32).max(1),
                             );
                             w.picture.set_paintable(Some(&texture));
-                            w.icon.set_visible(pivra::discovery::candidate_kind(&entry.path) == Some(pivra::media::MediaKind::Video));
+                            w.icon.set_visible(false);
                         }
                     }
                 }
@@ -845,14 +845,10 @@ impl Inner {
                 // Until video frame previews are implemented, video cells use
                 // one deterministic placeholder, regardless of cache state.
                 picture.set_visible(!is_video);
-                let icon = gtk::Image::from_icon_name(if is_video {
-                    "video-x-generic-symbolic"
-                } else {
-                    "image-x-generic-symbolic"
-                });
+                let icon = gtk::Image::from_icon_name("image-x-generic-symbolic");
                 icon.set_halign(gtk::Align::Center);
                 icon.set_valign(gtk::Align::Center);
-                icon.set_visible(is_video || entry.phase != Phase::Ready);
+                icon.set_visible(!is_video && entry.phase != Phase::Ready);
                 icon.set_can_target(false);
                 spinner.set_can_target(false);
                 for child in [
@@ -868,13 +864,13 @@ impl Inner {
                 content.set_measure_overlay(&selection, false);
                 content.set_clip_overlay(&selection, true);
                 // Filmstrip previews stay static; identify GIFs without playing frames.
-                if entry
+                let is_gif = entry
                     .path
                     .extension()
                     .and_then(|ext| ext.to_str())
-                    .is_some_and(|ext| ext.eq_ignore_ascii_case("gif"))
-                {
-                    let badge = gtk::Label::new(Some("GIF"));
+                    .is_some_and(|ext| ext.eq_ignore_ascii_case("gif"));
+                if is_gif || is_video {
+                    let badge = gtk::Label::new(Some(if is_video { "VIDEO" } else { "GIF" }));
                     badge.add_css_class("pivra-thumbnail-gif-badge");
                     badge.set_halign(gtk::Align::End);
                     badge.set_valign(gtk::Align::End);
@@ -1037,7 +1033,7 @@ impl Inner {
                 if visible.contains(&n) && matches!(e.phase, Phase::Pending | Phase::Loading) {
                     if pivra::discovery::candidate_kind(&e.path) == Some(pivra::media::MediaKind::Video) {
                         w.spinner.stop();
-                        w.icon.set_visible(true);
+                        w.icon.set_visible(false);
                     } else {
                         w.spinner.start();
                         w.icon.set_visible(false);
@@ -1252,7 +1248,7 @@ impl Inner {
                 }
                 if let Some(w) = &entry.widgets {
                     w.spinner.stop();
-                    w.icon.set_visible(entry.phase == Phase::Failed || pivra::discovery::candidate_kind(&entry.path) == Some(pivra::media::MediaKind::Video));
+                    w.icon.set_visible(entry.phase == Phase::Failed && pivra::discovery::candidate_kind(&entry.path) != Some(pivra::media::MediaKind::Video));
                 }
             }
             // LRU bounds apply to widget paintables as well, not just a side map.

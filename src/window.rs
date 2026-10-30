@@ -38,7 +38,7 @@ fn trash_entries(original: &std::path::Path) -> Vec<gio::File> {
     };
     let mut entries = vec![];
     while let Ok(Some(info)) = enumerator.next_file(None::<&gio::Cancellable>) {
-        if info.attribute_string("trash::orig-path")
+        if info.attribute_byte_string("trash::orig-path")
             .is_some_and(|value| std::path::Path::new(value.as_str()) == original)
         {
             entries.push(enumerator.child(&info));

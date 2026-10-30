@@ -52,6 +52,7 @@ pub(crate) fn install(
     window: &impl IsA<gtk::Window>,
     overlay: &gtk::Overlay,
     available: bool,
+    video: &gtk::Picture,
 ) -> ThumbnailStrip {
     install_css(&overlay.display());
     let items = gtk::Box::new(gtk::Orientation::Horizontal, 8);
@@ -145,6 +146,8 @@ pub(crate) fn install(
     }
     let state = Rc::new(Visibility {
         available,
+        window: window.as_ref().downgrade(),
+        video: video.downgrade(),
         preference: preference.clone(),
         strip: strip.downgrade(),
         resize_edge: resize_edge.downgrade(),
@@ -178,6 +181,11 @@ pub(crate) fn install(
     preference.subscribe(&listener);
     state.listener.replace(Some(listener));
     state.render(saved_pinned);
+    // Re-evaluate the strip's idle timeout when fullscreen video starts/stops.
+    let mode = state.clone();
+    window.connect_fullscreened_notify(move |_| mode.refresh_idle());
+    let mode = state.clone();
+    video.connect_visible_notify(move |_| mode.refresh_idle());
     let click = state.clone();
     button.connect_clicked(move |_| {
         if click.available {
@@ -209,7 +217,7 @@ pub(crate) fn install(
         }
         pin_click.render(pinned || pin_click.near.get() || pin_click.shown.get());
         if !pinned && !pin_click.near.get() {
-            pin_click.schedule(3000);
+            pin_click.schedule(pin_click.idle_delay());
         }
     });
     let resize = gtk::GestureDrag::new();
@@ -274,14 +282,14 @@ pub(crate) fn install(
         end_state.resizing.set(false);
         end_state.place_toggle();
         if !end_state.pinned.get() && !end_state.near.get() {
-            end_state.schedule(3000);
+            end_state.schedule(end_state.idle_delay());
         }
     });
     let cancel_state = state.clone();
     resize.connect_cancel(move |_, _| {
         cancel_state.resizing.set(false);
         if !cancel_state.pinned.get() && !cancel_state.near.get() {
-            cancel_state.schedule(3000);
+            cancel_state.schedule(cancel_state.idle_delay());
         }
     });
     resize.set_propagation_phase(gtk::PropagationPhase::Capture);
@@ -330,7 +338,7 @@ pub(crate) fn install(
         if key_state.preference.enabled() {
             key_state.render(true);
             if !key_state.near.get() {
-                key_state.schedule(3000);
+                key_state.schedule(key_state.idle_delay());
             }
         }
         glib::Propagation::Stop
@@ -400,6 +408,8 @@ pub(crate) fn install(
 type PreferenceListener = Rc<dyn Fn(bool)>;
 struct Visibility {
     available: bool,
+    window: glib::WeakRef<gtk::Window>,
+    video: glib::WeakRef<gtk::Picture>,
     preference: Rc<pivra::settings::ThumbnailPreference>,
     strip: glib::WeakRef<gtk::ScrolledWindow>,
     resize_edge: glib::WeakRef<gtk::Box>,
@@ -420,6 +430,18 @@ struct Visibility {
     listener: RefCell<Option<PreferenceListener>>,
 }
 impl Visibility {
+    fn fullscreen_video(&self) -> bool {
+        self.window.upgrade().is_some_and(|w| w.is_fullscreen())
+            && self.video.upgrade().is_some_and(|v| v.is_visible())
+    }
+    fn idle_delay(&self) -> u64 {
+        if self.fullscreen_video() { 1000 } else { 3000 }
+    }
+    fn refresh_idle(self: &Rc<Self>) {
+        if self.shown.get() && !self.near.get() && !self.pinned.get() {
+            self.schedule(self.idle_delay());
+        }
+    }
     fn disconnect_layout(&self) {
         if let Some((clock, handler)) = self.layout.borrow_mut().take() {
             clock.disconnect(handler);
@@ -548,7 +570,7 @@ impl Visibility {
         }
         self.near.set(false);
         if self.shown.get() && !self.pinned.get() && self.timeout.borrow().is_none() {
-            self.schedule(3000);
+            self.schedule(self.idle_delay());
         }
     }
     fn schedule(self: &Rc<Self>, milliseconds: u64) {

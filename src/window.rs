@@ -736,17 +736,25 @@ impl FolderWatch {
                     for issue in &report.issues {
                         eprintln!("{APP_NAME}: folder scan incomplete: {:?}: {}", issue.path, issue.error);
                     }
-                    let missing = context.collection.replace_preserving(report.collection.items().to_vec());
+                    // A periodic fallback scan must not cancel thumbnail work
+                    // when the directory's media catalog is unchanged.
+                    let catalog_changed = context.collection.items().iter().map(|item| item.path())
+                        .ne(report.collection.items().iter().map(|item| item.path()));
+                    let missing = if catalog_changed {
+                        context.collection.replace_preserving(report.collection.items().to_vec())
+                    } else {
+                        false
+                    };
                     if missing {
                         context.revision = context.revision.wrapping_add(1);
                         state.view.show_message("Selected media was removed or is inaccessible. Use arrow keys to continue.");
                         if let Some(banner) = state.banner.upgrade() { banner.set_reveal_child(false); }
                     }
                     state.view.set_neighbors(context.collection.photo_neighbors());
-                    update_thumbnail_catalog(&state.view, &context);
-                    // Revalidate the reconciled catalog: rebuilding the model may
-                    // cancel an older metadata epoch (e.g. replace + delete).
-                    state.view.invalidate_thumbnails();
+                    if catalog_changed {
+                        update_thumbnail_catalog(&state.view, &context);
+                        state.view.invalidate_thumbnails();
+                    }
                     state.view.finish_initial_thumbnail_catalog(context.collection.selected_index());
                     let count = context.collection.items().len();
                     let suffix = if warnings == 0 {

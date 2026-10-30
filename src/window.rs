@@ -223,7 +223,7 @@ fn display_selected(view: &ImageView, context: &FileContext) {
         .extension()
         .and_then(|e| e.to_str())
         .is_some_and(|e| {
-            ["jpg", "jpeg", "png"]
+            ["jpg", "jpeg", "png", "webp", "gif", "bmp", "tif", "tiff", "avif", "heic", "heif"]
                 .iter()
                 .any(|s| e.eq_ignore_ascii_case(s))
         })
@@ -232,7 +232,7 @@ fn display_selected(view: &ImageView, context: &FileContext) {
         view.set_neighbors(context.collection.photo_neighbors());
     } else {
         view.set_neighbors(vec![]);
-        view.show_message("This image format is not supported yet. JPEG and PNG only.");
+        view.show_message("This image format is not supported.");
     }
 }
 
@@ -506,7 +506,7 @@ pub(super) fn build(app: &adw::Application, settings: &Settings, file: Option<Op
                     .extension()
                     .and_then(|s| s.to_str())
                     .is_some_and(|ext| {
-                        ["jpg", "jpeg", "png"]
+                        ["jpg", "jpeg", "png", "webp", "gif", "bmp", "tif", "tiff", "avif", "heic", "heif"]
                             .iter()
                             .any(|s| ext.eq_ignore_ascii_case(s))
                     })

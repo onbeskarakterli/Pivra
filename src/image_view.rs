@@ -98,7 +98,7 @@ impl ImageView {
             }
             pivra::thumbnail_provider::ProviderId::Freedesktop => true,
         };
-        let thumbnail_strip = thumbnail_overlay::install(window, &overlay, thumbnails_available, &video);
+        let thumbnail_strip = thumbnail_overlay::install(window, &overlay, thumbnails_available);
         let phase = Rc::new(Cell::new(Phase::Requested));
         let closing_phase = phase.clone();
         window.connect_close_request(move |_| {

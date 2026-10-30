@@ -296,16 +296,8 @@ impl ThumbnailStrip {
         for entry in self.0.entries.borrow().iter() {
             if let Some(w) = &entry.widgets {
                 w.button.set_size_request(width, height);
-                if let Some(texture) = entry.texture.as_ref() {
-                    let ratio = (width as f64 / texture.width() as f64)
-                        .min(height as f64 / texture.height() as f64);
-                    w.selection.set_size_request(
-                        (texture.width() as f64 * ratio).round().max(1.0) as i32,
-                        (texture.height() as f64 * ratio).round().max(1.0) as i32,
-                    );
-                } else {
-                    w.selection.set_size_request(width, height);
-                }
+                w.selection.set_size_request(width, height);
+                w.picture.set_size_request(width, height);
             }
         }
         self.0.scroller.queue_draw();
@@ -651,13 +643,6 @@ impl Inner {
                         entry.keys = Some((source, cache));
                         entry.phase = Phase::Ready;
                         if let Some(w) = &entry.widgets {
-                            let (cell_width, cell_height) = i.cell_size.get();
-                            let ratio = (cell_width as f64 / texture.width() as f64)
-                                .min(cell_height as f64 / texture.height() as f64);
-                            w.selection.set_size_request(
-                                ((texture.width() as f64 * ratio).round() as i32).max(1),
-                                ((texture.height() as f64 * ratio).round() as i32).max(1),
-                            );
                             w.picture.set_paintable(Some(&texture));
                             w.icon.set_visible(false);
                         }
@@ -817,8 +802,8 @@ impl Inner {
                 content.set_overflow(gtk::Overflow::Hidden);
                 let selection = gtk::Frame::new(None);
                 selection.add_css_class("pivra-thumbnail-selection");
-                selection.set_halign(gtk::Align::Center);
-                selection.set_valign(gtk::Align::Center);
+                selection.set_halign(gtk::Align::Fill);
+                selection.set_valign(gtk::Align::Fill);
                 selection.set_can_target(false);
                 selection.set_size_request(cell_width, cell_height);
                 if Some(entry.index.get()) == i.selected.get() {
@@ -826,17 +811,16 @@ impl Inner {
                 }
                 let picture = gtk::Picture::new();
                 picture.set_content_fit(gtk::ContentFit::Contain);
+                picture.set_size_request(cell_width, cell_height);
+                picture.set_margin_start(3);
+                picture.set_margin_end(3);
+                picture.set_margin_top(3);
+                picture.set_margin_bottom(3);
                 picture.set_can_shrink(true);
                 picture.set_can_target(false);
                 // Hidden predecode can complete before a GTK cell exists.
                 // Hydrate new cells from their already-ready textures.
                 if let Some(texture) = entry.texture.as_ref() {
-                    let ratio = (cell_width as f64 / texture.width() as f64)
-                        .min(cell_height as f64 / texture.height() as f64);
-                    selection.set_size_request(
-                        ((texture.width() as f64 * ratio).round() as i32).max(1),
-                        ((texture.height() as f64 * ratio).round() as i32).max(1),
-                    );
                     picture.set_paintable(Some(texture));
                 }
                 let spinner = gtk::Spinner::new();
@@ -1206,12 +1190,6 @@ impl Inner {
                             entry.phase = Phase::Ready;
                             entry.used = i.clock.get();
                             if let Some(w) = &entry.widgets {
-                                let (cell_width, cell_height) = i.cell_size.get();
-                                let ratio = (cell_width as f64 / texture.width() as f64)
-                                    .min(cell_height as f64 / texture.height() as f64);
-                                let width = (texture.width() as f64 * ratio).round() as i32;
-                                let height = (texture.height() as f64 * ratio).round() as i32;
-                                w.selection.set_size_request(width.max(1), height.max(1));
                                 w.picture.set_paintable(Some(&texture));
                                 w.icon.set_visible(false);
                             }

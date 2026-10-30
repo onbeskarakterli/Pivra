@@ -120,6 +120,7 @@ async fn load_limited(
         image.mime_type().to_string().as_str(),
         "image/jpeg"
             | "image/png"
+            | "image/apng"
             | "image/webp"
             | "image/gif"
             | "image/bmp"

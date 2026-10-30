@@ -1,5 +1,7 @@
 //! Per-window presentation and cancellation. Glycin alone applies orientation.
 
+#[path = "animation.rs"]
+mod animation;
 #[path = "actual_paintable.rs"]
 mod actual_paintable;
 #[path = "thumbnail_overlay.rs"]
@@ -37,6 +39,7 @@ pub(super) struct ImageView {
     requested: Rc<RefCell<Option<PathBuf>>>,
     prefetch: Rc<RefCell<preload::State>>,
     phase: Rc<Cell<Phase>>,
+    animation_generation: Rc<Cell<u64>>,
 }
 
 impl ImageView {
@@ -91,6 +94,18 @@ impl ImageView {
         });
         let destroyed_prefetch = prefetch.clone();
         window.connect_destroy(move |_| destroyed_prefetch.borrow_mut().close());
+        let animation_generation = Rc::new(Cell::new(0_u64));
+        for signal in [false, true] {
+            let generation = animation_generation.clone();
+            if signal {
+                window.connect_destroy(move |_| generation.set(generation.get().wrapping_add(1)));
+            } else {
+                window.connect_close_request(move |_| {
+                    generation.set(generation.get().wrapping_add(1));
+                    glib::Propagation::Proceed
+                });
+            }
+        }
         let slot = Rc::new(LoadSlot::default());
         let closing = slot.clone();
         window.connect_close_request(move |_| {
@@ -181,6 +196,7 @@ impl ImageView {
         });
         window.add_action(&quality_action);
         Self {
+            animation_generation,
             thumbnail_strip,
             mode_action,
             prefetch,
@@ -248,6 +264,7 @@ impl ImageView {
         self.prepare(message, true);
     }
     fn prepare(&self, message: &str, cancel: bool) {
+        self.animation_generation.set(self.animation_generation.get().wrapping_add(1));
         if cancel {
             self.slot.cancel();
             self.phase.set(Phase::Cancelled);
@@ -382,6 +399,15 @@ impl ImageView {
         on_completion: impl FnOnce() + 'static,
         on_result: impl FnOnce(bool) + 'static,
     ) {
+        let generation = self.animation_generation.clone();
+        let expected = generation.get().wrapping_add(1);
+        generation.set(expected);
+        let animation_path = path.clone();
+        let animation_picture = self.picture.downgrade();
+        let animation_texture = self.texture.clone();
+        let animation_mode = self.mode_action.clone();
+        let animation_transform = self.transform.clone();
+        let animation_filter = self.filter.clone();
         if !allow_cache {
             self.prefetch.borrow_mut().invalidate();
         }
@@ -510,6 +536,16 @@ impl ImageView {
                             filter.clone(),
                         );
                         status.set_visible(false);
+                        animation::start(
+                            animation_path,
+                            generation,
+                            expected,
+                            animation_picture,
+                            animation_texture,
+                            animation_mode,
+                            animation_transform,
+                            animation_filter,
+                        );
                     }
                     Err(error) => {
                         eprintln!("Pivra: image load failed: {error}");

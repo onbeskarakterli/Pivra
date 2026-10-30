@@ -275,11 +275,7 @@ impl ImageView {
         let paths: Vec<_> = paths
             .into_iter()
             .filter(|p| {
-                p.extension().and_then(|e| e.to_str()).is_some_and(|e| {
-                    ["jpg", "jpeg", "png", "webp", "gif", "bmp", "tif", "tiff", "avif", "heic", "heif"]
-                        .iter()
-                        .any(|s| e.eq_ignore_ascii_case(s))
-                })
+                pivra::discovery::supported_photo(p)
             })
             .take(2)
             .collect();
@@ -339,11 +335,7 @@ impl ImageView {
     /// Retarget only an unfinished supported-image request after a paired folder rename.
     #[allow(dead_code)] // Standalone view probes omit the folder-monitor integration.
     pub(super) fn retarget_pending(&self, old: &std::path::Path, new: &std::path::Path) {
-        let supported = new.extension().and_then(|s| s.to_str()).is_some_and(|ext| {
-            ["jpg", "jpeg", "png", "webp", "gif", "bmp", "tif", "tiff", "avif", "heic", "heif"]
-                .iter()
-                .any(|s| ext.eq_ignore_ascii_case(s))
-        });
+        let supported = pivra::discovery::supported_photo(new);
         if !supported
             || self.requested.borrow().as_deref() != Some(old)
             || !self.slot.current_in_flight()

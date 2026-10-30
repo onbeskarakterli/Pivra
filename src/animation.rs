@@ -207,7 +207,7 @@ pub(super) fn start(
             let mut reached_end = false;
             for index in 0..2048 {
                 if probe_generation.get() != expected { return; }
-                match probe.next_frame().await {
+                match probe.specific_frame(glycin::FrameRequest::new().loop_animation(false)).await {
                     Ok(frame) => match frame.delay() {
                         Some(delay) => durations.push(delay.as_secs_f64().clamp(0.02, 10.0)),
                         None => { reached_end = true; break; }

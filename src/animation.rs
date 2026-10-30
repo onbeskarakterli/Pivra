@@ -276,35 +276,60 @@ pub(super) fn start(
                         offset += seconds;
                         target_index = index;
                     }
-                    if let Ok(reloaded) = open_image().load().await {
-                        image = reloaded;
-                        let mut found = None;
-                        for _ in 0..=target_index {
-                            if generation.get() != expected { cancelled.cancel(); return; }
-                            match image.next_frame().await {
-                                Ok(next) => found = Some(next),
-                                Err(_) => break,
-                            }
-                        }
-                        if let Some(next) = found {
-                            frame_index = target_index;
-                            elapsed = offset;
-                            delay = next.delay().unwrap_or(Duration::from_millis(100));
-                            if let Some(picture) = picture.upgrade() {
-                                if frame_is_valid(&next)
-                                    && (!webp || (next.width() == canvas_width
-                                        && next.height() == canvas_height))
-                                {
-                                    let next = next.texture();
-                                    let mode = mode_action.state()
-                                        .and_then(|v| v.str().and_then(ViewMode::from_id))
-                                        .unwrap_or_default();
-                                    texture.replace(Some(next.clone()));
-                                    present_filtered(&picture, Some(&next), mode.id(), transform.clone(), filter.clone());
+                    // If the requested frame is ahead of the current decoder
+                    // position, advance in-place instead of reopening and
+                    // re-decoding from frame zero on every forward seek.
+                    let forward = target_index >= frame_index;
+                    if forward || target_index < frame_index {
+                        let ready = if forward {
+                            true
+                        } else if let Ok(reloaded) = open_image().load().await {
+                            image = reloaded;
+                            true
+                        } else {
+                            false
+                        };
+                        if ready {
+                            let steps = if forward {
+                                target_index - frame_index
+                            } else {
+                                target_index + 1
+                            };
+                            let mut found = None;
+                            for step in 0..steps {
+                                if generation.get() != expected { cancelled.cancel(); return; }
+                                // A new drag position supersedes this request.
+                                if controls.seek.get().is_some() { break; }
+                                match image.next_frame().await {
+                                    Ok(next) => found = Some(next),
+                                    Err(_) => break,
+                                }
+                                if step % 16 == 15 {
+                                    glib::timeout_future(Duration::from_millis(1)).await;
                                 }
                             }
-                            controls.show_progress(elapsed / total);
-                            controls.show_time(elapsed, total);
+                            if controls.seek.get().is_none() {
+                                if let Some(next) = found {
+                                    if frame_is_valid(&next)
+                                        && (!webp || (next.width() == canvas_width
+                                            && next.height() == canvas_height))
+                                    {
+                                        frame_index = target_index;
+                                        elapsed = offset;
+                                        delay = next.delay().unwrap_or(Duration::from_millis(100));
+                                        if let Some(picture) = picture.upgrade() {
+                                            let next = next.texture();
+                                            let mode = mode_action.state()
+                                                .and_then(|v| v.str().and_then(ViewMode::from_id))
+                                                .unwrap_or_default();
+                                            texture.replace(Some(next.clone()));
+                                            present_filtered(&picture, Some(&next), mode.id(), transform.clone(), filter.clone());
+                                        }
+                                        controls.show_progress(elapsed / total);
+                                        controls.show_time(elapsed, total);
+                                    }
+                                }
+                            }
                         }
                     }
                 }

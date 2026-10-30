@@ -533,7 +533,8 @@ pub(super) fn build(app: &adw::Application, settings: &Settings, file: Option<Op
                 .cloned().collect();
             context.collection = MediaCollection::new(remaining);
             if !context.collection.items().is_empty() {
-                context.collection.select(old_index.min(context.collection.items().len() - 1));
+                let last_index = context.collection.items().len() - 1;
+                context.collection.select(old_index.min(last_index));
             }
             context.revision = context.revision.wrapping_add(1);
             trash_banner.set_reveal_child(false);

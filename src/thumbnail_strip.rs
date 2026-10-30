@@ -693,7 +693,13 @@ impl Inner {
             .map(|e| (e.path.clone(), e.keys.clone()))
             .collect();
         if samples.is_empty() {
+            // A restored file is a fresh Pending entry with no cached keys.
+            // Revalidation must still restart thumbnail production.
             self.scroller.queue_draw();
+            self.drive();
+            if !self.scroller.is_mapped() {
+                self.warm_hidden();
+            }
             return;
         }
         let token = gio::Cancellable::new();

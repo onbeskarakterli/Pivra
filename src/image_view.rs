@@ -98,50 +98,39 @@ impl ImageView {
         let animation_controls = animation::Controls::new();
         overlay.add_overlay(&animation_controls.bar);
         overlay.set_measure_overlay(&animation_controls.bar, false);
-        // Align to the ACTUAL top edge of the thumbnail toggle/pin cluster
-        // in overlay coordinates. Margin + measured height is not equivalent
-        // to its allocated geometry, especially during strip resizing.
+        // The thumbnail controls are bottom-aligned overlay siblings. Their
+        // bottom margin already accounts for the strip's visible height.
+        // Keep the timeline directly above their allocated button height.
         let mut child = overlay.first_child();
         while let Some(widget) = child {
             if widget.widget_name() == "thumbnail-controls" {
                 if let Ok(thumbnail_controls) = widget.downcast::<gtk::Box>() {
                     let bar = animation_controls.bar.downgrade();
-                    let viewport = overlay.downgrade();
                     let align = move |controls: &gtk::Box| {
-                        let (Some(bar), Some(viewport)) = (bar.upgrade(), viewport.upgrade()) else {
-                            return;
-                        };
-                        if !controls.is_visible() {
-                            bar.set_margin_bottom(2);
-                            return;
-                        }
-                        if let Some(bounds) = controls.compute_bounds(&viewport) {
-                            let bottom = ((viewport.height() as f32 - bounds.y()).ceil() as i32 + 2)
-                                .max(2);
-                            if bar.margin_bottom() != bottom {
-                                bar.set_margin_bottom(bottom);
+                        if let Some(bar) = bar.upgrade() {
+                            let button_height = controls.height().max(30);
+                            let offset = if controls.is_visible() {
+                                controls.margin_bottom() + button_height + 2
+                            } else {
+                                2
+                            };
+                            if bar.margin_bottom() != offset {
+                                bar.set_margin_bottom(offset);
                             }
                         }
                     };
                     align(&thumbnail_controls);
                     let align = Rc::new(align);
-                    let on_visibility = align.clone();
+                    let changed = align.clone();
                     thumbnail_controls.connect_notify_local(Some("visible"), move |controls, _| {
-                        on_visibility(controls);
+                        changed(controls);
                     });
-                    let on_margin = align.clone();
+                    let changed = align.clone();
                     thumbnail_controls.connect_notify_local(Some("margin-bottom"), move |controls, _| {
-                        on_margin(controls);
+                        changed(controls);
                     });
-                    let on_height = align.clone();
                     thumbnail_controls.connect_notify_local(Some("height"), move |controls, _| {
-                        on_height(controls);
-                    });
-                    let controls = thumbnail_controls.downgrade();
-                    overlay.connect_notify_local(Some("height"), move |_, _| {
-                        if let Some(controls) = controls.upgrade() {
-                            align(&controls);
-                        }
+                        align(controls);
                     });
                 }
                 break;

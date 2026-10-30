@@ -108,11 +108,20 @@ impl ImageView {
                     let bar = animation_controls.bar.downgrade();
                     let align = move |controls: &gtk::Box| {
                         if let Some(bar) = bar.upgrade() {
-                            let height = controls.measure(gtk::Orientation::Vertical, -1).1.max(0);
+                            // Use the actual top edge of the toggle/pin cluster,
+                            // rather than its natural size (which overestimates the gap).
                             let bottom = if controls.is_visible() {
-                                controls.margin_bottom() + height + 8
+                                controls
+                                    .parent()
+                                    .and_then(|parent| controls.compute_bounds(&parent))
+                                    .map(|bounds| {
+                                        (controls.margin_bottom() as f32 + bounds.height()).ceil()
+                                            as i32
+                                            + 2
+                                    })
+                                    .unwrap_or(controls.margin_bottom() + 30)
                             } else {
-                                8
+                                2
                             };
                             if bar.margin_bottom() != bottom {
                                 bar.set_margin_bottom(bottom);

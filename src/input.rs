@@ -3,7 +3,9 @@
 use std::{ffi::OsStr, fs, path::Path};
 
 use gtk::{gio, glib, prelude::*};
-use pivra::media::{MediaItem, MediaKind};
+use pivra::media::MediaItem;
+#[cfg(test)]
+use pivra::media::MediaKind;
 
 /// Window-owned association, not a decoded image or an open descriptor.
 #[derive(Clone, Debug)]

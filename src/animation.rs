@@ -161,17 +161,20 @@ pub(super) fn start(
     controls.bar.set_visible(true);
     glib::MainContext::default().spawn_local(async move {
         let cancelled = gio::Cancellable::new();
-        let mut loader = glycin::Loader::new(gio::File::for_path(&path));
-        loader.sandbox_selector(glycin::SandboxSelector::Bwrap);
-        loader.cancellable(cancelled.clone());
-        loader.apply_transformations(true);
-        loader.use_expose_base_dir(false);
+        let open_image = || {
+            let mut loader = glycin::Loader::new(gio::File::for_path(&path));
+            loader.sandbox_selector(glycin::SandboxSelector::Bwrap);
+            loader.cancellable(cancelled.clone());
+            loader.apply_transformations(true);
+            loader.use_expose_base_dir(false);
+            loader
+        };
 
         // A bounded timeline pass is required for real percentage-based seeking.
         // If the decoder exposes an endlessly repeating stream or more than
         // 2048 frames, keep playback but leave seeking disabled.
         let mut durations = Vec::new();
-        if let Ok(probe) = loader.load().await {
+        if let Ok(probe) = open_image().load().await {
             for _ in 0..2048 {
                 if generation.get() != expected { cancelled.cancel(); return; }
                 match probe.next_frame().await {
@@ -190,7 +193,7 @@ pub(super) fn start(
             controls.progress.set_sensitive(true);
         }
 
-        let Ok(mut image) = loader.load().await else { return; };
+        let Ok(mut image) = open_image().load().await else { return; };
         let Ok(mut frame) = image.next_frame().await else { return; };
         let Some(mut delay) = frame.delay() else {
             controls.bar.set_visible(false);
@@ -216,7 +219,7 @@ pub(super) fn start(
                         offset += seconds;
                         target_index = index;
                     }
-                    if let Ok(reloaded) = loader.load().await {
+                    if let Ok(reloaded) = open_image().load().await {
                         image = reloaded;
                         let mut found = None;
                         for _ in 0..=target_index {
@@ -280,7 +283,7 @@ pub(super) fn start(
                         continue;
                     }
                 }
-                let Ok(reloaded) = loader.load().await else { break; };
+                let Ok(reloaded) = open_image().load().await else { break; };
                 image = reloaded;
                 frame_index = 0;
                 elapsed = 0.0;
@@ -295,7 +298,6 @@ pub(super) fn start(
                 .unwrap_or_default();
             texture.replace(Some(next.clone()));
             present_filtered(&picture, Some(&next), mode.id(), transform.clone(), filter.clone());
-            frame = next_frame;
             delay = next_delay;
             if timeline_ready { controls.show_progress(elapsed / total); }
         }

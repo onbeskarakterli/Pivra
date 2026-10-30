@@ -58,8 +58,14 @@ pub(crate) fn install(
             return glib::Propagation::Proceed;
         };
         match key {
-            gdk::Key::Escape if window.is_fullscreen() || pending.get() == Some(true) => {
-                request(&window, &pending, false);
+            gdk::Key::Escape => {
+                // A second Escape closes even if the compositor has not yet
+                // acknowledged the first request to leave fullscreen.
+                if pending.get() == Some(false) || (!window.is_fullscreen() && pending.get() != Some(true)) {
+                    window.close();
+                } else {
+                    request(&window, &pending, false);
+                }
             }
             gdk::Key::f | gdk::Key::F => {
                 let mut focus = gtk::prelude::GtkWindowExt::focus(&window);

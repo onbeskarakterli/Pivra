@@ -77,7 +77,7 @@ int main(int argc, char **argv) {
     GFile *file=g_file_new_for_uri(argv[1]);
     char *path=g_file_get_path(file);
     struct stat before,after;
-    if (!path || stat(path,&before) || !S_ISREG(before.st_mode) || before.st_size>64*1024*1024 || before.st_mtime!=(time_t)mtime) return 2;
+    if (!path || stat(path,&before) || !S_ISREG(before.st_mode) || before.st_size>(g_str_has_prefix(argv[2],"video/") ? (gint64)8*1024*1024*1024 : (gint64)64*1024*1024) || before.st_mtime!=(time_t)mtime) return 2;
     GnomeDesktopThumbnailFactory *factory=gnome_desktop_thumbnail_factory_new(GNOME_DESKTOP_THUMBNAIL_SIZE_NORMAL);
     if (!factory) return 2;
     char *cached=gnome_desktop_thumbnail_factory_lookup(factory,argv[1],(time_t)mtime);

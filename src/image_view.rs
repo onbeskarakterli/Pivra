@@ -29,7 +29,9 @@ pub(super) struct ImageView {
     overlay: gtk::Overlay,
     thumbnail_strip: thumbnail_overlay::ThumbnailStrip,
     picture: gtk::Picture,
-    video: gtk::Video,
+    video: gtk::Picture,
+    video_stream: Rc<RefCell<Option<gtk::MediaFile>>>,
+
     video_controls: video_controls::Controls,
     status: gtk::Label,
     loading_spinner: gtk::Spinner,
@@ -65,12 +67,12 @@ impl ImageView {
         overlay.set_child(Some(&picture));
         // Native GTK media playback is an intentionally small first video
         // milestone. The backend depends on installed media codecs.
-        let video = gtk::Video::new();
+        let video = gtk::Picture::new();
         video.set_hexpand(true);
         video.set_vexpand(true);
-        video.set_autoplay(true);
-        video.set_loop(false);
+        video.set_content_fit(gtk::ContentFit::Contain);
         video.set_visible(false);
+        let video_stream: Rc<RefCell<Option<gtk::MediaFile>>> = Rc::default();
         overlay.add_overlay(&video);
         overlay.set_measure_overlay(&video, false);
         overlay.add_overlay(&status);
@@ -267,6 +269,7 @@ impl ImageView {
             animation_generation,
             thumbnail_strip,
             video,
+            video_stream,
             mode_action,
             prefetch,
             phase,
@@ -334,17 +337,22 @@ impl ImageView {
     }
     pub(super) fn load_video(&self, path: &std::path::Path) {
         self.prepare("", true);
-        self.video.set_filename(Some(path));
+        let media = gtk::MediaFile::for_filename(path);
+        media.set_loop(false);
+        self.video.set_paintable(Some(&media));
+        self.video_stream.replace(Some(media.clone()));
         self.video.set_visible(true);
-        self.video_controls.attach(self.video.media_stream());
+        self.video_controls.attach(Some(media.clone().upcast::<gtk::MediaStream>()));
+        media.play();
     }
     fn stop_video(&self) {
         self.video_controls.attach(None);
-        if let Some(stream) = self.video.media_stream() {
+        if let Some(stream) = self.video_stream.borrow_mut().take() {
             stream.pause();
+            stream.clear();
         }
         self.video.set_visible(false);
-        self.video.set_filename(None::<&std::path::Path>);
+        self.video.set_paintable(None::<&gtk::gdk::Paintable>);
     }
     fn prepare(&self, message: &str, cancel: bool) {
         self.stop_video();

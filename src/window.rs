@@ -150,6 +150,37 @@ fn install_navigation_arrows(overlay: &gtk::Overlay) {
     };
     let previous = make_arrow(true, "win.previous-media", gtk::Align::Start);
     let next = make_arrow(false, "win.next-media", gtk::Align::End);
+
+    // Keep full-height navigation panels out of the thumbnail strip. The strip
+    // can be shown, hidden and resized independently after arrow creation.
+    let mut sibling = overlay.first_child();
+    while let Some(widget) = sibling {
+        if widget.widget_name() == "thumbnail-strip" {
+            if let Ok(strip) = widget.downcast::<gtk::ScrolledWindow>() {
+                let left = previous.downgrade();
+                let right = next.downgrade();
+                let update = move |strip: &gtk::ScrolledWindow| {
+                    let bottom = if strip.is_visible() {
+                        strip.height_request().max(0)
+                    } else {
+                        0
+                    };
+                    for arrow in [&left, &right] {
+                        if let Some(arrow) = arrow.upgrade() {
+                            arrow.set_margin_bottom(bottom);
+                        }
+                    }
+                };
+                update(&strip);
+                let update = std::rc::Rc::new(update);
+                let visibility = update.clone();
+                strip.connect_notify_local(Some("visible"), move |strip, _| visibility(strip));
+                strip.connect_notify_local(Some("height-request"), move |strip, _| update(strip));
+            }
+            break;
+        }
+        sibling = widget.next_sibling();
+    }
     // GTK reports logical viewport size after allocation (including HiDPI).
     // Resize the glass panels as one piece with their arrows; no increase
     // beyond the approved 112px fullscreen width.

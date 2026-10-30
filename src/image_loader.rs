@@ -6,7 +6,7 @@ use std::path::Path;
 pub(crate) type LoadedFrame = glycin::Frame;
 
 const MAX_FILE_BYTES: u64 = 64 * 1024 * 1024;
-const MAX_PIXELS: u64 = 32_000_000;
+const MAX_PIXELS: u64 = 64_000_000;
 const MAX_FRAME_BYTES: usize = 512 * 1024 * 1024;
 const MAX_EDGE: u32 = 32_768;
 
@@ -45,7 +45,7 @@ pub(crate) fn validate_dimensions(width: u32, height: u32) -> Result<(), String>
         || u64::from(width) * u64::from(height) > MAX_PIXELS
     {
         return Err(
-            "Image exceeds the 32 MP / 32768-pixel edge limit or has invalid dimensions".into(),
+            "Image exceeds the 64 MP / 32768-pixel edge limit or has invalid dimensions".into(),
         );
     }
     Ok(())
@@ -167,7 +167,7 @@ mod tests {
     #[test]
     fn thumbnail_opt_in_does_not_raise_foreground_pixel_ceiling() {
         assert!(dimensions_for(6000, 4000, false).is_ok());
-        assert!(dimensions_for(8000, 6000, false).is_err());
+        assert!(dimensions_for(8000, 6000, false).is_ok());
         assert!(dimensions_for(8000, 6000, true).is_ok());
         assert!(dimensions_for(10000, 5000, true).is_ok());
         assert!(dimensions_for(12000, 9000, true).is_err());
@@ -180,7 +180,7 @@ mod tests {
             (1, 0),
             (u32::MAX, u32::MAX),
             (32769, 1),
-            (8000, 8000),
+            (8001, 8000),
         ] {
             assert!(validate_dimensions(width, height).is_err());
         }

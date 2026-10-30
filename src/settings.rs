@@ -226,3 +226,42 @@ mod thumbnail_tests {
         assert!(p.listeners.borrow().is_empty());
     }
 }
+
+/// Saved video audio controls shared by subsequent windows and launches.
+pub fn load_video_audio() -> (f64, bool) {
+    let path = glib::user_config_dir().join("pivra/video-audio.conf");
+    let Ok(content) = std::fs::read_to_string(path) else {
+        return (1.0, false);
+    };
+    let mut lines = content.lines();
+    let volume = lines.next().and_then(|s| s.parse::<f64>().ok())
+        .filter(|v| v.is_finite() && (0.0..=1.0).contains(v));
+    let muted = match lines.next() {
+        Some("true") => Some(true),
+        Some("false") => Some(false),
+        _ => None,
+    };
+    match (volume, muted) {
+        (Some(volume), Some(muted)) => (volume, muted),
+        _ => (1.0, false),
+    }
+}
+
+pub fn save_video_audio(volume: f64, muted: bool) {
+    if !volume.is_finite() { return; }
+    let dir = glib::user_config_dir().join("pivra");
+    let result = (|| -> Result<(), Box<dyn std::error::Error>> {
+        std::fs::create_dir_all(&dir)?;
+        gio::File::for_path(dir.join("video-audio.conf")).replace_contents(
+            format!("{:.4}\n{}\n", volume.clamp(0.0, 1.0), muted).as_bytes(),
+            None,
+            false,
+            gio::FileCreateFlags::PRIVATE | gio::FileCreateFlags::REPLACE_DESTINATION,
+            None::<&gio::Cancellable>,
+        )?;
+        Ok(())
+    })();
+    if let Err(error) = result {
+        eprintln!("Pivra: could not save video audio settings: {error}");
+    }
+}

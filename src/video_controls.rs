@@ -213,24 +213,18 @@ impl Controls {
         glib::MainContext::default().spawn_local(async move {
             while refresh.alive.get() {
                 glib::timeout_future(Duration::from_millis(150)).await;
-                let (fullscreen, maximized) = window_ref.upgrade()
-                    .map(|window| (window.is_fullscreen(), window.is_maximized()))
-                    .unwrap_or((false, false));
-                let hide_after = if fullscreen {
-                    Duration::from_secs(1)
-                } else {
-                    Duration::from_secs(2)
-                };
+                let fullscreen = window_ref.upgrade()
+                    .is_some_and(|window| window.is_fullscreen());
+                let hide_after = Duration::from_secs(1);
                 // Fullscreen video controls disappear after inactivity even if
                 // the pointer is resting on the bar. Windowed hover keeps them
                 // visible, and active seek drags always take priority.
                 let media = refresh.stream.borrow().clone();
                 if let Some(media) = media.as_ref() {
                     // A paused fullscreen video keeps its controls visible.
-                    if (fullscreen && !media.is_playing()) || (!fullscreen && maximized) {
+                    if !fullscreen || !media.is_playing() {
                         refresh.bar.set_visible(true);
                     } else if !refresh.scrubbing.get()
-                        && (fullscreen || !refresh.pointer_over.get())
                         && refresh.last_activity.get().elapsed() >= hide_after
                     {
                         refresh.bar.set_visible(false);

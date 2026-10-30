@@ -401,6 +401,11 @@ impl ImageView {
     fn stop_video(&self) {
         self.video_controls.attach(None);
         let path = self.video_path.borrow_mut().take();
+        // Detach the render surface before stopping the native decoder.
+        // Clearing a MediaFile while GtkPicture still paints it can race
+        // GStreamer/GTK frame delivery during rapid video navigation.
+        self.video.set_visible(false);
+        self.video.set_paintable(None::<&gtk::gdk::Paintable>);
         if let Some(stream) = self.video_stream.borrow_mut().take() {
             stream.pause();
             if let Some(path) = path {
@@ -409,10 +414,9 @@ impl ImageView {
                     self.video_positions.borrow_mut().insert(path, timestamp);
                 }
             }
-            stream.clear();
+            // The media file owns its playback pipeline and is released when
+            // references are dropped; don't synchronously clear it here.
         }
-        self.video.set_visible(false);
-        self.video.set_paintable(None::<&gtk::gdk::Paintable>);
     }
     fn prepare(&self, message: &str, cancel: bool) {
         self.stop_video();

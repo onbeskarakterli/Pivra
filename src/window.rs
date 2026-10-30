@@ -491,8 +491,7 @@ pub(super) fn build(app: &adw::Application, settings: &Settings, file: Option<Op
             let Some(item) = context.collection.current() else {
                 return;
             };
-            if item.kind() == MediaKind::Video
-                || !pivra::discovery::supported_photo(item.path()) {
+            if item.kind() == MediaKind::Video || !pivra::discovery::supported_photo(item.path()) {
                 refresh_banner.set_reveal_child(false);
                 display_selected(&refresh_view, &context);
                 return;

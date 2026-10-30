@@ -89,14 +89,23 @@ impl Controls {
         loop_button.set_active(true);
         loop_button.set_tooltip_text(Some("Loop on"));
         loop_button.add_css_class("flat");
-        loop_button.add_css_class("suggested-action");
+        loop_button.add_css_class("pivra-loop-active");
+        let css = gtk::CssProvider::new();
+        css.load_from_string(
+            ".pivra-animation-controls button.pivra-loop-active { background-color: @accent_bg_color; color: @accent_fg_color; }"
+        );
+        gtk::style_context_add_provider_for_display(
+            &loop_button.display(),
+            &css,
+            gtk::STYLE_PROVIDER_PRIORITY_APPLICATION,
+        );
         let loop_state = looping.clone();
         loop_button.connect_toggled(move |button| {
             loop_state.set(button.is_active());
             if button.is_active() {
-                button.add_css_class("suggested-action");
+                button.add_css_class("pivra-loop-active");
             } else {
-                button.remove_css_class("suggested-action");
+                button.remove_css_class("pivra-loop-active");
             }
             button.set_tooltip_text(Some(if button.is_active() { "Loop on" } else { "Loop off" }));
         });
@@ -293,10 +302,10 @@ pub(super) fn start(
             while remaining > 0.0 || controls.paused.get() {
                 if generation.get() != expected { cancelled.cancel(); return; }
                 if controls.seek.get().is_some() { break; }
-                glib::timeout_future(Duration::from_millis(20)).await;
+                glib::timeout_future(Duration::from_millis(5)).await;
                 if !controls.paused.get() {
                     let rate = controls.speed.get();
-                    remaining -= 0.020 * rate;
+                    remaining -= 0.005 * rate;
                     if timeline_ready {
                         let current = elapsed + (delay.as_secs_f64() - remaining.max(0.0)).min(delay.as_secs_f64());
                         controls.show_progress(current / total);
@@ -316,9 +325,18 @@ pub(super) fn start(
                     controls.paused.set(true);
                     controls.play.set_icon_name("media-playback-start-symbolic");
                     controls.play.set_tooltip_text(Some("Replay animation"));
-                    while controls.paused.get() && controls.seek.get().is_none() {
+                    while controls.paused.get()
+                        && !controls.looping.get()
+                        && controls.seek.get().is_none()
+                    {
                         if generation.get() != expected { cancelled.cancel(); return; }
                         glib::timeout_future(Duration::from_millis(20)).await;
+                    }
+                    // Enabling loop after the final frame resumes playback.
+                    if controls.looping.get() && controls.paused.get() {
+                        controls.paused.set(false);
+                        controls.play.set_icon_name("media-playback-pause-symbolic");
+                        controls.play.set_tooltip_text(Some("Pause animation"));
                     }
                     if controls.seek.get().is_some() {
                         frame_index = frame_index.saturating_sub(1);

@@ -69,7 +69,7 @@ pub(crate) fn install(
                     request(&window, &pending, false);
                 }
             }
-            gdk::Key::f | gdk::Key::F => {
+            gdk::Key::f | gdk::Key::F | gdk::Key::F11 => {
                 let mut focus = gtk::prelude::GtkWindowExt::focus(&window);
                 while let Some(widget) = focus {
                     if widget.is::<gtk::Editable>() || widget.is::<gtk::TextView>() {

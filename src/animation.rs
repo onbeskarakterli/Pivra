@@ -19,6 +19,8 @@ pub(super) struct Controls {
     pub progress: gtk::Scale,
     speed_button: gtk::MenuButton,
     loop_button: gtk::ToggleButton,
+    seek: Rc<Cell<Option<f64>>>,
+    internal_update: Rc<Cell<bool>>,
 }
 
 impl Controls {
@@ -41,11 +43,20 @@ impl Controls {
             button.set_tooltip_text(Some(if pause { "Play animation" } else { "Pause animation" }));
         });
 
+        let seek = Rc::new(Cell::new(None));
+        let internal_update = Rc::new(Cell::new(false));
         let progress = gtk::Scale::with_range(gtk::Orientation::Horizontal, 0.0, 1.0, 0.001);
         progress.set_draw_value(false);
         progress.set_hexpand(true);
-        progress.set_sensitive(false); // Enable only after an accurate frame timeline exists.
-        progress.set_tooltip_text(Some("Seeking requires a decoded frame timeline"));
+        progress.set_sensitive(false);
+        progress.set_tooltip_text(Some("Seek animation"));
+        let seek_requested = seek.clone();
+        let updating = internal_update.clone();
+        progress.connect_value_changed(move |scale| {
+            if !updating.get() {
+                seek_requested.set(Some(scale.value()));
+            }
+        });
 
         let speed_button = gtk::MenuButton::new();
         speed_button.set_label("1×");
@@ -104,17 +115,26 @@ impl Controls {
             progress,
             speed_button,
             loop_button,
+            seek,
+            internal_update,
         }
     }
     pub fn reset(&self) {
         self.paused.set(false);
         self.speed.set(1.0);
         self.looping.set(true);
-        self.progress.set_value(0.0);
+        self.seek.set(None);
+        self.progress.set_sensitive(false);
+        self.show_progress(0.0);
         self.speed_button.set_label("1×");
         self.loop_button.set_active(true);
         self.bar.set_visible(false);
         self.play.set_icon_name("media-playback-pause-symbolic");
+    }
+    fn show_progress(&self, value: f64) {
+        self.internal_update.set(true);
+        self.progress.set_value(value.clamp(0.0, 1.0));
+        self.internal_update.set(false);
     }
 }
 
@@ -136,6 +156,8 @@ pub(super) fn start(
     {
         return;
     }
+    // Inspect frame durations without retaining frame textures. Seeking
+    // re-decodes frames rather than caching an unbounded animation in memory.
     controls.bar.set_visible(true);
     glib::MainContext::default().spawn_local(async move {
         let cancelled = gio::Cancellable::new();
@@ -144,72 +166,140 @@ pub(super) fn start(
         loader.cancellable(cancelled.clone());
         loader.apply_transformations(true);
         loader.use_expose_base_dir(false);
-        let Ok(image) = loader.load().await else {
-            return;
-        };
-        if generation.get() != expected {
-            cancelled.cancel();
-            return;
-        }
-        let Ok(first) = image.next_frame().await else {
-            return;
-        };
-        let Some(mut delay) = first.delay() else {
-            return;
-        };
-        loop {
-            if generation.get() != expected {
-                cancelled.cancel();
-                break;
-            }
-            let mut left = delay.as_secs_f64() / controls.speed.get();
-            while left > 0.0 || controls.paused.get() {
+
+        // A bounded timeline pass is required for real percentage-based seeking.
+        // If the decoder exposes an endlessly repeating stream or more than
+        // 2048 frames, keep playback but leave seeking disabled.
+        let mut durations = Vec::new();
+        if let Ok(probe) = loader.load().await {
+            for _ in 0..2048 {
                 if generation.get() != expected { cancelled.cancel(); return; }
+                match probe.next_frame().await {
+                    Ok(frame) => match frame.delay() {
+                        Some(delay) => durations.push(delay.as_secs_f64().clamp(0.02, 10.0)),
+                        None => break,
+                    },
+                    Err(_) => break,
+                }
+            }
+        }
+        if generation.get() != expected { cancelled.cancel(); return; }
+        let timeline_ready = !durations.is_empty() && durations.len() < 2048;
+        let total: f64 = durations.iter().sum();
+        if timeline_ready && total > 0.0 {
+            controls.progress.set_sensitive(true);
+        }
+
+        let Ok(mut image) = loader.load().await else { return; };
+        let Ok(mut frame) = image.next_frame().await else { return; };
+        let Some(mut delay) = frame.delay() else {
+            controls.bar.set_visible(false);
+            return;
+        };
+        let mut frame_index = 0usize;
+        let mut elapsed = 0.0f64;
+        loop {
+            if generation.get() != expected { cancelled.cancel(); return; }
+
+            // Seeking is a decoder restart and bounded forward scan, never
+            // an arbitrary seek in the sandboxed compressed byte stream.
+            if let Some(fraction) = controls.seek.take() {
+                if timeline_ready {
+                    let target = total * fraction.clamp(0.0, 1.0);
+                    let mut offset = 0.0;
+                    let mut target_index = 0;
+                    for (index, seconds) in durations.iter().enumerate() {
+                        if offset + seconds > target {
+                            target_index = index;
+                            break;
+                        }
+                        offset += seconds;
+                        target_index = index;
+                    }
+                    if let Ok(reloaded) = loader.load().await {
+                        image = reloaded;
+                        let mut found = None;
+                        for _ in 0..=target_index {
+                            if generation.get() != expected { cancelled.cancel(); return; }
+                            match image.next_frame().await {
+                                Ok(next) => found = Some(next),
+                                Err(_) => break,
+                            }
+                        }
+                        if let Some(next) = found {
+                            frame = next;
+                            frame_index = target_index;
+                            elapsed = offset;
+                            delay = frame.delay().unwrap_or(Duration::from_millis(100));
+                            if let Some(picture) = picture.upgrade() {
+                                if frame_is_valid(&frame) {
+                                    let next = frame.texture();
+                                    let mode = mode_action.state()
+                                        .and_then(|v| v.str().and_then(ViewMode::from_id))
+                                        .unwrap_or_default();
+                                    texture.replace(Some(next.clone()));
+                                    present_filtered(&picture, Some(&next), mode.id(), transform.clone(), filter.clone());
+                                }
+                            }
+                            controls.show_progress(elapsed / total);
+                        }
+                    }
+                }
+            }
+
+            let mut remaining = delay.as_secs_f64().clamp(0.02, 10.0);
+            while remaining > 0.0 || controls.paused.get() {
+                if generation.get() != expected { cancelled.cancel(); return; }
+                if controls.seek.get().is_some() { break; }
                 glib::timeout_future(Duration::from_millis(20)).await;
-                if !controls.paused.get() { left -= 0.020; }
+                if !controls.paused.get() {
+                    let rate = controls.speed.get();
+                    remaining -= 0.020 * rate;
+                    if timeline_ready {
+                        controls.show_progress((elapsed + (delay.as_secs_f64() - remaining.max(0.0)).min(delay.as_secs_f64())) / total);
+                    }
+                }
             }
-            if generation.get() != expected {
-                cancelled.cancel();
-                break;
+            if controls.seek.get().is_some() { continue; }
+            if generation.get() != expected { cancelled.cancel(); return; }
+            elapsed += delay.as_secs_f64().clamp(0.02, 10.0);
+            frame_index += 1;
+
+            if timeline_ready && frame_index >= durations.len() {
+                if !controls.looping.get() {
+                    controls.show_progress(1.0);
+                    controls.paused.set(true);
+                    controls.play.set_icon_name("media-playback-start-symbolic");
+                    break;
+                }
+                let Ok(reloaded) = loader.load().await else { break; };
+                image = reloaded;
+                frame_index = 0;
+                elapsed = 0.0;
             }
-            let Ok(frame) = image.next_frame().await else {
-                break;
-            };
-            if generation.get() != expected {
-                cancelled.cancel();
-                break;
-            }
-            let width = frame.width();
-            let height = frame.height();
-            if width == 0
-                || height == 0
-                || width > 32_768
-                || height > 32_768
-                || u64::from(width) * u64::from(height) > 32_000_000
-                || frame.buf_slice().len() > 512 * 1024 * 1024
-            {
-                break;
-            }
-            let Some(next_delay) = frame.delay() else {
-                break;
-            };
-            let Some(picture) = picture.upgrade() else {
-                break;
-            };
-            let next = frame.texture();
-            let mode = mode_action
-                .state()
+            let Ok(next_frame) = image.next_frame().await else { break; };
+            if !frame_is_valid(&next_frame) { break; }
+            let Some(next_delay) = next_frame.delay() else { break; };
+            let Some(picture) = picture.upgrade() else { break; };
+            let next = next_frame.texture();
+            let mode = mode_action.state()
                 .and_then(|v| v.str().and_then(ViewMode::from_id))
                 .unwrap_or_default();
             texture.replace(Some(next.clone()));
-            present_filtered(
-                &picture,
-                Some(&next),
-                mode.id(),
-                transform.clone(),
-                filter.clone(),
-            );
+            present_filtered(&picture, Some(&next), mode.id(), transform.clone(), filter.clone());
+            frame = next_frame;
             delay = next_delay;
+            if timeline_ready { controls.show_progress(elapsed / total); }
         }
+        cancelled.cancel();
     });
+}
+
+fn frame_is_valid(frame: &glycin::Frame) -> bool {
+    let width = frame.width();
+    let height = frame.height();
+    width > 0 && height > 0
+        && width <= 32_768 && height <= 32_768
+        && u64::from(width) * u64::from(height) <= 32_000_000
+        && frame.buf_slice().len() <= 512 * 1024 * 1024
 }

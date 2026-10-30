@@ -218,8 +218,7 @@ fn display_selected(view: &ImageView, context: &FileContext) {
     if item.kind() == MediaKind::Video {
         view.set_neighbors(vec![]);
         view.show_message("Video playback is not available yet.");
-    } else if pivra::discovery::supported_photo(item.path())
-    {
+    } else if pivra::discovery::supported_photo(item.path()) {
         view.load(item.path().to_owned());
         view.set_neighbors(context.collection.photo_neighbors());
     } else {
@@ -493,8 +492,7 @@ pub(super) fn build(app: &adw::Application, settings: &Settings, file: Option<Op
                 return;
             };
             if item.kind() == MediaKind::Video
-                || !pivra::discovery::supported_photo(item.path())
-            {
+                || !pivra::discovery::supported_photo(item.path()) {
                 refresh_banner.set_reveal_child(false);
                 display_selected(&refresh_view, &context);
                 return;

@@ -105,6 +105,7 @@ pub(crate) fn install(
     pin.add_css_class("pivra-thumbnail-pin");
     pin.set_active(false);
     let controls = gtk::Box::new(gtk::Orientation::Horizontal, 0);
+    controls.set_widget_name("thumbnail-controls");
     controls.set_halign(gtk::Align::Center);
     controls.set_valign(gtk::Align::End);
     controls.append(&button);

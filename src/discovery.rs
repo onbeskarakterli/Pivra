@@ -27,8 +27,11 @@ pub struct ScanReport {
 /// Extension admission only; never a format/content or decoder capability claim.
 pub fn supported_photo(path: &Path) -> bool {
     path.extension().and_then(|e| e.to_str()).is_some_and(|e| {
-        ["jpg", "jpeg", "png", "webp", "gif", "bmp", "tif", "tiff", "avif", "heic", "heif"]
-            .iter().any(|s| e.eq_ignore_ascii_case(s))
+        [
+            "jpg", "jpeg", "png", "webp", "gif", "bmp", "tif", "tiff", "avif", "heic", "heif",
+        ]
+        .iter()
+        .any(|s| e.eq_ignore_ascii_case(s))
     })
 }
 

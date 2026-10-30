@@ -10,6 +10,7 @@ pub(super) struct Controls {
     time: gtk::Label,
     volume: gtk::Scale,
     mute: gtk::ToggleButton,
+    loop_button: gtk::ToggleButton,
     stream: Rc<std::cell::RefCell<Option<gtk::MediaStream>>>,
     updating: Rc<Cell<bool>>,
     scrubbing: Rc<Cell<bool>>,
@@ -88,6 +89,17 @@ impl Controls {
         fullscreen.add_css_class("flat");
         fullscreen.set_tooltip_text(Some("Toggle fullscreen"));
         fullscreen.set_action_name(Some("win.fullscreen"));
+
+        let loop_button = gtk::ToggleButton::new();
+        loop_button.set_icon_name("media-playlist-repeat-symbolic");
+        loop_button.add_css_class("flat");
+        loop_button.set_tooltip_text(Some("Repeat current video"));
+        let current = stream.clone();
+        loop_button.connect_toggled(move |button| {
+            if let Some(media) = current.borrow().as_ref() {
+                media.set_loop(button.is_active());
+            }
+        });
 
         let position = gtk::Scale::with_range(gtk::Orientation::Horizontal, 0.0, 1.0, 0.001);
         position.set_hexpand(true);
@@ -181,11 +193,12 @@ impl Controls {
             time.upcast_ref(),
             mute.upcast_ref(),
             volume.upcast_ref(),
+            loop_button.upcast_ref(),
             fullscreen.upcast_ref(),
         ] {
             bar.append(child);
         }
-        let result = Self { bar, play, position, time, volume, mute, stream, updating, scrubbing, pointer_over, alive, last_activity };
+        let result = Self { bar, play, position, time, volume, mute, loop_button, stream, updating, scrubbing, pointer_over, alive, last_activity };
         let refresh = result.clone();
         glib::MainContext::default().spawn_local(async move {
             while refresh.alive.get() {
@@ -264,6 +277,7 @@ impl Controls {
         if let Some(media) = self.stream.borrow().as_ref() {
             media.set_volume(self.volume.value());
             media.set_muted(self.mute.is_active());
+            media.set_loop(self.loop_button.is_active());
         } else {
             self.time.set_text("0:00 / --:--");
         }

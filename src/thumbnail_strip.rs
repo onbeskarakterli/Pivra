@@ -412,11 +412,7 @@ impl ThumbnailStrip {
                     index: Rc::new(Cell::new(*index)),
                     path: path.clone(),
                     widgets: None,
-                    phase: if pivra::discovery::candidate_kind(path) == Some(pivra::media::MediaKind::Video) {
-                        Phase::Ready
-                    } else {
-                        Phase::Pending
-                    },
+                    phase: Phase::Pending,
                     texture: None,
                     keys: None,
                     cost: 0,
@@ -424,10 +420,7 @@ impl ThumbnailStrip {
                     failure_retries: 0,
                 });
                 entry.index.set(*index);
-                if pivra::discovery::candidate_kind(path) == Some(pivra::media::MediaKind::Video) {
-                    entry.phase = Phase::Ready;
-                    entry.texture = None;
-                } else if entry.phase == Phase::Loading {
+                if entry.phase == Phase::Loading {
                     entry.phase = Phase::Pending;
                 }
                 next.push(entry);
@@ -753,11 +746,7 @@ impl Inner {
                 .iter_mut()
                 .filter(|e| dirty.contains(&e.path))
             {
-                e.phase = if pivra::discovery::candidate_kind(&e.path) == Some(pivra::media::MediaKind::Video) {
-                    Phase::Ready
-                } else {
-                    Phase::Pending
-                };
+                e.phase = Phase::Pending;
                 e.failure_retries = 0;
                 e.texture = None;
                 e.keys = None;
@@ -857,7 +846,7 @@ impl Inner {
                     == Some(pivra::media::MediaKind::Video);
                 // Until video frame previews are implemented, video cells use
                 // one deterministic placeholder, regardless of cache state.
-                picture.set_visible(!is_video);
+                picture.set_visible(true);
                 // The photo is the base child, not an unmeasured overlay.
                 // Badge, selection and loading indicators remain overlays.
                 content.set_child(Some(&picture));

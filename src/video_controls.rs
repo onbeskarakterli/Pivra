@@ -158,11 +158,16 @@ impl Controls {
 
         let time = gtk::Label::new(Some("0:00 / --:--"));
         time.add_css_class("dim-label");
+        let (saved_volume, saved_muted) = pivra::settings::load_video_audio();
         let mute = gtk::ToggleButton::new();
-        mute.set_icon_name("audio-volume-high-symbolic");
+        mute.set_icon_name(if saved_muted { "audio-volume-muted-symbolic" } else { "audio-volume-high-symbolic" });
+        mute.set_active(saved_muted);
         mute.add_css_class("flat");
         let current = stream.clone();
+        let remembered_volume = Rc::new(Cell::new(saved_volume));
+        let volume_for_mute = remembered_volume.clone();
         mute.connect_toggled(move |button| {
+            pivra::settings::save_video_audio(volume_for_mute.get(), button.is_active());
             if let Some(media) = current.borrow().as_ref() {
                 media.set_muted(button.is_active());
             }
@@ -175,9 +180,13 @@ impl Controls {
         let volume = gtk::Scale::with_range(gtk::Orientation::Horizontal, 0.0, 1.0, 0.01);
         volume.set_size_request(96, -1);
         volume.set_draw_value(false);
-        volume.set_value(1.0);
+        volume.set_value(saved_volume);
         let current = stream.clone();
+        let remembered = remembered_volume.clone();
+        let mute_for_volume = mute.clone();
         volume.connect_value_changed(move |scale| {
+            remembered.set(scale.value());
+            pivra::settings::save_video_audio(scale.value(), mute_for_volume.is_active());
             if let Some(media) = current.borrow().as_ref() {
                 media.set_volume(scale.value());
             }

@@ -202,16 +202,21 @@ pub(super) fn start(
         let probe_controls = controls.clone();
         let probe_generation = generation.clone();
         let probe_path = path.clone();
+        let probe_cancel = cancelled.clone();
         glib::MainContext::default().spawn_local(async move {
             let mut probe_loader = glycin::Loader::new(gio::File::for_path(&probe_path));
             probe_loader.sandbox_selector(glycin::SandboxSelector::Bwrap);
+            probe_loader.cancellable(probe_cancel.clone());
             probe_loader.apply_transformations(true);
             probe_loader.use_expose_base_dir(false);
             let Ok(probe) = probe_loader.load().await else { return; };
             let mut durations = Vec::new();
             let mut reached_end = false;
             for index in 0..2048 {
-                if probe_generation.get() != expected { return; }
+                if probe_generation.get() != expected || probe_cancel.is_cancelled() {
+                    probe_cancel.cancel();
+                    return;
+                }
                 match probe.specific_frame(glycin::FrameRequest::new().loop_animation(false)).await {
                     Ok(frame) => match frame.delay() {
                         Some(delay) => durations.push(delay.as_secs_f64().clamp(0.02, 10.0)),
@@ -233,15 +238,18 @@ pub(super) fn start(
         });
 
         let Ok(mut image) = open_image().load().await else { return; };
-        let Ok(mut frame) = image.next_frame().await else { return; };
+        let Ok(first_frame) = image.next_frame().await else { return; };
         let canvas_width = image.details().width();
         let canvas_height = image.details().height();
         let webp = path.extension().and_then(|extension| extension.to_str())
             .is_some_and(|extension| extension.eq_ignore_ascii_case("webp"));
-        let Some(mut delay) = frame.delay() else {
+        let Some(mut delay) = first_frame.delay() else {
             controls.bar.set_visible(false);
             return;
         };
+        // The initial frame is already displayed by the foreground loader.
+        // Drop its decoded buffer instead of retaining it for the entire animation.
+        drop(first_frame);
         let mut frame_index = 0usize;
         let mut elapsed = 0.0f64;
         loop {
@@ -279,16 +287,15 @@ pub(super) fn start(
                             }
                         }
                         if let Some(next) = found {
-                            frame = next;
                             frame_index = target_index;
                             elapsed = offset;
-                            delay = frame.delay().unwrap_or(Duration::from_millis(100));
+                            delay = next.delay().unwrap_or(Duration::from_millis(100));
                             if let Some(picture) = picture.upgrade() {
-                                if frame_is_valid(&frame)
-                                    && (!webp || (frame.width() == canvas_width
-                                        && frame.height() == canvas_height))
+                                if frame_is_valid(&next)
+                                    && (!webp || (next.width() == canvas_width
+                                        && next.height() == canvas_height))
                                 {
-                                    let next = frame.texture();
+                                    let next = next.texture();
                                     let mode = mode_action.state()
                                         .and_then(|v| v.str().and_then(ViewMode::from_id))
                                         .unwrap_or_default();

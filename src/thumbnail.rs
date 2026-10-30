@@ -5,7 +5,6 @@ use gtk::{gio, prelude::*};
 use std::{
     fs,
     io::Read,
-    os::unix::fs::MetadataExt,
     path::{Path, PathBuf},
     process::{Command, Stdio},
     sync::{

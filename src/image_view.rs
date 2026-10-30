@@ -119,6 +119,14 @@ impl ImageView {
         window.connect_destroy(move |_| closing_controls.shutdown());
         overlay.add_overlay(&video_controls.bar);
         overlay.set_measure_overlay(&video_controls.bar, false);
+        let motion = gtk::EventControllerMotion::new();
+        let reveal = video_controls.clone();
+        motion.connect_motion(move |_, _, _| reveal.reveal());
+        overlay.add_controller(motion);
+        let leave = gtk::EventControllerMotion::new();
+        let reveal = video_controls.clone();
+        leave.connect_enter(move |_, _, _| reveal.reveal());
+        video_controls.bar.add_controller(leave);
         // The thumbnail controls are bottom-aligned overlay siblings. Their
         // bottom margin already accounts for the strip's visible height.
         // Keep the timeline directly above their allocated button height.
@@ -334,6 +342,12 @@ impl ImageView {
     #[allow(dead_code)] // Some standalone view probes never display a non-image selection.
     pub(super) fn show_message(&self, message: &str) {
         self.prepare(message, true);
+    }
+    pub(super) fn video_key(&self, key: gtk::gdk::Key, ctrl: bool) -> bool {
+        self.video_controls.handle_key(key, ctrl)
+    }
+    pub(super) fn video_pointer_motion(&self) {
+        self.video_controls.reveal();
     }
     pub(super) fn load_video(&self, path: &std::path::Path) {
         self.prepare("", true);

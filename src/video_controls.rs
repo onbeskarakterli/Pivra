@@ -213,7 +213,9 @@ impl Controls {
         glib::MainContext::default().spawn_local(async move {
             while refresh.alive.get() {
                 glib::timeout_future(Duration::from_millis(150)).await;
-                let fullscreen = window_ref.upgrade().is_some_and(|window| window.is_fullscreen());
+                let (fullscreen, maximized) = window_ref.upgrade()
+                    .map(|window| (window.is_fullscreen(), window.is_maximized()))
+                    .unwrap_or((false, false));
                 let hide_after = if fullscreen {
                     Duration::from_secs(1)
                 } else {
@@ -225,7 +227,7 @@ impl Controls {
                 let media = refresh.stream.borrow().clone();
                 if let Some(media) = media.as_ref() {
                     // A paused fullscreen video keeps its controls visible.
-                    if fullscreen && !media.is_playing() {
+                    if (fullscreen && !media.is_playing()) || (!fullscreen && maximized) {
                         refresh.bar.set_visible(true);
                     } else if !refresh.scrubbing.get()
                         && (fullscreen || !refresh.pointer_over.get())

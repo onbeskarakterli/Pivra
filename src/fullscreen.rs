@@ -134,9 +134,9 @@ pub(crate) fn install(
         } else if count == 1 {
             let video_ref = video_ref.clone();
             let pending = pending_click.clone();
-            // Keep single-click response quick. Double-clicks slower than 200 ms
+            // Keep single-click response quick. Double-clicks slower than 300 ms
             // may still trigger playback before fullscreen.
-            let id = glib::timeout_add_local_once(Duration::from_millis(200), move || {
+            let id = glib::timeout_add_local_once(Duration::from_millis(300), move || {
                 pending.borrow_mut().take();
                 if let Some(video) = video_ref.upgrade() {
                     if !video.is_visible() {

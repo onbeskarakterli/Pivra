@@ -849,10 +849,8 @@ impl FolderWatch {
                     }
                     state.view.set_neighbors(context.collection.photo_neighbors());
                     if catalog_changed {
-                        // set_catalog advances the thumbnail epoch and schedules
-                        // new entries. A second invalidate immediately cancels
-                        // restored thumbnails before they can be published.
                         update_thumbnail_catalog(&state.view, &context);
+                        state.view.invalidate_thumbnails();
                     }
                     state.view.finish_initial_thumbnail_catalog(context.collection.selected_index());
                     let count = context.collection.items().len();

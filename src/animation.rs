@@ -6,7 +6,7 @@ use std::{
     cell::{Cell, RefCell},
     path::PathBuf,
     rc::Rc,
-    time::Duration,
+    time::{Duration, Instant},
 };
 
 #[derive(Clone)]
@@ -305,10 +305,19 @@ pub(super) fn start(
             while remaining > 0.0 || controls.paused.get() {
                 if generation.get() != expected { cancelled.cancel(); return; }
                 if controls.seek.get().is_some() { break; }
-                glib::timeout_future(Duration::from_millis(5)).await;
+                // Sleep close to the next frame deadline instead of polling
+                // every 5 ms. Bound the sleep so pause/speed/seek controls
+                // remain responsive even on long-duration frames.
+                let rate = controls.speed.get().clamp(0.25, 4.0);
+                let sleep = if controls.paused.get() {
+                    Duration::from_millis(40)
+                } else {
+                    Duration::from_secs_f64((remaining / rate).clamp(0.001, 0.04))
+                };
+                let started = Instant::now();
+                glib::timeout_future(sleep).await;
                 if !controls.paused.get() {
-                    let rate = controls.speed.get();
-                    remaining -= 0.005 * rate;
+                    remaining -= started.elapsed().as_secs_f64() * controls.speed.get();
                     if timeline_ready {
                         let current = elapsed + (delay.as_secs_f64() - remaining.max(0.0)).min(delay.as_secs_f64());
                         controls.show_progress(current / total);

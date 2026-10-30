@@ -840,10 +840,16 @@ impl Inner {
                 let spinner = gtk::Spinner::new();
                 spinner.set_halign(gtk::Align::Center);
                 spinner.set_valign(gtk::Align::Center);
-                let icon = gtk::Image::from_icon_name("image-x-generic-symbolic");
+                let is_video = pivra::discovery::candidate_kind(&entry.path)
+                    == Some(pivra::media::MediaKind::Video);
+                let icon = gtk::Image::from_icon_name(if is_video {
+                    "video-x-generic-symbolic"
+                } else {
+                    "image-x-generic-symbolic"
+                });
                 icon.set_halign(gtk::Align::Center);
                 icon.set_valign(gtk::Align::Center);
-                icon.set_visible(entry.phase != Phase::Ready);
+                icon.set_visible(is_video || entry.phase != Phase::Ready);
                 icon.set_can_target(false);
                 spinner.set_can_target(false);
                 for child in [

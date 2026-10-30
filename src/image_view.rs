@@ -113,6 +113,8 @@ impl ImageView {
         overlay.add_overlay(&animation_controls.bar);
         overlay.set_measure_overlay(&animation_controls.bar, false);
         let video_controls = video_controls::Controls::new();
+        let closing_controls = video_controls.clone();
+        window.connect_destroy(move |_| closing_controls.shutdown());
         overlay.add_overlay(&video_controls.bar);
         overlay.set_measure_overlay(&video_controls.bar, false);
         // The thumbnail controls are bottom-aligned overlay siblings. Their

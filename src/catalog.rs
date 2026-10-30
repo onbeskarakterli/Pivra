@@ -298,7 +298,7 @@ mod neighbor_tests {
             MediaItem::new("4.jpg", MediaKind::Image),
             MediaItem::new("10.PNG", MediaKind::Image),
         ]);
-        assert_eq!(c.photo_neighbors(), vec![std::path::PathBuf::from("4.jpg")]);
+        assert_eq!(c.photo_neighbors(), vec![std::path::PathBuf::from("3.webp")]);
         c.select(3);
         assert_eq!(
             c.photo_neighbors(),
@@ -334,6 +334,8 @@ mod photo_navigation_tests {
             MediaItem::new("11.mp4", Video),
         ];
         let mut c = MediaCollection::new(items.clone());
+        assert!(c.select_photo(true));
+        assert_eq!(c.selected_index(), Some(3));
         assert!(c.select_photo(true));
         assert_eq!(c.selected_index(), Some(4));
         assert!(!c.select_photo(true));

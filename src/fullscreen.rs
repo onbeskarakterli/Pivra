@@ -11,6 +11,7 @@ fn request(window: &adw::ApplicationWindow, pending: &Cell<Option<bool>>, target
 pub(crate) fn install(
     window: &adw::ApplicationWindow,
     picture: &gtk::Picture,
+    video: &gtk::Picture,
     chrome: &[gtk::Widget],
 ) {
     let pending = Rc::new(Cell::new(None));
@@ -85,31 +86,33 @@ pub(crate) fn install(
     });
     window.add_controller(keys);
 
-    // Only Picture receives this gesture: overlay siblings and chrome are not
-    // descendants, so their button/menu/thumbnail events cannot bubble here.
-    let click = gtk::GestureClick::new();
-    click.set_button(1);
-    click.set_propagation_phase(gtk::PropagationPhase::Capture);
-    let drag = picture
-        .observe_controllers()
-        .iter::<glib::Object>()
-        .filter_map(Result::ok)
-        .find_map(|c| c.downcast::<gtk::GestureDrag>().ok());
-    picture.add_controller(click.clone());
-    if let Some(drag) = &drag {
-        click.group_with(drag);
-    }
-    let weak = window.downgrade();
-    click.connect_pressed(move |gesture, count, _, _| {
-        if count != 2 {
-            return;
+    // Attach only to the media surfaces, not to playback controls or the
+    // thumbnail strip. Toggling fullscreen never calls play(), pause() or seek().
+    for surface in [picture, video] {
+        let click = gtk::GestureClick::new();
+        click.set_button(1);
+        click.set_propagation_phase(gtk::PropagationPhase::Capture);
+        let drag = surface
+            .observe_controllers()
+            .iter::<glib::Object>()
+            .filter_map(Result::ok)
+            .find_map(|c| c.downcast::<gtk::GestureDrag>().ok());
+        surface.add_controller(click.clone());
+        if let Some(drag) = &drag {
+            click.group_with(drag);
         }
-        if let Some(window) = weak.upgrade() {
-            gesture.set_state(gtk::EventSequenceState::Claimed);
-            if let Some(drag) = &drag {
-                drag.reset();
+        let weak = window.downgrade();
+        click.connect_pressed(move |gesture, count, _, _| {
+            if count != 2 {
+                return;
             }
-            gio::prelude::ActionGroupExt::activate_action(&window, "fullscreen", None);
-        }
-    });
+            if let Some(window) = weak.upgrade() {
+                gesture.set_state(gtk::EventSequenceState::Claimed);
+                if let Some(drag) = &drag {
+                    drag.reset();
+                }
+                gio::prelude::ActionGroupExt::activate_action(&window, "fullscreen", None);
+            }
+        });
+    }
 }

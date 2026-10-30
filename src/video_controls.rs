@@ -12,6 +12,7 @@ pub(super) struct Controls {
     mute: gtk::ToggleButton,
     stream: Rc<std::cell::RefCell<Option<gtk::MediaStream>>>,
     updating: Rc<Cell<bool>>,
+    alive: Rc<Cell<bool>>,
 }
 
 fn clock(us: i64) -> String {
@@ -23,6 +24,7 @@ impl Controls {
     pub fn new() -> Self {
         let stream: Rc<std::cell::RefCell<Option<gtk::MediaStream>>> = Rc::default();
         let updating = Rc::new(Cell::new(false));
+        let alive = Rc::new(Cell::new(true));
         let bar = gtk::Box::new(gtk::Orientation::Horizontal, 8);
         bar.add_css_class("pivra-animation-controls");
         bar.set_halign(gtk::Align::Fill);
@@ -91,10 +93,10 @@ impl Controls {
         ] {
             bar.append(child);
         }
-        let result = Self { bar, play, position, time, volume, mute, stream, updating };
+        let result = Self { bar, play, position, time, volume, mute, stream, updating, alive };
         let refresh = result.clone();
         glib::MainContext::default().spawn_local(async move {
-            loop {
+            while refresh.alive.get() {
                 glib::timeout_future(Duration::from_millis(150)).await;
                 if let Some(media) = refresh.stream.borrow().as_ref() {
                     refresh.play.set_icon_name(if media.is_playing() {
@@ -115,12 +117,14 @@ impl Controls {
                     } else { 0.0 });
                     refresh.updating.set(false);
                 }
-                if refresh.bar.root().is_none() && refresh.bar.is_visible() {
-                    break;
-                }
             }
         });
         result
+    }
+
+    pub fn shutdown(&self) {
+        self.alive.set(false);
+        self.attach(None);
     }
 
     pub fn attach(&self, media: Option<gtk::MediaStream>) {

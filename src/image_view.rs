@@ -31,6 +31,8 @@ pub(super) struct ImageView {
     picture: gtk::Picture,
     video: gtk::Picture,
     video_stream: Rc<RefCell<Option<gtk::MediaFile>>>,
+    video_path: Rc<RefCell<Option<PathBuf>>>,
+    video_positions: Rc<RefCell<std::collections::HashMap<PathBuf, i64>>>,
 
     video_controls: video_controls::Controls,
     status: gtk::Label,
@@ -73,6 +75,8 @@ impl ImageView {
         video.set_content_fit(gtk::ContentFit::Contain);
         video.set_visible(false);
         let video_stream: Rc<RefCell<Option<gtk::MediaFile>>> = Rc::default();
+        let video_path = Rc::default();
+        let video_positions = Rc::default();
         overlay.add_overlay(&video);
         overlay.set_measure_overlay(&video, false);
         overlay.add_overlay(&status);
@@ -278,6 +282,8 @@ impl ImageView {
             thumbnail_strip,
             video,
             video_stream,
+            video_path,
+            video_positions,
             mode_action,
             prefetch,
             phase,
@@ -350,6 +356,21 @@ impl ImageView {
         self.prepare("", true);
         let media = gtk::MediaFile::for_filename(path);
         media.set_loop(false);
+        let resume_at = self.video_positions.borrow().get(path).copied().unwrap_or(0);
+        if resume_at > 0 {
+            // MediaFile prepares asynchronously; a seek before preparation
+            // may be ignored. Apply the stored timestamp once prepared.
+            let stream = media.clone();
+            media.connect_notify_local(Some("prepared"), move |media, _| {
+                if media.is_prepared() && stream.is_seekable() {
+                    let duration = stream.duration();
+                    if duration > 0 && resume_at < duration {
+                        stream.seek(resume_at);
+                    }
+                }
+            });
+        }
+        self.video_path.replace(Some(path.to_owned()));
         self.video.set_paintable(Some(&media));
         self.video_stream.replace(Some(media.clone()));
         self.video.set_visible(true);
@@ -358,8 +379,15 @@ impl ImageView {
     }
     fn stop_video(&self) {
         self.video_controls.attach(None);
+        let path = self.video_path.borrow_mut().take();
         if let Some(stream) = self.video_stream.borrow_mut().take() {
             stream.pause();
+            if let Some(path) = path {
+                let timestamp = stream.timestamp();
+                if stream.is_prepared() && timestamp > 0 && timestamp < stream.duration() {
+                    self.video_positions.borrow_mut().insert(path, timestamp);
+                }
+            }
             stream.clear();
         }
         self.video.set_visible(false);

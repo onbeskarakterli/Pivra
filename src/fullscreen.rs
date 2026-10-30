@@ -61,7 +61,9 @@ pub(crate) fn install(
             gdk::Key::Escape => {
                 // A second Escape closes even if the compositor has not yet
                 // acknowledged the first request to leave fullscreen.
-                if pending.get() == Some(false) || (!window.is_fullscreen() && pending.get() != Some(true)) {
+                if pending.get() == Some(false)
+                    || (!window.is_fullscreen() && pending.get() != Some(true))
+                {
                     window.close();
                 } else {
                     request(&window, &pending, false);

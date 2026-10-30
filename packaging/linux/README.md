@@ -1,5 +1,33 @@
 # Building Pivra from source on Linux (experimental)
 
+## Common Makefile interface (development branch)
+
+From the repository root:
+
+```bash
+make check             # Inspect local build prerequisites
+make deps              # Install distro packages using pacman/dnf/apt (sudo)
+make build             # Build Rust viewer and GNOME native helper
+make test              # Rust tests
+make stage DESTDIR=/tmp/pivra-stage PREFIX=/usr
+sudo make install PREFIX=/usr
+```
+
+`make deps` requires the user's package-manager confirmation and does not
+install packages without being explicitly requested. Arch, Fedora and
+Debian/Ubuntu package names are provided as a starting point, but **none of the
+non-Arch dependency recipes has been tested**. openSUSE is intentionally
+check-only pending confirmation of its current package naming. Older
+Ubuntu/Debian releases may not supply GTK 4.16 or Rust 1.85; in that case
+the script reports a failure rather than claiming compatibility.
+
+`make build` reuses the previously Arch-tested
+`packaging/linux/build-install.sh` implementation. The staged install
+does not modify the host. `make install` installs files manually; it is not
+tracked by apt/dnf/pacman/zypper and does not ship complete third-party
+corresponding-source material required for redistributing binary packages.
+
+
 This workflow is for Linux distributions other than Arch Linux and is **not yet
 validated on Fedora, Ubuntu, Debian, or openSUSE**. The only completed native
 distribution acceptance so far is on Arch/GNOME. The source script is on

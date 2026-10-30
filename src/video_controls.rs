@@ -25,7 +25,7 @@ fn clock(us: i64) -> String {
 }
 
 impl Controls {
-    pub fn new() -> Self {
+    pub fn new(window: &adw::ApplicationWindow) -> Self {
         let stream: Rc<std::cell::RefCell<Option<gtk::MediaStream>>> = Rc::default();
         let updating = Rc::new(Cell::new(false));
         let scrubbing = Rc::new(Cell::new(false));
@@ -209,12 +209,11 @@ impl Controls {
         }
         let result = Self { bar, play, position, time, volume, mute, loop_button, stream, updating, scrubbing, pointer_over, alive, last_activity };
         let refresh = result.clone();
+        let window_ref = window.downgrade();
         glib::MainContext::default().spawn_local(async move {
             while refresh.alive.get() {
                 glib::timeout_future(Duration::from_millis(150)).await;
-                let fullscreen = refresh.bar.root()
-                    .and_then(|root| root.downcast::<gtk::Window>().ok())
-                    .is_some_and(|window| window.is_fullscreen());
+                let fullscreen = window_ref.upgrade().is_some_and(|window| window.is_fullscreen());
                 let hide_after = if fullscreen {
                     Duration::from_secs(1)
                 } else {

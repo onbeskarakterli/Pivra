@@ -313,6 +313,7 @@ pub(super) fn build(app: &adw::Application, settings: &Settings, file: Option<Op
         fullscreen::install(
             &window,
             &picture,
+            view.video_widget(),
             &[header.clone().upcast(), banner.clone().upcast()],
         );
         let menu = gio::Menu::new();

@@ -69,11 +69,11 @@ fn update_navigation_actions(window: &adw::ApplicationWindow, context: &FileCont
     for (name, enabled) in [
         (
             "previous-media",
-            context.collection.photo_target(false).is_some(),
+            context.collection.selected_index().map_or(!context.collection.items().is_empty(), |i| i > 0),
         ),
         (
             "next-media",
-            context.collection.photo_target(true).is_some(),
+            context.collection.selected_index().map_or(!context.collection.items().is_empty(), |i| i + 1 < context.collection.items().len()),
         ),
     ] {
         if let Some(action) = window
@@ -234,7 +234,6 @@ fn update_thumbnail_catalog(view: &ImageView, context: &FileContext) {
         .items()
         .iter()
         .enumerate()
-        .filter(|(_, item)| item.kind() == MediaKind::Image)
         .map(|(index, item)| (index, item.path().to_owned()))
         .collect();
     view.set_thumbnail_catalog(&photos, context.collection.selected_index());
@@ -465,7 +464,11 @@ pub(super) fn build(app: &adw::Application, settings: &Settings, file: Option<Op
                     return;
                 };
                 let mut context = context.borrow_mut();
-                let changed = context.collection.select_photo(forward);
+                let changed = if forward {
+                    context.collection.select_next()
+                } else {
+                    context.collection.select_previous()
+                };
                 if changed {
                     context.revision = context.revision.wrapping_add(1);
                     banner.set_reveal_child(false);

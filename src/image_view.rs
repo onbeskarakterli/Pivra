@@ -98,6 +98,33 @@ impl ImageView {
         let animation_controls = animation::Controls::new();
         overlay.add_overlay(&animation_controls.bar);
         overlay.set_measure_overlay(&animation_controls.bar, false);
+        // The timeline occupies only the center, and follows the strip's
+        // visibility and user-resized height without overlapping thumbnails.
+        let mut child = overlay.first_child();
+        while let Some(widget) = child {
+            if widget.widget_name() == "thumbnail-strip" {
+                if let Ok(strip) = widget.downcast::<gtk::ScrolledWindow>() {
+                    let controls = animation_controls.bar.downgrade();
+                    let align = move |strip: &gtk::ScrolledWindow| {
+                        if let Some(bar) = controls.upgrade() {
+                            let offset = if strip.is_visible() {
+                                strip.height_request().max(0) + 8
+                            } else {
+                                8
+                            };
+                            bar.set_margin_bottom(offset);
+                        }
+                    };
+                    align(&strip);
+                    let align = Rc::new(align);
+                    let visibility = align.clone();
+                    strip.connect_notify_local(Some("visible"), move |strip, _| visibility(strip));
+                    strip.connect_notify_local(Some("height-request"), move |strip, _| align(strip));
+                }
+                break;
+            }
+            child = widget.next_sibling();
+        }
         let animation_generation = Rc::new(Cell::new(0_u64));
         for signal in [false, true] {
             let generation = animation_generation.clone();

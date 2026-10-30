@@ -213,11 +213,11 @@ fn install_navigation_arrows(overlay: &gtk::Overlay) {
         };
         let width = widget.width() as f64;
         if let Some(button) = left.upgrade() {
-            let edge = f64::from(button.width_request()) + 44.0;
+            let edge = f64::from(button.width_request()) * 1.55;
             button.set_visible(x <= edge && button.is_sensitive());
         }
         if let Some(button) = right.upgrade() {
-            let edge = f64::from(button.width_request()) + 44.0;
+            let edge = f64::from(button.width_request()) * 1.55;
             button.set_visible(x >= width - edge && button.is_sensitive());
         }
     });

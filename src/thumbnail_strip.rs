@@ -412,7 +412,11 @@ impl ThumbnailStrip {
                     index: Rc::new(Cell::new(*index)),
                     path: path.clone(),
                     widgets: None,
-                    phase: Phase::Pending,
+                    phase: if pivra::discovery::candidate_kind(path) == Some(pivra::media::MediaKind::Video) {
+                        Phase::Ready
+                    } else {
+                        Phase::Pending
+                    },
                     texture: None,
                     keys: None,
                     cost: 0,
@@ -420,7 +424,10 @@ impl ThumbnailStrip {
                     failure_retries: 0,
                 });
                 entry.index.set(*index);
-                if entry.phase == Phase::Loading {
+                if pivra::discovery::candidate_kind(path) == Some(pivra::media::MediaKind::Video) {
+                    entry.phase = Phase::Ready;
+                    entry.texture = None;
+                } else if entry.phase == Phase::Loading {
                     entry.phase = Phase::Pending;
                 }
                 next.push(entry);
@@ -746,7 +753,11 @@ impl Inner {
                 .iter_mut()
                 .filter(|e| dirty.contains(&e.path))
             {
-                e.phase = Phase::Pending;
+                e.phase = if pivra::discovery::candidate_kind(&e.path) == Some(pivra::media::MediaKind::Video) {
+                    Phase::Ready
+                } else {
+                    Phase::Pending
+                };
                 e.failure_retries = 0;
                 e.texture = None;
                 e.keys = None;
@@ -813,6 +824,8 @@ impl Inner {
                 button.set_widget_name(&format!("thumbnail-cell-{}", entry.index.get()));
 
                 let content = gtk::Overlay::new();
+                content.set_size_request(cell_width, cell_height);
+                content.set_overflow(gtk::Overflow::Hidden);
                 let selection = gtk::Frame::new(None);
                 selection.add_css_class("pivra-thumbnail-selection");
                 selection.set_halign(gtk::Align::Center);
@@ -877,6 +890,7 @@ impl Inner {
                     badge.set_margin_end(4);
                     badge.set_margin_bottom(4);
                     badge.set_can_target(false);
+                    badge.set_max_width_chars(6);
                     content.add_overlay(&badge);
                     content.set_measure_overlay(&badge, false);
                     content.set_clip_overlay(&badge, true);

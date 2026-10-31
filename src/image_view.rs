@@ -312,6 +312,7 @@ impl ImageView {
         }
     }
 
+    #[allow(dead_code)] // Used by the fullscreen thumbnail probe.
     pub(super) fn video_widget(&self) -> &gtk::Picture {
         &self.video
     }
@@ -364,9 +365,11 @@ impl ImageView {
     pub(super) fn show_message(&self, message: &str) {
         self.prepare(message, true);
     }
+    #[allow(dead_code)] // Standalone image probes do not handle video keyboard input.
     pub(super) fn video_key(&self, key: gtk::gdk::Key, ctrl: bool) -> bool {
         self.video_controls.handle_key(key, ctrl)
     }
+    #[allow(dead_code)] // Standalone image probes do not open videos.
     pub(super) fn load_video(&self, path: &std::path::Path) {
         self.prepare("", true);
         let media = gtk::MediaFile::for_filename(path);

@@ -31,6 +31,7 @@ pub(super) struct ImageView {
     picture: gtk::Picture,
     video: gtk::Picture,
     video_stream: Rc<RefCell<Option<gtk::MediaFile>>>,
+    video_transform: Rc<RefCell<Transform>>,
     video_path: Rc<RefCell<Option<PathBuf>>>,
     video_positions: Rc<RefCell<std::collections::HashMap<PathBuf, i64>>>,
 
@@ -72,7 +73,9 @@ impl ImageView {
         let video = gtk::Picture::new();
         video.set_hexpand(true);
         video.set_vexpand(true);
-        video.set_content_fit(gtk::ContentFit::Contain);
+        video.set_content_fit(gtk::ContentFit::Fill);
+        video.set_can_shrink(true);
+        video.set_overflow(gtk::Overflow::Hidden);
         video.set_visible(false);
         let video_stream: Rc<RefCell<Option<gtk::MediaFile>>> = Rc::default();
         let video_path = Rc::default();
@@ -227,6 +230,14 @@ impl ImageView {
         let transform = Rc::new(RefCell::new(Transform::default()));
         let filter = Rc::new(Cell::new(Resampling::default()));
         let zoom_wheel = Rc::new(Cell::new(false));
+        let video_transform = Rc::new(RefCell::new(Transform::default()));
+        install_video_interaction(
+            &video,
+            video_stream.clone(),
+            video_transform.clone(),
+            &mode_action,
+            zoom_wheel.clone(),
+        );
         install_interaction(
             &picture,
             texture.clone(),
@@ -239,11 +250,23 @@ impl ImageView {
         let weak_picture = picture.downgrade();
         let current_texture = texture.clone();
         let mode_filter = filter.clone();
+        let mode_video = video.downgrade();
+        let mode_video_transform = video_transform.clone();
         mode_action.connect_activate(move |action, parameter| {
             let Some(mode) = parameter.and_then(|v| v.str()).and_then(ViewMode::from_id) else {
                 return;
             };
             mode_transform.borrow_mut().reset();
+            mode_video_transform.borrow_mut().reset();
+            if let Some(video) = mode_video.upgrade() {
+                if let Some(paintable) = video
+                    .paintable()
+                    .and_then(|p| p.downcast::<actual_paintable::ActualPaintable>().ok())
+                {
+                    paintable.set_mode(mode);
+                    paintable.invalidate_contents();
+                }
+            }
             action.set_state(&mode.id().to_variant());
             pivra::settings::save_view_mode(mode);
             if let Some(picture) = weak_picture.upgrade() {
@@ -296,6 +319,7 @@ impl ImageView {
             thumbnail_strip,
             video,
             video_stream,
+            video_transform,
             video_path,
             video_positions,
             mode_action,
@@ -316,6 +340,47 @@ impl ImageView {
     }
 
     #[allow(dead_code)] // Used by the fullscreen thumbnail probe.
+    /// Capture the current animation texture or the live video frame, not the zoomed UI.
+    pub(super) fn capture_frame(
+        &self,
+        path: &std::path::Path,
+    ) -> Result<gtk::gdk::Texture, String> {
+        if self.video_path.borrow().as_deref() == Some(path) {
+            let stream = self.video_stream.borrow();
+            let media = stream.as_ref().ok_or("Video is not ready")?;
+            if !media.is_prepared() {
+                return Err("Video frame is not ready".into());
+            }
+            // MediaFile::current_image() may return an empty placeholder for
+            // GStreamer-backed video even while the Picture is rendering frames.
+            // Snapshot the live MediaFile paintable instead of its static image.
+            let width = media.intrinsic_width();
+            let height = media.intrinsic_height();
+            if width <= 0 || height <= 0 {
+                return Err("Video frame dimensions are unavailable".into());
+            }
+            let snapshot = gtk::Snapshot::new();
+            gtk::gdk::prelude::PaintableExt::snapshot(
+                media,
+                &snapshot,
+                f64::from(width),
+                f64::from(height),
+            );
+            let node = snapshot.to_node().ok_or("No video frame available")?;
+            let window = self.window.upgrade().ok_or("Window is closed")?;
+            let renderer = window.renderer().ok_or("Video renderer is unavailable")?;
+            return Ok(renderer.render_texture(&node, None));
+        }
+        if self.requested.borrow().as_deref() == Some(path) && animation::is_animated_file(path) {
+            return self
+                .texture
+                .borrow()
+                .clone()
+                .ok_or("Animation frame is not ready".into());
+        }
+        Err("Frame capture is only available for videos and animations".into())
+    }
+
     pub(super) fn video_widget(&self) -> &gtk::Picture {
         &self.video
     }
@@ -402,8 +467,20 @@ impl ImageView {
             }
         }
         self.video_path.replace(Some(path.to_owned()));
-        self.video.set_paintable(Some(&media));
+        self.video_transform.borrow_mut().reset();
+        let mode = self
+            .mode_action
+            .state()
+            .and_then(|state| state.str().and_then(ViewMode::from_id))
+            .unwrap_or(ViewMode::Fit);
+        self.video
+            .set_paintable(Some(&actual_paintable::ActualPaintable::video(
+                &media,
+                self.video_transform.clone(),
+                mode,
+            )));
         self.video_stream.replace(Some(media.clone()));
+        self.mode_action.set_enabled(true);
         self.video.set_visible(true);
         self.video_controls
             .attach(Some(media.clone().upcast::<gtk::MediaStream>()));
@@ -676,6 +753,7 @@ impl ImageView {
                         let (decoded, key) = match output {
                             preload::Output::Decoded(frame, key) => (frame.texture(), key),
                             preload::Output::Cached(texture, key) => (texture, Some(key)),
+                            preload::Output::Raw(texture, key) => (texture, key),
                         };
                         let cost = texture_cost(decoded.width() as u32, decoded.height() as u32);
                         {
@@ -788,6 +866,137 @@ impl ImageView {
 }
 
 /// Attached only to the photo widget: header/menu/banner events never enter here.
+/// Video uses GTK's current MediaFile paintable, with only a lightweight
+/// snapshot transform. No extra decoder or video frame buffering is involved.
+fn install_video_interaction(
+    video: &gtk::Picture,
+    stream: Rc<RefCell<Option<gtk::MediaFile>>>,
+    transform: Rc<RefCell<Transform>>,
+    mode_action: &gio::SimpleAction,
+    zoom_wheel: Rc<Cell<bool>>,
+) {
+    let pointer = Rc::new(Cell::new((0.0, 0.0)));
+    let motion = gtk::EventControllerMotion::new();
+    let entered = pointer.clone();
+    motion.connect_enter(move |_, x, y| entered.set((x, y)));
+    let moved = pointer.clone();
+    motion.connect_motion(move |_, x, y| moved.set((x, y)));
+    video.add_controller(motion);
+
+    let scroll = gtk::EventControllerScroll::new(gtk::EventControllerScrollFlags::VERTICAL);
+    scroll.set_propagation_phase(gtk::PropagationPhase::Capture);
+    let source = stream.clone();
+    let state = transform.clone();
+    let action = mode_action.clone();
+    let weak = video.downgrade();
+    scroll.connect_scroll(move |controller, _, dy| {
+        if dy == 0.0 {
+            return glib::Propagation::Stop;
+        }
+        let zoom = zoom_wheel.get()
+            || controller.current_event_state().intersects(
+                gtk::gdk::ModifierType::BUTTON1_MASK | gtk::gdk::ModifierType::CONTROL_MASK,
+            );
+        let Some(video) = weak.upgrade() else {
+            return glib::Propagation::Proceed;
+        };
+        if !zoom {
+            if let Some(window) = video.root().and_downcast::<adw::ApplicationWindow>() {
+                let direction = if dy > 0.0 {
+                    "next-media"
+                } else {
+                    "previous-media"
+                };
+                gio::prelude::ActionGroupExt::activate_action(&window, direction, None);
+            }
+            return glib::Propagation::Stop;
+        }
+        let dimensions = source.borrow().as_ref().map(|media| {
+            (
+                media.intrinsic_width() as f64,
+                media.intrinsic_height() as f64,
+            )
+        });
+        let Some(dimensions) = dimensions else {
+            return glib::Propagation::Proceed;
+        };
+        let mode = action
+            .state()
+            .and_then(|value| value.str().and_then(ViewMode::from_id))
+            .unwrap_or(ViewMode::Fit);
+        if state.borrow_mut().zoom(
+            dimensions,
+            (video.width() as f64, video.height() as f64),
+            mode,
+            pointer.get(),
+            dy,
+        ) {
+            if let Some(paintable) = video.paintable() {
+                paintable.invalidate_contents();
+            }
+            action.set_state(&"manual".to_variant());
+        }
+        glib::Propagation::Stop
+    });
+    video.add_controller(scroll);
+
+    let drag = gtk::GestureDrag::new();
+    drag.set_button(1);
+    drag.set_propagation_phase(gtk::PropagationPhase::Capture);
+    let last = Rc::new(Cell::new(None::<(f64, f64)>));
+    let begin = last.clone();
+    let begin_stream = stream.clone();
+    drag.connect_drag_begin(move |gesture, _, _| {
+        if begin_stream.borrow().is_some() {
+            begin.set(Some((0.0, 0.0)));
+            gesture.set_state(gtk::EventSequenceState::Claimed);
+        }
+    });
+    let offset = last.clone();
+    let weak = video.downgrade();
+    let action = mode_action.clone();
+    drag.connect_drag_update(move |_, x, y| {
+        let Some(previous) = offset.get() else {
+            return;
+        };
+        let Some(video) = weak.upgrade() else {
+            return;
+        };
+        let dimensions = stream.borrow().as_ref().map(|media| {
+            (
+                media.intrinsic_width() as f64,
+                media.intrinsic_height() as f64,
+            )
+        });
+        let Some(dimensions) = dimensions else {
+            return;
+        };
+        if !x.is_finite() || !y.is_finite() {
+            return;
+        }
+        offset.set(Some((x, y)));
+        let mode = action
+            .state()
+            .and_then(|value| value.str().and_then(ViewMode::from_id))
+            .unwrap_or(ViewMode::Fit);
+        if transform.borrow_mut().pan(
+            dimensions,
+            (video.width() as f64, video.height() as f64),
+            mode,
+            (x - previous.0, y - previous.1),
+        ) {
+            if let Some(paintable) = video.paintable() {
+                paintable.invalidate_contents();
+            }
+            action.set_state(&"manual".to_variant());
+        }
+    });
+    let end = last.clone();
+    drag.connect_drag_end(move |_, _, _| end.set(None));
+    drag.connect_cancel(move |_, _| last.set(None));
+    video.add_controller(drag);
+}
+
 pub(super) fn install_interaction(
     picture: &gtk::Picture,
     texture: Rc<RefCell<Option<gtk::gdk::Texture>>>,
@@ -804,6 +1013,7 @@ pub(super) fn install_interaction(
     motion.connect_motion(move |_, x, y| position.set((x, y)));
     picture.add_controller(motion);
     let scroll = gtk::EventControllerScroll::new(gtk::EventControllerScrollFlags::VERTICAL);
+    scroll.set_propagation_phase(gtk::PropagationPhase::Capture);
     let weak = picture.downgrade();
     let source = texture.clone();
     let state = transform.clone();
@@ -811,9 +1021,9 @@ pub(super) fn install_interaction(
     let scroll_filter = filter.clone();
     scroll.connect_scroll(move |controller, _, dy| {
         let zoom = zoom_wheel.get()
-            || controller
-                .current_event_state()
-                .contains(gtk::gdk::ModifierType::BUTTON1_MASK);
+            || controller.current_event_state().intersects(
+                gtk::gdk::ModifierType::BUTTON1_MASK | gtk::gdk::ModifierType::CONTROL_MASK,
+            );
         if !zoom {
             if let Some(picture) = weak.upgrade() {
                 if let Some(window) = picture.root().and_downcast::<adw::ApplicationWindow>() {
@@ -958,6 +1168,32 @@ fn manual(
         )));
     }
     action.set_state(&"manual".to_variant());
+}
+
+/// Keep a single transformed paintable for all frames of one animation.
+pub(super) fn present_animation_frame(
+    picture: &gtk::Picture,
+    texture: &gtk::gdk::Texture,
+    id: &str,
+    transform: Rc<RefCell<Transform>>,
+    filter: Rc<Cell<Resampling>>,
+) {
+    let mode = ViewMode::from_id(id).unwrap_or(ViewMode::Actual);
+    if let Some(current) = picture
+        .paintable()
+        .and_then(|p| p.downcast::<actual_paintable::ActualPaintable>().ok())
+        .filter(|p| p.has_transform(&transform))
+    {
+        // Manual zoom lives in Transform, not in the incoming frame texture.
+        current.set_mode(mode);
+        current.update_texture(texture);
+        return;
+    }
+    picture.set_overflow(gtk::Overflow::Hidden);
+    picture.set_content_fit(gtk::ContentFit::Fill);
+    picture.set_paintable(Some(&actual_paintable::ActualPaintable::transformed(
+        texture, transform, mode, filter,
+    )));
 }
 
 pub(super) fn present_filtered(

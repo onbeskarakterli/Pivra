@@ -1,6 +1,6 @@
 //! Local input boundary. No decoding, directory discovery or GTK initialization.
 
-use std::{ffi::OsStr, fs, path::Path};
+use std::{ffi::OsStr, fs, path::Path, sync::atomic::AtomicBool};
 
 use gtk::{gio, glib, prelude::*};
 use pivra::media::MediaItem;
@@ -54,8 +54,24 @@ impl OpenedFile {
         let path = file.path().ok_or("only local files are accepted")?;
         // Follow symlinks, but preserve the requested GFile/path association.
         let metadata = fs::metadata(&path).map_err(|e| format!("cannot access local file: {e}"))?;
+        if metadata.is_dir() {
+            // Reuse folder navigation's natural ordering and readable-media checks.
+            let report = pivra::discovery::scan_directory(&path, &AtomicBool::new(false))
+                .map_err(|e| format!("cannot scan media directory: {e}"))?;
+            let first = report.collection.current().ok_or_else(|| {
+                if report.issues.is_empty() {
+                    "no supported media found in directory".to_string()
+                } else {
+                    format!(
+                        "no accessible supported media found in directory ({} unreadable entries)",
+                        report.issues.len()
+                    )
+                }
+            })?;
+            return Self::from_file(&gio::File::for_path(first.path()));
+        }
         if !metadata.is_file() {
-            return Err("input must be a regular file, not a directory or special file".into());
+            return Err("input must be a regular file or directory".into());
         }
         let kind = pivra::discovery::candidate_kind(&path).ok_or("unsupported media extension")?;
         // Open read-only and inspect the descriptor; never read file contents.
@@ -139,6 +155,41 @@ mod tests {
     }
 
     #[test]
+    fn folder_opens_first_naturally_sorted_media() {
+        let dir = tempfile::tempdir().unwrap();
+        fs::write(dir.path().join("notes.txt"), b"ignored").unwrap();
+        fixture(dir.path(), OsStr::new("10.png"));
+        fixture(dir.path(), OsStr::new("2.jpg"));
+        fixture(dir.path(), OsStr::new("1.mp4"));
+        let opened = OpenedFile::from_argument(dir.path().as_os_str()).unwrap();
+        assert_eq!(opened.item.path(), dir.path().join("1.mp4"));
+        assert_eq!(opened.item.kind(), MediaKind::Video);
+        assert_eq!(
+            OpenedFile::from_file(&gio::File::for_path(dir.path()))
+                .unwrap()
+                .item
+                .path(),
+            dir.path().join("1.mp4")
+        );
+    }
+
+    #[test]
+    fn empty_or_unsupported_folder_returns_clear_error() {
+        let dir = tempfile::tempdir().unwrap();
+        assert!(
+            OpenedFile::from_argument(dir.path().as_os_str())
+                .unwrap_err()
+                .contains("no supported media")
+        );
+        fs::write(dir.path().join("notes.txt"), b"ignored").unwrap();
+        assert!(
+            OpenedFile::from_argument(dir.path().as_os_str())
+                .unwrap_err()
+                .contains("no supported media")
+        );
+    }
+
+    #[test]
     fn rejects_remote_malformed_and_ambiguous_uris_without_network_access() {
         for text in [
             "https://example.org/photo.png",
@@ -167,7 +218,6 @@ mod tests {
     fn rejects_missing_directories_special_files_and_unsupported_extensions() {
         let dir = tempfile::tempdir().unwrap();
         for path in [
-            dir.path().to_owned(),
             dir.path().join("missing.png"),
             std::path::PathBuf::from("/dev/null"),
         ] {

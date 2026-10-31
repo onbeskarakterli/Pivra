@@ -22,7 +22,8 @@ fn install_css(display: &gtk::gdk::Display) {
             .pivra-thumbnail-cell.selected { box-shadow: none; }\n\
             .pivra-thumbnail-selection { background: transparent; border: 0; padding: 0; box-shadow: none; }\n\
             .pivra-thumbnail-selection.selected { border: 2px solid @accent_color; box-shadow: none; }\n\
-            .pivra-thumbnail-gif-badge { background-color: rgba(0,0,0,0.78); color: white; font-weight: bold; font-size: 15px; padding: 2px 6px; border-radius: 3px; }\n");
+            .pivra-thumbnail-failure-label { background-color: rgba(0,0,0,0.78); color: white; font-weight: bold; font-size: 10px; padding: 3px 5px; border-radius: 3px; }\n\
+             .pivra-thumbnail-gif-badge { background-color: rgba(0,0,0,0.78); color: white; font-weight: bold; font-size: 15px; padding: 2px 6px; border-radius: 3px; }\n");
         gtk::style_context_add_provider_for_display(display,&css,gtk::STYLE_PROVIDER_PRIORITY_APPLICATION);
     });
 }

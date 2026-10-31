@@ -13,6 +13,7 @@ use std::{
 pub(super) enum Output {
     Decoded(crate::image_loader::LoadedFrame, Option<FileKey>),
     Cached(gdk::Texture, FileKey),
+    Raw(gdk::Texture, Option<FileKey>),
 }
 pub(super) type Completion = Box<dyn FnOnce(Result<Output, String>, bool)>;
 pub(super) struct Background {
@@ -178,16 +179,24 @@ pub(super) fn fetch(
             }
         }
     }
-    let result = glib::MainContext::new().block_on(async {
-        if let Some(budget) = budget {
-            crate::image_loader::preload(path, token, budget).await
-        } else {
-            crate::image_loader::load(path, token).await
+    let result = if crate::raw_loader::is_dng(path) {
+        if budget.is_some() {
+            return (Err("DNG preloading is not enabled".into()), true);
         }
-    });
-    let after = FileKey::read(path).ok();
-    let key = if before == after { before } else { None };
-    (result.map(|frame| Output::Decoded(frame, key)), true)
+        crate::raw_loader::load(path, token).map(|texture| Output::Raw(texture, before.clone()))
+    } else {
+        let decoded = glib::MainContext::new().block_on(async {
+            if let Some(budget) = budget {
+                crate::image_loader::preload(path, token, budget).await
+            } else {
+                crate::image_loader::load(path, token).await
+            }
+        });
+        let after = FileKey::read(path).ok();
+        let key = if before == after { before } else { None };
+        decoded.map(|frame| Output::Decoded(frame, key))
+    };
+    (result, true)
 }
 pub(super) fn maybe_start(state: &Rc<RefCell<State>>, slot: &Rc<LoadSlot>, has_image: bool) {
     if !has_image || slot.stats().running != 0 || slot.stats().pending != 0 {
@@ -271,6 +280,7 @@ pub(super) fn maybe_start(state: &Rc<RefCell<State>>, slot: &Rc<LoadSlot>, has_i
                         let (texture, key) = match output {
                             Output::Decoded(frame, key) => (frame.texture(), key),
                             Output::Cached(texture, key) => (texture, Some(key)),
+                            Output::Raw(texture, key) => (texture, key),
                         };
                         if let (Some(key), Some(cost)) = (
                             key,

@@ -25,7 +25,7 @@ if [[ -n "$destdir" && "$destdir" != /* ]]; then
   exit 2
 fi
 
-for cmd in cargo rustc cc pkg-config install; do
+for cmd in cargo rustc cc pkg-config install python3; do
   command -v "$cmd" >/dev/null || { printf 'ERROR: missing command: %s\n' "$cmd" >&2; exit 1; }
 done
 pkg-config --atleast-version=4.16 gtk4 || { echo 'ERROR: GTK >= 4.16 required' >&2; exit 1; }
@@ -35,7 +35,12 @@ pkg-config --exists gnome-desktop-4 gio-2.0 gobject-2.0 gdk-pixbuf-2.0 lcms2 lib
 
 build_dir="$root/target/pivra-native"
 helper="$build_dir/pivra-thumbnail-factory"
-viewer="$root/target/release/pivra"
+# Honor Cargo's effective target directory (including .cargo/config.toml and
+# CARGO_TARGET_DIR). Otherwise a stale target/release/pivra can be installed
+# or scanned even when Cargo built into a different directory.
+cargo_target_dir="$(cargo metadata --locked --no-deps --format-version 1 | python3 -c 'import json,sys; print(json.load(sys.stdin)["target_directory"])')"
+viewer="$cargo_target_dir/release/pivra"
+raw_helper="$build_dir/pivra-raw-decoder"
 
 build_all() {
   [[ -z "${LCMS2_STATIC+x}" && -z "${LCMS2_LIB_DIR+x}" ]] ||
@@ -50,6 +55,14 @@ build_all() {
   read -r -a pkg_libs <<< "$(pkg-config --libs gnome-desktop-4 gio-2.0 gobject-2.0 gdk-pixbuf-2.0)"
   "${cc_args[@]}" "${cpp_args[@]}" "${c_args[@]}" "${pkg_cflags[@]}" -Wall -Wextra -Werror \
     native/thumbnail_factory.c -o "$helper" "${ld_args[@]}" "${pkg_libs[@]}"
+  if [[ "${PIVRA_BUILD_EXPERIMENTAL_RAW:-0}" == 1 ]]; then
+    command -v c++ >/dev/null || { echo "ERROR: C++ required for experimental RAW build" >&2; return 1; }
+    pkg-config --exists libraw || { echo "ERROR: libraw development files required for experimental RAW build" >&2; return 1; }
+    bash raw/build_helper.sh "$raw_helper"
+  else
+    # Do not accidentally stage a helper left over from an earlier opt-in build.
+    rm -f -- "$raw_helper"
+  fi
   PIVRA_DISTRIBUTION_BUILD=1 cargo build --release --locked --bin pivra
   [[ -x "$helper" && -x "$viewer" ]] || { echo 'ERROR: missing build output' >&2; return 1; }
   if grep -aFq '/out/pivra-thumbnail-factory' "$viewer"; then
@@ -57,6 +70,7 @@ build_all() {
     return 1
   fi
   echo 'PASS: Pivra and thumbnail helper built'
+  [[ "${PIVRA_BUILD_EXPERIMENTAL_RAW:-0}" != 1 ]] || echo 'PASS: experimental RAW helper built (not installed by default)'
 }
 
 case "$action" in
@@ -64,10 +78,24 @@ case "$action" in
   install)
     [[ -x "$viewer" && -x "$helper" ]] ||
       { echo 'ERROR: build outputs missing; run build first' >&2; exit 1; }
+    # Validate all requested artifacts before changing the destination.
+    if [[ "${PIVRA_INSTALL_EXPERIMENTAL_RAW:-0}" == 1 && ! -x "$raw_helper" ]]; then
+      echo "ERROR: experimental RAW helper missing; rebuild with PIVRA_BUILD_EXPERIMENTAL_RAW=1" >&2
+      exit 1
+    fi
     bindir="$destdir$prefix/bin"
     sharedir="$destdir$prefix/share"
     install -Dm755 "$viewer" "$bindir/pivra"
     install -Dm755 "$helper" "$bindir/pivra-thumbnail-factory"
+    # Experimental RAW is installed only when explicitly requested.
+    if [[ "${PIVRA_INSTALL_EXPERIMENTAL_RAW:-0}" == 1 ]]; then
+      install -Dm755 "$raw_helper" "$bindir/pivra-raw-decoder"
+      install -Dm755 raw/run_decode.sh "$bindir/pivra-raw-runner"
+    elif [[ -n "$destdir" ]]; then
+      # A reused staging directory must not accidentally retain experimental
+      # companion files from a previous opt-in package build.
+      rm -f -- "$bindir/pivra-raw-decoder" "$bindir/pivra-raw-runner"
+    fi
     install -Dm644 data/io.github.onbeskarakterli.Pivra.desktop \
       "$sharedir/applications/io.github.onbeskarakterli.Pivra.desktop"
     for variant in scalable symbolic; do

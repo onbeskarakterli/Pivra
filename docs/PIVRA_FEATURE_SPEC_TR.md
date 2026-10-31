@@ -44,13 +44,13 @@
 | 29 | Video kontrolü | Oynarken 2 sn hareketsizlikte gizlenir, duraklatıldığında kalır, imleç kontrol üzerindeyken gizlenmez. |
 | 30 | Kısayollar | Space oynat/duraklat; Ctrl+sol/sağ 5 sn sarma; virgül/nokta duraklatılmışken kare geri/ileri; yukarı/aşağı ses. |
 | 31 | Kare adımı | Mümkün olan en doğru kare hassasiyetinde ileri/geri, değişken FPS zamanlaması gözetilir. |
-| 32 | Zaman çizgisi | Hover ile önizleme karesi+zaman; tıklamadan oynatma pozisyonu değişmez. |
+| 32 | Zaman çizgisi | **KAPSAM DIŞI:** Hover ile kare önizlemesi yapılmayacak. Mevcut seek/zaman çizgisi korunur. |
 | 33 | Zoom ve pan | Aynı videoda oynatma, duraklama, seek ve kare adımında korunur; yeni medyada ekrana sığdırılır. |
 | 34 | Pozisyon | Aynı pencere içinde videoya dönülünce kaldığı yerden otomatik oynar; pencere kapanınca unutulur. |
 | 35 | Ses | Ses seviyesi ve mute durumu uygulamanın sonraki açılışlarında korunur. |
 | 36 | Video kare kaydetme | Kaynak çözünürlüğünde, ekran/zoom'dan bağımsız; PNG varsayılan, JPEG/WebP, önerilen zaman damgalı ad. |
-| 37 | Alt yazı/parçalar | Gömülü/harici SRT ve ASS; aynı adlı harici altyazıyı otomatik algılama; birden fazla ses parçası seçimi. |
-| 38 | Alt yazı stili | ASS'nin özgün biçimi varsayılan korunur; yazı boyutu/renk/çerçeve/arka plan ayarı ve sıfırlama. |
+| 37 | Ses parçaları | Birden fazla ses parçası seçimi planlanır. **KAPSAM DIŞI:** Gömülü/harici altyazı, SRT ve ASS desteği. |
+| 38 | Alt yazı stili | **KAPSAM DIŞI:** Altyazı bulunmadığından stil ayarları da geliştirilmeyecek. |
 | 39 | Formatlar | MP4/MKV/MOV/WebM/AVI/WMV/MPEG/3GP gibi konteynerler; H264/HEVC/VP8/VP9/AV1 vb.; donanım çözme, yazılıma geri düşme. Gerçek destek platforma bağlı. |
 | 40 | Hareketli fotoğraf | GIF, animasyonlu WebP, APNG otomatik ve sonsuz döngü; Space ile duraklat; ayrılınca durur. |
 | 41 | Güç yönetimi | Slayt gösterisi boyunca (duraklatılsa bile) ve normal modda video oynatılırken ekranın otomatik kapanması engellenir; normal video duraklayınca güç yönetimi normale döner. |
@@ -145,7 +145,7 @@
 | Öncelik | Kapsam / ilke |
 |---|---|
 | 1 — Görüntüleyici çekirdeği | Rust + GTK4/libadwaita temel pencere, Nautilus'tan açılış, klasör listeleme, doğal sıralama, fotoğraf gösterme, zoom/pan, hızlı gezinme ve performans. |
-| 2 — Video | Fotoğraf/video karma gezinme, GStreamer oynatma, ses, kontrol, altyazı, seek ve planlanmış video davranışları. |
+| 2 — Video | Fotoğraf/video karma gezinme, GStreamer oynatma, ses, kontrol, seek ve planlanmış video davranışları. |
 | 3 — Görüntüleme deneyiminin tamamlanması | Şerit, mini harita, slayt gösterisi, bilgi paneli, kısayollar, format uyumluluğu, yerel paketleme, kararlılık ve testler. |
 | 4 — Son geliştirme aşaması: Edit | **Bütün fotoğraf düzenleme özellikleri**, yalnız ayrı **Edit** seçeneğiyle açılacak modda geliştirilir. Normal görüntüleme arayüzüne düzenleme paneli veya kalıcı araç çubuğu eklenmez. Toplu dönüştürme gibi düzenleme/işleme temelli özellikler de çekirdek görüntüleme ve videodan sonra planlanır. |
 
@@ -168,7 +168,7 @@
 |---|---|---|
 | Ana dil | **Rust** | **KARARLAŞTIRILDI** |
 | Kullanıcı arayüzü | **GTK4 + libadwaita**, Rust için gtk4-rs / libadwaita bindings | **HEDEF MİMARİ**; GNOME arayüzü |
-| Video motoru | **GStreamer** / gstreamer-rs | **İLK TERCİH**; GTK4 içinde oynatma, ses, altyazı, seek, frame-step ve zoom prototipte doğrulanacak |
+| Video motoru | **GStreamer** / gstreamer-rs | **İLK TERCİH**; GTK4 içinde oynatma, ses, seek, frame-step ve zoom prototipte doğrulanacak |
 | Görsel çözümleme | **Glycin** ve formatlara özgü uygun çözücüler | **İLK ADAY**; RAW, HDR, HEIC, JXL, PSD vb. gerçek destek tek tek test edilecek |
 | Görüntü işleme | **libvips** ve gerektiğinde özel görüntü işlemleri | **İLK ADAY**; Rust entegrasyonu, kalite ve işlem kapsamı test edilecek |
 | Dosya ve klasör olayları | **GIO** | **HEDEF ALTYAPI** |
@@ -180,7 +180,7 @@
 
 1. **Medya/katalog yöneticisi:** Nautilus'tan açılan dosya ve klasör, doğal sıralama, dosya olayları, gezinme konumu.
 2. **Görüntüleme motoru:** Decode, fotoğraf/video viewport'u, zoom/pan, renk profilleri, kaynak kontrollü hazırlama.
-3. **Video motoru:** GStreamer oynatma yaşam döngüsü, ses/altyazı, kare adımı, seek ve video önizlemesi.
+3. **Video motoru:** GStreamer oynatma yaşam döngüsü, ses, kare adımı ve seek.
 4. **Düzenleme motoru:** Geri alınabilir, kayda kadar tahribatsız işlemler; format dönüştürme ve atomik yazma.
 5. **Arka plan iş yöneticisi:** Kaynak önceliği, iptal, duraklat/devam, durum/ilerleme ve bildirimler.
 6. **GTK4/libadwaita sunum katmanı:** Pencere, şerit, paneller, kısayollar ve etkileşimler; medya işlemleriyle gevşek bağlılık.
@@ -189,7 +189,7 @@
 
 - Büyük fotoğraf/RAW açılışı, zoom ve RAM tüketimi; önizlemeden tam çözüme geçiş.
 - GTK4 içinde 4K video, donanım hızlandırma ve yazılımsal fallback; fotoğraf ↔ video geçişleri.
-- Frame-step, harici/gömülü altyazı ve ASS biçimlendirme; video kaynağından orijinal çözünürlükte kare kaydı.
+- Frame-step ve video kaynağından orijinal çözünürlükte kare kaydı.
 - ICC/HDR ve desteklenen gerçek formatların her birinin platforma göre doğrulanması.
 - Her aşamada birim/entegrasyon testleri ve gerçek GNOME kullanım testi; otomatik push tetiklemeli CI yok (eklenirse yalnız manuel workflow_dispatch).
 

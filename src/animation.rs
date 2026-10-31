@@ -1,5 +1,5 @@
 //! Animated foreground images; thumbnails stay on their static first frame.
-use super::{ViewMode, present_filtered};
+use super::ViewMode;
 use gtk::{gio, glib, prelude::*};
 use pivra::viewing::{Resampling, Transform};
 use std::{
@@ -342,7 +342,7 @@ pub(super) fn start(
                                                 .and_then(|v| v.str().and_then(ViewMode::from_id))
                                                 .unwrap_or_default();
                                             texture.replace(Some(next.clone()));
-                                            present_filtered(&picture, Some(&next), mode.id(), transform.clone(), filter.clone());
+                                            super::present_animation_frame(&picture, &next, mode.id(), transform.clone(), filter.clone());
                                         }
                                         controls.show_progress(elapsed / total);
                                         controls.show_time(elapsed, total);
@@ -433,7 +433,7 @@ pub(super) fn start(
                 .and_then(|v| v.str().and_then(ViewMode::from_id))
                 .unwrap_or_default();
             texture.replace(Some(next.clone()));
-            present_filtered(&picture, Some(&next), mode.id(), transform.clone(), filter.clone());
+            super::present_animation_frame(&picture, &next, mode.id(), transform.clone(), filter.clone());
             delay = next_delay;
             if timeline_ready {
                 controls.show_progress(elapsed / total);
@@ -521,6 +521,6 @@ fn animation_kind(path: &std::path::Path) -> Option<AnimationKind> {
     None
 }
 
-fn is_animated_file(path: &std::path::Path) -> bool {
+pub(super) fn is_animated_file(path: &std::path::Path) -> bool {
     animation_kind(path).is_some()
 }

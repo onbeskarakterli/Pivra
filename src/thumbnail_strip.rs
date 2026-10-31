@@ -30,7 +30,7 @@ struct CellWidgets {
     selection: gtk::Frame,
     picture: gtk::Picture,
     spinner: gtk::Spinner,
-    icon: gtk::Image,
+    icon: gtk::Label,
 }
 struct Entry {
     index: Rc<Cell<usize>>,
@@ -508,12 +508,19 @@ impl Inner {
         // Prioritize the selected image, then the neighbors actually expected
         // in the initial viewport, not unrelated images at the folder start.
         if let Some(n) = selected {
-            if entries[n].phase == Phase::Pending {
+            if entries[n].phase == Phase::Pending && !crate::raw_loader::is_dng(&entries[n].path) {
                 paths.push(entries[n].path.clone());
             }
         }
         for e in &entries[start..end] {
-            if e.phase == Phase::Pending && !paths.contains(&e.path) {
+            // RAW requires a full, expensive decode in the experimental path.
+            // Reserve hidden warming for normal media so a single DNG cannot
+            // delay all visible photo thumbnails. Visible DNG uses the normal
+            // priority scheduler below.
+            if e.phase == Phase::Pending
+                && !crate::raw_loader::is_dng(&e.path)
+                && !paths.contains(&e.path)
+            {
                 paths.push(e.path.clone());
             }
         }
@@ -539,27 +546,60 @@ impl Inner {
                 // The hidden pass uses the SAME verified decode/resize path as
                 // the visible scheduler. Merely resolving disk cache entries
                 // leaves the GTK cells pending and forces a second decode.
-                let work = match Manager::session().resolve(&path, &worker_token) {
-                    Ok(response) => {
-                        if let Some(candidate) = response.candidate() {
-                            let cached =
-                                cache_work(candidate, &worker_token, response.deadline(), scale);
-                            if matches!(cached, Work::Hit(..)) {
-                                cached
+                let work = if crate::raw_loader::enabled() && crate::raw_loader::is_dng(&path) {
+                    match (
+                        FileKey::read(&path),
+                        crate::raw_loader::load(&path, &worker_token),
+                    ) {
+                        (Ok(key), Ok(texture))
+                            if !worker_token.is_cancelled()
+                                && FileKey::read(&path).ok().as_ref() == Some(&key) =>
+                        {
+                            let decoded =
+                                texture_cost(texture.width() as u32, texture.height() as u32)
+                                    .unwrap_or(usize::MAX);
+                            match display_texture(&texture, scale) {
+                                Ok(small) => Work::Hit(small, key, None, decoded),
+                                Err(e) => Work::Failed(e),
+                            }
+                        }
+                        (_, _) if worker_token.is_cancelled() => Work::Cancelled,
+                        (Err(e), _) => Work::Failed(format!("DNG identity: {e}")),
+                        (_, Err(e)) => Work::Failed(e),
+                        _ => Work::Failed("DNG source changed during hidden decode".into()),
+                    }
+                } else {
+                    match Manager::session().resolve(&path, &worker_token) {
+                        Ok(response) => {
+                            if let Some(candidate) = response.candidate() {
+                                let cached = cache_work(
+                                    candidate,
+                                    &worker_token,
+                                    response.deadline(),
+                                    scale,
+                                );
+                                if matches!(cached, Work::Hit(..)) {
+                                    cached
+                                } else if let Some(generated) = response.memory() {
+                                    memory_work(
+                                        generated,
+                                        &worker_token,
+                                        response.deadline(),
+                                        scale,
+                                    )
+                                } else {
+                                    cached
+                                }
                             } else if let Some(generated) = response.memory() {
                                 memory_work(generated, &worker_token, response.deadline(), scale)
                             } else {
-                                cached
+                                Work::Failed("Thumbnail unavailable".into())
                             }
-                        } else if let Some(generated) = response.memory() {
-                            memory_work(generated, &worker_token, response.deadline(), scale)
-                        } else {
-                            Work::Failed("Thumbnail unavailable".into())
                         }
+                        Err(Error::Busy) => Work::Busy,
+                        Err(Error::Cancelled) => Work::Cancelled,
+                        Err(error) => provider_failure(error),
                     }
-                    Err(Error::Busy) => Work::Busy,
-                    Err(Error::Cancelled) => Work::Cancelled,
-                    Err(error) => provider_failure(error),
                 };
                 pivra::thumbnail_diagnostics::trace(
                     "hidden-result",
@@ -674,7 +714,7 @@ impl Inner {
                     entry.phase = Phase::Evicted;
                     if let Some(w) = &entry.widgets {
                         w.picture.set_paintable(None::<&gdk::Texture>);
-                        w.icon.set_visible(true);
+                        w.icon.set_visible(false);
                     }
                 }
                 drop(entries);
@@ -750,7 +790,7 @@ impl Inner {
                 e.cost = 0;
                 if let Some(w) = &e.widgets {
                     w.picture.set_paintable(None::<&gdk::Texture>);
-                    w.icon.set_visible(true);
+                    w.icon.set_visible(false);
                 }
             }
             i.scroller.queue_draw();
@@ -852,10 +892,11 @@ impl Inner {
                 // The photo is the base child, not an unmeasured overlay.
                 // Badge, selection and loading indicators remain overlays.
                 content.set_child(Some(&picture));
-                let icon = gtk::Image::from_icon_name("image-x-generic-symbolic");
+                let icon = gtk::Label::new(Some("NO THUMBNAIL"));
+                icon.add_css_class("pivra-thumbnail-failure-label");
                 icon.set_halign(gtk::Align::Center);
                 icon.set_valign(gtk::Align::Center);
-                icon.set_visible(!is_video && entry.phase != Phase::Ready);
+                icon.set_visible(entry.phase == Phase::Failed);
                 icon.set_can_target(false);
                 spinner.set_can_target(false);
                 for child in [icon.upcast_ref::<gtk::Widget>(), spinner.upcast_ref()] {
@@ -1133,6 +1174,29 @@ impl Inner {
             if worker_token.is_cancelled() {
                 return Work::Cancelled;
             }
+            if crate::raw_loader::enabled() && crate::raw_loader::is_dng(&worker_path) {
+                let identity = FileKey::read(&worker_path);
+                return match (
+                    identity,
+                    crate::raw_loader::load(&worker_path, &worker_token),
+                ) {
+                    (Ok(key), Ok(texture))
+                        if !worker_token.is_cancelled()
+                            && FileKey::read(&worker_path).ok().as_ref() == Some(&key) =>
+                    {
+                        let decoded = texture_cost(texture.width() as u32, texture.height() as u32)
+                            .unwrap_or(usize::MAX);
+                        match display_texture(&texture, scale) {
+                            Ok(small) => Work::Hit(small, key, None, decoded),
+                            Err(e) => Work::Failed(e),
+                        }
+                    }
+                    (_, _) if worker_token.is_cancelled() => Work::Cancelled,
+                    (Err(e), _) => Work::Failed(format!("DNG identity: {e}")),
+                    (_, Err(e)) => Work::Failed(e),
+                    _ => Work::Failed("DNG source changed during decode".into()),
+                };
+            }
             let response = match Manager::session().resolve(&worker_path, &worker_token) {
                 Ok(response) => response,
                 Err(Error::Busy) => return Work::Busy,
@@ -1271,11 +1335,7 @@ impl Inner {
                 }
                 if let Some(w) = &entry.widgets {
                     w.spinner.stop();
-                    w.icon.set_visible(
-                        entry.phase == Phase::Failed
-                            && pivra::discovery::candidate_kind(&entry.path)
-                                != Some(pivra::media::MediaKind::Video),
-                    );
+                    w.icon.set_visible(entry.phase == Phase::Failed);
                 }
             }
             // LRU bounds apply to widget paintables as well, not just a side map.
@@ -1305,7 +1365,7 @@ impl Inner {
                 e.phase = Phase::Evicted;
                 if let Some(w) = &e.widgets {
                     w.picture.set_paintable(None::<&gdk::Texture>);
-                    w.icon.set_visible(true);
+                    w.icon.set_visible(false);
                 }
             }
             drop(entries);

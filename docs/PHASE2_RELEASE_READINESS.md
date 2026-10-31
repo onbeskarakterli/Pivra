@@ -1,6 +1,14 @@
-# Faz 2 kapanışı ve Pivra 0.1.0 teknik hazırlığı
+# Faz 2 kapanışı — tarihsel 0.1.0 değerlendirmesi ve güncel dev v0.2.3
 
-25.10.2026 · Europe/Istanbul · yalnız `dev`.
+25.10.2026 tarihli denetim; kapanış kararı 31.10.2026 · yalnız `dev`.
+
+**Güncel sürüm bağlamı:** v0.2.3 geliştirme dalı, yayımlanmadı; kararlı kaynak v0.2.1, AUR sürümü v0.2.1-3. Faz 2 ve PIV-18 DONE. Tarihsel 0.1.0 test ve yayın değerlendirmeleri korunur; v0.2.3 için yayın onayı anlamına gelmez.
+
+## Nihai kapanış — 31.10.2026 — DONE
+
+**PIV-18 DONE; Faz 2 DONE (kullanıcı onayı).** Erken önizleme yapılmayacak ve Faz 2 kapsamında değildir. 64 MP görüntü desteği kullanıcı tarafından test edilip kabul edildi. Önceki PIV-13–17 native/manuel kabul kayıtları geçerlidir. 31.10 RAW/DNG toplu testi 36/36 Rust testi, release build, negatif/iptal testleri, staged paketleme ve gerçek 6020×4024 DNG için PASS; RAW/DNG bu fazın zorunlu kapanış koşulu değildir.
+
+Aşağıdaki eski TESTING, 32 MP ve erken preview eksikliği değerlendirmeleri 25.10 tarihli tarihsel snapshot'lardır. Faz 0, Nautilus, dağıtım ve yayın kapıları otomatik geçilmiş sayılmaz; main, tag, Release, AUR değişmedi.
 
 **Karar: PIV-18 TESTING; Faz 2 henüz kapanmaya hazır değil; 0.1.0 yayın onayı yok.**
 Full-only fotoğraf yolu ve fullscreen kabul edilmiş olsa da gerçek erken preview

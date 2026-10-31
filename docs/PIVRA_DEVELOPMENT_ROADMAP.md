@@ -1,5 +1,8 @@
 # Pivra — Geliştirme Yol Haritası
 
+**Aktif geliştirme sürümü: v0.2.3 (`dev`, yayımlanmadı).** `Cargo.toml` ve `Cargo.lock` bu sürümü taşır. Kararlı `main` v0.2.1; AUR'daki yayımlanmış paket v0.2.1-3. **Faz 2 / PIV-18 DONE (31.10.2026).** Erken önizleme geliştirilmeyecek; 64 MP desteği kullanıcı tarafından test edilip kabul edildi. 31.10 tarihli DNG deneyi ayrıca başarılı test edildi, ancak varsayılan olarak kapalıdır. Sürüm numarası değişimi yeni yayın, etiket veya AUR güncellemesi değildir. Aşağıdaki eski sürüm ve TESTING kayıtları tarihsel kanıtlardır.
+
+
 ## B6-F2 — Son RC kabulü: teknik GO — 29.10.2026
 
 Kabul edilen RC kaynak `7e26e780acffdb1f2db0f37e8cf6485eba0baa63`;
@@ -63,6 +66,12 @@ final source/metadata/yayın kapıları ayrı. Önceki B6 FAIL kaydı tarihseldi
 [Her uyarı, değişiklik, gerçek komut ve sınırlamalar](releases/PIVRA_V0.1_B6_READINESS_AUDIT.md#b6-w1--strict-warning-cleanup--2026-10-29).
 
 
+## Faz 2 resmî kapanış — 31.10.2026 — DONE
+
+**Proje sahibi kararı: Faz 2 DONE; PIV-18 DONE.** Erken önizleme yapılmayacak; kabul koşulundan çıkarılmıştır. 64 MP görüntü desteği kullanıcı tarafından test edilip kabul edilmiştir. PIV-13–17 kabul kayıtları geçerlidir. 31.10.2026 RAW/DNG toplu testi ayrıca 36/36 Rust birim testi, release build, dört negatif test, iptal ve gerçek 6020×4024 DNG decode PASS gösterdi; bu 64 MP sınır testi değildir.
+
+Faz 0, DESKTOP-06, ayrı paketleme/yayın kapıları bağımsızdır. Bu karar main/tag/Release/AUR/CI değişikliği değildir. Eski TESTING kayıtları tarihsel snapshot olarak kalır.
+
 ## B6 — Güncel yayın hazırlığı kaydı — 29.10.2026
 
 Denetlenen ve kullanıcı tarafından native paketi kabul edilen kaynak:
@@ -85,7 +94,7 @@ Tam komutlar, kanıt ayrımı, değişiklik SHA'ları ve kalan kararlar:
 Bu görev yalnız dokümandır; main/tag/release/AUR/CI değiştirilmedi.
 
 
-**Durum:** PIV-01–08 DONE (giriş, keşif ve doğal sıra); PIV-09 DONE (Arch gerçek JPEG/PNG/EXIF, geometri ve aktif-decode kapanış/temizlik PASS); PIV-10 DONE (native gerçek secure piksel/Fit ve fiziksel sol/sağ gezinme PASS); PIV-11 DONE (Arch native ve GNOME Yenile PASS); PIV-12 DONE (24.10.2026 native + manuel kabul); PIV-13 DONE (24.10.2026 Arch native ve manuel kabul); PIV-14 DONE (24.10.2026 Arch native + gerçek fare kabulü); PIV-15 DONE (24.10.2026 Arch native ve manuel Smooth/Nearest kabulü); PIV-16 DONE (24.10.2026 Arch native + manuel kabul); PIV-17 DONE (Arch native + manuel kabul); PIV-18 TESTING; PIV-19–60 TODO. Faz 0 INCOMPLETE: temiz native kurulumun bağımsız yeniden üretimi NOT RUN; temiz Cargo target derlemesi ve headless regresyonlar geçti. [PIV-05 kanıtı ve ayrı faz kapısı](PIVRA_TECHNICAL_CAPABILITIES.md#102-piv-05-ve-faz-0-kapanışını-ayrı-değerlendirme).
+**Durum:** PIV-01–08 DONE (giriş, keşif ve doğal sıra); PIV-09 DONE (Arch gerçek JPEG/PNG/EXIF, geometri ve aktif-decode kapanış/temizlik PASS); PIV-10 DONE (native gerçek secure piksel/Fit ve fiziksel sol/sağ gezinme PASS); PIV-11 DONE (Arch native ve GNOME Yenile PASS); PIV-12 DONE (24.10.2026 native + manuel kabul); PIV-13 DONE (24.10.2026 Arch native ve manuel kabul); PIV-14 DONE (24.10.2026 Arch native + gerçek fare kabulü); PIV-15 DONE (24.10.2026 Arch native ve manuel Smooth/Nearest kabulü); PIV-16 DONE (24.10.2026 Arch native + manuel kabul); PIV-17 DONE (Arch native + manuel kabul); PIV-18 DONE (31.10.2026); PIV-19–60 TODO. Faz 0 INCOMPLETE: temiz native kurulumun bağımsız yeniden üretimi NOT RUN; temiz Cargo target derlemesi ve headless regresyonlar geçti. [PIV-05 kanıtı ve ayrı faz kapısı](PIVRA_TECHNICAL_CAPABILITIES.md#102-piv-05-ve-faz-0-kapanışını-ayrı-değerlendirme).
 **Başlangıç branch:** `dev` · **Kararlı sürümler:** `main`  
 **Kaynak şartname:** [PIVRA_FEATURE_SPEC_TR.md](PIVRA_FEATURE_SPEC_TR.md)  
 **Görev ve commit takibi:** [PIVRA_COMMIT_TRACKER.md](PIVRA_COMMIT_TRACKER.md)
@@ -127,7 +136,7 @@ PIV-19 ve sonraki aşamalar başlamadı.
 - **app/ui:** GTK4/libadwaita pencereleri, overlay kontroller, input ve paneller.
 - **catalog:** klasör tarama, doğal ad sırası, dosya sistemi olayları, gezinme ve pencere bağımsızlığı.
 - **image:** fotoğraf çözümleme adaptörleri, kaynak çözünürlüğü, fit/fill/100%, zoom/pan, renk.
-- **video:** GStreamer oynatma yaşam döngüsü, seek, frame-step, ses/altyazı, render.
+- **video:** GStreamer oynatma yaşam döngüsü, seek, frame-step, ses, render.
 - **jobs/cache:** iptal edilebilir ön yükleme, RAM içi thumbnail, kaynak önceliği, toplu kuyruk.
 - **settings/platform:** GSettings, GNOME/GIO, HiDPI, güç yönetimi, tema, dosya ilişkileri.
 - **edit:** kullanıcı `Edit` dediğinde aktive edilen ayrı tahribatsız düzenleme hattı; yalnız en son faz.
@@ -143,7 +152,7 @@ Bu isimler mantıksal modüllerdir; gerçek Rust crate/dizin yapısı PIV-01/02 
 | 1 — Fotoğraf çekirdeği | PIV-06–12 | Nautilus'tan açılan görüntü, klasörde doğal sırada gezinme, fotoğraf render, fit/fill/100% | JPEG/PNG açılışı, 1/2/10 sıralama, kararlı gezinme, doğru yön, bozuk dosyada çökme yok |
 | 2 — Zoom ve kaynak yönetimi | PIV-13–18 | İmleç odaklı zoom/pan, RAM cache/ön yükleme, büyük görsel tepkiselliği, mini harita temeli | Büyük fotoğrafta UI donmaz; zoom sınırları ve iptal edilen decode doğrulanır |
 | 3 — Video çekirdeği | PIV-19–24 | Aynı dosya sırası içinde video, otomatik oynatma/temiz kapatma, ses ve zaman çubuğu | Fotoğraf → video → fotoğraf akışı, kaynakların serbest kalması, sessiz geçiş |
-| 4 — Gelişmiş video | PIV-25–31 | Frame-step, hover scrub önizleme, altyazı/ses izleri, video zoom, kare kaydetme | Video test matrisi ve mümkün/uygulanamayan özellikler belgeli |
+| 4 — Gelişmiş video | PIV-25–31 | Frame-step, ses izi seçimi, video zoom, kare kaydetme | Video test matrisi ve mümkün/uygulanamayan özellikler belgeli |
 | 5 — Tam görüntüleyici arayüzü | PIV-32–39 | Şerit ve seçim modu, mini harita, bilgi paneli, slayt, kısayollar, touchpad/HiDPI, karşılaştırma | Tüm temel kullanım senaryoları GNOME'da manuel doğrulanmış |
 | 6 — Uyumluluk ve yayın hazırlığı | PIV-40–47 | Format genişletme, ICC/HDR, hata dayanıklılığı, performans regresyonu, native paketler | Destek matrisi, paket kurulum testi, tekrarlanabilir testler, görüntüleme/video test sürümü |
 | 7 — **Edit ve toplu işleme (son faz)** | PIV-48–57 | Ayrı Edit modu, dönüş/kırp/boyut/renk/iyileştirme/karşılaştırma, güvenli kayıt ve toplu dönüştürme | Orijinal koruması, undo, güvenli kayıt, job iptali/çakışma testleri; normal viewer sade kalır |
@@ -188,7 +197,7 @@ Deterministik küçük fixture'lar, kaynak/lisans durumu ve SHA-256 manifesti `t
 | Risk | Karşılık / karar kapısı |
 |---|---|
 | Glycin format/RAW/HDR yetenekleri | Hedef örnek dosya seti; eksik özellik için alternatif adapter; kullanıcıya kapsam bildirimi |
-| GStreamer frame-step, ASS, timeline önizlemesi | Küçük doğrulama prototipleri; kısıt kanıtlanırsa çözüm/alternatif görüşülür |
+| GStreamer frame-step, ses izi seçimi, video zoom | Küçük doğrulama prototipleri; kısıt kanıtlanırsa çözüm/alternatif görüşülür |
 | GTK4'te yüksek çözünürlüklü zoom/texture akışı | Benchmark, tiled/preview stratejisi, kontrollü bellek ve iptal |
 | Rust ↔ libvips bağlayıcısı / sistem sürümleri | Son Edit fazı öncesi bağımlılık ve bakım değerlendirmesi |
 | Native paket sürüm ayrışması | Arch/DEB/RPM için minimum sürüm ve smoke test matrisi, hedeflenen dağıtımlar için koşullu destek |

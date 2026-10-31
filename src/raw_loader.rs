@@ -2,6 +2,7 @@
 //! RAW support is opt-in; distribution builds require an installed helper.
 use gtk::{gdk, gio, glib, prelude::*};
 use std::fs::OpenOptions;
+use std::io::Read;
 use std::os::unix::{fs::DirBuilderExt, process::CommandExt};
 
 unsafe extern "C" {
@@ -110,13 +111,19 @@ pub(crate) fn load(path: &Path, cancel: &gio::Cancellable) -> Result<gdk::Textur
     if !status.success() {
         // Error text is untrusted decoder output: cap it and never display
         // arbitrary control characters or multi-megabyte diagnostic streams.
-        let detail = std::fs::read(&diagnostics)
+        let detail = OpenOptions::new()
+            .read(true)
+            .open(&diagnostics)
             .ok()
-            .map(|bytes| {
-                String::from_utf8_lossy(&bytes[..bytes.len().min(1024)])
-                    .chars()
-                    .filter(|c| !c.is_control() || *c == '\n')
-                    .collect::<String>()
+            .and_then(|mut file| {
+                let mut bytes = Vec::new();
+                file.take(1024).read_to_end(&mut bytes).ok()?;
+                Some(
+                    String::from_utf8_lossy(&bytes)
+                        .chars()
+                        .filter(|c| !c.is_control() || *c == '\n')
+                        .collect::<String>(),
+                )
             })
             .unwrap_or_default();
         return Err(if detail.trim().is_empty() {

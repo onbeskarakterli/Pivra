@@ -36,6 +36,7 @@ pkg-config --exists gnome-desktop-4 gio-2.0 gobject-2.0 gdk-pixbuf-2.0 lcms2 lib
 build_dir="$root/target/pivra-native"
 helper="$build_dir/pivra-thumbnail-factory"
 viewer="$root/target/release/pivra"
+raw_helper="$build_dir/pivra-raw-decoder"
 
 build_all() {
   [[ -z "${LCMS2_STATIC+x}" && -z "${LCMS2_LIB_DIR+x}" ]] ||
@@ -50,6 +51,11 @@ build_all() {
   read -r -a pkg_libs <<< "$(pkg-config --libs gnome-desktop-4 gio-2.0 gobject-2.0 gdk-pixbuf-2.0)"
   "${cc_args[@]}" "${cpp_args[@]}" "${c_args[@]}" "${pkg_cflags[@]}" -Wall -Wextra -Werror \
     native/thumbnail_factory.c -o "$helper" "${ld_args[@]}" "${pkg_libs[@]}"
+  if [[ "${PIVRA_BUILD_EXPERIMENTAL_RAW:-0}" == 1 ]]; then
+    command -v c++ >/dev/null || { echo "ERROR: C++ required for experimental RAW build" >&2; return 1; }
+    pkg-config --exists libraw || { echo "ERROR: libraw development files required for experimental RAW build" >&2; return 1; }
+    bash raw/build_helper.sh "$raw_helper"
+  fi
   PIVRA_DISTRIBUTION_BUILD=1 cargo build --release --locked --bin pivra
   [[ -x "$helper" && -x "$viewer" ]] || { echo 'ERROR: missing build output' >&2; return 1; }
   if grep -aFq '/out/pivra-thumbnail-factory' "$viewer"; then
@@ -57,6 +63,7 @@ build_all() {
     return 1
   fi
   echo 'PASS: Pivra and thumbnail helper built'
+  [[ "${PIVRA_BUILD_EXPERIMENTAL_RAW:-0}" != 1 ]] || echo 'PASS: experimental RAW helper built (not installed by default)'
 }
 
 case "$action" in
@@ -68,6 +75,12 @@ case "$action" in
     sharedir="$destdir$prefix/share"
     install -Dm755 "$viewer" "$bindir/pivra"
     install -Dm755 "$helper" "$bindir/pivra-thumbnail-factory"
+    # Never install experimental RAW into ordinary releases. The standalone
+    # decoder has not yet been wired to an installed runtime launcher.
+    if [[ "${PIVRA_INSTALL_EXPERIMENTAL_RAW:-0}" == 1 ]]; then
+      [[ -x "$raw_helper" ]] || { echo "ERROR: experimental RAW helper missing; rebuild with PIVRA_BUILD_EXPERIMENTAL_RAW=1" >&2; exit 1; }
+      install -Dm755 "$raw_helper" "$bindir/pivra-raw-decoder"
+    fi
     install -Dm644 data/io.github.onbeskarakterli.Pivra.desktop \
       "$sharedir/applications/io.github.onbeskarakterli.Pivra.desktop"
     for variant in scalable symbolic; do

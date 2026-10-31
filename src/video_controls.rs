@@ -260,6 +260,7 @@ impl Controls {
         }
     }
 
+    #[allow(dead_code)] // Standalone image probes do not handle video keyboard input.
     pub fn handle_key(&self, key: gtk::gdk::Key, ctrl: bool) -> bool {
         let media = self.stream.borrow().clone();
         let Some(media) = media else { return false; };

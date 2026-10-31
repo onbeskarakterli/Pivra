@@ -12,6 +12,11 @@ fi
 if [[ -n "$output" && "$output" != /* ]]; then
     output="$PWD/$output"
 fi
+# A test-provided decoder path is also relative to the invoking directory,
+# not to the source tree entered by the development runner.
+if [[ -n "${PIVRA_RAW_HELPER:-}" && "$PIVRA_RAW_HELPER" != /* ]]; then
+    PIVRA_RAW_HELPER="$PWD/$PIVRA_RAW_HELPER"
+fi
 if [[ "${PIVRA_RAW_INSTALLED:-0}" == 1 ]]; then
     # Installed runtime must never use sample inputs or development defaults.
     [[ "$#" == 2 ]] || { echo "Usage: pivra-raw-runner INPUT OUTPUT" >&2; exit 2; }

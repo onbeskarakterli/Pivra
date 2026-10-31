@@ -1,5 +1,8 @@
 # Pivra — Geliştirme Yol Haritası
 
+**Aktif geliştirme sürümü: v0.2.3 (`dev`, yayımlanmadı).** `Cargo.toml` ve `Cargo.lock` bu sürümü taşır. Kararlı `main` v0.2.1; AUR'daki yayımlanmış paket v0.2.1-3. **Faz 2 / PIV-18 DONE (31.10.2026).** Erken önizleme geliştirilmeyecek; 64 MP desteği kullanıcı tarafından test edilip kabul edildi. 31.10 tarihli DNG deneyi ayrıca başarılı test edildi, ancak varsayılan olarak kapalıdır. Sürüm numarası değişimi yeni yayın, etiket veya AUR güncellemesi değildir. Aşağıdaki eski sürüm ve TESTING kayıtları tarihsel kanıtlardır.
+
+
 ## B6-F2 — Son RC kabulü: teknik GO — 29.10.2026
 
 Kabul edilen RC kaynak `7e26e780acffdb1f2db0f37e8cf6485eba0baa63`;

@@ -180,16 +180,18 @@ pub(super) fn fetch(
         }
     }
     let result = if crate::raw_loader::is_dng(path) {
-        if budget.is_some() { return (Err("DNG preloading is not enabled".into()), true); }
+        if budget.is_some() {
+            return (Err("DNG preloading is not enabled".into()), true);
+        }
         crate::raw_loader::load(path, token).map(|texture| Output::Raw(texture, before.clone()))
     } else {
         let decoded = glib::MainContext::new().block_on(async {
-        if let Some(budget) = budget {
-            crate::image_loader::preload(path, token, budget).await
-        } else {
-            crate::image_loader::load(path, token).await
-        }
-    });
+            if let Some(budget) = budget {
+                crate::image_loader::preload(path, token, budget).await
+            } else {
+                crate::image_loader::load(path, token).await
+            }
+        });
         let after = FileKey::read(path).ok();
         let key = if before == after { before } else { None };
         decoded.map(|frame| Output::Decoded(frame, key))

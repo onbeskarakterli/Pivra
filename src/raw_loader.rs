@@ -1,7 +1,7 @@
 //! Experimental DNG bridge. The RAW decoder only runs under mandatory Bubblewrap.
 //! This development-tree helper is deliberately opt-in; no packaged RAW support.
 use gtk::{gdk, gio, glib, prelude::*};
-use std::{path::Path, process::Command, sync::atomic::{AtomicU64, Ordering}};
+use std::{path::Path, process::{Command, Stdio}, sync::atomic::{AtomicU64, Ordering}, time::{Duration, Instant}};
 static SERIAL: AtomicU64 = AtomicU64::new(0);
 
 pub(crate) fn enabled() -> bool {
@@ -29,8 +29,30 @@ pub(crate) fn load(path: &Path, cancel: &gio::Cancellable) -> Result<gdk::Textur
     let script = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/run_raw_sandbox_probe.sh");
     // Never use a shell to interpolate the source filename. This experiment
     // invokes a known repository script that enforces Bwrap isolation.
-    let status = Command::new("bash").arg(script).arg(path).arg(&output)
-        .status().map_err(|e| format!("DNG sandbox process: {e}"))?;
+    let mut child = Command::new("bash").arg(script).arg(path).arg(&output)
+        .stdout(Stdio::null()).stderr(Stdio::null())
+        .spawn().map_err(|e| format!("DNG sandbox process: {e}"))?;
+    let started = Instant::now();
+    let status = loop {
+        if cancel.is_cancelled() || started.elapsed() > Duration::from_secs(100) {
+            let _ = child.kill();
+            let _ = child.wait();
+            return Err(if cancel.is_cancelled() {
+                "DNG loading cancelled".into()
+            } else {
+                "DNG sandbox timed out".into()
+            });
+        }
+        match child.try_wait() {
+            Ok(Some(status)) => break status,
+            Ok(None) => std::thread::sleep(Duration::from_millis(40)),
+            Err(error) => {
+                let _ = child.kill();
+                let _ = child.wait();
+                return Err(format!("DNG sandbox wait: {error}"));
+            }
+        }
+    };
     if !status.success() {
         return Err(format!("DNG sandbox exited: {status}"));
     }

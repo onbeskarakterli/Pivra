@@ -59,6 +59,9 @@ build_all() {
     command -v c++ >/dev/null || { echo "ERROR: C++ required for experimental RAW build" >&2; return 1; }
     pkg-config --exists libraw || { echo "ERROR: libraw development files required for experimental RAW build" >&2; return 1; }
     bash raw/build_helper.sh "$raw_helper"
+  else
+    # Do not accidentally stage a helper left over from an earlier opt-in build.
+    rm -f -- "$raw_helper"
   fi
   PIVRA_DISTRIBUTION_BUILD=1 cargo build --release --locked --bin pivra
   [[ -x "$helper" && -x "$viewer" ]] || { echo 'ERROR: missing build output' >&2; return 1; }

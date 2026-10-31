@@ -435,6 +435,7 @@ impl ImageView {
             mode,
         )));
         self.video_stream.replace(Some(media.clone()));
+        self.mode_action.set_enabled(true);
         self.video.set_visible(true);
         self.video_controls
             .attach(Some(media.clone().upcast::<gtk::MediaStream>()));

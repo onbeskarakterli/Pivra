@@ -23,10 +23,11 @@ timeout 90s bwrap \
     --setenv PATH /usr/bin --setenv HOME /tmp \
     --ro-bind /usr /usr \
     --ro-bind /etc /etc \
+    --ro-bind-try /lib /lib --ro-bind-try /lib64 /lib64 \
     --proc /proc --dev /dev --tmpfs /tmp \
     --ro-bind "$tmp/raw_decode_probe" /raw-probe \
     --ro-bind "$input" /input.dng \
-    /usr/bin/sh -c '
+    /usr/bin/bash -c '
         test ! -e /home || { echo "FAIL: host home visible"; exit 1; }
         test ! -e /mnt || { echo "FAIL: host mounts visible"; exit 1; }
         echo "PASS mount isolation: host home/mnt unavailable"

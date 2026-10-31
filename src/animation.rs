@@ -1,5 +1,5 @@
 //! Animated foreground images; thumbnails stay on their static first frame.
-use super::{ViewMode, present_filtered};
+use super::ViewMode;
 use gtk::{gio, glib, prelude::*};
 use pivra::viewing::{Resampling, Transform};
 use std::{

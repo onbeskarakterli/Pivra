@@ -259,7 +259,8 @@ impl ImageView {
             mode_transform.borrow_mut().reset();
             mode_video_transform.borrow_mut().reset();
             if let Some(video) = mode_video.upgrade() {
-                if let Some(paintable) = video.paintable()
+                if let Some(paintable) = video
+                    .paintable()
                     .and_then(|p| p.downcast::<actual_paintable::ActualPaintable>().ok())
                 {
                     paintable.set_mode(mode);
@@ -426,14 +427,17 @@ impl ImageView {
         }
         self.video_path.replace(Some(path.to_owned()));
         self.video_transform.borrow_mut().reset();
-        let mode = self.mode_action.state()
+        let mode = self
+            .mode_action
+            .state()
             .and_then(|state| state.str().and_then(ViewMode::from_id))
             .unwrap_or(ViewMode::Fit);
-        self.video.set_paintable(Some(&actual_paintable::ActualPaintable::video(
-            &media,
-            self.video_transform.clone(),
-            mode,
-        )));
+        self.video
+            .set_paintable(Some(&actual_paintable::ActualPaintable::video(
+                &media,
+                self.video_transform.clone(),
+                mode,
+            )));
         self.video_stream.replace(Some(media.clone()));
         self.mode_action.set_enabled(true);
         self.video.set_visible(true);
@@ -847,24 +851,34 @@ fn install_video_interaction(
             return glib::Propagation::Stop;
         }
         let zoom = zoom_wheel.get()
-            || controller.current_event_state().contains(gtk::gdk::ModifierType::BUTTON1_MASK);
+            || controller
+                .current_event_state()
+                .contains(gtk::gdk::ModifierType::BUTTON1_MASK);
         let Some(video) = weak.upgrade() else {
             return glib::Propagation::Proceed;
         };
         if !zoom {
             if let Some(window) = video.root().and_downcast::<adw::ApplicationWindow>() {
-                let direction = if dy > 0.0 { "next-media" } else { "previous-media" };
+                let direction = if dy > 0.0 {
+                    "next-media"
+                } else {
+                    "previous-media"
+                };
                 gio::prelude::ActionGroupExt::activate_action(&window, direction, None);
             }
             return glib::Propagation::Stop;
         }
         let dimensions = source.borrow().as_ref().map(|media| {
-            (media.intrinsic_width() as f64, media.intrinsic_height() as f64)
+            (
+                media.intrinsic_width() as f64,
+                media.intrinsic_height() as f64,
+            )
         });
         let Some(dimensions) = dimensions else {
             return glib::Propagation::Proceed;
         };
-        let mode = action.state()
+        let mode = action
+            .state()
             .and_then(|value| value.str().and_then(ViewMode::from_id))
             .unwrap_or(ViewMode::Fit);
         if state.borrow_mut().zoom(
@@ -899,15 +913,27 @@ fn install_video_interaction(
     let weak = video.downgrade();
     let action = mode_action.clone();
     drag.connect_drag_update(move |_, x, y| {
-        let Some(previous) = offset.get() else { return; };
-        let Some(video) = weak.upgrade() else { return; };
+        let Some(previous) = offset.get() else {
+            return;
+        };
+        let Some(video) = weak.upgrade() else {
+            return;
+        };
         let dimensions = stream.borrow().as_ref().map(|media| {
-            (media.intrinsic_width() as f64, media.intrinsic_height() as f64)
+            (
+                media.intrinsic_width() as f64,
+                media.intrinsic_height() as f64,
+            )
         });
-        let Some(dimensions) = dimensions else { return; };
-        if !x.is_finite() || !y.is_finite() { return; }
+        let Some(dimensions) = dimensions else {
+            return;
+        };
+        if !x.is_finite() || !y.is_finite() {
+            return;
+        }
         offset.set(Some((x, y)));
-        let mode = action.state()
+        let mode = action
+            .state()
             .and_then(|value| value.str().and_then(ViewMode::from_id))
             .unwrap_or(ViewMode::Fit);
         if transform.borrow_mut().pan(

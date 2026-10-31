@@ -508,12 +508,21 @@ impl Inner {
         // Prioritize the selected image, then the neighbors actually expected
         // in the initial viewport, not unrelated images at the folder start.
         if let Some(n) = selected {
-            if entries[n].phase == Phase::Pending {
+            if entries[n].phase == Phase::Pending
+                && !crate::raw_loader::is_dng(&entries[n].path)
+            {
                 paths.push(entries[n].path.clone());
             }
         }
         for e in &entries[start..end] {
-            if e.phase == Phase::Pending && !paths.contains(&e.path) {
+            // RAW requires a full, expensive decode in the experimental path.
+            // Reserve hidden warming for normal media so a single DNG cannot
+            // delay all visible photo thumbnails. Visible DNG uses the normal
+            // priority scheduler below.
+            if e.phase == Phase::Pending
+                && !crate::raw_loader::is_dng(&e.path)
+                && !paths.contains(&e.path)
+            {
                 paths.push(e.path.clone());
             }
         }

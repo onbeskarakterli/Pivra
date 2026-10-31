@@ -1,6 +1,6 @@
 //! Experimental DNG bridge. The RAW decoder only runs under mandatory Bubblewrap.
 //! This development-tree helper is deliberately opt-in; no packaged RAW support.
-use gtk::{gdk, gio, glib};
+use gtk::{gdk, gio, glib, prelude::*};
 use std::{path::Path, process::Command, sync::atomic::{AtomicU64, Ordering}};
 static SERIAL: AtomicU64 = AtomicU64::new(0);
 
@@ -44,7 +44,7 @@ pub(crate) fn load(path: &Path, cancel: &gio::Cancellable) -> Result<gdk::Textur
     let bytes = std::fs::read(&output).map_err(|e| format!("DNG image read: {e}"))?;
     let frame = crate::raw_ppm::parse(&bytes).map_err(str::to_string)?;
     let stride = usize::try_from(frame.width).map_err(|e| e.to_string())? * 3;
-    let pixels = glib::Bytes::from(frame.pixels);
+    let pixels = glib::Bytes::from_owned(frame.pixels.to_vec());
     Ok(gdk::MemoryTexture::new(frame.width as i32, frame.height as i32,
         gdk::MemoryFormat::R8g8b8, &pixels, stride).upcast())
 }

@@ -32,9 +32,9 @@ pub(super) fn parse_args(mut args: impl Iterator<Item = OsString>) -> Command {
 pub(super) fn print_help() {
     println!("{APP_NAME} {}", env!("CARGO_PKG_VERSION"));
     println!("Usage: pivra [--help | --version]");
-    println!("       pivra <local-photo-path | file://URI>");
-    println!("JPEG/PNG viewing requires a working sandboxed Glycin loader.");
-    println!("Accepts one local .jpg/.jpeg/.png file; reports loading and decoder errors.");
+    println!("       pivra <local-media-path | directory | file://URI>");
+    println!("Photo decoding requires a working sandboxed Glycin loader.");
+    println!("A directory opens its first supported media in natural filename order.");
 }
 
 #[cfg(test)]

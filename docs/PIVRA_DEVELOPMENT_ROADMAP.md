@@ -63,6 +63,12 @@ final source/metadata/yayın kapıları ayrı. Önceki B6 FAIL kaydı tarihseldi
 [Her uyarı, değişiklik, gerçek komut ve sınırlamalar](releases/PIVRA_V0.1_B6_READINESS_AUDIT.md#b6-w1--strict-warning-cleanup--2026-10-29).
 
 
+## Faz 2 resmî kapanış — 31.10.2026 — DONE
+
+**Proje sahibi kararı: Faz 2 DONE; PIV-18 DONE.** Erken önizleme yapılmayacak; kabul koşulundan çıkarılmıştır. 64 MP görüntü desteği kullanıcı tarafından test edilip kabul edilmiştir. PIV-13–17 kabul kayıtları geçerlidir. 31.10.2026 RAW/DNG toplu testi ayrıca 36/36 Rust birim testi, release build, dört negatif test, iptal ve gerçek 6020×4024 DNG decode PASS gösterdi; bu 64 MP sınır testi değildir.
+
+Faz 0, DESKTOP-06, ayrı paketleme/yayın kapıları bağımsızdır. Bu karar main/tag/Release/AUR/CI değişikliği değildir. Eski TESTING kayıtları tarihsel snapshot olarak kalır.
+
 ## B6 — Güncel yayın hazırlığı kaydı — 29.10.2026
 
 Denetlenen ve kullanıcı tarafından native paketi kabul edilen kaynak:
@@ -85,7 +91,7 @@ Tam komutlar, kanıt ayrımı, değişiklik SHA'ları ve kalan kararlar:
 Bu görev yalnız dokümandır; main/tag/release/AUR/CI değiştirilmedi.
 
 
-**Durum:** PIV-01–08 DONE (giriş, keşif ve doğal sıra); PIV-09 DONE (Arch gerçek JPEG/PNG/EXIF, geometri ve aktif-decode kapanış/temizlik PASS); PIV-10 DONE (native gerçek secure piksel/Fit ve fiziksel sol/sağ gezinme PASS); PIV-11 DONE (Arch native ve GNOME Yenile PASS); PIV-12 DONE (24.10.2026 native + manuel kabul); PIV-13 DONE (24.10.2026 Arch native ve manuel kabul); PIV-14 DONE (24.10.2026 Arch native + gerçek fare kabulü); PIV-15 DONE (24.10.2026 Arch native ve manuel Smooth/Nearest kabulü); PIV-16 DONE (24.10.2026 Arch native + manuel kabul); PIV-17 DONE (Arch native + manuel kabul); PIV-18 TESTING; PIV-19–60 TODO. Faz 0 INCOMPLETE: temiz native kurulumun bağımsız yeniden üretimi NOT RUN; temiz Cargo target derlemesi ve headless regresyonlar geçti. [PIV-05 kanıtı ve ayrı faz kapısı](PIVRA_TECHNICAL_CAPABILITIES.md#102-piv-05-ve-faz-0-kapanışını-ayrı-değerlendirme).
+**Durum:** PIV-01–08 DONE (giriş, keşif ve doğal sıra); PIV-09 DONE (Arch gerçek JPEG/PNG/EXIF, geometri ve aktif-decode kapanış/temizlik PASS); PIV-10 DONE (native gerçek secure piksel/Fit ve fiziksel sol/sağ gezinme PASS); PIV-11 DONE (Arch native ve GNOME Yenile PASS); PIV-12 DONE (24.10.2026 native + manuel kabul); PIV-13 DONE (24.10.2026 Arch native ve manuel kabul); PIV-14 DONE (24.10.2026 Arch native + gerçek fare kabulü); PIV-15 DONE (24.10.2026 Arch native ve manuel Smooth/Nearest kabulü); PIV-16 DONE (24.10.2026 Arch native + manuel kabul); PIV-17 DONE (Arch native + manuel kabul); PIV-18 DONE (31.10.2026); PIV-19–60 TODO. Faz 0 INCOMPLETE: temiz native kurulumun bağımsız yeniden üretimi NOT RUN; temiz Cargo target derlemesi ve headless regresyonlar geçti. [PIV-05 kanıtı ve ayrı faz kapısı](PIVRA_TECHNICAL_CAPABILITIES.md#102-piv-05-ve-faz-0-kapanışını-ayrı-değerlendirme).
 **Başlangıç branch:** `dev` · **Kararlı sürümler:** `main`  
 **Kaynak şartname:** [PIVRA_FEATURE_SPEC_TR.md](PIVRA_FEATURE_SPEC_TR.md)  
 **Görev ve commit takibi:** [PIVRA_COMMIT_TRACKER.md](PIVRA_COMMIT_TRACKER.md)

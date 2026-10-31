@@ -16,8 +16,8 @@ int main(int argc, char **argv) {
     std::error_code ec;
     const fs::path path(argv[1]);
     const auto size = fs::file_size(path, ec);
-    if (ec || !fs::is_regular_file(path) || size > 64ULL * 1024 * 1024) {
-        std::cerr << "FAIL: missing, non-regular or larger than 64 MiB\n";
+    if (ec || !fs::is_regular_file(path) || size == 0 || size > 64ULL * 1024 * 1024) {
+        std::cerr << "FAIL: empty, missing, non-regular or larger than 64 MiB\n";
         return 2;
     }
     LibRaw raw;

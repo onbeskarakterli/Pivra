@@ -31,8 +31,8 @@ PY
 cargo fmt --all -- --check
 cargo check --locked --bin pivra
 
-echo '=== 2/5 Rust RAW unit tests ==='
-cargo test --locked --bin pivra raw_loader::tests
+echo '=== 2/5 Rust unit tests (including RAW parser and loader) ==='
+cargo test --locked --bin pivra
 
 echo '=== 3/5 Native experimental RAW build ==='
 PIVRA_BUILD_EXPERIMENTAL_RAW=1 bash packaging/linux/build-install.sh build
@@ -55,9 +55,11 @@ done
 # Check the actual installed launcher and packaged decoder with a real DNG.
 # TMPDIR places the decoder scratch and the final output on one filesystem.
 mkdir -p "$stage/work"
+# An invalid inherited helper override must not replace the packaged decoder.
 TMPDIR="$stage/work" PIVRA_RAW_INSTALLED=1 \
+    PIVRA_RAW_HELPER="$stage/nonexistent-override" \
     bash "$stage/usr/bin/pivra-raw-runner" "$sample" "$stage/work/accepted.ppm"
 python3 tests/validate_raw_ppm.py "$stage/work/accepted.ppm"
 
-echo 'PASS: static checks, Rust RAW tests, negative inputs, cancellation, staged packaging and real installed DNG decoding'
+echo 'PASS: static checks, Rust tests, negative inputs, cancellation, staged packaging, real DNG decoding and installed helper override isolation'
 echo 'NOTE: GUI DNG rendering and orphan-free cancellation still require separate observation.'

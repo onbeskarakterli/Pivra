@@ -1,6 +1,7 @@
 //! Experimental DNG bridge. The RAW decoder only runs under mandatory Bubblewrap.
 //! RAW support is opt-in; distribution builds require an installed helper.
 use gtk::{gdk, gio, glib, prelude::*};
+use std::fs::OpenOptions;
 use std::os::unix::process::CommandExt;
 
 unsafe extern "C" {
@@ -72,7 +73,10 @@ pub(crate) fn load(path: &Path, cancel: &gio::Cancellable) -> Result<gdk::Textur
     // Filenames are passed as individual argv values, never shell-interpolated.
     // Keep bounded diagnostics for failed decodes instead of hiding every
     // sandbox error behind an uninformative exit code.
-    let log = std::fs::File::create(&diagnostics)
+    let log = OpenOptions::new()
+        .write(true)
+        .create_new(true)
+        .open(&diagnostics)
         .map_err(|e| format!("DNG diagnostics: {e}"))?;
     let mut child = command
         .process_group(0)

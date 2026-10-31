@@ -2,6 +2,12 @@
 # Experimental LibRaw runtime launcher with mandatory Bubblewrap isolation.
 set -euo pipefail
 script_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+# Resolve relative media paths before changing to the source directory.
+# The development runner should interpret paths relative to the caller.
+input="${1:-$HOME/Downloads/Ricoh-GR-III.DNG}"
+if [[ "$input" != /* ]]; then
+    input="$PWD/$input"
+fi
 if [[ "${PIVRA_RAW_INSTALLED:-0}" == 1 ]]; then
     # Installed runtime must never use sample inputs or development defaults.
     [[ "$#" == 2 ]] || { echo "Usage: pivra-raw-runner INPUT OUTPUT" >&2; exit 2; }
@@ -9,7 +15,6 @@ else
     cd "$script_dir/.."
     [[ "$#" -le 2 ]] || { echo "Usage: run_decode.sh [INPUT] [OUTPUT]" >&2; exit 2; }
 fi
-input="${1:-$HOME/Downloads/Ricoh-GR-III.DNG}"
 [[ -f "$input" && ! -L "$input" ]] || { printf 'Missing or unsafe RAW input: %s\n' "$input" >&2; exit 2; }
 # Match the native decoder's 64 MiB bound before entering the sandbox.
 [[ "$(stat -c %s -- "$input")" -gt 0 && "$(stat -c %s -- "$input")" -le 67108864 ]] ||

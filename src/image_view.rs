@@ -851,12 +851,9 @@ fn install_video_interaction(
             return glib::Propagation::Stop;
         }
         let zoom = zoom_wheel.get()
-            || controller
-                .current_event_state()
-                .intersects(
-                    gtk::gdk::ModifierType::BUTTON1_MASK
-                        | gtk::gdk::ModifierType::CONTROL_MASK,
-                );
+            || controller.current_event_state().intersects(
+                gtk::gdk::ModifierType::BUTTON1_MASK | gtk::gdk::ModifierType::CONTROL_MASK,
+            );
         let Some(video) = weak.upgrade() else {
             return glib::Propagation::Proceed;
         };
@@ -980,12 +977,9 @@ pub(super) fn install_interaction(
     let scroll_filter = filter.clone();
     scroll.connect_scroll(move |controller, _, dy| {
         let zoom = zoom_wheel.get()
-            || controller
-                .current_event_state()
-                .intersects(
-                    gtk::gdk::ModifierType::BUTTON1_MASK
-                        | gtk::gdk::ModifierType::CONTROL_MASK,
-                );
+            || controller.current_event_state().intersects(
+                gtk::gdk::ModifierType::BUTTON1_MASK | gtk::gdk::ModifierType::CONTROL_MASK,
+            );
         if !zoom {
             if let Some(picture) = weak.upgrade() {
                 if let Some(window) = picture.root().and_downcast::<adw::ApplicationWindow>() {

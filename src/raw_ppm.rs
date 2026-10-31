@@ -14,14 +14,25 @@ pub(crate) fn parse(data: &[u8]) -> Result<RgbFrame<'_>, &'static str> {
         return Err("invalid PPM signature");
     }
     let rest = &data[3..];
-    let end_dimensions = rest.iter().position(|&b| b == b'\n').ok_or("missing dimensions")?;
+    let end_dimensions = rest
+        .iter()
+        .position(|&b| b == b'\n')
+        .ok_or("missing dimensions")?;
     if end_dimensions > 32 {
         return Err("oversized dimensions header");
     }
     let dims = std::str::from_utf8(&rest[..end_dimensions]).map_err(|_| "non-ASCII dimensions")?;
     let mut values = dims.split(' ');
-    let width = values.next().ok_or("missing width")?.parse::<u32>().map_err(|_| "invalid width")?;
-    let height = values.next().ok_or("missing height")?.parse::<u32>().map_err(|_| "invalid height")?;
+    let width = values
+        .next()
+        .ok_or("missing width")?
+        .parse::<u32>()
+        .map_err(|_| "invalid width")?;
+    let height = values
+        .next()
+        .ok_or("missing height")?
+        .parse::<u32>()
+        .map_err(|_| "invalid height")?;
     if values.next().is_some() || width == 0 || height == 0 || width > 16384 || height > 16384 {
         return Err("invalid geometry");
     }
@@ -33,12 +44,16 @@ pub(crate) fn parse(data: &[u8]) -> Result<RgbFrame<'_>, &'static str> {
         return Err("invalid PPM maxval");
     }
     let start = offset + 4;
-    let expected = usize::try_from(u64::from(width) * u64::from(height) * 3)
-        .map_err(|_| "raster overflow")?;
+    let expected =
+        usize::try_from(u64::from(width) * u64::from(height) * 3).map_err(|_| "raster overflow")?;
     if expected > MAX_BYTES || data.len().checked_sub(start) != Some(expected) {
         return Err("invalid raster length");
     }
-    Ok(RgbFrame { width, height, pixels: &data[start..] })
+    Ok(RgbFrame {
+        width,
+        height,
+        pixels: &data[start..],
+    })
 }
 
 #[cfg(test)]

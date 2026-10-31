@@ -92,6 +92,11 @@ if [[ -n "$output" ]]; then
     if [[ "${PIVRA_RAW_INSTALLED:-0}" != 1 ]]; then
         python3 tests/validate_raw_ppm.py "$tmp/image.ppm"
     fi
-    cp --no-clobber -- "$tmp/image.ppm" "$output"
+    # Bash noclobber uses exclusive creation: unlike cp --no-clobber,
+    # a racing destination cannot be silently treated as success.
+    if ! (set -C; cat -- "$tmp/image.ppm" > "$output"); then
+        echo 'FAIL: RAW output could not be created exclusively' >&2
+        exit 2
+    fi
     printf 'PPM output: %s\n' "$output"
 fi

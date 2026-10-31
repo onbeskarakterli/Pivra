@@ -30,6 +30,14 @@ check() {
         { echo "MISSING NATIVE MODULE: $module"; failed=1; }
     done
   fi
+  if [[ "${PIVRA_BUILD_EXPERIMENTAL_RAW:-0}" == 1 ]]; then
+    command -v c++ >/dev/null 2>&1 ||
+      { echo 'MISSING COMMAND: c++ (experimental RAW build)'; failed=1; }
+    command -v timeout >/dev/null 2>&1 ||
+      { echo 'MISSING COMMAND: timeout (experimental RAW runtime)'; failed=1; }
+    pkg-config --exists libraw 2>/dev/null ||
+      { echo 'MISSING NATIVE MODULE: libraw (experimental RAW build)'; failed=1; }
+  fi
   if [[ "$failed" == 0 ]]; then echo 'PASS: required build tools and native development APIs available'; fi
   return "$failed"
 }

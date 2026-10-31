@@ -3,11 +3,13 @@
 #include <cstdint>
 #include <filesystem>
 #include <iostream>
+#include <fstream>
+#include <string>
 #include <memory>
 
 int main(int argc, char **argv) {
-    if (argc != 2) {
-        std::cerr << "Usage: raw_decode_probe <raw-file>\n";
+    if (argc != 2 && argc != 3) {
+        std::cerr << "Usage: raw_decode_probe <raw-file> [output-ppm]\n";
         return 2;
     }
     namespace fs = std::filesystem;
@@ -42,6 +44,25 @@ int main(int argc, char **argv) {
     std::cout << "BITMAP width=" << img->width << " height=" << img->height
               << " colors=" << img->colors << " bits=" << img->bits
               << " bytes=" << img->data_size << "\n";
+    if (valid && argc == 3) {
+        const uint64_t expected = uint64_t(img->width) * img->height * img->colors * (img->bits / 8);
+        if (img->bits != 8 || img->colors != 3 || expected != img->data_size ||
+            expected > 256ULL * 1024 * 1024 || img->width > 16384 || img->height > 16384) {
+            std::cerr << "FAIL: unsafe PPM output geometry or size\\n";
+            raw.dcraw_clear_mem(img);
+            return 1;
+        }
+        std::ofstream out(argv[2], std::ios::binary | std::ios::trunc);
+        out << "P6\\n" << img->width << " " << img->height << "\\n255\\n";
+        out.write(reinterpret_cast<const char *>(img->data), img->data_size);
+        out.flush();
+        if (!out.good()) {
+            std::cerr << "FAIL: PPM write error\\n";
+            raw.dcraw_clear_mem(img);
+            return 1;
+        }
+        std::cout << "PASS bounded PPM transfer output\\n";
+    }
     raw.dcraw_clear_mem(img);
     if (!valid) {
         std::cerr << "FAIL invalid processed bitmap\n";

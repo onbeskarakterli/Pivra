@@ -1,6 +1,6 @@
 [package]
 name = "pivra"
-version = "0.2.1"
+version = "0.2.3"
 edition = "2024"
 rust-version = "1.85"
 description = "A lightweight GNOME image viewer with seamless photo and video navigation"

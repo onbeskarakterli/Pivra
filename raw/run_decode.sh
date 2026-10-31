@@ -108,7 +108,9 @@ if [[ -n "$output" ]]; then
     # This is atomic, never overwrites a destination, and leaves no staging
     # file behind even if the runner is killed with SIGKILL.
     # Pivra places the decoder scratch and output on the same filesystem.
-    if ! ln -- "$tmp/image.ppm" "$output"; then
+    # -T treats the destination as a file even if a directory appears
+    # between the initial existence check and this atomic link operation.
+    if ! ln -T -- "$tmp/image.ppm" "$output"; then
         echo 'FAIL: RAW output link could not be created (destination exists or filesystems differ)' >&2
         exit 2
     fi

@@ -842,6 +842,7 @@ fn install_video_interaction(
     video.add_controller(motion);
 
     let scroll = gtk::EventControllerScroll::new(gtk::EventControllerScrollFlags::VERTICAL);
+    scroll.set_propagation_phase(gtk::PropagationPhase::Capture);
     let source = stream.clone();
     let state = transform.clone();
     let action = mode_action.clone();
@@ -970,6 +971,7 @@ pub(super) fn install_interaction(
     motion.connect_motion(move |_, x, y| position.set((x, y)));
     picture.add_controller(motion);
     let scroll = gtk::EventControllerScroll::new(gtk::EventControllerScrollFlags::VERTICAL);
+    scroll.set_propagation_phase(gtk::PropagationPhase::Capture);
     let weak = picture.downgrade();
     let source = texture.clone();
     let state = transform.clone();
@@ -1124,6 +1126,32 @@ fn manual(
         )));
     }
     action.set_state(&"manual".to_variant());
+}
+
+/// Keep a single transformed paintable for all frames of one animation.
+pub(super) fn present_animation_frame(
+    picture: &gtk::Picture,
+    texture: &gtk::gdk::Texture,
+    id: &str,
+    transform: Rc<RefCell<Transform>>,
+    filter: Rc<Cell<Resampling>>,
+) {
+    let mode = ViewMode::from_id(id).unwrap_or(ViewMode::Actual);
+    if let Some(current) = picture
+        .paintable()
+        .and_then(|p| p.downcast::<actual_paintable::ActualPaintable>().ok())
+        .filter(|p| p.has_transform(&transform))
+    {
+        // Manual zoom lives in Transform, not in the incoming frame texture.
+        current.set_mode(mode);
+        current.update_texture(texture);
+        return;
+    }
+    picture.set_overflow(gtk::Overflow::Hidden);
+    picture.set_content_fit(gtk::ContentFit::Fill);
+    picture.set_paintable(Some(&actual_paintable::ActualPaintable::transformed(
+        texture, transform, mode, filter,
+    )));
 }
 
 pub(super) fn present_filtered(

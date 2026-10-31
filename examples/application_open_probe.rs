@@ -1,4 +1,6 @@
 //! Actual app::launch/GIO-open path. No mock decoder, no automatic MIME override.
+#[path = "../src/raw_loader.rs"]
+mod raw_loader;
 #[path = "../src/app.rs"]
 mod app;
 #[path = "../src/image_loader.rs"]

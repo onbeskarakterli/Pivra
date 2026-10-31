@@ -1,4 +1,9 @@
 # Pivra — Geliştirme Yol Haritası
+## Dev TODO — example-target warnings (31.10.2026)
+
+- **TODO, non-blocking:** Remove recurring `dead_code` warning for `ImageView::video_widget()` in example probes (navigation_race_probe, image_gui_probe, async_cancel_probe, active_decode_close_probe, preload_probe). Preserve production video functionality; avoid blanket suppression. Validate with `cargo check --locked --all-targets` and `cargo test --locked --all-targets`.
+- This cleanup is for `dev` and does not block the v0.2.3-1 AUR package.
+
 
 **Aktif geliştirme sürümü: v0.2.3 (`dev`, yayımlanmadı).** `Cargo.toml` ve `Cargo.lock` bu sürümü taşır. Kararlı `main` v0.2.1; AUR'daki yayımlanmış paket v0.2.1-3. **Faz 2 / PIV-18 DONE (31.10.2026).** Erken önizleme geliştirilmeyecek; 64 MP desteği kullanıcı tarafından test edilip kabul edildi. 31.10 tarihli DNG deneyi ayrıca başarılı test edildi, ancak varsayılan olarak kapalıdır. Sürüm numarası değişimi yeni yayın, etiket veya AUR güncellemesi değildir. Aşağıdaki eski sürüm ve TESTING kayıtları tarihsel kanıtlardır.
 

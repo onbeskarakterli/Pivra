@@ -106,7 +106,7 @@ pub(crate) fn load(path: &Path, cancel: &gio::Cancellable) -> Result<gdk::Textur
             .map(|bytes| {
                 String::from_utf8_lossy(&bytes[..bytes.len().min(1024)])
                     .chars()
-                    .filter(|c| !c.is_control() || *c == '\\n')
+                    .filter(|c| !c.is_control() || *c == '\n')
                     .collect::<String>()
             })
             .unwrap_or_default();

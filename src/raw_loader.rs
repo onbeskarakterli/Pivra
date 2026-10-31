@@ -1,5 +1,5 @@
 //! Experimental DNG bridge. The RAW decoder only runs under mandatory Bubblewrap.
-//! This development-tree helper is deliberately opt-in; no packaged RAW support.
+//! RAW support is opt-in; distribution builds require an installed helper.
 use gtk::{gdk, gio, glib, prelude::*};
 use std::os::unix::process::CommandExt;
 
@@ -49,6 +49,11 @@ pub(crate) fn load(path: &Path, cancel: &gio::Cancellable) -> Result<gdk::Textur
         .ok()
         .and_then(|exe| exe.parent().map(|dir| dir.join("pivra-raw-runner")))
         .filter(|runner| runner.is_file());
+    // A distribution binary must never fall back to a path embedded from the
+    // developer's build machine. Missing installed helpers fail closed.
+    if option_env!("PIVRA_DISTRIBUTION_RAW").is_some() && installed_runner.is_none() {
+        return Err("Experimental RAW sandbox runner is not installed".into());
+    }
     let script = installed_runner.clone().unwrap_or_else(|| {
         Path::new(env!("CARGO_MANIFEST_DIR")).join("raw/run_decode.sh")
     });
@@ -61,7 +66,8 @@ pub(crate) fn load(path: &Path, cancel: &gio::Cancellable) -> Result<gdk::Textur
     let mut child = command
         .process_group(0)
         .stdout(Stdio::null()).stderr(Stdio::null())
-        .spawn().map_err(|e| format!("DNG sandbox process: {e}"))?;
+        .spawn()
+        .map_err(|e| format!("DNG sandbox process: {e}"))?;
     let started = Instant::now();
     let status = loop {
         if cancel.is_cancelled() || started.elapsed() > Duration::from_secs(100) {

@@ -746,6 +746,7 @@ impl ImageView {
                         let (decoded, key) = match output {
                             preload::Output::Decoded(frame, key) => (frame.texture(), key),
                             preload::Output::Cached(texture, key) => (texture, Some(key)),
+                            preload::Output::Raw(texture, key) => (texture, key),
                         };
                         let cost = texture_cost(decoded.width() as u32, decoded.height() as u32);
                         {

@@ -92,32 +92,24 @@ if [[ -n "$output" ]]; then
     if [[ "${PIVRA_RAW_INSTALLED:-0}" != 1 ]]; then
         python3 tests/validate_raw_ppm.py "$tmp/image.ppm"
     fi
-    # Fully stage the image beside the destination, then publish using an
-    # exclusive hard link. A failed or interrupted copy never exposes a
-    # partial output, and an existing destination is never overwritten.
+    # The completed decoder frame already lives in a private scratch
+    # directory. Publish it with one exclusive hard-link operation instead
+    # of copying a second 200+ MiB temporary file beside the destination.
+    # This is atomic, never overwrites a destination, and leaves no staging
+    # file behind even if the runner is killed with SIGKILL.
+    # Pivra places the decoder scratch and output on the same filesystem.
     python3 - "$tmp/image.ppm" "$output" <<'PY'
+import errno
 import os
-import shutil
 import sys
-import tempfile
 
 source, destination = sys.argv[1:]
-parent = os.path.dirname(os.path.abspath(destination))
-staged = None
 try:
-    with tempfile.NamedTemporaryFile(
-        mode="wb", prefix=".pivra-raw-", suffix=".ppm",
-        dir=parent, delete=False
-    ) as target:
-        staged = target.name
-        with open(source, "rb") as frame:
-            shutil.copyfileobj(frame, target)
-        target.flush()
-        os.fsync(target.fileno())
-    os.link(staged, destination, follow_symlinks=False)
-finally:
-    if staged is not None:
-        os.unlink(staged)
+    os.link(source, destination, follow_symlinks=False)
+except OSError as error:
+    if error.errno == errno.EXDEV:
+        sys.exit("RAW output must be on the same filesystem as its scratch directory")
+    raise
 PY
     printf 'PPM output: %s\n' "$output"
 fi

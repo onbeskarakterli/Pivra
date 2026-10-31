@@ -18,8 +18,10 @@ if [[ -n "${PIVRA_RAW_HELPER:-}" && "$PIVRA_RAW_HELPER" != /* ]]; then
     PIVRA_RAW_HELPER="$PWD/$PIVRA_RAW_HELPER"
 fi
 if [[ "${PIVRA_RAW_INSTALLED:-0}" == 1 ]]; then
-    # Installed runtime must never use sample inputs or development defaults.
+    # Installed runtime must never use sample inputs, development defaults,
+    # or environment-supplied decoders. Always run the packaged sibling.
     [[ "$#" == 2 ]] || { echo "Usage: pivra-raw-runner INPUT OUTPUT" >&2; exit 2; }
+    unset PIVRA_RAW_HELPER
 else
     cd "$script_dir/.."
     [[ "$#" -le 2 ]] || { echo "Usage: run_decode.sh [INPUT] [OUTPUT]" >&2; exit 2; }

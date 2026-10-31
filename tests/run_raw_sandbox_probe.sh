@@ -7,6 +7,9 @@ input="${1:-$HOME/Downloads/Ricoh-GR-III.DNG}"
 [[ -f "$input" ]] || { printf 'Missing RAW input: %s\n' "$input" >&2; exit 2; }
 command -v bwrap >/dev/null || { echo 'FAIL: bubblewrap required' >&2; exit 2; }
 command -v c++ >/dev/null || { echo 'FAIL: C++ compiler required' >&2; exit 2; }
+cache="${XDG_CACHE_HOME:-$HOME/.cache}/pivra/raw-helper"
+mkdir -p "$cache"
+chmod 700 "$cache"
 tmp="$(mktemp -d)"
 output="${2:-}"
 if [[ -n "$output" ]]; then
@@ -18,7 +21,19 @@ if pkg-config --exists libraw 2>/dev/null; then
 else
     flags=(-lraw)
 fi
-c++ -std=c++17 -O2 -Wall -Wextra -Werror tests/raw_decode_probe.cpp -o "$tmp/raw_decode_probe" "${flags[@]}"
+# Compile once per source/compiler/LibRaw version rather than every DNG open.
+key="$( { sha256sum tests/raw_decode_probe.cpp; c++ --version | head -n 1; pkg-config --modversion libraw 2>/dev/null || pacman -Q libraw; } | sha256sum | cut -d' ' -f1)"
+helper="$cache/raw-probe-$key"
+if [[ ! -x "$helper" ]]; then
+    staging="$(mktemp "$cache/.building.XXXXXX")"
+    trap 'rm -f "$staging"; rm -rf "$tmp"' EXIT
+    c++ -std=c++17 -O2 -Wall -Wextra -Werror tests/raw_decode_probe.cpp -o "$staging" "${flags[@]}"
+    chmod 700 "$staging"
+    mv -f "$staging" "$helper"
+    echo "RAW_HELPER_BUILD=compiled"
+else
+    echo "RAW_HELPER_BUILD=cached"
+fi
 # The input is the only host media visible inside the sandbox.
 # No --bind of /home or working directory and no network namespace sharing.
 printf 'SANDBOX: mandatory=bwrap, unshare-all, input-only read-only mount\n'
@@ -29,7 +44,7 @@ timeout 90s bwrap \
     --ro-bind /etc /etc \
     --ro-bind-try /lib /lib --ro-bind-try /lib64 /lib64 \
     --proc /proc --dev /dev --tmpfs /tmp \
-    --ro-bind "$tmp/raw_decode_probe" /raw-probe \
+    --ro-bind "$helper" /raw-probe \
     --ro-bind "$input" /input.dng \
     --bind "$tmp" /output \
     /usr/bin/bash -c '

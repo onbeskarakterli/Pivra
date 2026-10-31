@@ -594,7 +594,11 @@ fn high_resolution_geometry_and_weighted_admission_are_bounded() {
     drop(large);
     assert_eq!(MEMORY.lock().unwrap().0, 0);
     assert!(
-        secure_loader::validate_dimensions(8000, 6000).is_err(),
-        "main photo policy remains32MP"
+        secure_loader::validate_dimensions(8000, 6000).is_ok(),
+        "48 MP images are supported by the 64 MP photo policy"
+    );
+    assert!(
+        secure_loader::validate_dimensions(8001, 8000).is_err(),
+        "images exceeding 64 MP remain rejected"
     );
 }

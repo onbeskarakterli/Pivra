@@ -99,9 +99,11 @@ fn directory_with_media_passes_input_validation_before_graphical_initialization(
     let output = run(&[directory.path().to_str().unwrap()]);
     assert_eq!(output.status.code(), Some(1));
     assert!(output.stdout.is_empty());
-    assert!(String::from_utf8(output.stderr)
-        .unwrap()
-        .starts_with("Pivra: unable to initialize GTK;"));
+    assert!(
+        String::from_utf8(output.stderr)
+            .unwrap()
+            .starts_with("Pivra: unable to initialize GTK;")
+    );
 }
 
 #[test]

@@ -342,7 +342,7 @@ pub(super) fn start(
                                                 .and_then(|v| v.str().and_then(ViewMode::from_id))
                                                 .unwrap_or_default();
                                             texture.replace(Some(next.clone()));
-                                            present_filtered(&picture, Some(&next), mode.id(), transform.clone(), filter.clone());
+                                            super::present_animation_frame(&picture, &next, mode.id(), transform.clone(), filter.clone());
                                         }
                                         controls.show_progress(elapsed / total);
                                         controls.show_time(elapsed, total);
@@ -433,7 +433,7 @@ pub(super) fn start(
                 .and_then(|v| v.str().and_then(ViewMode::from_id))
                 .unwrap_or_default();
             texture.replace(Some(next.clone()));
-            present_filtered(&picture, Some(&next), mode.id(), transform.clone(), filter.clone());
+            super::present_animation_frame(&picture, &next, mode.id(), transform.clone(), filter.clone());
             delay = next_delay;
             if timeline_ready {
                 controls.show_progress(elapsed / total);

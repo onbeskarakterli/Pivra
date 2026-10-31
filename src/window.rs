@@ -393,6 +393,14 @@ pub(super) fn build(app: &adw::Application, settings: &Settings, file: Option<Op
         });
         zoom_toggle.set_child(Some(&lens));
         zoom_toggle.set_active(false);
+        // Use the GNOME accent color only while wheel zoom is enabled.
+        zoom_toggle.connect_toggled(|button| {
+            if button.is_active() {
+                button.add_css_class("suggested-action");
+            } else {
+                button.remove_css_class("suggested-action");
+            }
+        });
         header.pack_end(&zoom_toggle);
         let zoom_for_key = zoom_toggle.clone();
         let zoom_key = gtk::EventControllerKey::new();

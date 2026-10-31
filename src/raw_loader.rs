@@ -41,14 +41,19 @@ pub(crate) fn load(path: &Path, cancel: &gio::Cancellable) -> Result<gdk::Textur
     if cancel.is_cancelled() {
         return Err("DNG loading cancelled".into());
     }
-    let serial = SERIAL.fetch_add(1, Ordering::Relaxed);
-    let directory = std::env::temp_dir().join(format!("pivra-dng-{}-{serial}", std::process::id()));
-    // Atomically create a private directory. Never reuse an existing path:
-    // cleanup below must not delete files owned by another process or user.
-    std::fs::DirBuilder::new()
-        .mode(0o700)
-        .create(&directory)
-        .map_err(|e| format!("DNG temp directory: {e}"))?;
+    // A previous Pivra process may have been killed before cleanup. Skip
+    // leftover names safely instead of failing the first RAW load on restart.
+    // Never open or delete a directory that this process did not create.
+    let directory = loop {
+        let serial = SERIAL.fetch_add(1, Ordering::Relaxed);
+        let candidate = std::env::temp_dir()
+            .join(format!("pivra-dng-{}-{serial}", std::process::id()));
+        match std::fs::DirBuilder::new().mode(0o700).create(&candidate) {
+            Ok(()) => break candidate,
+            Err(error) if error.kind() == std::io::ErrorKind::AlreadyExists => continue,
+            Err(error) => return Err(format!("DNG temp directory: {error}")),
+        }
+    };
     struct Cleanup(std::path::PathBuf);
     impl Drop for Cleanup {
         fn drop(&mut self) { let _ = std::fs::remove_dir_all(&self.0); }

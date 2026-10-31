@@ -2,7 +2,7 @@
 //! RAW support is opt-in; distribution builds require an installed helper.
 use gtk::{gdk, gio, glib, prelude::*};
 use std::fs::OpenOptions;
-use std::os::unix::process::CommandExt;
+use std::os::unix::{fs::DirBuilderExt, process::CommandExt};
 
 unsafe extern "C" {
     fn kill(pid: i32, signal: i32) -> i32;
@@ -37,7 +37,12 @@ pub(crate) fn load(path: &Path, cancel: &gio::Cancellable) -> Result<gdk::Textur
     }
     let serial = SERIAL.fetch_add(1, Ordering::Relaxed);
     let directory = std::env::temp_dir().join(format!("pivra-dng-{}-{serial}", std::process::id()));
-    std::fs::create_dir(&directory).map_err(|e| format!("DNG temp directory: {e}"))?;
+    // Atomically create a private directory. Never reuse an existing path:
+    // cleanup below must not delete files owned by another process or user.
+    std::fs::DirBuilder::new()
+        .mode(0o700)
+        .create(&directory)
+        .map_err(|e| format!("DNG temp directory: {e}"))?;
     struct Cleanup(std::path::PathBuf);
     impl Drop for Cleanup {
         fn drop(&mut self) { let _ = std::fs::remove_dir_all(&self.0); }

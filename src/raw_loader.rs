@@ -59,6 +59,9 @@ pub(crate) fn load(path: &Path, cancel: &gio::Cancellable) -> Result<gdk::Textur
     });
     let mut command = Command::new("bash");
     command.arg(&script).arg(path).arg(&output);
+    // Scope all runner scratch directories to this load. The RAII cleanup
+    // removes them even when the entire process group is killed on cancel.
+    command.env("TMPDIR", &directory);
     if installed_runner.is_some() {
         command.env("PIVRA_RAW_INSTALLED", "1");
     }

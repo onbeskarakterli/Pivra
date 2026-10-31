@@ -43,7 +43,7 @@ pub(crate) fn load(path: &Path, cancel: &gio::Cancellable) -> Result<gdk::Textur
     }
     let _cleanup = Cleanup(directory.clone());
     let output = directory.join("frame.ppm");
-    let script = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/run_raw_sandbox_probe.sh");
+    let script = Path::new(env!("CARGO_MANIFEST_DIR")).join("raw/run_decode.sh");
     // Never use a shell to interpolate the source filename. This experiment
     // invokes a known repository script that enforces Bwrap isolation.
     let mut child = Command::new("bash").arg(script).arg(path).arg(&output)

@@ -5,8 +5,12 @@ script_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 # Resolve relative media paths before changing to the source directory.
 # The development runner should interpret paths relative to the caller.
 input="${1:-$HOME/Downloads/Ricoh-GR-III.DNG}"
+output="${2:-}"
 if [[ "$input" != /* ]]; then
     input="$PWD/$input"
+fi
+if [[ -n "$output" && "$output" != /* ]]; then
+    output="$PWD/$output"
 fi
 if [[ "${PIVRA_RAW_INSTALLED:-0}" == 1 ]]; then
     # Installed runtime must never use sample inputs or development defaults.
@@ -21,7 +25,6 @@ fi
     { echo 'RAW input must be between 1 byte and 64 MiB' >&2; exit 2; }
 command -v bwrap >/dev/null || { echo 'FAIL: bubblewrap required' >&2; exit 2; }
 tmp="$(mktemp -d)"
-output="${2:-}"
 if [[ -n "$output" ]]; then
     [[ ! -e "$output" ]] || { echo "Output already exists; refusing overwrite" >&2; exit 2; }
 fi

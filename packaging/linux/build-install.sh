@@ -78,15 +78,23 @@ case "$action" in
   install)
     [[ -x "$viewer" && -x "$helper" ]] ||
       { echo 'ERROR: build outputs missing; run build first' >&2; exit 1; }
+    # Validate all requested artifacts before changing the destination.
+    if [[ "${PIVRA_INSTALL_EXPERIMENTAL_RAW:-0}" == 1 && ! -x "$raw_helper" ]]; then
+      echo "ERROR: experimental RAW helper missing; rebuild with PIVRA_BUILD_EXPERIMENTAL_RAW=1" >&2
+      exit 1
+    fi
     bindir="$destdir$prefix/bin"
     sharedir="$destdir$prefix/share"
     install -Dm755 "$viewer" "$bindir/pivra"
     install -Dm755 "$helper" "$bindir/pivra-thumbnail-factory"
     # Experimental RAW is installed only when explicitly requested.
     if [[ "${PIVRA_INSTALL_EXPERIMENTAL_RAW:-0}" == 1 ]]; then
-      [[ -x "$raw_helper" ]] || { echo "ERROR: experimental RAW helper missing; rebuild with PIVRA_BUILD_EXPERIMENTAL_RAW=1" >&2; exit 1; }
       install -Dm755 "$raw_helper" "$bindir/pivra-raw-decoder"
       install -Dm755 raw/run_decode.sh "$bindir/pivra-raw-runner"
+    elif [[ -n "$destdir" ]]; then
+      # A reused staging directory must not accidentally retain experimental
+      # companion files from a previous opt-in package build.
+      rm -f -- "$bindir/pivra-raw-decoder" "$bindir/pivra-raw-runner"
     fi
     install -Dm644 data/io.github.onbeskarakterli.Pivra.desktop \
       "$sharedir/applications/io.github.onbeskarakterli.Pivra.desktop"

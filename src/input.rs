@@ -167,7 +167,8 @@ mod tests {
         assert_eq!(
             OpenedFile::from_file(&gio::File::for_path(dir.path()))
                 .unwrap()
-                .item.path(),
+                .item
+                .path(),
             dir.path().join("1.mp4")
         );
     }
@@ -175,9 +176,11 @@ mod tests {
     #[test]
     fn empty_or_unsupported_folder_returns_clear_error() {
         let dir = tempfile::tempdir().unwrap();
-        assert!(OpenedFile::from_argument(dir.path().as_os_str())
-            .unwrap_err()
-            .contains("no supported media"));
+        assert!(
+            OpenedFile::from_argument(dir.path().as_os_str())
+                .unwrap_err()
+                .contains("no supported media")
+        );
         fs::write(dir.path().join("notes.txt"), b"ignored").unwrap();
         assert!(OpenedFile::from_argument(dir.path().as_os_str())
             .unwrap_err()

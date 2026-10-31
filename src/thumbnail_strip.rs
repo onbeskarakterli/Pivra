@@ -858,10 +858,7 @@ impl Inner {
                 icon.set_visible(!is_video && entry.phase != Phase::Ready);
                 icon.set_can_target(false);
                 spinner.set_can_target(false);
-                for child in [
-                    icon.upcast_ref::<gtk::Widget>(),
-                    spinner.upcast_ref(),
-                ] {
+                for child in [icon.upcast_ref::<gtk::Widget>(), spinner.upcast_ref()] {
                     content.add_overlay(child);
                     content.set_measure_overlay(child, false);
                     content.set_clip_overlay(child, true);
@@ -1061,7 +1058,9 @@ impl Inner {
             }
             if let Some(w) = &e.widgets {
                 if visible.contains(&n) && matches!(e.phase, Phase::Pending | Phase::Loading) {
-                    if pivra::discovery::candidate_kind(&e.path) == Some(pivra::media::MediaKind::Video) {
+                    if pivra::discovery::candidate_kind(&e.path)
+                        == Some(pivra::media::MediaKind::Video)
+                    {
                         w.spinner.stop();
                         w.icon.set_visible(false);
                     } else {
@@ -1272,7 +1271,11 @@ impl Inner {
                 }
                 if let Some(w) = &entry.widgets {
                     w.spinner.stop();
-                    w.icon.set_visible(entry.phase == Phase::Failed && pivra::discovery::candidate_kind(&entry.path) != Some(pivra::media::MediaKind::Video));
+                    w.icon.set_visible(
+                        entry.phase == Phase::Failed
+                            && pivra::discovery::candidate_kind(&entry.path)
+                                != Some(pivra::media::MediaKind::Video),
+                    );
                 }
             }
             // LRU bounds apply to widget paintables as well, not just a side map.

@@ -1,6 +1,10 @@
 //! Compact native video controls, separate from animated-image playback.
 use gtk::{glib, prelude::*};
-use std::{cell::Cell, rc::Rc, time::{Duration, Instant}};
+use std::{
+    cell::Cell,
+    rc::Rc,
+    time::{Duration, Instant},
+};
 
 #[derive(Clone)]
 pub(super) struct Controls {
@@ -43,7 +47,11 @@ impl Controls {
         let current = stream.clone();
         play.connect_clicked(move |_| {
             if let Some(media) = current.borrow().as_ref() {
-                if media.is_playing() { media.pause(); } else { media.play(); }
+                if media.is_playing() {
+                    media.pause();
+                } else {
+                    media.play();
+                }
             }
         });
 
@@ -67,8 +75,12 @@ impl Controls {
         forward.connect_clicked(move |_| {
             if let Some(media) = current.borrow().as_ref() {
                 if media.is_seekable() {
-                    media.seek(media.timestamp().saturating_add(5_000_000)
-                        .min(media.duration().max(0)));
+                    media.seek(
+                        media
+                            .timestamp()
+                            .saturating_add(5_000_000)
+                            .min(media.duration().max(0)),
+                    );
                 }
             }
         });
@@ -105,7 +117,9 @@ impl Controls {
         let current = stream.clone();
         let guard = updating.clone();
         position.connect_value_changed(move |scale| {
-            if guard.get() { return; }
+            if guard.get() {
+                return;
+            }
             if let Some(media) = current.borrow().as_ref() {
                 let duration = media.duration();
                 if duration > 0 && media.is_seekable() {
@@ -139,8 +153,9 @@ impl Controls {
         let active = scrubbing.clone();
         drag.connect_drag_update(move |_, dx, _| {
             if active.get() {
-                slider.set_value(((initial.get() + dx) / f64::from(slider.width().max(1)))
-                    .clamp(0.0, 1.0));
+                slider.set_value(
+                    ((initial.get() + dx) / f64::from(slider.width().max(1))).clamp(0.0, 1.0),
+                );
             }
         });
         let slider = position.clone();
@@ -148,8 +163,9 @@ impl Controls {
         let active = scrubbing.clone();
         drag.connect_drag_end(move |_, dx, _| {
             if active.replace(false) {
-                slider.set_value(((initial.get() + dx) / f64::from(slider.width().max(1)))
-                    .clamp(0.0, 1.0));
+                slider.set_value(
+                    ((initial.get() + dx) / f64::from(slider.width().max(1))).clamp(0.0, 1.0),
+                );
             }
         });
         let active = scrubbing.clone();
@@ -160,7 +176,11 @@ impl Controls {
         time.add_css_class("dim-label");
         let (saved_volume, saved_muted) = pivra::settings::load_video_audio();
         let mute = gtk::ToggleButton::new();
-        mute.set_icon_name(if saved_muted { "audio-volume-muted-symbolic" } else { "audio-volume-high-symbolic" });
+        mute.set_icon_name(if saved_muted {
+            "audio-volume-muted-symbolic"
+        } else {
+            "audio-volume-high-symbolic"
+        });
         mute.set_active(saved_muted);
         mute.add_css_class("flat");
         let current = stream.clone();
@@ -204,13 +224,27 @@ impl Controls {
         ] {
             bar.append(child);
         }
-        let result = Self { bar, play, position, time, volume, mute, loop_button, stream, updating, scrubbing, alive, last_activity };
+        let result = Self {
+            bar,
+            play,
+            position,
+            time,
+            volume,
+            mute,
+            loop_button,
+            stream,
+            updating,
+            scrubbing,
+            alive,
+            last_activity,
+        };
         let refresh = result.clone();
         let window_ref = window.downgrade();
         glib::MainContext::default().spawn_local(async move {
             while refresh.alive.get() {
                 glib::timeout_future(Duration::from_millis(150)).await;
-                let fullscreen = window_ref.upgrade()
+                let fullscreen = window_ref
+                    .upgrade()
                     .is_some_and(|window| window.is_fullscreen());
                 let hide_after = Duration::from_secs(1);
                 // Fullscreen video controls disappear after inactivity even if
@@ -237,15 +271,23 @@ impl Controls {
                     refresh.time.set_text(&format!(
                         "{} / {}",
                         clock(media.timestamp()),
-                        if duration > 0 { clock(duration) } else { "--:--".into() }
+                        if duration > 0 {
+                            clock(duration)
+                        } else {
+                            "--:--".into()
+                        }
                     ));
-                    refresh.position.set_sensitive(duration > 0 && media.is_seekable());
+                    refresh
+                        .position
+                        .set_sensitive(duration > 0 && media.is_seekable());
                     if !refresh.scrubbing.get() {
-                    refresh.updating.set(true);
-                    refresh.position.set_value(if duration > 0 {
-                        (media.timestamp() as f64 / duration as f64).clamp(0.0, 1.0)
-                    } else { 0.0 });
-                    refresh.updating.set(false);
+                        refresh.updating.set(true);
+                        refresh.position.set_value(if duration > 0 {
+                            (media.timestamp() as f64 / duration as f64).clamp(0.0, 1.0)
+                        } else {
+                            0.0
+                        });
+                        refresh.updating.set(false);
                     }
                 }
             }
@@ -263,14 +305,26 @@ impl Controls {
     #[allow(dead_code)] // Standalone image probes do not handle video keyboard input.
     pub fn handle_key(&self, key: gtk::gdk::Key, ctrl: bool) -> bool {
         let media = self.stream.borrow().clone();
-        let Some(media) = media else { return false; };
+        let Some(media) = media else {
+            return false;
+        };
         match (key, ctrl) {
             (gtk::gdk::Key::space, false) => {
-                if media.is_playing() { media.pause(); } else { media.play(); }
+                if media.is_playing() {
+                    media.pause();
+                } else {
+                    media.play();
+                }
             }
             (gtk::gdk::Key::Left, true) | (gtk::gdk::Key::Right, true) => {
-                if !media.is_seekable() { return false; }
-                let offset = if key == gtk::gdk::Key::Left { -5_000_000 } else { 5_000_000 };
+                if !media.is_seekable() {
+                    return false;
+                }
+                let offset = if key == gtk::gdk::Key::Left {
+                    -5_000_000
+                } else {
+                    5_000_000
+                };
                 media.seek((media.timestamp() + offset).clamp(0, media.duration().max(0)));
             }
             (gtk::gdk::Key::comma, false) | (gtk::gdk::Key::period, false) => {
@@ -280,9 +334,17 @@ impl Controls {
                     return false;
                 }
                 let step_us = 33_333_i64;
-                let delta = if key == gtk::gdk::Key::comma { -step_us } else { step_us };
-                media.seek(media.timestamp().saturating_add(delta)
-                    .clamp(0, media.duration()));
+                let delta = if key == gtk::gdk::Key::comma {
+                    -step_us
+                } else {
+                    step_us
+                };
+                media.seek(
+                    media
+                        .timestamp()
+                        .saturating_add(delta)
+                        .clamp(0, media.duration()),
+                );
             }
             (gtk::gdk::Key::m, false) | (gtk::gdk::Key::M, false) => {
                 self.mute.set_active(!self.mute.is_active());
@@ -323,7 +385,10 @@ impl Controls {
                 }
                 // Weak references prevent retired streams from retaining the
                 // playback controls and keeping native decoders alive.
-                let same = current.borrow().as_ref().is_some_and(|active| active == ended);
+                let same = current
+                    .borrow()
+                    .as_ref()
+                    .is_some_and(|active| active == ended);
                 if same {
                     ended.seek(0);
                     ended.play();

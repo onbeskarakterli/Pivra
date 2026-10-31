@@ -38,7 +38,8 @@ fn trash_entries(original: &std::path::Path) -> Vec<gio::File> {
     };
     let mut entries = vec![];
     while let Ok(Some(info)) = enumerator.next_file(None::<&gio::Cancellable>) {
-        if info.attribute_byte_string("trash::orig-path")
+        if info
+            .attribute_byte_string("trash::orig-path")
             .is_some_and(|value| std::path::Path::new(value.as_str()) == original)
         {
             entries.push(enumerator.child(&info));
@@ -91,11 +92,19 @@ fn update_navigation_actions(window: &adw::ApplicationWindow, context: &FileCont
     for (name, enabled) in [
         (
             "previous-media",
-            context.collection.selected_index().map_or(!context.collection.items().is_empty(), |i| i > 0),
+            context
+                .collection
+                .selected_index()
+                .map_or(!context.collection.items().is_empty(), |i| i > 0),
         ),
         (
             "next-media",
-            context.collection.selected_index().map_or(!context.collection.items().is_empty(), |i| i + 1 < context.collection.items().len()),
+            context
+                .collection
+                .selected_index()
+                .map_or(!context.collection.items().is_empty(), |i| {
+                    i + 1 < context.collection.items().len()
+                }),
         ),
     ] {
         if let Some(action) = window
@@ -515,20 +524,30 @@ pub(super) fn build(app: &adw::Application, settings: &Settings, file: Option<Op
         let trash_window = window.downgrade();
         let toasts = toast_overlay.clone();
         delete.connect_activate(move |_, _| {
-            let Some(window) = trash_window.upgrade() else { return; };
+            let Some(window) = trash_window.upgrade() else {
+                return;
+            };
             let mut context = trash_context.borrow_mut();
-            let Some(selected) = context.collection.current().cloned() else { return; };
+            let Some(selected) = context.collection.current().cloned() else {
+                return;
+            };
             let path = selected.path().to_owned();
             let old_index = context.collection.selected_index().unwrap_or(0);
             let old_entries = trash_entries(&path);
             let file = gio::File::for_path(&path);
             if let Err(error) = file.trash(None::<&gio::Cancellable>) {
-                toasts.add_toast(adw::Toast::new(&format!("Could not move to Trash: {error}")));
+                toasts.add_toast(adw::Toast::new(&format!(
+                    "Could not move to Trash: {error}"
+                )));
                 return;
             }
-            let remaining: Vec<_> = context.collection.items().iter()
+            let remaining: Vec<_> = context
+                .collection
+                .items()
+                .iter()
                 .filter(|item| item.path() != path)
-                .cloned().collect();
+                .cloned()
+                .collect();
             context.collection = MediaCollection::new(remaining);
             if !context.collection.items().is_empty() {
                 let last_index = context.collection.items().len() - 1;
@@ -549,10 +568,12 @@ pub(super) fn build(app: &adw::Application, settings: &Settings, file: Option<Op
             let undo_toasts = toasts.clone();
             toast.connect_button_clicked(move |_| {
                 if path.exists() {
-                    undo_toasts.add_toast(adw::Toast::new("Undo failed: destination already exists"));
+                    undo_toasts
+                        .add_toast(adw::Toast::new("Undo failed: destination already exists"));
                     return;
                 }
-                let trashed = trash_entries(&path).into_iter()
+                let trashed = trash_entries(&path)
+                    .into_iter()
                     .find(|entry| !old_entries.iter().any(|old| old.equal(entry)));
                 let Some(trashed) = trashed else {
                     undo_toasts.add_toast(adw::Toast::new("Undo failed: trashed file not found"));

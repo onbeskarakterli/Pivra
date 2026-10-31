@@ -1,7 +1,11 @@
 //! Per-window fullscreen intent; compositor state owns presentation and chrome.
 use adw::prelude::*;
 use gtk::{gdk, gio, glib};
-use std::{cell::{Cell, RefCell}, rc::Rc, time::Duration};
+use std::{
+    cell::{Cell, RefCell},
+    rc::Rc,
+    time::Duration,
+};
 
 fn request(window: &adw::ApplicationWindow, pending: &Cell<Option<bool>>, target: bool) {
     pending.set(Some(target));

@@ -92,11 +92,32 @@ if [[ -n "$output" ]]; then
     if [[ "${PIVRA_RAW_INSTALLED:-0}" != 1 ]]; then
         python3 tests/validate_raw_ppm.py "$tmp/image.ppm"
     fi
-    # Bash noclobber uses exclusive creation: unlike cp --no-clobber,
-    # a racing destination cannot be silently treated as success.
-    if ! (set -C; cat -- "$tmp/image.ppm" > "$output"); then
-        echo 'FAIL: RAW output could not be created exclusively' >&2
-        exit 2
-    fi
+    # Fully stage the image beside the destination, then publish using an
+    # exclusive hard link. A failed or interrupted copy never exposes a
+    # partial output, and an existing destination is never overwritten.
+    python3 - "$tmp/image.ppm" "$output" <<'PY'
+import os
+import shutil
+import sys
+import tempfile
+
+source, destination = sys.argv[1:]
+parent = os.path.dirname(os.path.abspath(destination))
+staged = None
+try:
+    with tempfile.NamedTemporaryFile(
+        mode="wb", prefix=".pivra-raw-", suffix=".ppm",
+        dir=parent, delete=False
+    ) as target:
+        staged = target.name
+        with open(source, "rb") as frame:
+            shutil.copyfileobj(frame, target)
+        target.flush()
+        os.fsync(target.fileno())
+    os.link(staged, destination, follow_symlinks=False)
+finally:
+    if staged is not None:
+        os.unlink(staged)
+PY
     printf 'PPM output: %s\n' "$output"
 fi

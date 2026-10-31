@@ -1,5 +1,7 @@
 //! Deterministic GTK/GIO late-result guard test, with controlled ERROR workers.
 //! Never decodes or simulates image pixels; not a Glycin/sandbox success gate.
+#[path = "../src/raw_loader.rs"]
+mod raw_loader;
 #[path = "../src/image_view.rs"]
 mod image_view;
 

@@ -1,5 +1,9 @@
 //! Run through tests/active_decode_close.py, not directly: its parent certifies
 //! a real, partially written secure-loader output before sending CLOSE.
+#[path = "../src/raw_loader.rs"]
+mod raw_loader;
+#[path = "../src/raw_ppm.rs"]
+mod raw_ppm;
 #[path = "../src/image_view.rs"]
 mod image_view;
 #[path = "../src/image_loader.rs"]

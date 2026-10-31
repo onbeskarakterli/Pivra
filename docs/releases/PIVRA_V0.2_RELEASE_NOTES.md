@@ -1,32 +1,30 @@
-# Pivra v0.2.0 — Release Notes
+# Pivra v0.2.0
 
-Release date: 2026-10-31 (pending publication)
+Pivra 0.2.0 expands the native GNOME image viewer into a unified photo, animation, and video browser.
 
-## Highlights
+## What's new
 
-- Navigate mixed photo and video folders through one ordered media catalog and thumbnail strip.
-- Play videos through GTK's native media backend with playback/pause, seek, volume/mute, looping, keyboard controls, and remembered playback position within a window.
-- Play animated GIF, WebP, and APNG files with animation controls.
-- Move selected media to Trash and restore with Undo.
-- Improve thumbnail cache freshness after Trash/Undo, thumbnail strip scheduling, and media transitions.
-- Support still images up to 64 MP, with a maximum 32,768-pixel edge and existing memory/input bounds.
-- Refine fullscreen navigation and native translucent thumbnail/navigation overlays.
+- **Mixed media browsing:** Navigate photos and videos together in natural filename order, with a unified thumbnail strip.
+- **Video playback:** Native GTK playback with play/pause, seeking, volume and mute controls, looping, keyboard shortcuts, auto-hiding controls, and in-window resume positions.
+- **Animated images:** Playback and controls for GIF, animated WebP, and APNG.
+- **Trash and Undo:** Move a selected photo or video to Trash and restore it using Undo.
+- **Thumbnail improvements:** More reliable image/video thumbnails and refresh behavior, including after restoring a file from Trash.
+- **Larger images:** View still images up to 64 megapixels, subject to file size, memory, and maximum-edge limits.
+- **Refined interface:** Improvements to fullscreen viewing, navigation overlays, and the resizable thumbnail strip.
 
-## Compatibility
+## Requirements and compatibility
 
-Linux desktop with GTK 4.16+, libadwaita 1.2+, Rust 1.85+ for source builds, Glycin image loaders, and system video codecs/backend. Available media formats depend on installed loaders/codecs. Arch Linux is the primary verified build environment; broader distribution-specific testing is still needed.
+Pivra targets Linux desktops and integrates with GNOME using GTK4 and libadwaita. Image decoding uses Glycin. Video playback depends on the installed GTK media backend and system codecs; supported file formats can vary by system.
 
-## Known limitations
+Arch Linux is the primary tested environment. Build instructions for other Linux distributions are provided in the repository.
 
-- No separate editing mode, batch conversion, slideshow or advanced comparison tools yet.
-- Subtitle support, timeline hover previews, ICC/HDR workflows, and other advanced video/image tools remain planned.
-- Video playback depends on the system's GTK/GStreamer backend and codecs. Rapid video-to-video navigation should be included in release smoke testing; historical crashes have been investigated but not fully certified across systems.
-- Secure decode and memory limits may reject oversized or malformed files.
+## Current limitations
 
-## Validation
+Editing, slideshows, batch conversion, advanced comparison, subtitles, timeline hover previews, and HDR workflows are not included in this release. Oversized, malformed, or unsupported media may be rejected by the decoder.
 
-Before publication, the development branch passed local Rust tests, formatting, Clippy with warnings denied, and a release build. Manual multimedia smoke testing and packaging validation remain release gates.
+## Installation
 
-## Distribution
+- **Arch Linux (AUR):** `yay -S pivra`
+- **Other Linux distributions:** Follow the [source-build instructions](https://github.com/onbeskarakterli/Pivra#installation).
 
-After tagging `v0.2.0`, update the AUR `pivra` PKGBUILD to the immutable tagged source commit, recompute SHA-256, regenerate `.SRCINFO`, and publish package version `0.2.0-1`. Preserve `options=('!debug')` so optional debug packages are not generated automatically.
+Pivra is free software licensed under GPL-3.0-only.

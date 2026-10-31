@@ -2,9 +2,9 @@
 
 **Pivra** is a native image viewer for Linux, built with **Rust, GTK4, and libadwaita**. It is designed to feel at home on GNOME: open a photo, move through the folder, zoom in on details, and browse thumbnails without getting in the way.
 
-Pivra is free and open-source software. Version **0.2.0** adds mixed photo/video navigation, native video controls, animated-image playback, and Trash/Undo. Editing and advanced media tools remain planned.
+Pivra is free and open-source software. Version **0.2.1** is a maintenance update to the 0.2 series, including removal of an obsolete video-playback warning and release consistency fixes. Mixed photo/video navigation, native video controls, animated-image playback, and Trash/Undo remain available. Editing and advanced media tools remain planned.
 
-**[Latest release](https://github.com/onbeskarakterli/Pivra/releases/tag/v0.2.0)** · **[Arch Linux AUR](https://aur.archlinux.org/packages/pivra)** · **[Development roadmap](docs/PIVRA_DEVELOPMENT_ROADMAP.md)**
+**[Latest published release](https://github.com/onbeskarakterli/Pivra/releases/latest)** · **[Arch Linux AUR](https://aur.archlinux.org/packages/pivra)** · **[Development roadmap](docs/PIVRA_DEVELOPMENT_ROADMAP.md)**
 
 ## Installation
 
@@ -40,11 +40,11 @@ yay -S pivra
 paru -S pivra
 ```
 
-You can also install the verified prebuilt Arch package from the [v0.2.0 GitHub release](https://github.com/onbeskarakterli/Pivra/releases/tag/v0.2.0), or build it using the AUR PKGBUILD.
+AUR builds Pivra from source. GitHub releases provide source archives; a prebuilt package is available only when separately attached.
 
 ## Features and roadmap
 
-**Available** = supported in the current v0.2.0 release. **Planned** = on the development roadmap, **not yet available**. Planned features are goals, not promises of a specific release date. Some early interface work was completed ahead of its original roadmap phase.
+**Available** = implemented in the v0.2.1 source. **Planned** = not yet available. Planned features are goals, not promises of a specific release date. Some early interface work was completed ahead of its original roadmap phase.
 
 ### Photo viewing and navigation
 
@@ -116,11 +116,11 @@ The full [60-step development roadmap](docs/PIVRA_DEVELOPMENT_ROADMAP.md) and [f
 
 ## Current limitations
 
-Version 0.2.0 is a Linux/GNOME-focused viewer, not an image editor. Advanced subtitles, timeline hover previews, slideshow, HDR/ICC workflows, and batch conversion are not yet available. Image decoding depends on installed Glycin format loaders and their supported codecs. Video playback depends on the system GTK/GStreamer media backend and available codecs. Individual formats and files may fail.
+Version 0.2.1 is a Linux/GNOME-focused viewer, not an image editor. Advanced subtitles, timeline hover previews, slideshow, HDR/ICC workflows, and batch conversion are not yet available. Image decoding depends on installed Glycin format loaders and their supported codecs. Video playback depends on the system GTK/GStreamer media backend and available codecs. Individual formats and files may fail.
 
-Still-image loading is bounded to 64 MP (maximum 32,768 pixels per edge) and 64 MiB input size. Animated frames have additional bounds. The repository's GUI probes and the release's video navigation should be checked on supported GNOME systems before publishing.
+Still-image loading is bounded to 64 MP (maximum 32,768 pixels per edge) and 64 MiB input size. Animated frames have additional bounds. Release testing and packaging validation should be completed before publishing v0.2.1.
 
-See the [v0.2.0 release notes](docs/releases/PIVRA_V0.2_RELEASE_NOTES.md).
+See the [v0.2.1 release notes](docs/releases/PIVRA_V0.2.1_RELEASE_NOTES.md) for changes in this update.
 
 ## License
 

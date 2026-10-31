@@ -10,7 +10,10 @@ else
     [[ "$#" -le 2 ]] || { echo "Usage: run_decode.sh [INPUT] [OUTPUT]" >&2; exit 2; }
 fi
 input="${1:-$HOME/Downloads/Ricoh-GR-III.DNG}"
-[[ -f "$input" ]] || { printf 'Missing RAW input: %s\n' "$input" >&2; exit 2; }
+[[ -f "$input" && ! -L "$input" ]] || { printf 'Missing or unsafe RAW input: %s\n' "$input" >&2; exit 2; }
+# Match the native decoder's 64 MiB bound before entering the sandbox.
+[[ "$(stat -c %s -- "$input")" -gt 0 && "$(stat -c %s -- "$input")" -le 67108864 ]] ||
+    { echo 'RAW input must be between 1 byte and 64 MiB' >&2; exit 2; }
 command -v bwrap >/dev/null || { echo 'FAIL: bubblewrap required' >&2; exit 2; }
 tmp="$(mktemp -d)"
 output="${2:-}"

@@ -16,6 +16,19 @@ makedepends=('cargo' 'pkgconf' 'python>=3.11')
 checkdepends=('desktop-file-utils')
 _target='x86_64-unknown-linux-gnu'
 _recipe_dir=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
+# Per-recipe persistent Cargo caches survive makepkg --cleanbuild.
+# Cargo validates compiler options, lockfile and dependency fingerprints.
+_cache_dir="$_recipe_dir/.pivra-cache"
+_cache_setup() {
+  if [[ -L "$_cache_dir" || ( -e "$_cache_dir" && ! -d "$_cache_dir" ) ]]; then
+    printf 'ERROR: unsafe Cargo cache path: %s\n' "$_cache_dir" >&2
+    return 1
+  fi
+  (umask 077; mkdir -p "$_cache_dir/cargo-home" "$_cache_dir/cargo-target") || return 1
+  export CARGO_HOME="$_cache_dir/cargo-home"
+  export CARGO_TARGET_DIR="$_cache_dir/cargo-target"
+}
+
 
 release_commit=''
 release_url=''
@@ -36,8 +49,7 @@ source=("pivra-$pkgver.tar.gz::$release_url" 'collect-licenses.py')
 sha256sums=("$release_sha256" 'e0bad72c99f4629b0668f59450e53a75022ea746efe57191ab8da34fb5cf1201')
 
 prepare() {
-  export CARGO_HOME="$srcdir/cargo-home"
-  export CARGO_TARGET_DIR="$srcdir/Pivra-$release_commit/target"
+  _cache_setup || return 1
   cd "$srcdir/Pivra-$release_commit" || return 1
   # Do not publish a package whose declared version differs from the pinned source.
   local source_version
@@ -51,9 +63,8 @@ prepare() {
 
 build() {
   export PIVRA_DISTRIBUTION_BUILD=1
-  export CARGO_HOME="$srcdir/cargo-home"
+  _cache_setup || return 1
   export RUSTFLAGS="${RUSTFLAGS:+$RUSTFLAGS }--remap-path-prefix=$srcdir=/usr/src/debug/pivra"
-  export CARGO_TARGET_DIR="$srcdir/Pivra-$release_commit/target"
   cd "$srcdir/Pivra-$release_commit" || return 1
   pkg-config --atleast-version=4.16 gtk4 || return 1
   pkg-config --atleast-version=1.2 libadwaita-1 || return 1
@@ -78,14 +89,14 @@ build() {
     native/thumbnail_factory.c -o "$srcdir/build/pivra-thumbnail-factory" \
     "${ldflags[@]}" "${pkg_libs[@]}" || return 1
   cargo build --release --locked --offline --target "$_target" --bin pivra || return 1
-  python - "target/$_target/release/pivra" <<'PY' || return 1
+  python - "$CARGO_TARGET_DIR/$_target/release/pivra" <<'PY' || return 1
 import pathlib
 import sys
 if b'/out/pivra-thumbnail-factory' in pathlib.Path(sys.argv[1]).read_bytes():
     sys.exit('FAIL: viewer embeds a Cargo OUT_DIR thumbnail-helper path')
 PY
   test -x "$srcdir/build/pivra-thumbnail-factory" || return 1
-  readelf -d "target/$_target/release/pivra" > "$srcdir/build/pivra.dynamic" || return 1
+  readelf -d "$CARGO_TARGET_DIR/$_target/release/pivra" > "$srcdir/build/pivra.dynamic" || return 1
   grep -F 'liblcms2.so.2' "$srcdir/build/pivra.dynamic" >/dev/null || return 1
   grep -F 'libseccomp.so.2' "$srcdir/build/pivra.dynamic" >/dev/null || return 1
   cargo metadata --locked --offline --format-version 1 > "$srcdir/build/metadata.json" || return 1
@@ -96,8 +107,7 @@ PY
 
 check() {
   export PIVRA_DISTRIBUTION_BUILD=1
-  export CARGO_HOME="$srcdir/cargo-home"
-  export CARGO_TARGET_DIR="$srcdir/Pivra-$release_commit/target"
+  _cache_setup || return 1
   cd "$srcdir/Pivra-$release_commit" || return 1
   CARGO_INCREMENTAL=0 cargo test --locked --offline --target "$_target" || return 1
   cargo check --locked --offline --target "$_target" || return 1
@@ -105,8 +115,9 @@ check() {
 }
 
 package() {
+  _cache_setup || return 1
   cd "$srcdir/Pivra-$release_commit" || return 1
-  install -Dm755 "target/$_target/release/pivra" "$pkgdir/usr/bin/pivra" || return 1
+  install -Dm755 "$CARGO_TARGET_DIR/$_target/release/pivra" "$pkgdir/usr/bin/pivra" || return 1
   install -Dm755 "$srcdir/build/pivra-thumbnail-factory" "$pkgdir/usr/bin/pivra-thumbnail-factory" || return 1
   install -Dm644 data/io.github.onbeskarakterli.Pivra.desktop \
     "$pkgdir/usr/share/applications/io.github.onbeskarakterli.Pivra.desktop" || return 1

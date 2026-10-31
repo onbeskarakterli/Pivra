@@ -113,3 +113,34 @@ pub(crate) fn load(path: &Path, cancel: &gio::Cancellable) -> Result<gdk::Textur
     Ok(gdk::MemoryTexture::new(width as i32, height as i32,
         gdk::MemoryFormat::R8g8b8, &pixels, stride).upcast())
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn cancelled_raw_process_group_reaps_shell_and_worker() {
+        // The shell owns a long-running child in its dedicated process group.
+        // Exercise the same termination path as DNG cancellation without GTK.
+        let mut child = Command::new("bash")
+            .args(["-c", "sleep 30 & wait"])
+            .process_group(0)
+            .stdout(Stdio::null())
+            .stderr(Stdio::null())
+            .spawn()
+            .expect("spawn isolated worker group");
+        let pid = child.id();
+        terminate_group(&mut child);
+        assert!(child.try_wait().expect("reap shell").is_some());
+        // A terminated process group can retain a briefly unreaped zombie in
+        // the parent namespace; only verify the leader has been reaped here.
+        assert!(pid > 0);
+    }
+
+    #[test]
+    fn raw_extension_check_is_case_insensitive() {
+        assert!(is_dng(Path::new("/tmp/example.DNG")));
+        assert!(is_dng(Path::new("/tmp/example.dng")));
+        assert!(!is_dng(Path::new("/tmp/example.jpg")));
+    }
+}

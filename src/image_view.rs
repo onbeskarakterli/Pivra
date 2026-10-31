@@ -340,6 +340,38 @@ impl ImageView {
     }
 
     #[allow(dead_code)] // Used by the fullscreen thumbnail probe.
+    /// Capture the current animation texture or the live video frame, not the zoomed UI.
+    pub(super) fn capture_frame(&self, path: &std::path::Path) -> Result<gtk::gdk::Texture, String> {
+        if self.video_path.borrow().as_deref() == Some(path) {
+            let stream = self.video_stream.borrow();
+            let media = stream.as_ref().ok_or("Video is not ready")?;
+            if !media.is_prepared() {
+                return Err("Video frame is not ready".into());
+            }
+            let paintable = gtk::gdk::prelude::PaintableExt::current_image(media);
+            let width = paintable.intrinsic_width();
+            let height = paintable.intrinsic_height();
+            if width <= 0 || height <= 0 {
+                return Err("Video frame dimensions are unavailable".into());
+            }
+            let snapshot = gtk::Snapshot::new();
+            gtk::gdk::prelude::PaintableExt::snapshot(
+                &paintable,
+                &snapshot,
+                f64::from(width),
+                f64::from(height),
+            );
+            let node = snapshot.to_node().ok_or("No video frame available")?;
+            let window = self.window.upgrade().ok_or("Window is closed")?;
+            let renderer = window.renderer().ok_or("Video renderer is unavailable")?;
+            return Ok(renderer.render_texture(&node, None));
+        }
+        if self.requested.borrow().as_deref() == Some(path) && animation::is_animated_file(path) {
+            return self.texture.borrow().clone().ok_or("Animation frame is not ready".into());
+        }
+        Err("Frame capture is only available for videos and animations".into())
+    }
+
     pub(super) fn video_widget(&self) -> &gtk::Picture {
         &self.video
     }

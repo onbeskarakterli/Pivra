@@ -10,7 +10,7 @@ if [[ -x /usr/bin/time ]]; then
 else
     timing=python
     command -v python3 >/dev/null || { echo 'python3 required for elapsed-time fallback' >&2; exit 2; }
-    echo 'NOTE: GNU time unavailable; peak RSS not measured'
+    echo 'NOTE: GNU time unavailable; Python wait4 child peak RSS fallback (not total Pivra memory)'
 fi
 tmp="$(mktemp -d)"
 trap 'rm -rf "$tmp"' EXIT
@@ -22,7 +22,10 @@ for iteration in 1 2 3; do
         /usr/bin/time -f 'ELAPSED_SECONDS=%e PEAK_RSS_KB=%M EXIT=%x' \
             bash tests/run_raw_sandbox_probe.sh "$input" "$tmp/frame-$iteration.ppm"
     else
-        python3 -c 'import subprocess, sys, time; start=time.monotonic(); result=subprocess.run(sys.argv[1:]); print(f"ELAPSED_SECONDS={time.monotonic()-start:.3f} PEAK_RSS_KB=NOT_MEASURED EXIT={result.returncode}",flush=True); sys.exit(result.returncode)' \
+        python3 -c 'import os, sys, time; start=time.monotonic(); pid=os.fork();
+if pid == 0:
+    os.execvp(sys.argv[1], sys.argv[1:]);
+_, status, usage=os.wait4(pid, 0); code=os.waitstatus_to_exitcode(status); print(f"ELAPSED_SECONDS={time.monotonic()-start:.3f} PEAK_CHILD_RSS_KB={usage.ru_maxrss} EXIT={code}", flush=True); sys.exit(code)' \
             bash tests/run_raw_sandbox_probe.sh "$input" "$tmp/frame-$iteration.ppm"
     fi
     python3 tests/validate_raw_ppm.py "$tmp/frame-$iteration.ppm"

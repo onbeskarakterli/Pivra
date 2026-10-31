@@ -109,11 +109,8 @@ check() {
   export PIVRA_DISTRIBUTION_BUILD=1
   _cache_setup || return 1
   cd "$srcdir/Pivra-$release_commit" || return 1
-  CARGO_INCREMENTAL=0 cargo test --locked --offline --target "$_target" || return 1
-  cargo check --locked --offline --target "$_target" || return 1
-  # Only remove ephemeral test/check artifacts after all Rust checks pass.
-  # Keep Cargo downloads and release outputs for subsequent AUR upgrades.
-  rm -rf -- "$CARGO_TARGET_DIR/debug" "$CARGO_TARGET_DIR/$_target/debug" || return 1
+  CARGO_INCREMENTAL=0 cargo test --release --locked --offline --target "$_target" || return 1
+  cargo check --release --locked --offline --target "$_target" || return 1
   desktop-file-validate data/io.github.onbeskarakterli.Pivra.desktop || return 1
 }
 

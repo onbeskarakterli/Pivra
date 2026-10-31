@@ -1,5 +1,7 @@
 //! Real image-view regression gate; requires secure Glycin and a graphical session.
 //! Exit 77 means unavailable decode, never a passing geometry/lifecycle test.
+#[path = "../src/raw_loader.rs"]
+mod raw_loader;
 #[path = "../src/image_loader.rs"]
 mod image_loader;
 #[path = "../src/image_view.rs"]

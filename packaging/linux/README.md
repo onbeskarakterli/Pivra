@@ -1,5 +1,8 @@
 # Building Pivra from source on Linux (experimental)
 
+The `dev` branch currently reports **Pivra 0.2.3 (unreleased)** through Cargo. The stable `main` and published AUR package remain on the 0.2.1 release line. Native builds from `dev` do not change the installed AUR package without a separate approved installation or release. Experimental DNG decoding requires explicit opt-in and optional native helper dependencies; it is not enabled by default.
+
+
 ## Common Makefile interface (development branch)
 
 From the repository root:

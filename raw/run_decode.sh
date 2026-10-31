@@ -108,18 +108,9 @@ if [[ -n "$output" ]]; then
     # This is atomic, never overwrites a destination, and leaves no staging
     # file behind even if the runner is killed with SIGKILL.
     # Pivra places the decoder scratch and output on the same filesystem.
-    python3 - "$tmp/image.ppm" "$output" <<'PY'
-import errno
-import os
-import sys
-
-source, destination = sys.argv[1:]
-try:
-    os.link(source, destination, follow_symlinks=False)
-except OSError as error:
-    if error.errno == errno.EXDEV:
-        sys.exit("RAW output must be on the same filesystem as its scratch directory")
-    raise
-PY
+    if ! ln -- "$tmp/image.ppm" "$output"; then
+        echo 'FAIL: RAW output link could not be created (destination exists or filesystems differ)' >&2
+        exit 2
+    fi
     printf 'PPM output: %s\n' "$output"
 fi

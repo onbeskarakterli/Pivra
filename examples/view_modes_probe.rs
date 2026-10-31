@@ -1,5 +1,9 @@
 //! Default: secure decode + production actions. --synthetic: renderer only.
 //! --controlled-navigation: explicit synthetic loader, real production actions.
+#[path = "../src/raw_loader.rs"]
+mod raw_loader;
+#[path = "../src/raw_ppm.rs"]
+mod raw_ppm;
 #[path = "../src/image_loader.rs"]
 #[allow(dead_code)]
 mod secure_image_loader;

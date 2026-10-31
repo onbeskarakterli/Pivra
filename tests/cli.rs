@@ -20,7 +20,7 @@ fn run_on_backend(args: &[&str], backend: &str) -> Output {
 
 #[test]
 fn help_and_alias_work_without_a_display() {
-    let expected = b"Pivra 0.1.0\nUsage: pivra [--help | --version]\n       pivra <local-photo-path | file://URI>\nJPEG/PNG viewing requires a working sandboxed Glycin loader.\nAccepts one local .jpg/.jpeg/.png file; reports loading and decoder errors.\n";
+    let expected = b"Pivra 0.2.0\nUsage: pivra [--help | --version]\n       pivra <local-photo-path | file://URI>\nJPEG/PNG viewing requires a working sandboxed Glycin loader.\nAccepts one local .jpg/.jpeg/.png file; reports loading and decoder errors.\n";
     for flag in ["--help", "-h"] {
         let output = run(&[flag]);
         assert_eq!(output.status.code(), Some(0));
@@ -34,7 +34,7 @@ fn version_and_alias_work_without_a_display() {
     for flag in ["--version", "-V"] {
         let output = run(&[flag]);
         assert_eq!(output.status.code(), Some(0));
-        assert_eq!(output.stdout, b"Pivra 0.1.0\n");
+        assert_eq!(output.stdout, b"Pivra 0.2.0\n");
         assert!(output.stderr.is_empty());
     }
 }

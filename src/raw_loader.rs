@@ -64,8 +64,7 @@ pub(crate) fn load(path: &Path, cancel: &gio::Cancellable) -> Result<gdk::Textur
             Ok(Some(status)) => break status,
             Ok(None) => std::thread::sleep(Duration::from_millis(40)),
             Err(error) => {
-                let _ = child.kill();
-                let _ = child.wait();
+                terminate_group(&mut child);
                 return Err(format!("DNG sandbox wait: {error}"));
             }
         }
@@ -80,10 +79,19 @@ pub(crate) fn load(path: &Path, cancel: &gio::Cancellable) -> Result<gdk::Textur
     if metadata.len() > 256 * 1024 * 1024 + 64 {
         return Err("DNG image exceeds transfer limit".into());
     }
-    let bytes = std::fs::read(&output).map_err(|e| format!("DNG image read: {e}"))?;
-    let frame = crate::raw_ppm::parse(&bytes).map_err(str::to_string)?;
-    let stride = usize::try_from(frame.width).map_err(|e| e.to_string())? * 3;
-    let pixels = glib::Bytes::from_owned(frame.pixels.to_vec());
-    Ok(gdk::MemoryTexture::new(frame.width as i32, frame.height as i32,
+    let mut bytes = std::fs::read(&output).map_err(|e| format!("DNG image read: {e}"))?;
+    // Validate the untrusted PPM before removing its small header. Shift the
+    // raster in-place instead of allocating a second full-resolution RGB copy.
+    let (width, height, offset) = {
+        let frame = crate::raw_ppm::parse(&bytes).map_err(str::to_string)?;
+        (frame.width, frame.height, bytes.len() - frame.pixels.len())
+    };
+    if cancel.is_cancelled() {
+        return Err("DNG loading cancelled".into());
+    }
+    bytes.drain(..offset);
+    let stride = usize::try_from(width).map_err(|e| e.to_string())? * 3;
+    let pixels = glib::Bytes::from_owned(bytes);
+    Ok(gdk::MemoryTexture::new(width as i32, height as i32,
         gdk::MemoryFormat::R8g8b8, &pixels, stride).upcast())
 }

@@ -1134,6 +1134,24 @@ impl Inner {
             if worker_token.is_cancelled() {
                 return Work::Cancelled;
             }
+            if crate::raw_loader::enabled() && crate::raw_loader::is_dng(&worker_path) {
+                let identity = FileKey::read(&worker_path);
+                return match (identity, crate::raw_loader::load(&worker_path, &worker_token)) {
+                    (Ok(key), Ok(texture)) if !worker_token.is_cancelled()
+                        && FileKey::read(&worker_path).ok().as_ref() == Some(&key) => {
+                        let decoded = texture_cost(texture.width() as u32, texture.height() as u32)
+                            .unwrap_or(usize::MAX);
+                        match display_texture(&texture, scale) {
+                            Ok(small) => Work::Hit(small, key, None, decoded),
+                            Err(e) => Work::Failed(e),
+                        }
+                    }
+                    (_, _) if worker_token.is_cancelled() => Work::Cancelled,
+                    (Err(e), _) => Work::Failed(format!("DNG identity: {e}")),
+                    (_, Err(e)) => Work::Failed(e),
+                    _ => Work::Failed("DNG source changed during decode".into()),
+                };
+            }
             let response = match Manager::session().resolve(&worker_path, &worker_token) {
                 Ok(response) => response,
                 Err(Error::Busy) => return Work::Busy,

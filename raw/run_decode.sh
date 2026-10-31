@@ -6,33 +6,44 @@ cd "$(dirname "${BASH_SOURCE[0]}")/.."
 input="${1:-$HOME/Downloads/Ricoh-GR-III.DNG}"
 [[ -f "$input" ]] || { printf 'Missing RAW input: %s\n' "$input" >&2; exit 2; }
 command -v bwrap >/dev/null || { echo 'FAIL: bubblewrap required' >&2; exit 2; }
-command -v c++ >/dev/null || { echo 'FAIL: C++ compiler required' >&2; exit 2; }
-cache="${XDG_CACHE_HOME:-$HOME/.cache}/pivra/raw-helper"
-mkdir -p "$cache"
-chmod 700 "$cache"
 tmp="$(mktemp -d)"
 output="${2:-}"
 if [[ -n "$output" ]]; then
     [[ ! -e "$output" ]] || { echo "Output already exists; refusing overwrite" >&2; exit 2; }
 fi
 trap 'rm -rf "$tmp"' EXIT
-if pkg-config --exists libraw 2>/dev/null; then
-    read -r -a flags <<< "$(pkg-config --cflags --libs libraw)"
+# Package builders can provide a precompiled helper. Never silently compile
+# when a specifically configured helper is missing or invalid.
+if [[ -n "${PIVRA_RAW_HELPER:-}" ]]; then
+    helper="$PIVRA_RAW_HELPER"
+    [[ -f "$helper" && -x "$helper" && ! -L "$helper" ]] || {
+        echo "Configured RAW helper is unavailable or unsafe" >&2; exit 2;
+    }
+    helper="$(realpath -- "$helper")"
+    echo "RAW_HELPER_BUILD=prebuilt"
 else
-    flags=(-lraw)
-fi
-# Compile once per source/compiler/LibRaw version rather than every DNG open.
-key="$( { sha256sum raw/decoder.cpp; c++ --version | head -n 1; pkg-config --modversion libraw 2>/dev/null || pacman -Q libraw; } | sha256sum | cut -d' ' -f1)"
-helper="$cache/raw-probe-$key"
-if [[ ! -x "$helper" ]]; then
-    staging="$(mktemp "$cache/.building.XXXXXX")"
-    trap 'rm -f "$staging"; rm -rf "$tmp"' EXIT
-    c++ -std=c++17 -O2 -Wall -Wextra -Werror raw/decoder.cpp -o "$staging" "${flags[@]}"
-    chmod 700 "$staging"
-    mv -f "$staging" "$helper"
-    echo "RAW_HELPER_BUILD=compiled"
-else
-    echo "RAW_HELPER_BUILD=cached"
+    # Legacy development-tree fallback; this path still requires the compiler.
+    command -v c++ >/dev/null || { echo 'FAIL: C++ compiler required; set PIVRA_RAW_HELPER to a built executable' >&2; exit 2; }
+    cache="${XDG_CACHE_HOME:-$HOME/.cache}/pivra/raw-helper"
+    mkdir -p "$cache"
+    chmod 700 "$cache"
+    if pkg-config --exists libraw 2>/dev/null; then
+        read -r -a flags <<< "$(pkg-config --cflags --libs libraw)"
+    else
+        flags=(-lraw)
+    fi
+    key="$( { sha256sum raw/decoder.cpp; c++ --version | head -n 1; pkg-config --modversion libraw 2>/dev/null || pacman -Q libraw; } | sha256sum | cut -d' ' -f1)"
+    helper="$cache/raw-probe-$key"
+    if [[ ! -x "$helper" ]]; then
+        staging="$(mktemp "$cache/.building.XXXXXX")"
+        trap 'rm -f "$staging"; rm -rf "$tmp"' EXIT
+        c++ -std=c++17 -O2 -Wall -Wextra -Werror raw/decoder.cpp -o "$staging" "${flags[@]}"
+        chmod 700 "$staging"
+        mv -f "$staging" "$helper"
+        echo "RAW_HELPER_BUILD=compiled"
+    else
+        echo "RAW_HELPER_BUILD=cached"
+    fi
 fi
 # The input is the only host media visible inside the sandbox.
 # No --bind of /home or working directory and no network namespace sharing.

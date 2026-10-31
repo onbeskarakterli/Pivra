@@ -38,7 +38,10 @@ mod imp {
             let image = if let Some(texture) = self.texture.get() {
                 (texture.width() as f64, texture.height() as f64)
             } else if let Some(media) = self.media.get() {
-                (media.intrinsic_width() as f64, media.intrinsic_height() as f64)
+                (
+                    media.intrinsic_width() as f64,
+                    media.intrinsic_height() as f64,
+                )
             } else {
                 return;
             };
@@ -72,7 +75,12 @@ mod imp {
                         pivra::viewing::Resampling::Smooth => gtk::gsk::ScalingFilter::Linear,
                         pivra::viewing::Resampling::Nearest => gtk::gsk::ScalingFilter::Nearest,
                     },
-                    &gtk::graphene::Rect::new(g.x as f32, g.y as f32, g.width as f32, g.height as f32),
+                    &gtk::graphene::Rect::new(
+                        g.x as f32,
+                        g.y as f32,
+                        g.width as f32,
+                        g.height as f32,
+                    ),
                 );
             } else if let Some(media) = self.media.get() {
                 snapshot.save();
@@ -93,8 +101,16 @@ impl ActualPaintable {
         mode: pivra::viewing::ViewMode,
     ) -> Self {
         let object: Self = glib::Object::new();
-        object.imp().media.set(media.clone().upcast()).expect("new media paintable");
-        object.imp().transform.set(transform).expect("new transform");
+        object
+            .imp()
+            .media
+            .set(media.clone().upcast())
+            .expect("new media paintable");
+        object
+            .imp()
+            .transform
+            .set(transform)
+            .expect("new transform");
         object.imp().mode.set(mode);
         let weak = object.downgrade();
         media.connect_invalidate_contents(move |_| {

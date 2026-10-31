@@ -1,4 +1,6 @@
 //! TH-02 only: synthetic main image + explicitly labelled TEST PLACEHOLDERS.
+#[path = "../src/raw_loader.rs"]
+mod raw_loader;
 #[path = "support/thumbnail_catalog.rs"]
 mod catalog_probe;
 #[path = "support/fd06_close.rs"]

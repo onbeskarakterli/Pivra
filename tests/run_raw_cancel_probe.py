@@ -23,7 +23,7 @@ try:
     work.mkdir()
     output = work / "frame.ppm"
     env = dict(os.environ, TMPDIR=str(work), PIVRA_RAW_HELPER=str(helper),
-               PIVRA_RAW_INSTALLED="1")
+               PIVRA_RAW_INSTALLED="0")
     process = subprocess.Popen(["bash", str(runner), str(sample), str(output)],
                                env=env, stdout=subprocess.DEVNULL,
                                stderr=subprocess.DEVNULL, start_new_session=True)

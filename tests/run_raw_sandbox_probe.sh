@@ -23,7 +23,7 @@ c++ -std=c++17 -O2 -Wall -Wextra -Werror tests/raw_decode_probe.cpp -o "$tmp/raw
 # No --bind of /home or working directory and no network namespace sharing.
 printf 'SANDBOX: mandatory=bwrap, unshare-all, input-only read-only mount\n'
 timeout 90s bwrap \
-        --die-with-parent --new-session --unshare-all --clearenv \
+    --die-with-parent --new-session --unshare-all --clearenv \
     --setenv PATH /usr/bin --setenv HOME /tmp \
     --ro-bind /usr /usr \
     --ro-bind /etc /etc \
@@ -36,6 +36,12 @@ timeout 90s bwrap \
         test ! -e /home || { echo "FAIL: host home visible"; exit 1; }
         test ! -e /mnt || { echo "FAIL: host mounts visible"; exit 1; }
         echo "PASS mount isolation: host home/mnt unavailable"
+        ulimit -v 1572864
         exec /raw-probe /input.dng /output/image.ppm
     '
-printf 'PASS isolated native LibRaw decode (no Pivra integration, syscall audit, or memory budget yet).\n'
+printf 'PASS isolated native LibRaw decode (no Pivra integration or syscall audit yet).\n'
+if [[ -n "$output" ]]; then
+    test -s "$tmp/image.ppm"
+    cp --no-clobber -- "$tmp/image.ppm" "$output"
+    printf 'PPM output: %s\n' "$output"
+fi

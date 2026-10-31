@@ -43,6 +43,7 @@ pub(crate) fn load(path: &Path, cancel: &gio::Cancellable) -> Result<gdk::Textur
     }
     let _cleanup = Cleanup(directory.clone());
     let output = directory.join("frame.ppm");
+    let diagnostics = directory.join("decoder.log");
     // Installed builds use a sibling sandbox runner and prebuilt LibRaw helper.
     // Development builds keep the existing source-tree runner fallback.
     let installed_runner = std::env::current_exe()
@@ -69,9 +70,13 @@ pub(crate) fn load(path: &Path, cancel: &gio::Cancellable) -> Result<gdk::Textur
         command.env_remove("PIVRA_RAW_HELPER");
     }
     // Filenames are passed as individual argv values, never shell-interpolated.
+    // Keep bounded diagnostics for failed decodes instead of hiding every
+    // sandbox error behind an uninformative exit code.
+    let log = std::fs::File::create(&diagnostics)
+        .map_err(|e| format!("DNG diagnostics: {e}"))?;
     let mut child = command
         .process_group(0)
-        .stdout(Stdio::null()).stderr(Stdio::null())
+        .stdout(Stdio::null()).stderr(Stdio::from(log))
         .spawn()
         .map_err(|e| format!("DNG sandbox process: {e}"))?;
     let started = Instant::now();
@@ -94,7 +99,22 @@ pub(crate) fn load(path: &Path, cancel: &gio::Cancellable) -> Result<gdk::Textur
         }
     };
     if !status.success() {
-        return Err(format!("DNG sandbox exited: {status}"));
+        // Error text is untrusted decoder output: cap it and never display
+        // arbitrary control characters or multi-megabyte diagnostic streams.
+        let detail = std::fs::read(&diagnostics)
+            .ok()
+            .map(|bytes| {
+                String::from_utf8_lossy(&bytes[..bytes.len().min(1024)])
+                    .chars()
+                    .filter(|c| !c.is_control() || *c == '\\n')
+                    .collect::<String>()
+            })
+            .unwrap_or_default();
+        return Err(if detail.trim().is_empty() {
+            format!("DNG sandbox exited: {status}")
+        } else {
+            format!("DNG sandbox exited: {status}: {}", detail.trim())
+        });
     }
     if cancel.is_cancelled() {
         return Err("DNG loading cancelled".into());

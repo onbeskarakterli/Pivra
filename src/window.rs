@@ -607,7 +607,10 @@ pub(super) fn build(app: &adw::Application, settings: &Settings, file: Option<Op
         save_frame.connect_activate(move |_, _| {
             let source = {
                 let state = frame_context.borrow();
-                state.collection.current().map(|item| item.path().to_owned())
+                state
+                    .collection
+                    .current()
+                    .map(|item| item.path().to_owned())
             };
             let Some(source) = source else {
                 frame_toasts.add_toast(adw::Toast::new("Could not save frame: no media selected"));
@@ -616,7 +619,10 @@ pub(super) fn build(app: &adw::Application, settings: &Settings, file: Option<Op
             let result = (|| -> Result<std::path::PathBuf, String> {
                 let frame = frame_view.capture_frame(&source)?;
                 let parent = source.parent().ok_or("Source folder is unavailable")?;
-                let stem = source.file_stem().ok_or("Source filename is unavailable")?.to_string_lossy();
+                let stem = source
+                    .file_stem()
+                    .ok_or("Source filename is unavailable")?
+                    .to_string_lossy();
                 for index in 1..=9999 {
                     let target = parent.join(format!("{stem}_frame_{index:03}.png"));
                     if target.exists() {
@@ -648,9 +654,8 @@ pub(super) fn build(app: &adw::Application, settings: &Settings, file: Option<Op
                     "Frame saved: {}",
                     target.file_name().unwrap_or_default().to_string_lossy()
                 ))),
-                Err(error) => frame_toasts.add_toast(adw::Toast::new(&format!(
-                    "Could not save frame: {error}"
-                ))),
+                Err(error) => frame_toasts
+                    .add_toast(adw::Toast::new(&format!("Could not save frame: {error}"))),
             }
         });
         window.add_action(&save_frame);
@@ -673,7 +678,11 @@ pub(super) fn build(app: &adw::Application, settings: &Settings, file: Option<Op
             }
             if matches!(key, gdk::Key::s | gdk::Key::S) {
                 if let Some(window) = weak_window.upgrade() {
-                    gio::prelude::ActionGroupExt::activate_action(&window, "save-current-frame", None);
+                    gio::prelude::ActionGroupExt::activate_action(
+                        &window,
+                        "save-current-frame",
+                        None,
+                    );
                 }
                 return glib::Propagation::Stop;
             }

@@ -75,11 +75,17 @@ pub(crate) fn load(path: &Path, cancel: &gio::Cancellable) -> Result<gdk::Textur
     // Scope all runner scratch directories to this load. The RAII cleanup
     // removes them even when the entire process group is killed on cancel.
     command.env("TMPDIR", &directory);
+    // The measurement branch runs a different process supervisor. Normal
+    // image loading must never inherit a user's probe/debug environment.
+    command.env_remove("PIVRA_RAW_METRICS");
     if installed_runner.is_some() {
         // Installed Pivra must use its packaged decoder, not an inherited
         // development override pointing to an arbitrary host executable.
         command.env("PIVRA_RAW_INSTALLED", "1");
         command.env_remove("PIVRA_RAW_HELPER");
+    } else {
+        // A developer launch must not inherit installed-mode semantics.
+        command.env_remove("PIVRA_RAW_INSTALLED");
     }
     // Filenames are passed as individual argv values, never shell-interpolated.
     // Keep bounded diagnostics for failed decodes instead of hiding every

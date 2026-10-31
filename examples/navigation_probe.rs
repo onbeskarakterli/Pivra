@@ -1,5 +1,7 @@
 //! Production window/controller/view integration. Default requires real secure
 //! pixels; --expect-image-error is scoped GUI/error coverage, not image PASS.
+#[path = "../src/raw_loader.rs"]
+mod raw_loader;
 #[path = "../src/image_loader.rs"]
 mod image_loader;
 #[path = "../src/image_view.rs"]

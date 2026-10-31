@@ -1,6 +1,4 @@
-//! TH-04/05 stable cells and bounded, viewport-prioritized thumbnail work.                        Err(Error::Busy) => Work::Busy,
-                        Err(Error::Cancelled) => Work::Cancelled,
-                        Err(error) => provider_failure(error),
+//! TH-04/05 stable cells and bounded, viewport-prioritized thumbnail work.
 use super::{CELL_HEIGHT, CELL_WIDTH};
 use gtk::{gdk, gio, glib, prelude::*};
 use pivra::{

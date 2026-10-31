@@ -81,7 +81,7 @@ fn update_title(window: &adw::ApplicationWindow, title: &adw::WindowTitle, conte
         }
         title.set_subtitle(&format!("{photo_number} / {photo_total}"));
     } else {
-        title.set_subtitle("Video playback is not available yet.");
+        title.set_subtitle("");
     }
 }
 

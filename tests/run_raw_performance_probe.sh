@@ -4,15 +4,27 @@ set -euo pipefail
 cd "$(dirname "${BASH_SOURCE[0]}")/.."
 input="${1:-$HOME/Downloads/Ricoh-GR-III.DNG}"
 [[ -f "$input" ]] || { printf 'Missing DNG: %s\n' "$input" >&2; exit 2; }
-command -v /usr/bin/time >/dev/null || { echo '/usr/bin/time required for peak RSS metrics' >&2; exit 2; }
+# GNU time is optional on minimal Arch installations. Do not require a package install.
+if [[ -x /usr/bin/time ]]; then
+    timing=gnu
+else
+    timing=python
+    command -v python3 >/dev/null || { echo 'python3 required for elapsed-time fallback' >&2; exit 2; }
+    echo 'NOTE: GNU time unavailable; peak RSS not measured'
+fi
 tmp="$(mktemp -d)"
 trap 'rm -rf "$tmp"' EXIT
 for iteration in 1 2 3; do
     echo "===== RAW ITERATION $iteration/3 ====="
     # Probe compilation is included in wall-clock elapsed. Separate program
     # startup/compile costs from decoder time before drawing performance claims.
-    /usr/bin/time -f 'ELAPSED_SECONDS=%e PEAK_RSS_KB=%M EXIT=%x' \
-        bash tests/run_raw_sandbox_probe.sh "$input" "$tmp/frame-$iteration.ppm"
+    if [[ "$timing" == gnu ]]; then
+        /usr/bin/time -f 'ELAPSED_SECONDS=%e PEAK_RSS_KB=%M EXIT=%x' \
+            bash tests/run_raw_sandbox_probe.sh "$input" "$tmp/frame-$iteration.ppm"
+    else
+        python3 -c 'import subprocess, sys, time; start=time.monotonic(); result=subprocess.run(sys.argv[1:]); print(f"ELAPSED_SECONDS={time.monotonic()-start:.3f} PEAK_RSS_KB=NOT_MEASURED EXIT={result.returncode}",flush=True); sys.exit(result.returncode)' \
+            bash tests/run_raw_sandbox_probe.sh "$input" "$tmp/frame-$iteration.ppm"
+    fi
     python3 tests/validate_raw_ppm.py "$tmp/frame-$iteration.ppm"
     echo "OUTPUT_BYTES=$(stat -c %s "$tmp/frame-$iteration.ppm")"
 done

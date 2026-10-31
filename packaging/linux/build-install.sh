@@ -25,7 +25,7 @@ if [[ -n "$destdir" && "$destdir" != /* ]]; then
   exit 2
 fi
 
-for cmd in cargo rustc cc pkg-config install; do
+for cmd in cargo rustc cc pkg-config install python3; do
   command -v "$cmd" >/dev/null || { printf 'ERROR: missing command: %s\n' "$cmd" >&2; exit 1; }
 done
 pkg-config --atleast-version=4.16 gtk4 || { echo 'ERROR: GTK >= 4.16 required' >&2; exit 1; }
@@ -35,7 +35,11 @@ pkg-config --exists gnome-desktop-4 gio-2.0 gobject-2.0 gdk-pixbuf-2.0 lcms2 lib
 
 build_dir="$root/target/pivra-native"
 helper="$build_dir/pivra-thumbnail-factory"
-viewer="$root/target/release/pivra"
+# Honor Cargo's effective target directory (including .cargo/config.toml and
+# CARGO_TARGET_DIR). Otherwise a stale target/release/pivra can be installed
+# or scanned even when Cargo built into a different directory.
+cargo_target_dir="$(cargo metadata --locked --no-deps --format-version 1 | python3 -c 'import json,sys; print(json.load(sys.stdin)["target_directory"])')"
+viewer="$cargo_target_dir/release/pivra"
 raw_helper="$build_dir/pivra-raw-decoder"
 
 build_all() {

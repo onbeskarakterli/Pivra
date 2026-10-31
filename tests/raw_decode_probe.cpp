@@ -48,20 +48,20 @@ int main(int argc, char **argv) {
         const uint64_t expected = uint64_t(img->width) * img->height * img->colors * (img->bits / 8);
         if (img->bits != 8 || img->colors != 3 || expected != img->data_size ||
             expected > 256ULL * 1024 * 1024 || img->width > 16384 || img->height > 16384) {
-            std::cerr << "FAIL: unsafe PPM output geometry or size\\n";
+            std::cerr << "FAIL: unsafe PPM output geometry or size\n";
             raw.dcraw_clear_mem(img);
             return 1;
         }
         std::ofstream out(argv[2], std::ios::binary | std::ios::trunc);
-        out << "P6\\n" << img->width << " " << img->height << "\\n255\\n";
+        out << "P6\n" << img->width << " " << img->height << "\n255\n";
         out.write(reinterpret_cast<const char *>(img->data), img->data_size);
         out.flush();
         if (!out.good()) {
-            std::cerr << "FAIL: PPM write error\\n";
+            std::cerr << "FAIL: PPM write error\n";
             raw.dcraw_clear_mem(img);
             return 1;
         }
-        std::cout << "PASS bounded PPM transfer output\\n";
+        std::cout << "PASS bounded PPM transfer output\n";
     }
     raw.dcraw_clear_mem(img);
     if (!valid) {

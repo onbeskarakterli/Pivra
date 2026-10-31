@@ -138,7 +138,7 @@ pub(crate) fn load(path: &Path, cancel: &gio::Cancellable) -> Result<gdk::Textur
             .read(true)
             .open(&diagnostics)
             .ok()
-            .and_then(|mut file| {
+            .and_then(|file| {
                 let mut bytes = Vec::new();
                 file.take(1024).read_to_end(&mut bytes).ok()?;
                 Some(

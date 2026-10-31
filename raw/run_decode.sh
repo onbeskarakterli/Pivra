@@ -25,10 +25,12 @@ fi
     { echo 'RAW input must be between 1 byte and 64 MiB' >&2; exit 2; }
 command -v bwrap >/dev/null || { echo 'FAIL: bubblewrap required' >&2; exit 2; }
 tmp="$(mktemp -d)"
+# Install cleanup immediately: output validation can fail before decoding.
+trap 'rm -rf -- "$tmp"' EXIT
 if [[ -n "$output" ]]; then
-    [[ ! -e "$output" ]] || { echo "Output already exists; refusing overwrite" >&2; exit 2; }
+    [[ ! -e "$output" && ! -L "$output" ]] ||
+        { echo "Output already exists; refusing overwrite" >&2; exit 2; }
 fi
-trap 'rm -rf "$tmp"' EXIT
 # Package builders can provide a precompiled helper. Never silently compile
 # when a specifically configured helper is missing or invalid.
 if [[ -n "${PIVRA_RAW_HELPER:-}" || "${PIVRA_RAW_INSTALLED:-0}" == 1 ]]; then
@@ -53,7 +55,7 @@ else
     helper="$cache/raw-probe-$key"
     if [[ ! -x "$helper" ]]; then
         staging="$(mktemp "$cache/.building.XXXXXX")"
-        trap 'rm -f "$staging"; rm -rf "$tmp"' EXIT
+        trap 'rm -f -- "$staging"; rm -rf -- "$tmp"' EXIT
         c++ -std=c++17 -O2 -Wall -Wextra -Werror raw/decoder.cpp -o "$staging" "${flags[@]}"
         chmod 700 "$staging"
         mv -f "$staging" "$helper"

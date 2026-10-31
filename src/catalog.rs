@@ -46,15 +46,7 @@ impl MediaCollection {
         };
         let supported = |item: &&MediaItem| {
             item.kind() == crate::media::MediaKind::Image
-                && item
-                    .path()
-                    .extension()
-                    .and_then(|e| e.to_str())
-                    .is_some_and(|e| {
-                        ["jpg", "jpeg", "png"]
-                            .iter()
-                            .any(|s| e.eq_ignore_ascii_case(s))
-                    })
+                && crate::discovery::supported_photo(item.path())
         };
         self.items[index + 1..]
             .iter()
@@ -83,15 +75,7 @@ impl MediaCollection {
         let supported = |index: &usize| {
             let item = &self.items[*index];
             item.kind() == crate::media::MediaKind::Image
-                && item
-                    .path()
-                    .extension()
-                    .and_then(|e| e.to_str())
-                    .is_some_and(|e| {
-                        ["jpg", "jpeg", "png"]
-                            .iter()
-                            .any(|s| e.eq_ignore_ascii_case(s))
-                    })
+                && crate::discovery::supported_photo(item.path())
         };
         if forward {
             let start = self.selected.map_or(0, |index| index + 1);
@@ -314,13 +298,16 @@ mod neighbor_tests {
             MediaItem::new("4.jpg", MediaKind::Image),
             MediaItem::new("10.PNG", MediaKind::Image),
         ]);
-        assert_eq!(c.photo_neighbors(), vec![std::path::PathBuf::from("4.jpg")]);
+        assert_eq!(
+            c.photo_neighbors(),
+            vec![std::path::PathBuf::from("3.webp")]
+        );
         c.select(3);
         assert_eq!(
             c.photo_neighbors(),
             vec![
                 std::path::PathBuf::from("10.PNG"),
-                std::path::PathBuf::from("1.png")
+                std::path::PathBuf::from("3.webp")
             ]
         );
         c.select(4);
@@ -351,9 +338,13 @@ mod photo_navigation_tests {
         ];
         let mut c = MediaCollection::new(items.clone());
         assert!(c.select_photo(true));
+        assert_eq!(c.selected_index(), Some(3));
+        assert!(c.select_photo(true));
         assert_eq!(c.selected_index(), Some(4));
         assert!(!c.select_photo(true));
         assert_eq!(c.selected_index(), Some(4));
+        assert!(c.select_photo(false));
+        assert_eq!(c.selected_index(), Some(3));
         assert!(c.select_photo(false));
         assert_eq!(c.selected_index(), Some(0));
         assert!(!c.select_photo(false));

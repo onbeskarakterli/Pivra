@@ -2,9 +2,9 @@
 
 **Pivra** is a native image viewer for Linux, built with **Rust, GTK4, and libadwaita**. It is designed to feel at home on GNOME: open a photo, move through the folder, zoom in on details, and browse thumbnails without getting in the way.
 
-Pivra is free and open-source software. The current release, **v0.1.0**, focuses on JPEG and PNG photos. Video playback, editing, and additional image formats are planned for later versions.
+Pivra is free and open-source software. Version **0.2.0** adds mixed photo/video navigation, native video controls, animated-image playback, and Trash/Undo. Editing and advanced media tools remain planned.
 
-**[Latest release](https://github.com/onbeskarakterli/Pivra/releases/tag/v0.1.0)** · **[Arch Linux AUR](https://aur.archlinux.org/packages/pivra)** · **[Development roadmap](docs/PIVRA_DEVELOPMENT_ROADMAP.md)**
+**[Latest release](https://github.com/onbeskarakterli/Pivra/releases/tag/v0.2.0)** · **[Arch Linux AUR](https://aur.archlinux.org/packages/pivra)** · **[Development roadmap](docs/PIVRA_DEVELOPMENT_ROADMAP.md)**
 
 ## Installation
 
@@ -40,11 +40,11 @@ yay -S pivra
 paru -S pivra
 ```
 
-You can also install the verified prebuilt Arch package from the [v0.1.0 GitHub release](https://github.com/onbeskarakterli/Pivra/releases/tag/v0.1.0), or build it using the AUR PKGBUILD.
+You can also install the verified prebuilt Arch package from the [v0.2.0 GitHub release](https://github.com/onbeskarakterli/Pivra/releases/tag/v0.2.0), or build it using the AUR PKGBUILD.
 
 ## Features and roadmap
 
-**Available** = supported in the current v0.1.0 release. **Planned** = on the development roadmap, **not yet available**. Planned features are goals, not promises of a specific release date. Some early interface work was completed ahead of its original roadmap phase.
+**Available** = supported in the current v0.2.0 release. **Planned** = on the development roadmap, **not yet available**. Planned features are goals, not promises of a specific release date. Some early interface work was completed ahead of its original roadmap phase.
 
 ### Photo viewing and navigation
 
@@ -54,7 +54,7 @@ You can also install the verified prebuilt Arch package from the [v0.1.0 GitHub 
 | Secure image decoding with Glycin and Bubblewrap | ✅ Available |
 | Apply EXIF orientation to supported photos | ✅ Available |
 | Browse other supported photos in the same folder, in natural filename order | ✅ Available |
-| Previous/next navigation; skip unsupported video entries | ✅ Available |
+| Previous/next navigation through photos and videos | ✅ Available |
 | Fit, Fill, and 100% display modes | ✅ Available |
 | Cursor-anchored zoom and drag-to-pan | ✅ Available |
 | Smooth/Nearest image filtering | ✅ Available |
@@ -69,27 +69,27 @@ You can also install the verified prebuilt Arch package from the [v0.1.0 GitHub 
 | Photo/video/all filters and multi-selection | ⏳ Planned |
 | Slideshow with configurable timing, looping, and transitions | ⏳ Planned |
 | Customizable keyboard shortcuts and touchpad gestures | ⏳ Planned |
-| Expanded file actions, trash/undo, wallpaper, and side-by-side comparison | ⏳ Planned |
+| Move media to Trash with Undo | ✅ Available |
 
 ### Video playback
 
 | Feature | Status |
 |---|---|
-| Play videos in the same photo/video browsing sequence | ⏳ Planned |
-| Automatic playback and clean stop when switching files | ⏳ Planned |
-| Playback/pause, volume, mute, seek bar, and keyboard controls | ⏳ Planned |
-| Remember volume and playback position within a window | ⏳ Planned |
-| Frame-by-frame stepping and timeline hover previews | ⏳ Planned |
+| Play videos in the same photo/video browsing sequence | ✅ Available |
+| Automatic playback and stop when switching files | ✅ Available |
+| Playback/pause, volume, mute, seek bar, and keyboard controls | ✅ Available |
+| Remember volume and playback position within a window | ✅ Available |
+| Frame stepping (timeline hover previews planned) | ✅ Available |
 | Embedded/external SRT/ASS subtitles and audio-track selection | ⏳ Planned |
 | Subtitle appearance settings | ⏳ Planned |
 | Video zoom/pan and still-frame capture | ⏳ Planned |
-| Auto-hiding playback controls and display sleep inhibition | ⏳ Planned |
+| Auto-hiding playback controls (sleep inhibition planned) | ✅ Available |
 
 ### Formats, display quality, and performance
 
 | Feature | Status |
 |---|---|
-| GIF, animated WebP, and APNG playback | ⏳ Planned |
+| GIF, animated WebP, and APNG playback | ✅ Available |
 | Additional still formats such as TIFF, SVG, BMP, and ICO | ⏳ Planned |
 | RAW, HEIC, AVIF, JPEG XL, and PSD support where feasible | ⏳ Planned |
 | Multipage images and supported layered-file viewing | ⏳ Planned |
@@ -116,9 +116,11 @@ The full [60-step development roadmap](docs/PIVRA_DEVELOPMENT_ROADMAP.md) and [f
 
 ## Current limitations
 
-Pivra v0.1.0 displays **JPEG and PNG still images only**. It does not yet play videos, animate GIF/WebP/APNG files, or edit images. It uses a full-resolution image-loading pipeline without an early preview stage.
+Version 0.2.0 is a Linux/GNOME-focused viewer, not an image editor. Advanced subtitles, timeline hover previews, slideshow, HDR/ICC workflows, and batch conversion are not yet available. Image decoding depends on installed Glycin format loaders and their supported codecs. Video playback depends on the system GTK/GStreamer media backend and available codecs. Individual formats and files may fail.
 
-A previously observed `Preload exceeds cache entry budget` error remains unresolved and is documented as a known v0.1.0 risk. See the [release notes](docs/releases/PIVRA_V0.1_RELEASE_NOTES.md) for details.
+Still-image loading is bounded to 64 MP (maximum 32,768 pixels per edge) and 64 MiB input size. Animated frames have additional bounds. The repository's GUI probes and the release's video navigation should be checked on supported GNOME systems before publishing.
+
+See the [v0.2.0 release notes](docs/releases/PIVRA_V0.2_RELEASE_NOTES.md).
 
 ## License
 

@@ -21,7 +21,8 @@ fn install_css(display: &gtk::gdk::Display) {
             .pivra-thumbnail-cell { background-image: none; background-color: transparent; padding: 0; min-width: 0; min-height: 0; border: none; border-radius: 0; box-shadow: none; }\n\
             .pivra-thumbnail-cell.selected { box-shadow: none; }\n\
             .pivra-thumbnail-selection { background: transparent; border: 0; padding: 0; box-shadow: none; }\n\
-            .pivra-thumbnail-selection.selected { box-shadow: inset 0 0 0 2px @accent_color; }\n");
+            .pivra-thumbnail-selection.selected { border: 2px solid @accent_color; box-shadow: none; }\n\
+            .pivra-thumbnail-gif-badge { background-color: rgba(0,0,0,0.78); color: white; font-weight: bold; font-size: 15px; padding: 2px 6px; border-radius: 3px; }\n");
         gtk::style_context_add_provider_for_display(display,&css,gtk::STYLE_PROVIDER_PRIORITY_APPLICATION);
     });
 }
@@ -104,6 +105,7 @@ pub(crate) fn install(
     pin.add_css_class("pivra-thumbnail-pin");
     pin.set_active(false);
     let controls = gtk::Box::new(gtk::Orientation::Horizontal, 0);
+    controls.set_widget_name("thumbnail-controls");
     controls.set_halign(gtk::Align::Center);
     controls.set_valign(gtk::Align::End);
     controls.append(&button);
@@ -207,7 +209,7 @@ pub(crate) fn install(
         }
         pin_click.render(pinned || pin_click.near.get() || pin_click.shown.get());
         if !pinned && !pin_click.near.get() {
-            pin_click.schedule(3000);
+            pin_click.schedule(pin_click.idle_delay());
         }
     });
     let resize = gtk::GestureDrag::new();
@@ -272,14 +274,14 @@ pub(crate) fn install(
         end_state.resizing.set(false);
         end_state.place_toggle();
         if !end_state.pinned.get() && !end_state.near.get() {
-            end_state.schedule(3000);
+            end_state.schedule(end_state.idle_delay());
         }
     });
     let cancel_state = state.clone();
     resize.connect_cancel(move |_, _| {
         cancel_state.resizing.set(false);
         if !cancel_state.pinned.get() && !cancel_state.near.get() {
-            cancel_state.schedule(3000);
+            cancel_state.schedule(cancel_state.idle_delay());
         }
     });
     resize.set_propagation_phase(gtk::PropagationPhase::Capture);
@@ -328,7 +330,7 @@ pub(crate) fn install(
         if key_state.preference.enabled() {
             key_state.render(true);
             if !key_state.near.get() {
-                key_state.schedule(3000);
+                key_state.schedule(key_state.idle_delay());
             }
         }
         glib::Propagation::Stop
@@ -418,6 +420,9 @@ struct Visibility {
     listener: RefCell<Option<PreferenceListener>>,
 }
 impl Visibility {
+    fn idle_delay(&self) -> u64 {
+        1000
+    }
     fn disconnect_layout(&self) {
         if let Some((clock, handler)) = self.layout.borrow_mut().take() {
             clock.disconnect(handler);
@@ -546,7 +551,7 @@ impl Visibility {
         }
         self.near.set(false);
         if self.shown.get() && !self.pinned.get() && self.timeout.borrow().is_none() {
-            self.schedule(3000);
+            self.schedule(self.idle_delay());
         }
     }
     fn schedule(self: &Rc<Self>, milliseconds: u64) {

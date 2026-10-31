@@ -25,6 +25,28 @@ struct FileContext {
     revision: u64,
 }
 
+// Identify the exact newly trashed entry rather than restoring an unrelated
+// older item with the same original path.
+fn trash_entries(original: &std::path::Path) -> Vec<gio::File> {
+    let root = gio::File::for_uri("trash:///");
+    let Ok(enumerator) = root.enumerate_children(
+        "standard::name,trash::orig-path",
+        gio::FileQueryInfoFlags::NONE,
+        None::<&gio::Cancellable>,
+    ) else {
+        return vec![];
+    };
+    let mut entries = vec![];
+    while let Ok(Some(info)) = enumerator.next_file(None::<&gio::Cancellable>) {
+        if info.attribute_byte_string("trash::orig-path")
+            .is_some_and(|value| std::path::Path::new(value.as_str()) == original)
+        {
+            entries.push(enumerator.child(&info));
+        }
+    }
+    entries
+}
+
 fn update_title(window: &adw::ApplicationWindow, title: &adw::WindowTitle, context: &FileContext) {
     update_navigation_actions(window, context);
     let Some(selected) = context.collection.current() else {
@@ -69,11 +91,11 @@ fn update_navigation_actions(window: &adw::ApplicationWindow, context: &FileCont
     for (name, enabled) in [
         (
             "previous-media",
-            context.collection.photo_target(false).is_some(),
+            context.collection.selected_index().map_or(!context.collection.items().is_empty(), |i| i > 0),
         ),
         (
             "next-media",
-            context.collection.photo_target(true).is_some(),
+            context.collection.selected_index().map_or(!context.collection.items().is_empty(), |i| i + 1 < context.collection.items().len()),
         ),
     ] {
         if let Some(action) = window
@@ -106,15 +128,16 @@ fn install_navigation_arrows(overlay: &gtk::Overlay) {
             "Sonraki fotoğraf"
         }));
         let arrow = gtk::DrawingArea::new();
-        arrow.set_content_width(48);
-        arrow.set_content_height(72);
+        arrow.set_content_width(32);
+        arrow.set_content_height(48);
         arrow.set_can_target(false);
         arrow.set_draw_func(move |_, cr, width, height| {
             // Preserve the 4K/fullscreen silhouette; scale only down in a
             // smaller viewport, including the chevron stroke and wing length.
             let scale = (f64::from(width) / 112.0)
                 .min(f64::from(height) / 900.0)
-                .clamp(0.35, 1.0);
+                .clamp(0.35, 1.0)
+                * 0.5;
             let cx = f64::from(width) / 2.0;
             let cy = f64::from(height) / 2.0;
             let tip_x = if left {
@@ -140,7 +163,7 @@ fn install_navigation_arrows(overlay: &gtk::Overlay) {
         button.set_action_name(Some(action));
         button.set_halign(align);
         button.set_valign(gtk::Align::Fill);
-        button.set_size_request(112, -1);
+        button.set_size_request(80, -1);
         button.set_focus_on_click(false);
         button.set_visible(false);
         overlay.add_overlay(&button);
@@ -150,16 +173,47 @@ fn install_navigation_arrows(overlay: &gtk::Overlay) {
     };
     let previous = make_arrow(true, "win.previous-media", gtk::Align::Start);
     let next = make_arrow(false, "win.next-media", gtk::Align::End);
+
+    // Keep full-height navigation panels out of the thumbnail strip. The strip
+    // can be shown, hidden and resized independently after arrow creation.
+    let mut sibling = overlay.first_child();
+    while let Some(widget) = sibling {
+        if widget.widget_name() == "thumbnail-strip" {
+            if let Ok(strip) = widget.downcast::<gtk::ScrolledWindow>() {
+                let left = previous.downgrade();
+                let right = next.downgrade();
+                let update = move |strip: &gtk::ScrolledWindow| {
+                    let bottom = if strip.is_visible() {
+                        strip.height_request().max(0)
+                    } else {
+                        0
+                    };
+                    for arrow in [&left, &right] {
+                        if let Some(arrow) = arrow.upgrade() {
+                            arrow.set_margin_bottom(bottom);
+                        }
+                    }
+                };
+                update(&strip);
+                let update = std::rc::Rc::new(update);
+                let visibility = update.clone();
+                strip.connect_notify_local(Some("visible"), move |strip, _| visibility(strip));
+                strip.connect_notify_local(Some("height-request"), move |strip, _| update(strip));
+            }
+            break;
+        }
+        sibling = widget.next_sibling();
+    }
     // GTK reports logical viewport size after allocation (including HiDPI).
     // Resize the glass panels as one piece with their arrows; no increase
-    // beyond the approved 112px fullscreen width.
+    // beyond the reduced 80px fullscreen width.
     let prev_size = previous.downgrade();
     let next_size = next.downgrade();
     let resize = move |viewport: &gtk::Overlay| {
         let scale = (f64::from(viewport.width()) / 1600.0)
             .min(f64::from(viewport.height()) / 900.0)
             .clamp(0.5, 1.0);
-        let panel_width = (112.0 * scale).round() as i32;
+        let panel_width = (80.0 * scale).round() as i32;
         for panel in [&prev_size, &next_size] {
             if let Some(panel) = panel.upgrade() {
                 if panel.width_request() != panel_width {
@@ -181,11 +235,11 @@ fn install_navigation_arrows(overlay: &gtk::Overlay) {
         };
         let width = widget.width() as f64;
         if let Some(button) = left.upgrade() {
-            let edge = f64::from(button.width_request()) + 44.0;
+            let edge = f64::from(button.width_request()) * 1.55;
             button.set_visible(x <= edge && button.is_sensitive());
         }
         if let Some(button) = right.upgrade() {
-            let edge = f64::from(button.width_request()) + 44.0;
+            let edge = f64::from(button.width_request()) * 1.55;
             button.set_visible(x >= width - edge && button.is_sensitive());
         }
     });
@@ -202,7 +256,6 @@ fn update_thumbnail_catalog(view: &ImageView, context: &FileContext) {
         .items()
         .iter()
         .enumerate()
-        .filter(|(_, item)| item.kind() == MediaKind::Image)
         .map(|(index, item)| (index, item.path().to_owned()))
         .collect();
     view.set_thumbnail_catalog(&photos, context.collection.selected_index());
@@ -217,22 +270,13 @@ fn display_selected(view: &ImageView, context: &FileContext) {
     };
     if item.kind() == MediaKind::Video {
         view.set_neighbors(vec![]);
-        view.show_message("Video playback is not available yet.");
-    } else if item
-        .path()
-        .extension()
-        .and_then(|e| e.to_str())
-        .is_some_and(|e| {
-            ["jpg", "jpeg", "png"]
-                .iter()
-                .any(|s| e.eq_ignore_ascii_case(s))
-        })
-    {
+        view.load_video(item.path());
+    } else if pivra::discovery::supported_photo(item.path()) {
         view.load(item.path().to_owned());
         view.set_neighbors(context.collection.photo_neighbors());
     } else {
         view.set_neighbors(vec![]);
-        view.show_message("This image format is not supported yet. JPEG and PNG only.");
+        view.show_message("This image format is not supported.");
     }
 }
 
@@ -291,6 +335,7 @@ pub(super) fn build(app: &adw::Application, settings: &Settings, file: Option<Op
         fullscreen::install(
             &window,
             &picture,
+            view.video_widget(),
             &[header.clone().upcast(), banner.clone().upcast()],
         );
         let menu = gio::Menu::new();
@@ -426,7 +471,9 @@ pub(super) fn build(app: &adw::Application, settings: &Settings, file: Option<Op
             }
         });
         install_navigation_arrows(view.widget());
-        viewport.prepend(view.widget());
+        let toast_overlay = adw::ToastOverlay::new();
+        toast_overlay.set_child(Some(view.widget()));
+        viewport.prepend(&toast_overlay);
         placeholder.set_vexpand(false);
         update_title(&window, &title, &context.borrow());
         display_selected(&view, &context.borrow());
@@ -442,7 +489,11 @@ pub(super) fn build(app: &adw::Application, settings: &Settings, file: Option<Op
                     return;
                 };
                 let mut context = context.borrow_mut();
-                let changed = context.collection.select_photo(forward);
+                let changed = if forward {
+                    context.collection.select_next()
+                } else {
+                    context.collection.select_previous()
+                };
                 if changed {
                     context.revision = context.revision.wrapping_add(1);
                     banner.set_reveal_child(false);
@@ -453,16 +504,94 @@ pub(super) fn build(app: &adw::Application, settings: &Settings, file: Option<Op
             window.add_action(&action);
         }
         update_navigation_actions(&window, &context.borrow());
+
+        // Delete moves the selected photo or video to the system Trash.
+        // Undo is bound to the specific new trash entry, never a path guess.
+        let delete = gio::SimpleAction::new("trash-selected", None);
+        let trash_context = context.clone();
+        let trash_view = view.clone();
+        let trash_title = title.clone();
+        let trash_banner = banner.clone();
+        let trash_window = window.downgrade();
+        let toasts = toast_overlay.clone();
+        delete.connect_activate(move |_, _| {
+            let Some(window) = trash_window.upgrade() else { return; };
+            let mut context = trash_context.borrow_mut();
+            let Some(selected) = context.collection.current().cloned() else { return; };
+            let path = selected.path().to_owned();
+            let old_index = context.collection.selected_index().unwrap_or(0);
+            let old_entries = trash_entries(&path);
+            let file = gio::File::for_path(&path);
+            if let Err(error) = file.trash(None::<&gio::Cancellable>) {
+                toasts.add_toast(adw::Toast::new(&format!("Could not move to Trash: {error}")));
+                return;
+            }
+            let remaining: Vec<_> = context.collection.items().iter()
+                .filter(|item| item.path() != path)
+                .cloned().collect();
+            context.collection = MediaCollection::new(remaining);
+            if !context.collection.items().is_empty() {
+                let last_index = context.collection.items().len() - 1;
+                context.collection.select(old_index.min(last_index));
+            }
+            context.revision = context.revision.wrapping_add(1);
+            trash_banner.set_reveal_child(false);
+            update_title(&window, &trash_title, &context);
+            display_selected(&trash_view, &context);
+            drop(context);
+
+            let name = path.file_name().unwrap_or_default().to_string_lossy();
+            let toast = adw::Toast::new(&format!("Moved to Trash: {name}"));
+            // The Trash backend may update its GIO directory asynchronously.
+            // Always expose Undo and resolve the new entry when clicked, not
+            // immediately after trash() returns.
+            toast.set_button_label(Some("Undo"));
+            let undo_toasts = toasts.clone();
+            toast.connect_button_clicked(move |_| {
+                if path.exists() {
+                    undo_toasts.add_toast(adw::Toast::new("Undo failed: destination already exists"));
+                    return;
+                }
+                let trashed = trash_entries(&path).into_iter()
+                    .find(|entry| !old_entries.iter().any(|old| old.equal(entry)));
+                let Some(trashed) = trashed else {
+                    undo_toasts.add_toast(adw::Toast::new("Undo failed: trashed file not found"));
+                    return;
+                };
+                if let Err(error) = trashed.move_(
+                    &gio::File::for_path(&path),
+                    gio::FileCopyFlags::NONE,
+                    None::<&gio::Cancellable>,
+                    None,
+                ) {
+                    undo_toasts.add_toast(adw::Toast::new(&format!("Undo failed: {error}")));
+                }
+            });
+            toasts.add_toast(toast);
+        });
+        window.add_action(&delete);
         let keys = gtk::EventControllerKey::new();
         keys.set_propagation_phase(gtk::PropagationPhase::Capture);
         let weak_window = window.downgrade();
+        let video_keys = view.clone();
         keys.connect_key_pressed(move |_, key, _, modifiers| {
+            if !modifiers.intersects(gdk::ModifierType::ALT_MASK | gdk::ModifierType::SUPER_MASK)
+                && video_keys.video_key(key, modifiers.contains(gdk::ModifierType::CONTROL_MASK))
+            {
+                return glib::Propagation::Stop;
+            }
             if modifiers.intersects(
                 gdk::ModifierType::CONTROL_MASK
                     | gdk::ModifierType::ALT_MASK
                     | gdk::ModifierType::SUPER_MASK,
             ) {
                 return glib::Propagation::Proceed;
+            }
+            if key == gdk::Key::Delete {
+                if let Some(window) = weak_window.upgrade() {
+                    gio::prelude::ActionGroupExt::activate_action(&window, "trash-selected", None);
+                }
+                return glib::Propagation::Stop;
             }
             let mode = match key {
                 gdk::Key::F6 => Some("fit"),
@@ -500,17 +629,7 @@ pub(super) fn build(app: &adw::Application, settings: &Settings, file: Option<Op
             let Some(item) = context.collection.current() else {
                 return;
             };
-            if item.kind() == MediaKind::Video
-                || !item
-                    .path()
-                    .extension()
-                    .and_then(|s| s.to_str())
-                    .is_some_and(|ext| {
-                        ["jpg", "jpeg", "png"]
-                            .iter()
-                            .any(|s| ext.eq_ignore_ascii_case(s))
-                    })
-            {
+            if item.kind() == MediaKind::Video || !pivra::discovery::supported_photo(item.path()) {
                 refresh_banner.set_reveal_child(false);
                 display_selected(&refresh_view, &context);
                 return;
@@ -567,6 +686,7 @@ struct FolderWatch {
     cancelled: Arc<AtomicBool>,
     monitor: RefCell<Option<gio::FileMonitor>>,
     timer: RefCell<Option<glib::SourceId>>,
+    fallback_poll: RefCell<Option<glib::SourceId>>,
     running: Cell<bool>,
     dirty: Cell<bool>,
     initialized: Cell<bool>,
@@ -579,6 +699,9 @@ impl FolderWatch {
         self.cancelled.store(true, Ordering::Relaxed);
         if let Some(timer) = self.timer.borrow_mut().take() {
             timer.remove();
+        }
+        if let Some(poll) = self.fallback_poll.borrow_mut().take() {
+            poll.remove();
         }
         for monitor in self.link_monitors.borrow_mut().drain(..) {
             monitor.cancel();
@@ -710,17 +833,25 @@ impl FolderWatch {
                     for issue in &report.issues {
                         eprintln!("{APP_NAME}: folder scan incomplete: {:?}: {}", issue.path, issue.error);
                     }
-                    let missing = context.collection.replace_preserving(report.collection.items().to_vec());
+                    // A periodic fallback scan must not cancel thumbnail work
+                    // when the directory's media catalog is unchanged.
+                    let catalog_changed = context.collection.items().iter().map(|item| item.path())
+                        .ne(report.collection.items().iter().map(|item| item.path()));
+                    let missing = if catalog_changed {
+                        context.collection.replace_preserving(report.collection.items().to_vec())
+                    } else {
+                        false
+                    };
                     if missing {
                         context.revision = context.revision.wrapping_add(1);
                         state.view.show_message("Selected media was removed or is inaccessible. Use arrow keys to continue.");
                         if let Some(banner) = state.banner.upgrade() { banner.set_reveal_child(false); }
                     }
                     state.view.set_neighbors(context.collection.photo_neighbors());
-                    update_thumbnail_catalog(&state.view, &context);
-                    // Revalidate the reconciled catalog: rebuilding the model may
-                    // cancel an older metadata epoch (e.g. replace + delete).
-                    state.view.invalidate_thumbnails();
+                    if catalog_changed {
+                        update_thumbnail_catalog(&state.view, &context);
+                        state.view.invalidate_thumbnails();
+                    }
                     state.view.finish_initial_thumbnail_catalog(context.collection.selected_index());
                     let count = context.collection.items().len();
                     let suffix = if warnings == 0 {
@@ -782,6 +913,7 @@ fn watch(
         cancelled: Arc::new(AtomicBool::new(false)),
         monitor: RefCell::new(None),
         timer: RefCell::new(None),
+        fallback_poll: RefCell::new(None),
         running: Cell::new(false),
         dirty: Cell::new(false),
         initialized: Cell::new(false),
@@ -869,5 +1001,21 @@ fn watch(
     });
     let destroying = state.clone();
     window.connect_destroy(move |_| destroying.stop());
+    // Some backends do not deliver directory notifications reliably.
+    // Periodically reconcile the catalog as a fallback while this window lives.
+    let weak = Rc::downgrade(&state);
+    let poll = glib::timeout_add_local(Duration::from_secs(5), move || {
+        let Some(state) = weak.upgrade() else {
+            return glib::ControlFlow::Break;
+        };
+        if state.cancelled.load(Ordering::Relaxed) {
+            return glib::ControlFlow::Break;
+        }
+        if !state.running.get() {
+            state.schedule();
+        }
+        glib::ControlFlow::Continue
+    });
+    state.fallback_poll.replace(Some(poll));
     state.scan();
 }

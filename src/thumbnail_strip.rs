@@ -26,6 +26,7 @@ enum Phase {
 }
 struct CellWidgets {
     button: gtk::Button,
+    content: gtk::Overlay,
     selection: gtk::Frame,
     picture: gtk::Picture,
     spinner: gtk::Spinner,
@@ -296,16 +297,9 @@ impl ThumbnailStrip {
         for entry in self.0.entries.borrow().iter() {
             if let Some(w) = &entry.widgets {
                 w.button.set_size_request(width, height);
-                if let Some(texture) = entry.texture.as_ref() {
-                    let ratio = (width as f64 / texture.width() as f64)
-                        .min(height as f64 / texture.height() as f64);
-                    w.selection.set_size_request(
-                        (texture.width() as f64 * ratio).round().max(1.0) as i32,
-                        (texture.height() as f64 * ratio).round().max(1.0) as i32,
-                    );
-                } else {
-                    w.selection.set_size_request(width, height);
-                }
+                w.content.set_size_request(width, height);
+                w.selection.set_size_request(width, height);
+                w.picture.set_size_request(width, height);
             }
         }
         self.0.scroller.queue_draw();
@@ -462,6 +456,10 @@ impl ThumbnailStrip {
         i.scroller.queue_draw();
         if i.initialized.get() && !i.scroller.is_mapped() {
             i.warm_hidden();
+        } else if i.initialized.get() && i.scroller.is_mapped() {
+            // File restoration creates pending cells during an asynchronous
+            // folder reconciliation; kick the visible scheduler immediately.
+            i.drive();
         }
     }
     /// Called on a real source-folder rescan, not on photo selection.
@@ -651,13 +649,6 @@ impl Inner {
                         entry.keys = Some((source, cache));
                         entry.phase = Phase::Ready;
                         if let Some(w) = &entry.widgets {
-                            let (cell_width, cell_height) = i.cell_size.get();
-                            let ratio = (cell_width as f64 / texture.width() as f64)
-                                .min(cell_height as f64 / texture.height() as f64);
-                            w.selection.set_size_request(
-                                ((texture.width() as f64 * ratio).round() as i32).max(1),
-                                ((texture.height() as f64 * ratio).round() as i32).max(1),
-                            );
                             w.picture.set_paintable(Some(&texture));
                             w.icon.set_visible(false);
                         }
@@ -706,7 +697,13 @@ impl Inner {
             .map(|e| (e.path.clone(), e.keys.clone()))
             .collect();
         if samples.is_empty() {
+            // A restored file is a fresh Pending entry with no cached keys.
+            // Revalidation must still restart thumbnail production.
             self.scroller.queue_draw();
+            self.drive();
+            if !self.scroller.is_mapped() {
+                self.warm_hidden();
+            }
             return;
         }
         let token = gio::Cancellable::new();
@@ -757,7 +754,13 @@ impl Inner {
                 }
             }
             i.scroller.queue_draw();
-            i.drive();
+            if i.scroller.is_mapped() {
+                i.drive();
+            } else {
+                // Rescans can invalidate a hidden strip. Its pending entries
+                // must be warmed now, not on the next filesystem change.
+                i.warm_hidden();
+            }
         });
     }
     fn disconnect(&self) {
@@ -813,10 +816,12 @@ impl Inner {
                 button.set_widget_name(&format!("thumbnail-cell-{}", entry.index.get()));
 
                 let content = gtk::Overlay::new();
+                content.set_size_request(cell_width, cell_height);
+                content.set_overflow(gtk::Overflow::Hidden);
                 let selection = gtk::Frame::new(None);
                 selection.add_css_class("pivra-thumbnail-selection");
-                selection.set_halign(gtk::Align::Center);
-                selection.set_valign(gtk::Align::Center);
+                selection.set_halign(gtk::Align::Fill);
+                selection.set_valign(gtk::Align::Fill);
                 selection.set_can_target(false);
                 selection.set_size_request(cell_width, cell_height);
                 if Some(entry.index.get()) == i.selected.get() {
@@ -824,31 +829,37 @@ impl Inner {
                 }
                 let picture = gtk::Picture::new();
                 picture.set_content_fit(gtk::ContentFit::Contain);
+                picture.set_size_request(cell_width, cell_height);
+                picture.set_margin_start(3);
+                picture.set_margin_end(3);
+                picture.set_margin_top(3);
+                picture.set_margin_bottom(3);
                 picture.set_can_shrink(true);
                 picture.set_can_target(false);
                 // Hidden predecode can complete before a GTK cell exists.
                 // Hydrate new cells from their already-ready textures.
                 if let Some(texture) = entry.texture.as_ref() {
-                    let ratio = (cell_width as f64 / texture.width() as f64)
-                        .min(cell_height as f64 / texture.height() as f64);
-                    selection.set_size_request(
-                        ((texture.width() as f64 * ratio).round() as i32).max(1),
-                        ((texture.height() as f64 * ratio).round() as i32).max(1),
-                    );
                     picture.set_paintable(Some(texture));
                 }
                 let spinner = gtk::Spinner::new();
                 spinner.set_halign(gtk::Align::Center);
                 spinner.set_valign(gtk::Align::Center);
+                let is_video = pivra::discovery::candidate_kind(&entry.path)
+                    == Some(pivra::media::MediaKind::Video);
+                // Until video frame previews are implemented, video cells use
+                // one deterministic placeholder, regardless of cache state.
+                picture.set_visible(true);
+                // The photo is the base child, not an unmeasured overlay.
+                // Badge, selection and loading indicators remain overlays.
+                content.set_child(Some(&picture));
                 let icon = gtk::Image::from_icon_name("image-x-generic-symbolic");
                 icon.set_halign(gtk::Align::Center);
                 icon.set_valign(gtk::Align::Center);
-                icon.set_visible(entry.phase != Phase::Ready);
+                icon.set_visible(!is_video && entry.phase != Phase::Ready);
                 icon.set_can_target(false);
                 spinner.set_can_target(false);
                 for child in [
-                    picture.upcast_ref::<gtk::Widget>(),
-                    icon.upcast_ref(),
+                    icon.upcast_ref::<gtk::Widget>(),
                     spinner.upcast_ref(),
                 ] {
                     content.add_overlay(child);
@@ -858,6 +869,47 @@ impl Inner {
                 content.add_overlay(&selection);
                 content.set_measure_overlay(&selection, false);
                 content.set_clip_overlay(&selection, true);
+                // Filmstrip previews stay static; identify GIFs without playing frames.
+                let is_gif = entry
+                    .path
+                    .extension()
+                    .and_then(|ext| ext.to_str())
+                    .is_some_and(|ext| ext.eq_ignore_ascii_case("gif"));
+                if is_gif || is_video {
+                    let badge = gtk::Label::new(Some(if is_video { "VIDEO" } else { "GIF" }));
+                    badge.add_css_class("pivra-thumbnail-gif-badge");
+                    // Identical badge geometry for both media types, anchored
+                    // to the fixed thumbnail cell rather than the image bounds.
+                    badge.set_size_request(64, 24);
+                    badge.set_xalign(0.5);
+                    badge.set_yalign(0.5);
+                    badge.set_can_target(false);
+                    // A full-cell anchor gives every badge the same coordinate
+                    // system, regardless of its label width or image aspect ratio.
+                    let badge_anchor = gtk::Box::new(gtk::Orientation::Vertical, 0);
+                    badge_anchor.set_hexpand(true);
+                    badge_anchor.set_vexpand(true);
+                    badge_anchor.set_halign(gtk::Align::Fill);
+                    badge_anchor.set_valign(gtk::Align::Fill);
+                    badge_anchor.set_can_target(false);
+                    let bottom = gtk::Box::new(gtk::Orientation::Horizontal, 0);
+                    bottom.set_halign(gtk::Align::Fill);
+                    bottom.set_valign(gtk::Align::End);
+                    bottom.set_margin_end(6);
+                    bottom.set_margin_bottom(6);
+                    bottom.set_can_target(false);
+                    let spacer = gtk::Box::new(gtk::Orientation::Horizontal, 0);
+                    spacer.set_hexpand(true);
+                    bottom.append(&spacer);
+                    bottom.append(&badge);
+                    let vertical_spacer = gtk::Box::new(gtk::Orientation::Vertical, 0);
+                    vertical_spacer.set_vexpand(true);
+                    badge_anchor.append(&vertical_spacer);
+                    badge_anchor.append(&bottom);
+                    content.add_overlay(&badge_anchor);
+                    content.set_measure_overlay(&badge_anchor, false);
+                    content.set_clip_overlay(&badge_anchor, true);
+                }
                 button.set_child(Some(&content));
                 let weak = Rc::downgrade(&i);
                 let index = entry.index.clone();
@@ -878,6 +930,7 @@ impl Inner {
                 i.items.append(&button);
                 entry.widgets = Some(CellWidgets {
                     button,
+                    content,
                     selection,
                     picture,
                     spinner,
@@ -1008,8 +1061,13 @@ impl Inner {
             }
             if let Some(w) = &e.widgets {
                 if visible.contains(&n) && matches!(e.phase, Phase::Pending | Phase::Loading) {
-                    w.spinner.start();
-                    w.icon.set_visible(false);
+                    if pivra::discovery::candidate_kind(&e.path) == Some(pivra::media::MediaKind::Video) {
+                        w.spinner.stop();
+                        w.icon.set_visible(false);
+                    } else {
+                        w.spinner.start();
+                        w.icon.set_visible(false);
+                    }
                 } else {
                     w.spinner.stop();
                 }
@@ -1173,12 +1231,6 @@ impl Inner {
                             entry.phase = Phase::Ready;
                             entry.used = i.clock.get();
                             if let Some(w) = &entry.widgets {
-                                let (cell_width, cell_height) = i.cell_size.get();
-                                let ratio = (cell_width as f64 / texture.width() as f64)
-                                    .min(cell_height as f64 / texture.height() as f64);
-                                let width = (texture.width() as f64 * ratio).round() as i32;
-                                let height = (texture.height() as f64 * ratio).round() as i32;
-                                w.selection.set_size_request(width.max(1), height.max(1));
                                 w.picture.set_paintable(Some(&texture));
                                 w.icon.set_visible(false);
                             }
@@ -1220,7 +1272,7 @@ impl Inner {
                 }
                 if let Some(w) = &entry.widgets {
                     w.spinner.stop();
-                    w.icon.set_visible(entry.phase == Phase::Failed);
+                    w.icon.set_visible(entry.phase == Phase::Failed && pivra::discovery::candidate_kind(&entry.path) != Some(pivra::media::MediaKind::Video));
                 }
             }
             // LRU bounds apply to widget paintables as well, not just a side map.

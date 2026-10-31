@@ -190,7 +190,29 @@ impl Manager {
         };
         request.check_control(Instant::now())?;
         if self.id == ProviderId::Gnome {
-            // Preserve the existing GNOME algorithm, including helper discovery/cache-only.
+            // Video previews are produced by the desktop thumbnailer, not by
+            // Pivra's still-image decoder. GNOME may save them in any standard
+            // thumbnail size class, so accept an already validated cache hit.
+            if crate::discovery::candidate_kind(path) == Some(crate::media::MediaKind::Video) {
+                if let Ok(reader) = CacheReader::new(self.home.clone()) {
+                    for class in [
+                        SizeClass::Normal,
+                        SizeClass::Large,
+                        SizeClass::XLarge,
+                        SizeClass::XxLarge,
+                    ] {
+                        match reader.lookup(&request, class) {
+                            Ok(CacheOutcome::Hit(candidate)) => {
+                                return Ok(Resolved::Cache(candidate));
+                            }
+                            Err(Error::Cancelled) => return Err(Error::Cancelled),
+                            Err(Error::TimedOut) => return Err(Error::TimedOut),
+                            _ => {}
+                        }
+                    }
+                }
+            }
+            // Preserve the existing GNOME GIO lookup for other cases.
             return match thumbnail::query_or_generate(&Provider::new(true, None), path, cancel) {
                 CacheOutcome::Hit(c) => Ok(Resolved::Cache(c)),
                 CacheOutcome::Cancelled => Err(Error::Cancelled),

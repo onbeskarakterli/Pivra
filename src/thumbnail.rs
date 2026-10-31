@@ -5,7 +5,6 @@ use gtk::{gio, prelude::*};
 use std::{
     fs,
     io::Read,
-    os::unix::fs::MetadataExt,
     path::{Path, PathBuf},
     process::{Command, Stdio},
     sync::{
@@ -280,16 +279,17 @@ impl Provider {
             || FileKey::read(path).ok().as_ref() != Some(&source)
             || FileKey::read(&cache).ok().as_ref() != Some(&cache_key)
         {
+            crate::thumbnail_diagnostics::trace("cache-stale-validation", Some(path),
+                format_args!("gio_valid={valid} source_unchanged={} cache_unchanged={}",
+                    FileKey::read(path).ok().as_ref() == Some(&source),
+                    FileKey::read(&cache).ok().as_ref() == Some(&cache_key)));
             return Outcome::Stale;
         }
-        // Reject same-path replacement even when seconds-resolution Thumb::MTime survives.
-        let src = match fs::metadata(path) {
-            Ok(m) => m,
-            Err(_) => return Outcome::Stale,
-        };
-        if (src.ctime(), src.ctime_nsec()) > (metadata.mtime(), metadata.mtime_nsec()) {
-            return Outcome::Stale;
-        }
+        // Moving a file to Trash and restoring it changes its inode ctime
+        // without changing its contents or mtime. GNOME's Thumb::URI/MTime
+        // validation above, the unchanged source key and cache key are the
+        // authoritative freshness checks; comparing source ctime to the
+        // thumbnail's filesystem mtime incorrectly rejects restored files.
         Outcome::Hit(Candidate {
             uri,
             source,
@@ -384,8 +384,12 @@ pub fn query_or_generate(provider: &Provider, path: &Path, cancel: &gio::Cancell
         Ok(info) => info,
         Err(e) => return Outcome::SourceUnavailable(e.to_string()),
     };
-    if info.size() > 64 * 1024 * 1024 {
-        return Outcome::Invalid("source exceeds 64MiB".into());
+    // The desktop video thumbnailer reads compressed streams, not decoded image
+    // pixels. Keep the image limit unchanged and bound videos separately.
+    let is_video = crate::discovery::candidate_kind(path) == Some(crate::media::MediaKind::Video);
+    let max_size = if is_video { 8_i64 * 1024 * 1024 * 1024 } else { 64_i64 * 1024 * 1024 };
+    if info.size() > max_size {
+        return Outcome::Invalid("source exceeds thumbnail generation size limit".into());
     }
     let Some(mime) = info
         .content_type()

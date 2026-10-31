@@ -1,5 +1,9 @@
 //! Per-window presentation and cancellation. Glycin alone applies orientation.
 
+#[path = "animation.rs"]
+mod animation;
+#[path = "video_controls.rs"]
+mod video_controls;
 #[path = "actual_paintable.rs"]
 mod actual_paintable;
 #[path = "thumbnail_overlay.rs"]
@@ -25,6 +29,12 @@ pub(super) struct ImageView {
     overlay: gtk::Overlay,
     thumbnail_strip: thumbnail_overlay::ThumbnailStrip,
     picture: gtk::Picture,
+    video: gtk::Picture,
+    video_stream: Rc<RefCell<Option<gtk::MediaFile>>>,
+    video_path: Rc<RefCell<Option<PathBuf>>>,
+    video_positions: Rc<RefCell<std::collections::HashMap<PathBuf, i64>>>,
+
+    video_controls: video_controls::Controls,
     status: gtk::Label,
     loading_spinner: gtk::Spinner,
     slot: Rc<LoadSlot>,
@@ -37,6 +47,8 @@ pub(super) struct ImageView {
     requested: Rc<RefCell<Option<PathBuf>>>,
     prefetch: Rc<RefCell<preload::State>>,
     phase: Rc<Cell<Phase>>,
+    animation_generation: Rc<Cell<u64>>,
+    animation_controls: animation::Controls,
 }
 
 impl ImageView {
@@ -55,6 +67,18 @@ impl ImageView {
         overlay.set_hexpand(true);
         overlay.set_vexpand(true);
         overlay.set_child(Some(&picture));
+        // Native GTK media playback is an intentionally small first video
+        // milestone. The backend depends on installed media codecs.
+        let video = gtk::Picture::new();
+        video.set_hexpand(true);
+        video.set_vexpand(true);
+        video.set_content_fit(gtk::ContentFit::Contain);
+        video.set_visible(false);
+        let video_stream: Rc<RefCell<Option<gtk::MediaFile>>> = Rc::default();
+        let video_path = Rc::default();
+        let video_positions = Rc::default();
+        overlay.add_overlay(&video);
+        overlay.set_measure_overlay(&video, false);
         overlay.add_overlay(&status);
         let loading_spinner = gtk::Spinner::new();
         loading_spinner.set_widget_name("photo-loading-spinner");
@@ -91,6 +115,88 @@ impl ImageView {
         });
         let destroyed_prefetch = prefetch.clone();
         window.connect_destroy(move |_| destroyed_prefetch.borrow_mut().close());
+        let animation_controls = animation::Controls::new();
+        overlay.add_overlay(&animation_controls.bar);
+        overlay.set_measure_overlay(&animation_controls.bar, false);
+        let video_controls = video_controls::Controls::new(window);
+        let closing_controls = video_controls.clone();
+        window.connect_destroy(move |_| closing_controls.shutdown());
+        overlay.add_overlay(&video_controls.bar);
+        overlay.set_measure_overlay(&video_controls.bar, false);
+        // Only physical pointer movement may reset the controls' idle timer.
+        // GTK can dispatch repeated motion events while overlay children redraw;
+        // those must not keep fullscreen controls visible indefinitely.
+        let motion = gtk::EventControllerMotion::new();
+        let last_pointer = Rc::new(Cell::new(None::<(f64, f64)>));
+        let previous = last_pointer.clone();
+        let reveal = video_controls.clone();
+        motion.connect_motion(move |_, x, y| {
+            let moved = previous.get().is_none_or(|(px, py)| {
+                (x - px).abs() >= 2.0 || (y - py).abs() >= 2.0
+            });
+            if moved {
+                previous.set(Some((x, y)));
+                reveal.reveal();
+            }
+        });
+        let previous = last_pointer.clone();
+        motion.connect_leave(move |_| previous.set(None));
+        overlay.add_controller(motion);
+        // The thumbnail controls are bottom-aligned overlay siblings. Their
+        // bottom margin already accounts for the strip's visible height.
+        // Keep the timeline directly above their allocated button height.
+        let mut child = overlay.first_child();
+        while let Some(widget) = child {
+            if widget.widget_name() == "thumbnail-controls" {
+                if let Ok(thumbnail_controls) = widget.downcast::<gtk::Box>() {
+                    let bar = animation_controls.bar.downgrade();
+                    let video_bar = video_controls.bar.downgrade();
+                    let align = move |controls: &gtk::Box| {
+                        if let Some(bar) = bar.upgrade() {
+                            let button_height = controls.height().max(30);
+                            let offset = if controls.is_visible() {
+                                controls.margin_bottom() + button_height + 2
+                            } else {
+                                2
+                            };
+                            if bar.margin_bottom() != offset {
+                                bar.set_margin_bottom(offset);
+                            }
+                            if let Some(video_bar) = video_bar.upgrade() {
+                                video_bar.set_margin_bottom(offset);
+                            }
+                        }
+                    };
+                    align(&thumbnail_controls);
+                    let align = Rc::new(align);
+                    let changed = align.clone();
+                    thumbnail_controls.connect_notify_local(Some("visible"), move |controls, _| {
+                        changed(controls);
+                    });
+                    let changed = align.clone();
+                    thumbnail_controls.connect_notify_local(Some("margin-bottom"), move |controls, _| {
+                        changed(controls);
+                    });
+                    thumbnail_controls.connect_notify_local(Some("height"), move |controls, _| {
+                        align(controls);
+                    });
+                }
+                break;
+            }
+            child = widget.next_sibling();
+        }
+        let animation_generation = Rc::new(Cell::new(0_u64));
+        for signal in [false, true] {
+            let generation = animation_generation.clone();
+            if signal {
+                window.connect_destroy(move |_| generation.set(generation.get().wrapping_add(1)));
+            } else {
+                window.connect_close_request(move |_| {
+                    generation.set(generation.get().wrapping_add(1));
+                    glib::Propagation::Proceed
+                });
+            }
+        }
         let slot = Rc::new(LoadSlot::default());
         let closing = slot.clone();
         window.connect_close_request(move |_| {
@@ -181,7 +287,14 @@ impl ImageView {
         });
         window.add_action(&quality_action);
         Self {
+            animation_controls,
+            video_controls,
+            animation_generation,
             thumbnail_strip,
+            video,
+            video_stream,
+            video_path,
+            video_positions,
             mode_action,
             prefetch,
             phase,
@@ -197,6 +310,11 @@ impl ImageView {
             slot,
             window: window.downgrade(),
         }
+    }
+
+    #[allow(dead_code)] // Used by the fullscreen thumbnail probe.
+    pub(super) fn video_widget(&self) -> &gtk::Picture {
+        &self.video
     }
 
     /// Bounded queue diagnostics for native/controlled probes; no product UI.
@@ -247,7 +365,65 @@ impl ImageView {
     pub(super) fn show_message(&self, message: &str) {
         self.prepare(message, true);
     }
+    #[allow(dead_code)] // Standalone image probes do not handle video keyboard input.
+    pub(super) fn video_key(&self, key: gtk::gdk::Key, ctrl: bool) -> bool {
+        self.video_controls.handle_key(key, ctrl)
+    }
+    #[allow(dead_code)] // Standalone image probes do not open videos.
+    pub(super) fn load_video(&self, path: &std::path::Path) {
+        self.prepare("", true);
+        let media = gtk::MediaFile::for_filename(path);
+        media.set_loop(false);
+        let resume_at = self.video_positions.borrow().get(path).copied().unwrap_or(0);
+        if resume_at > 0 {
+            // MediaFile prepares asynchronously; a seek before preparation
+            // may be ignored. Apply the stored timestamp once prepared.
+            media.connect_notify_local(Some("prepared"), move |media, _| {
+                if media.is_prepared() && media.is_seekable() {
+                    let duration = media.duration();
+                    if duration > 0 && resume_at < duration {
+                        media.seek(resume_at);
+                    }
+                }
+            });
+        }
+        if resume_at > 0 && media.is_prepared() && media.is_seekable() {
+            let duration = media.duration();
+            if duration > 0 && resume_at < duration {
+                media.seek(resume_at);
+            }
+        }
+        self.video_path.replace(Some(path.to_owned()));
+        self.video.set_paintable(Some(&media));
+        self.video_stream.replace(Some(media.clone()));
+        self.video.set_visible(true);
+        self.video_controls.attach(Some(media.clone().upcast::<gtk::MediaStream>()));
+        media.play();
+    }
+    fn stop_video(&self) {
+        self.video_controls.attach(None);
+        let path = self.video_path.borrow_mut().take();
+        // Detach the render surface before stopping the native decoder.
+        // Clearing a MediaFile while GtkPicture still paints it can race
+        // GStreamer/GTK frame delivery during rapid video navigation.
+        self.video.set_visible(false);
+        self.video.set_paintable(None::<&gtk::gdk::Paintable>);
+        if let Some(stream) = self.video_stream.borrow_mut().take() {
+            stream.pause();
+            if let Some(path) = path {
+                let timestamp = stream.timestamp();
+                if stream.is_prepared() && timestamp > 0 && timestamp < stream.duration() {
+                    self.video_positions.borrow_mut().insert(path, timestamp);
+                }
+            }
+            // The media file owns its playback pipeline and is released when
+            // references are dropped; don't synchronously clear it here.
+        }
+    }
     fn prepare(&self, message: &str, cancel: bool) {
+        self.stop_video();
+        self.animation_generation.set(self.animation_generation.get().wrapping_add(1));
+        self.animation_controls.reset();
         if cancel {
             self.slot.cancel();
             self.phase.set(Phase::Cancelled);
@@ -274,13 +450,7 @@ impl ImageView {
     pub(super) fn set_neighbors(&self, paths: Vec<PathBuf>) {
         let paths: Vec<_> = paths
             .into_iter()
-            .filter(|p| {
-                p.extension().and_then(|e| e.to_str()).is_some_and(|e| {
-                    ["jpg", "jpeg", "png"]
-                        .iter()
-                        .any(|s| e.eq_ignore_ascii_case(s))
-                })
-            })
+            .filter(|p| pivra::discovery::supported_photo(p))
             .take(2)
             .collect();
         {
@@ -336,14 +506,10 @@ impl ImageView {
         self.prefetch.borrow().cache.lock().unwrap().peek(path)
     }
 
-    /// Retarget only an unfinished JPEG/PNG request after a paired folder rename.
+    /// Retarget only an unfinished supported-image request after a paired folder rename.
     #[allow(dead_code)] // Standalone view probes omit the folder-monitor integration.
     pub(super) fn retarget_pending(&self, old: &std::path::Path, new: &std::path::Path) {
-        let supported = new.extension().and_then(|s| s.to_str()).is_some_and(|ext| {
-            ["jpg", "jpeg", "png"]
-                .iter()
-                .any(|s| ext.eq_ignore_ascii_case(s))
-        });
+        let supported = pivra::discovery::supported_photo(new);
         if !supported
             || self.requested.borrow().as_deref() != Some(old)
             || !self.slot.current_in_flight()
@@ -392,6 +558,18 @@ impl ImageView {
         on_completion: impl FnOnce() + 'static,
         on_result: impl FnOnce(bool) + 'static,
     ) {
+        self.stop_video();
+        self.animation_controls.reset();
+        let animation_controls = self.animation_controls.clone();
+        let generation = self.animation_generation.clone();
+        let expected = generation.get().wrapping_add(1);
+        generation.set(expected);
+        let animation_path = path.clone();
+        let animation_picture = self.picture.downgrade();
+        let animation_texture = self.texture.clone();
+        let animation_mode = self.mode_action.clone();
+        let animation_transform = self.transform.clone();
+        let animation_filter = self.filter.clone();
         if !allow_cache {
             self.prefetch.borrow_mut().invalidate();
         }
@@ -520,9 +698,20 @@ impl ImageView {
                             filter.clone(),
                         );
                         status.set_visible(false);
+                        animation::start(
+                            animation_path,
+                            generation,
+                            expected,
+                            animation_controls,
+                            animation_picture,
+                            animation_texture,
+                            animation_mode,
+                            animation_transform,
+                            animation_filter,
+                        );
                     }
                     Err(error) => {
-                        eprintln!("Pivra: image load failed: {error}");
+                        eprintln!("Pivra: image load failed for {target_name}: {error}");
                         let summary = error.lines().next().unwrap_or("Secure loading failed.");
                         let retained = if texture.borrow().is_some() {
                             "\nPrevious photo is still displayed."

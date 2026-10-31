@@ -1,4 +1,6 @@
 //! Real GIO events and production windows. Default requires secure Glycin pixels.
+#[path = "../src/raw_ppm.rs"]
+mod raw_ppm;
 #[path = "../src/raw_loader.rs"]
 mod raw_loader;
 #[path = "../src/image_loader.rs"]

@@ -30,7 +30,7 @@ struct CellWidgets {
     selection: gtk::Frame,
     picture: gtk::Picture,
     spinner: gtk::Spinner,
-    icon: gtk::Image,
+    icon: gtk::Label,
 }
 struct Entry {
     index: Rc<Cell<usize>>,
@@ -674,7 +674,7 @@ impl Inner {
                     entry.phase = Phase::Evicted;
                     if let Some(w) = &entry.widgets {
                         w.picture.set_paintable(None::<&gdk::Texture>);
-                        w.icon.set_visible(true);
+                        w.icon.set_visible(false);
                     }
                 }
                 drop(entries);
@@ -750,7 +750,7 @@ impl Inner {
                 e.cost = 0;
                 if let Some(w) = &e.widgets {
                     w.picture.set_paintable(None::<&gdk::Texture>);
-                    w.icon.set_visible(true);
+                    w.icon.set_visible(false);
                 }
             }
             i.scroller.queue_draw();
@@ -852,10 +852,11 @@ impl Inner {
                 // The photo is the base child, not an unmeasured overlay.
                 // Badge, selection and loading indicators remain overlays.
                 content.set_child(Some(&picture));
-                let icon = gtk::Image::from_icon_name("image-x-generic-symbolic");
+                let icon = gtk::Label::new(Some("NO THUMBNAIL"));
+                icon.add_css_class("pivra-thumbnail-failure-label");
                 icon.set_halign(gtk::Align::Center);
                 icon.set_valign(gtk::Align::Center);
-                icon.set_visible(!is_video && entry.phase != Phase::Ready);
+                icon.set_visible(entry.phase == Phase::Failed);
                 icon.set_can_target(false);
                 spinner.set_can_target(false);
                 for child in [icon.upcast_ref::<gtk::Widget>(), spinner.upcast_ref()] {
@@ -1271,11 +1272,7 @@ impl Inner {
                 }
                 if let Some(w) = &entry.widgets {
                     w.spinner.stop();
-                    w.icon.set_visible(
-                        entry.phase == Phase::Failed
-                            && pivra::discovery::candidate_kind(&entry.path)
-                                != Some(pivra::media::MediaKind::Video),
-                    );
+                    w.icon.set_visible(entry.phase == Phase::Failed);
                 }
             }
             // LRU bounds apply to widget paintables as well, not just a side map.
@@ -1305,7 +1302,7 @@ impl Inner {
                 e.phase = Phase::Evicted;
                 if let Some(w) = &e.widgets {
                     w.picture.set_paintable(None::<&gdk::Texture>);
-                    w.icon.set_visible(true);
+                    w.icon.set_visible(false);
                 }
             }
             drop(entries);

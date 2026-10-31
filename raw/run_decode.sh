@@ -46,12 +46,20 @@ else
     cache="${XDG_CACHE_HOME:-$HOME/.cache}/pivra/raw-helper"
     mkdir -p "$cache"
     chmod 700 "$cache"
-    if pkg-config --exists libraw 2>/dev/null; then
-        read -r -a flags <<< "$(pkg-config --cflags --libs libraw)"
-    else
-        flags=(-lraw)
-    fi
-    key="$( { sha256sum raw/decoder.cpp; c++ --version | head -n 1; pkg-config --modversion libraw 2>/dev/null || pacman -Q libraw; } | sha256sum | cut -d' ' -f1)"
+    # Match the native packaging requirements on every Linux distribution.
+    # The old fallback to pacman -Q made this development path Arch-specific
+    # and could build against an untracked LibRaw version.
+    command -v pkg-config >/dev/null ||
+        { echo 'FAIL: pkg-config required for experimental RAW decoder' >&2; exit 2; }
+    pkg-config --exists libraw ||
+        { echo 'FAIL: LibRaw development files required (pkg-config libraw)' >&2; exit 2; }
+    read -r -a flags <<< "$(pkg-config --cflags --libs libraw)"
+    key="$( {
+        sha256sum raw/decoder.cpp
+        c++ --version | head -n 1
+        pkg-config --modversion libraw
+        pkg-config --cflags --libs libraw
+    } | sha256sum | cut -d' ' -f1)"
     helper="$cache/raw-probe-$key"
     if [[ ! -x "$helper" ]]; then
         staging="$(mktemp "$cache/.building.XXXXXX")"

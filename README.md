@@ -44,7 +44,7 @@ The AUR package builds Pivra from a pinned source revision. GitHub releases also
 
 ## Features and roadmap
 
-**Available** = implemented in the published v0.2.1 baseline; `dev` includes additional unreleased changes. **Partial** = some aspects implemented, with more work planned. **Planned** = not yet delivered. This is a feature-level snapshot, not a declaration that every numbered roadmap milestone is complete.
+**Available** = implemented in the current `dev` source (v0.2.3, unreleased); the published v0.2.1 release may have a different feature set. **Partial** = some aspects implemented, with more work planned. **Planned** = not yet delivered. This is a feature-level snapshot, not a declaration that every numbered roadmap milestone is complete.
 
 ### Photo viewing and navigation
 
@@ -63,7 +63,7 @@ The AUR package builds Pivra from a pinned source revision. GitHub releases also
 | Adjacent-photo preloading and bounded in-memory image cache | ✅ Available |
 | Folder-change monitoring and manual Refresh | ✅ Available |
 | Independent windows and saved window size/maximized state | ✅ Available |
-| Early low-resolution previews while full images load | ⏳ Planned |
+| Early low-resolution previews while full images load | Not planned (project decision) |
 | Image minimap when zoomed beyond the viewport | ⏳ Planned |
 | Optional EXIF/metadata information panel | ⏳ Planned |
 | Photo/video/all filters and multi-selection | ⏳ Planned |
@@ -93,7 +93,8 @@ The AUR package builds Pivra from a pinned source revision. GitHub releases also
 | GIF, animated WebP, and APNG playback | ✅ Available |
 | Still-image decoding up to 64 MP (subject to loader support and limits) | ✅ Available |
 | Additional still formats such as TIFF, SVG, BMP, and ICO | ⏳ Planned |
-| RAW, HEIC, AVIF, JPEG XL, and PSD support where feasible | ⏳ Planned |
+| Experimental DNG/RAW via opt-in LibRaw sandbox (development only) | 🧪 Experimental (`PIVRA_EXPERIMENTAL_DNG=1`; separate native helper build) |
+| HEIC, AVIF, JPEG XL, and PSD support where feasible | ⏳ Planned |
 | Multipage images and supported layered-file viewing | ⏳ Planned |
 | ICC color management and conditional HDR support | ⏳ Planned |
 | Further large-file responsiveness and memory/performance work | ⏳ Planned |
@@ -114,7 +115,7 @@ Editing will live in a separate **Edit** mode so the normal viewer remains simpl
 | Safe Save As, metadata handling, and original-file protection | ⏳ Planned |
 | Background batch conversion with pause/cancel and collision handling | ⏳ Planned |
 
-The [detailed development roadmap](docs/PIVRA_DEVELOPMENT_ROADMAP.md) retains historical PIV milestone and release-gate records; its older status snapshots do not supersede the v0.2.0 feature status above. The [feature specification](docs/PIVRA_FEATURE_SPEC_TR.md) describes the longer-term goals.
+The [detailed development roadmap](docs/PIVRA_DEVELOPMENT_ROADMAP.md) retains historical PIV milestone and release-gate records; its older status snapshots do not supersede the current v0.2.3 development status above. The [feature specification](docs/PIVRA_FEATURE_SPEC_TR.md) describes the longer-term goals.
 
 ## Current limitations
 
@@ -122,7 +123,7 @@ Pivra is a Linux/GNOME-focused viewer, not an image editor. Slideshow, HDR/ICC w
 
 Still-image loading is bounded to 64 MP (maximum 32,768 pixels per edge) and 64 MiB input size. Animated frames have additional bounds. The automated tests and video-navigation stress test were exercised on the development build; compatibility across other Linux environments remains to be verified.
 
-See the [v0.2.1 release notes](docs/releases/PIVRA_V0.2.1_RELEASE_NOTES.md).
+The `dev` branch is unreleased v0.2.3; these [v0.2.1 release notes](docs/releases/PIVRA_V0.2.1_RELEASE_NOTES.md) describe the last published stable release, not the development branch.
 
 ## License
 

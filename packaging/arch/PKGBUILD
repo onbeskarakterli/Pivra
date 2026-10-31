@@ -110,7 +110,6 @@ check() {
   _cache_setup || return 1
   cd "$srcdir/Pivra-$release_commit" || return 1
   CARGO_INCREMENTAL=0 cargo test --release --locked --offline --target "$_target" || return 1
-  cargo check --release --locked --offline --target "$_target" || return 1
   desktop-file-validate data/io.github.onbeskarakterli.Pivra.desktop || return 1
 }
 

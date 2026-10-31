@@ -581,7 +581,7 @@ impl Inner {
                                     scale,
                                 );
                                 if matches!(cached, Work::Hit(..)) {
-                                    Work::Failed("Thumbnail unavailable".into())
+                                    cached
                                 } else if let Some(generated) = response.memory() {
                                     memory_work(
                                         generated,
@@ -595,10 +595,12 @@ impl Inner {
                             } else if let Some(generated) = response.memory() {
                                 memory_work(generated, &worker_token, response.deadline(), scale)
                             } else {
-                                cached
+                                Work::Failed("Thumbnail unavailable".into())
                             }
-
                         }
+                        Err(Error::Busy) => Work::Busy,
+                        Err(Error::Cancelled) => Work::Cancelled,
+                        Err(error) => provider_failure(error),
                     }
                 };
                 pivra::thumbnail_diagnostics::trace(

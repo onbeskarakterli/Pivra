@@ -853,7 +853,10 @@ fn install_video_interaction(
         let zoom = zoom_wheel.get()
             || controller
                 .current_event_state()
-                .contains(gtk::gdk::ModifierType::BUTTON1_MASK);
+                .intersects(
+                    gtk::gdk::ModifierType::BUTTON1_MASK
+                        | gtk::gdk::ModifierType::CONTROL_MASK,
+                );
         let Some(video) = weak.upgrade() else {
             return glib::Propagation::Proceed;
         };
@@ -979,7 +982,10 @@ pub(super) fn install_interaction(
         let zoom = zoom_wheel.get()
             || controller
                 .current_event_state()
-                .contains(gtk::gdk::ModifierType::BUTTON1_MASK);
+                .intersects(
+                    gtk::gdk::ModifierType::BUTTON1_MASK
+                        | gtk::gdk::ModifierType::CONTROL_MASK,
+                );
         if !zoom {
             if let Some(picture) = weak.upgrade() {
                 if let Some(window) = picture.root().and_downcast::<adw::ApplicationWindow>() {

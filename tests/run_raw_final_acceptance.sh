@@ -16,7 +16,17 @@ sample="$(realpath -- "$sample")"
 echo '=== 1/5 Static checks ==='
 bash -n raw/run_decode.sh raw/build_helper.sh packaging/linux/build-install.sh \
     tests/run_raw_negative_probe.sh tests/run_raw_performance_probe.sh
-python3 -m py_compile tests/run_raw_cancel_probe.py tests/validate_raw_ppm.py
+python3 - <<'PY'
+import ast
+from pathlib import Path
+
+for path in (
+    Path("tests/run_raw_cancel_probe.py"),
+    Path("tests/validate_raw_ppm.py"),
+):
+    ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
+print("PASS: Python syntax (without writing __pycache__)")
+PY
 cargo fmt --all -- --check
 
 echo '=== 2/5 Rust RAW unit tests ==='

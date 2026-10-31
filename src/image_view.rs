@@ -348,15 +348,17 @@ impl ImageView {
             if !media.is_prepared() {
                 return Err("Video frame is not ready".into());
             }
-            let paintable = gtk::gdk::prelude::PaintableExt::current_image(media);
-            let width = paintable.intrinsic_width();
-            let height = paintable.intrinsic_height();
+            // MediaFile::current_image() may return an empty placeholder for
+            // GStreamer-backed video even while the Picture is rendering frames.
+            // Snapshot the live MediaFile paintable instead of its static image.
+            let width = media.intrinsic_width();
+            let height = media.intrinsic_height();
             if width <= 0 || height <= 0 {
                 return Err("Video frame dimensions are unavailable".into());
             }
             let snapshot = gtk::Snapshot::new();
             gtk::gdk::prelude::PaintableExt::snapshot(
-                &paintable,
+                media,
                 &snapshot,
                 f64::from(width),
                 f64::from(height),

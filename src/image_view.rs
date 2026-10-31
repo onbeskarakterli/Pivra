@@ -31,6 +31,7 @@ pub(super) struct ImageView {
     picture: gtk::Picture,
     video: gtk::Picture,
     video_stream: Rc<RefCell<Option<gtk::MediaFile>>>,
+    video_transform: Rc<RefCell<Transform>>,
     video_path: Rc<RefCell<Option<PathBuf>>>,
     video_positions: Rc<RefCell<std::collections::HashMap<PathBuf, i64>>>,
 
@@ -72,38 +73,15 @@ impl ImageView {
         let video = gtk::Picture::new();
         video.set_hexpand(true);
         video.set_vexpand(true);
-        video.set_content_fit(gtk::ContentFit::Contain);
+        video.set_content_fit(gtk::ContentFit::Fill);
+        video.set_can_shrink(true);
+        video.set_overflow(gtk::Overflow::Hidden);
         video.set_visible(false);
         let video_stream: Rc<RefCell<Option<gtk::MediaFile>>> = Rc::default();
         let video_path = Rc::default();
         let video_positions = Rc::default();
         overlay.add_overlay(&video);
         overlay.set_measure_overlay(&video, false);
-        // The image wheel handler belongs to the photo Picture, which is
-        // covered by the video Picture during playback. Give the video surface
-        // the same media-navigation behavior without enabling photo zoom.
-        let video_scroll = gtk::EventControllerScroll::new(
-            gtk::EventControllerScrollFlags::VERTICAL,
-        );
-        video_scroll.connect_scroll(move |controller, _, dy| {
-            if dy == 0.0 {
-                return glib::Propagation::Proceed;
-            }
-            if let Some(window) = controller
-                .widget()
-                .and_then(|widget| widget.root())
-                .and_then(|root| root.downcast::<adw::ApplicationWindow>().ok())
-            {
-                let action = if dy > 0.0 {
-                    "next-media"
-                } else {
-                    "previous-media"
-                };
-                gio::prelude::ActionGroupExt::activate_action(&window, action, None);
-            }
-            glib::Propagation::Stop
-        });
-        video.add_controller(video_scroll);
         overlay.add_overlay(&status);
         let loading_spinner = gtk::Spinner::new();
         loading_spinner.set_widget_name("photo-loading-spinner");
@@ -252,6 +230,14 @@ impl ImageView {
         let transform = Rc::new(RefCell::new(Transform::default()));
         let filter = Rc::new(Cell::new(Resampling::default()));
         let zoom_wheel = Rc::new(Cell::new(false));
+        let video_transform = Rc::new(RefCell::new(Transform::default()));
+        install_video_interaction(
+            &video,
+            video_stream.clone(),
+            video_transform.clone(),
+            &mode_action,
+            zoom_wheel.clone(),
+        );
         install_interaction(
             &picture,
             texture.clone(),
@@ -264,11 +250,22 @@ impl ImageView {
         let weak_picture = picture.downgrade();
         let current_texture = texture.clone();
         let mode_filter = filter.clone();
+        let mode_video = video.downgrade();
+        let mode_video_transform = video_transform.clone();
         mode_action.connect_activate(move |action, parameter| {
             let Some(mode) = parameter.and_then(|v| v.str()).and_then(ViewMode::from_id) else {
                 return;
             };
             mode_transform.borrow_mut().reset();
+            mode_video_transform.borrow_mut().reset();
+            if let Some(video) = mode_video.upgrade() {
+                if let Some(paintable) = video.paintable()
+                    .and_then(|p| p.downcast::<actual_paintable::ActualPaintable>().ok())
+                {
+                    paintable.set_mode(mode);
+                    paintable.invalidate_contents();
+                }
+            }
             action.set_state(&mode.id().to_variant());
             pivra::settings::save_view_mode(mode);
             if let Some(picture) = weak_picture.upgrade() {
@@ -321,6 +318,7 @@ impl ImageView {
             thumbnail_strip,
             video,
             video_stream,
+            video_transform,
             video_path,
             video_positions,
             mode_action,
@@ -427,7 +425,15 @@ impl ImageView {
             }
         }
         self.video_path.replace(Some(path.to_owned()));
-        self.video.set_paintable(Some(&media));
+        self.video_transform.borrow_mut().reset();
+        let mode = self.mode_action.state()
+            .and_then(|state| state.str().and_then(ViewMode::from_id))
+            .unwrap_or(ViewMode::Fit);
+        self.video.set_paintable(Some(&actual_paintable::ActualPaintable::video(
+            &media,
+            self.video_transform.clone(),
+            mode,
+        )));
         self.video_stream.replace(Some(media.clone()));
         self.video.set_visible(true);
         self.video_controls
@@ -813,6 +819,114 @@ impl ImageView {
 }
 
 /// Attached only to the photo widget: header/menu/banner events never enter here.
+/// Video uses GTK's current MediaFile paintable, with only a lightweight
+/// snapshot transform. No extra decoder or video frame buffering is involved.
+fn install_video_interaction(
+    video: &gtk::Picture,
+    stream: Rc<RefCell<Option<gtk::MediaFile>>>,
+    transform: Rc<RefCell<Transform>>,
+    mode_action: &gio::SimpleAction,
+    zoom_wheel: Rc<Cell<bool>>,
+) {
+    let pointer = Rc::new(Cell::new((0.0, 0.0)));
+    let motion = gtk::EventControllerMotion::new();
+    let entered = pointer.clone();
+    motion.connect_enter(move |_, x, y| entered.set((x, y)));
+    let moved = pointer.clone();
+    motion.connect_motion(move |_, x, y| moved.set((x, y)));
+    video.add_controller(motion);
+
+    let scroll = gtk::EventControllerScroll::new(gtk::EventControllerScrollFlags::VERTICAL);
+    let source = stream.clone();
+    let state = transform.clone();
+    let action = mode_action.clone();
+    let weak = video.downgrade();
+    scroll.connect_scroll(move |controller, _, dy| {
+        if dy == 0.0 {
+            return glib::Propagation::Stop;
+        }
+        let zoom = zoom_wheel.get()
+            || controller.current_event_state().contains(gtk::gdk::ModifierType::BUTTON1_MASK);
+        let Some(video) = weak.upgrade() else {
+            return glib::Propagation::Proceed;
+        };
+        if !zoom {
+            if let Some(window) = video.root().and_downcast::<adw::ApplicationWindow>() {
+                let direction = if dy > 0.0 { "next-media" } else { "previous-media" };
+                gio::prelude::ActionGroupExt::activate_action(&window, direction, None);
+            }
+            return glib::Propagation::Stop;
+        }
+        let dimensions = source.borrow().as_ref().map(|media| {
+            (media.intrinsic_width() as f64, media.intrinsic_height() as f64)
+        });
+        let Some(dimensions) = dimensions else {
+            return glib::Propagation::Proceed;
+        };
+        let mode = action.state()
+            .and_then(|value| value.str().and_then(ViewMode::from_id))
+            .unwrap_or(ViewMode::Fit);
+        if state.borrow_mut().zoom(
+            dimensions,
+            (video.width() as f64, video.height() as f64),
+            mode,
+            pointer.get(),
+            dy,
+        ) {
+            if let Some(paintable) = video.paintable() {
+                paintable.invalidate_contents();
+            }
+            action.set_state(&"manual".to_variant());
+        }
+        glib::Propagation::Stop
+    });
+    video.add_controller(scroll);
+
+    let drag = gtk::GestureDrag::new();
+    drag.set_button(1);
+    drag.set_propagation_phase(gtk::PropagationPhase::Capture);
+    let last = Rc::new(Cell::new(None::<(f64, f64)>));
+    let begin = last.clone();
+    let begin_stream = stream.clone();
+    drag.connect_drag_begin(move |gesture, _, _| {
+        if begin_stream.borrow().is_some() {
+            begin.set(Some((0.0, 0.0)));
+            gesture.set_state(gtk::EventSequenceState::Claimed);
+        }
+    });
+    let offset = last.clone();
+    let weak = video.downgrade();
+    let action = mode_action.clone();
+    drag.connect_drag_update(move |_, x, y| {
+        let Some(previous) = offset.get() else { return; };
+        let Some(video) = weak.upgrade() else { return; };
+        let dimensions = stream.borrow().as_ref().map(|media| {
+            (media.intrinsic_width() as f64, media.intrinsic_height() as f64)
+        });
+        let Some(dimensions) = dimensions else { return; };
+        if !x.is_finite() || !y.is_finite() { return; }
+        offset.set(Some((x, y)));
+        let mode = action.state()
+            .and_then(|value| value.str().and_then(ViewMode::from_id))
+            .unwrap_or(ViewMode::Fit);
+        if transform.borrow_mut().pan(
+            dimensions,
+            (video.width() as f64, video.height() as f64),
+            mode,
+            (x - previous.0, y - previous.1),
+        ) {
+            if let Some(paintable) = video.paintable() {
+                paintable.invalidate_contents();
+            }
+            action.set_state(&"manual".to_variant());
+        }
+    });
+    let end = last.clone();
+    drag.connect_drag_end(move |_, _, _| end.set(None));
+    drag.connect_cancel(move |_, _| last.set(None));
+    video.add_controller(drag);
+}
+
 pub(super) fn install_interaction(
     picture: &gtk::Picture,
     texture: Rc<RefCell<Option<gtk::gdk::Texture>>>,

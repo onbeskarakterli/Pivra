@@ -1,4 +1,6 @@
 //! Real production window lifecycle; private XDG_CONFIG_HOME is mandatory.
+#[path = "../src/raw_loader.rs"]
+mod raw_loader;
 #[path = "../src/image_loader.rs"]
 mod image_loader;
 #[path = "../src/image_view.rs"]

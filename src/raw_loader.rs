@@ -43,10 +43,22 @@ pub(crate) fn load(path: &Path, cancel: &gio::Cancellable) -> Result<gdk::Textur
     }
     let _cleanup = Cleanup(directory.clone());
     let output = directory.join("frame.ppm");
-    let script = Path::new(env!("CARGO_MANIFEST_DIR")).join("raw/run_decode.sh");
-    // Never use a shell to interpolate the source filename. This experiment
-    // invokes a known repository script that enforces Bwrap isolation.
-    let mut child = Command::new("bash").arg(script).arg(path).arg(&output)
+    // Installed builds use a sibling sandbox runner and prebuilt LibRaw helper.
+    // Development builds keep the existing source-tree runner fallback.
+    let installed_runner = std::env::current_exe()
+        .ok()
+        .and_then(|exe| exe.parent().map(|dir| dir.join("pivra-raw-runner")))
+        .filter(|runner| runner.is_file());
+    let script = installed_runner.clone().unwrap_or_else(|| {
+        Path::new(env!("CARGO_MANIFEST_DIR")).join("raw/run_decode.sh")
+    });
+    let mut command = Command::new("bash");
+    command.arg(&script).arg(path).arg(&output);
+    if installed_runner.is_some() {
+        command.env("PIVRA_RAW_INSTALLED", "1");
+    }
+    // Filenames are passed as individual argv values, never shell-interpolated.
+    let mut child = command
         .process_group(0)
         .stdout(Stdio::null()).stderr(Stdio::null())
         .spawn().map_err(|e| format!("DNG sandbox process: {e}"))?;

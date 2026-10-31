@@ -279,10 +279,15 @@ impl Provider {
             || FileKey::read(path).ok().as_ref() != Some(&source)
             || FileKey::read(&cache).ok().as_ref() != Some(&cache_key)
         {
-            crate::thumbnail_diagnostics::trace("cache-stale-validation", Some(path),
-                format_args!("gio_valid={valid} source_unchanged={} cache_unchanged={}",
+            crate::thumbnail_diagnostics::trace(
+                "cache-stale-validation",
+                Some(path),
+                format_args!(
+                    "gio_valid={valid} source_unchanged={} cache_unchanged={}",
                     FileKey::read(path).ok().as_ref() == Some(&source),
-                    FileKey::read(&cache).ok().as_ref() == Some(&cache_key)));
+                    FileKey::read(&cache).ok().as_ref() == Some(&cache_key)
+                ),
+            );
             return Outcome::Stale;
         }
         // Moving a file to Trash and restoring it changes its inode ctime
@@ -387,7 +392,11 @@ pub fn query_or_generate(provider: &Provider, path: &Path, cancel: &gio::Cancell
     // The desktop video thumbnailer reads compressed streams, not decoded image
     // pixels. Keep the image limit unchanged and bound videos separately.
     let is_video = crate::discovery::candidate_kind(path) == Some(crate::media::MediaKind::Video);
-    let max_size = if is_video { 8_i64 * 1024 * 1024 * 1024 } else { 64_i64 * 1024 * 1024 };
+    let max_size = if is_video {
+        8_i64 * 1024 * 1024 * 1024
+    } else {
+        64_i64 * 1024 * 1024
+    };
     if info.size() > max_size {
         return Outcome::Invalid("source exceeds thumbnail generation size limit".into());
     }

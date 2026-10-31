@@ -200,7 +200,9 @@ pub fn load_video_audio() -> (f64, bool) {
         return (1.0, false);
     };
     let mut lines = content.lines();
-    let volume = lines.next().and_then(|s| s.parse::<f64>().ok())
+    let volume = lines
+        .next()
+        .and_then(|s| s.parse::<f64>().ok())
         .filter(|v| v.is_finite() && (0.0..=1.0).contains(v));
     let muted = match lines.next() {
         Some("true") => Some(true),
@@ -214,7 +216,9 @@ pub fn load_video_audio() -> (f64, bool) {
 }
 
 pub fn save_video_audio(volume: f64, muted: bool) {
-    if !volume.is_finite() { return; }
+    if !volume.is_finite() {
+        return;
+    }
     let dir = glib::user_config_dir().join("pivra");
     let result = (|| -> Result<(), Box<dyn std::error::Error>> {
         std::fs::create_dir_all(&dir)?;
@@ -265,4 +269,3 @@ mod thumbnail_tests {
         assert!(p.listeners.borrow().is_empty());
     }
 }
-

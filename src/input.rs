@@ -57,8 +57,7 @@ impl OpenedFile {
         if !metadata.is_file() {
             return Err("input must be a regular file, not a directory or special file".into());
         }
-        let kind = pivra::discovery::candidate_kind(&path)
-            .ok_or("unsupported media extension")?;
+        let kind = pivra::discovery::candidate_kind(&path).ok_or("unsupported media extension")?;
         // Open read-only and inspect the descriptor; never read file contents.
         // This is a point-in-time check, not a promise against later replacement.
         let handle = fs::File::open(&path).map_err(|e| format!("cannot read local file: {e}"))?;

@@ -1,5 +1,5 @@
 //! Animated foreground images; thumbnails stay on their static first frame.
-use super::{present_filtered, ViewMode};
+use super::{ViewMode, present_filtered};
 use gtk::{gio, glib, prelude::*};
 use pivra::viewing::{Resampling, Transform};
 use std::{
@@ -41,7 +41,11 @@ impl Controls {
             } else {
                 "media-playback-pause-symbolic"
             });
-            button.set_tooltip_text(Some(if pause { "Play animation" } else { "Pause animation" }));
+            button.set_tooltip_text(Some(if pause {
+                "Play animation"
+            } else {
+                "Pause animation"
+            }));
         });
 
         let seek = Rc::new(Cell::new(None));
@@ -64,7 +68,13 @@ impl Controls {
         speed_button.add_css_class("flat");
         let speed_popover = gtk::Popover::new();
         let speeds = gtk::Box::new(gtk::Orientation::Vertical, 2);
-        for (label, value) in [("0.25×", 0.25), ("0.5×", 0.5), ("1×", 1.0), ("2×", 2.0), ("4×", 4.0)] {
+        for (label, value) in [
+            ("0.25×", 0.25),
+            ("0.5×", 0.5),
+            ("1×", 1.0),
+            ("2×", 2.0),
+            ("4×", 4.0),
+        ] {
             let option = gtk::Button::with_label(label);
             option.add_css_class("flat");
             let selected = speed.clone();
@@ -107,7 +117,11 @@ impl Controls {
             } else {
                 button.remove_css_class("pivra-loop-active");
             }
-            button.set_tooltip_text(Some(if button.is_active() { "Loop on" } else { "Loop off" }));
+            button.set_tooltip_text(Some(if button.is_active() {
+                "Loop on"
+            } else {
+                "Loop off"
+            }));
         });
 
         let bar = gtk::Box::new(gtk::Orientation::Horizontal, 8);
@@ -158,7 +172,8 @@ impl Controls {
             let seconds = seconds.max(0.0).floor() as u64;
             format!("{}:{:02}", seconds / 60, seconds % 60)
         };
-        self.time_label.set_text(&format!("{} / {}", timestamp(current), timestamp(total)));
+        self.time_label
+            .set_text(&format!("{} / {}", timestamp(current), timestamp(total)));
     }
     fn show_progress(&self, value: f64) {
         self.internal_update.set(true);
@@ -432,8 +447,10 @@ pub(super) fn start(
 fn frame_is_valid(frame: &glycin::Frame) -> bool {
     let width = frame.width();
     let height = frame.height();
-    width > 0 && height > 0
-        && width <= 32_768 && height <= 32_768
+    width > 0
+        && height > 0
+        && width <= 32_768
+        && height <= 32_768
         && u64::from(width) * u64::from(height) <= 32_000_000
         && frame.buf_slice().len() <= 512 * 1024 * 1024
 }
@@ -495,7 +512,11 @@ fn animation_kind(path: &std::path::Path) -> Option<AnimationKind> {
         if examined > 1024 * 1024 {
             return None;
         }
-        std::io::copy(&mut std::io::Read::by_ref(&mut file).take(len + 4), &mut std::io::sink()).ok()?;
+        std::io::copy(
+            &mut std::io::Read::by_ref(&mut file).take(len + 4),
+            &mut std::io::sink(),
+        )
+        .ok()?;
     }
     None
 }

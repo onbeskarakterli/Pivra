@@ -1,13 +1,13 @@
 //! Per-window presentation and cancellation. Glycin alone applies orientation.
 
-#[path = "animation.rs"]
-mod animation;
-#[path = "video_controls.rs"]
-mod video_controls;
 #[path = "actual_paintable.rs"]
 mod actual_paintable;
+#[path = "animation.rs"]
+mod animation;
 #[path = "thumbnail_overlay.rs"]
 pub(crate) mod thumbnail_overlay;
+#[path = "video_controls.rs"]
+mod video_controls;
 use adw::prelude::*;
 use gtk::{gio, glib};
 use pivra::viewing::{Resampling, Transform, ViewMode};
@@ -131,9 +131,9 @@ impl ImageView {
         let previous = last_pointer.clone();
         let reveal = video_controls.clone();
         motion.connect_motion(move |_, x, y| {
-            let moved = previous.get().is_none_or(|(px, py)| {
-                (x - px).abs() >= 2.0 || (y - py).abs() >= 2.0
-            });
+            let moved = previous
+                .get()
+                .is_none_or(|(px, py)| (x - px).abs() >= 2.0 || (y - py).abs() >= 2.0);
             if moved {
                 previous.set(Some((x, y)));
                 reveal.reveal();
@@ -174,9 +174,12 @@ impl ImageView {
                         changed(controls);
                     });
                     let changed = align.clone();
-                    thumbnail_controls.connect_notify_local(Some("margin-bottom"), move |controls, _| {
-                        changed(controls);
-                    });
+                    thumbnail_controls.connect_notify_local(
+                        Some("margin-bottom"),
+                        move |controls, _| {
+                            changed(controls);
+                        },
+                    );
                     thumbnail_controls.connect_notify_local(Some("height"), move |controls, _| {
                         align(controls);
                     });
@@ -374,7 +377,12 @@ impl ImageView {
         self.prepare("", true);
         let media = gtk::MediaFile::for_filename(path);
         media.set_loop(false);
-        let resume_at = self.video_positions.borrow().get(path).copied().unwrap_or(0);
+        let resume_at = self
+            .video_positions
+            .borrow()
+            .get(path)
+            .copied()
+            .unwrap_or(0);
         if resume_at > 0 {
             // MediaFile prepares asynchronously; a seek before preparation
             // may be ignored. Apply the stored timestamp once prepared.
@@ -397,7 +405,8 @@ impl ImageView {
         self.video.set_paintable(Some(&media));
         self.video_stream.replace(Some(media.clone()));
         self.video.set_visible(true);
-        self.video_controls.attach(Some(media.clone().upcast::<gtk::MediaStream>()));
+        self.video_controls
+            .attach(Some(media.clone().upcast::<gtk::MediaStream>()));
         media.play();
     }
     fn stop_video(&self) {
@@ -422,7 +431,8 @@ impl ImageView {
     }
     fn prepare(&self, message: &str, cancel: bool) {
         self.stop_video();
-        self.animation_generation.set(self.animation_generation.get().wrapping_add(1));
+        self.animation_generation
+            .set(self.animation_generation.get().wrapping_add(1));
         self.animation_controls.reset();
         if cancel {
             self.slot.cancel();

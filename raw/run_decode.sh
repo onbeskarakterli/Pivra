@@ -2,7 +2,11 @@
 # Native LibRaw feasibility under mandatory Bubblewrap mount/network isolation.
 # This is an experimental helper, NOT integrated into Pivra's rendering pipeline.
 set -euo pipefail
-cd "$(dirname "${BASH_SOURCE[0]}")/.."
+script_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+source_root="$(cd -- "$script_dir/.." && pwd)"
+if [[ "${PIVRA_RAW_INSTALLED:-0}" != 1 ]]; then
+    cd "$source_root"
+fi
 input="${1:-$HOME/Downloads/Ricoh-GR-III.DNG}"
 [[ -f "$input" ]] || { printf 'Missing RAW input: %s\n' "$input" >&2; exit 2; }
 command -v bwrap >/dev/null || { echo 'FAIL: bubblewrap required' >&2; exit 2; }
@@ -14,8 +18,8 @@ fi
 trap 'rm -rf "$tmp"' EXIT
 # Package builders can provide a precompiled helper. Never silently compile
 # when a specifically configured helper is missing or invalid.
-if [[ -n "${PIVRA_RAW_HELPER:-}" ]]; then
-    helper="$PIVRA_RAW_HELPER"
+if [[ -n "${PIVRA_RAW_HELPER:-}" || "${PIVRA_RAW_INSTALLED:-0}" == 1 ]]; then
+    helper="${PIVRA_RAW_HELPER:-$script_dir/pivra-raw-decoder}"
     [[ -f "$helper" && -x "$helper" && ! -L "$helper" ]] || {
         echo "Configured RAW helper is unavailable or unsafe" >&2; exit 2;
     }
@@ -80,7 +84,9 @@ sys.exit(code)"
 printf 'PASS isolated native LibRaw decode (no Pivra integration or syscall audit yet).\n'
 if [[ -n "$output" ]]; then
     test -s "$tmp/image.ppm"
-    python3 tests/validate_raw_ppm.py "$tmp/image.ppm"
+    if [[ "${PIVRA_RAW_INSTALLED:-0}" != 1 ]]; then
+        python3 tests/validate_raw_ppm.py "$tmp/image.ppm"
+    fi
     cp --no-clobber -- "$tmp/image.ppm" "$output"
     printf 'PPM output: %s\n' "$output"
 fi

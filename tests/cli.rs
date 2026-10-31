@@ -21,7 +21,7 @@ fn run_on_backend(args: &[&str], backend: &str) -> Output {
 #[test]
 fn help_and_alias_work_without_a_display() {
     let expected = format!(
-        "Pivra {}\nUsage: pivra [--help | --version]\n       pivra <local-photo-path | file://URI>\nJPEG/PNG viewing requires a working sandboxed Glycin loader.\nAccepts one local .jpg/.jpeg/.png file; reports loading and decoder errors.\n",
+        "Pivra {}\nUsage: pivra [--help | --version]\n       pivra <local-media-path | directory | file://URI>\nPhoto decoding requires a working sandboxed Glycin loader.\nA directory opens its first supported media in natural filename order.\n",
         env!("CARGO_PKG_VERSION")
     );
     for flag in ["--help", "-h"] {
@@ -89,6 +89,19 @@ fn valid_local_path_and_uri_reach_graphical_initialization_without_decoding() {
                 .starts_with("Pivra: unable to initialize GTK;")
         );
     }
+}
+
+#[test]
+fn directory_with_media_passes_input_validation_before_graphical_initialization() {
+    let directory = support::temp_dir();
+    let path = directory.path().join("1.png");
+    std::fs::write(&path, include_bytes!("fixtures/pixels-2x2.png")).unwrap();
+    let output = run(&[directory.path().to_str().unwrap()]);
+    assert_eq!(output.status.code(), Some(1));
+    assert!(output.stdout.is_empty());
+    assert!(String::from_utf8(output.stderr)
+        .unwrap()
+        .starts_with("Pivra: unable to initialize GTK;"));
 }
 
 #[test]

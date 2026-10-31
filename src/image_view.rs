@@ -79,6 +79,31 @@ impl ImageView {
         let video_positions = Rc::default();
         overlay.add_overlay(&video);
         overlay.set_measure_overlay(&video, false);
+        // The image wheel handler belongs to the photo Picture, which is
+        // covered by the video Picture during playback. Give the video surface
+        // the same media-navigation behavior without enabling photo zoom.
+        let video_scroll = gtk::EventControllerScroll::new(
+            gtk::EventControllerScrollFlags::VERTICAL,
+        );
+        video_scroll.connect_scroll(move |controller, _, dy| {
+            if dy == 0.0 {
+                return glib::Propagation::Proceed;
+            }
+            if let Some(window) = controller
+                .widget()
+                .and_then(|widget| widget.root())
+                .and_then(|root| root.downcast::<adw::ApplicationWindow>().ok())
+            {
+                let action = if dy > 0.0 {
+                    "next-media"
+                } else {
+                    "previous-media"
+                };
+                gio::prelude::ActionGroupExt::activate_action(&window, action, None);
+            }
+            glib::Propagation::Stop
+        });
+        video.add_controller(video_scroll);
         overlay.add_overlay(&status);
         let loading_spinner = gtk::Spinner::new();
         loading_spinner.set_widget_name("photo-loading-spinner");

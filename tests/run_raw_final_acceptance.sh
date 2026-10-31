@@ -15,7 +15,8 @@ sample="$(realpath -- "$sample")"
 
 echo '=== 1/5 Static checks ==='
 bash -n raw/run_decode.sh raw/build_helper.sh packaging/linux/build-install.sh \
-    tests/run_raw_negative_probe.sh tests/run_raw_performance_probe.sh
+    tests/run_raw_final_acceptance.sh tests/run_raw_negative_probe.sh \
+    tests/run_raw_performance_probe.sh tests/run_raw_sandbox_probe.sh
 python3 - <<'PY'
 import ast
 from pathlib import Path
@@ -28,6 +29,7 @@ for path in (
 print("PASS: Python syntax (without writing __pycache__)")
 PY
 cargo fmt --all -- --check
+cargo check --locked --bin pivra
 
 echo '=== 2/5 Rust RAW unit tests ==='
 cargo test --locked --bin pivra raw_loader::tests

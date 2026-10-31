@@ -182,9 +182,11 @@ mod tests {
                 .contains("no supported media")
         );
         fs::write(dir.path().join("notes.txt"), b"ignored").unwrap();
-        assert!(OpenedFile::from_argument(dir.path().as_os_str())
-            .unwrap_err()
-            .contains("no supported media"));
+        assert!(
+            OpenedFile::from_argument(dir.path().as_os_str())
+                .unwrap_err()
+                .contains("no supported media")
+        );
     }
 
     #[test]

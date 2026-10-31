@@ -9,6 +9,7 @@ fn main() {
     // Packages compile/install the mandatory sidecar separately. Never bake
     // their temporary OUT_DIR into the installed viewer's runtime fallback.
     if env::var_os("PIVRA_DISTRIBUTION_BUILD").is_some_and(|value| value == "1") {
+        println!("cargo:rustc-env=PIVRA_DISTRIBUTION_RAW=1");
         println!("cargo:rustc-env=PIVRA_BUILT_THUMBNAIL_FACTORY=");
         println!("cargo::metadata=gnome-helper-status=runtime-sibling");
         return;

@@ -40,11 +40,11 @@ yay -S pivra
 paru -S pivra
 ```
 
-AUR builds Pivra from source. GitHub releases provide source archives; a prebuilt package is available only when separately attached.
+The AUR package builds Pivra from a pinned source revision. GitHub releases also provide source archives; prebuilt packages are listed only when explicitly attached to a release.
 
 ## Features and roadmap
 
-**Available** = implemented in the v0.2.1 source. **Planned** = not yet available. Planned features are goals, not promises of a specific release date. Some early interface work was completed ahead of its original roadmap phase.
+**Available** = implemented in the v0.2.1 source. **Partial** = some aspects implemented, with more work planned. **Planned** = not yet delivered. This is a feature-level snapshot, not a declaration that every numbered roadmap milestone is complete.
 
 ### Photo viewing and navigation
 
@@ -70,6 +70,7 @@ AUR builds Pivra from source. GitHub releases provide source archives; a prebuil
 | Slideshow with configurable timing, looping, and transitions | ⏳ Planned |
 | Customizable keyboard shortcuts and touchpad gestures | ⏳ Planned |
 | Move media to Trash with Undo | ✅ Available |
+| Wallpaper setting and side-by-side comparison | ⏳ Planned |
 
 ### Video playback
 
@@ -79,17 +80,20 @@ AUR builds Pivra from source. GitHub releases provide source archives; a prebuil
 | Automatic playback and stop when switching files | ✅ Available |
 | Playback/pause, volume, mute, seek bar, and keyboard controls | ✅ Available |
 | Remember volume and playback position within a window | ✅ Available |
-| Frame stepping (timeline hover previews planned) | ✅ Available |
+| Approximate frame stepping via seeking | ✅ Available |
+| Timeline hover previews | ⏳ Planned |
 | Embedded/external SRT/ASS subtitles and audio-track selection | ⏳ Planned |
 | Subtitle appearance settings | ⏳ Planned |
 | Video zoom/pan and still-frame capture | ⏳ Planned |
-| Auto-hiding playback controls (sleep inhibition planned) | ✅ Available |
+| Auto-hiding playback controls | ✅ Available |
+| Display sleep inhibition during playback | ⏳ Planned |
 
 ### Formats, display quality, and performance
 
 | Feature | Status |
 |---|---|
 | GIF, animated WebP, and APNG playback | ✅ Available |
+| Still-image decoding up to 64 MP (subject to loader support and limits) | ✅ Available |
 | Additional still formats such as TIFF, SVG, BMP, and ICO | ⏳ Planned |
 | RAW, HEIC, AVIF, JPEG XL, and PSD support where feasible | ⏳ Planned |
 | Multipage images and supported layered-file viewing | ⏳ Planned |
@@ -112,15 +116,15 @@ Editing will live in a separate **Edit** mode so the normal viewer remains simpl
 | Safe Save As, metadata handling, and original-file protection | ⏳ Planned |
 | Background batch conversion with pause/cancel and collision handling | ⏳ Planned |
 
-The full [60-step development roadmap](docs/PIVRA_DEVELOPMENT_ROADMAP.md) and [feature specification](docs/PIVRA_FEATURE_SPEC_TR.md) describe the implementation plan in detail.
+The [detailed development roadmap](docs/PIVRA_DEVELOPMENT_ROADMAP.md) retains historical PIV milestone and release-gate records; its older status snapshots do not supersede the v0.2.0 feature status above. The [feature specification](docs/PIVRA_FEATURE_SPEC_TR.md) describes the longer-term goals.
 
 ## Current limitations
 
 Version 0.2.1 is a Linux/GNOME-focused viewer, not an image editor. Advanced subtitles, timeline hover previews, slideshow, HDR/ICC workflows, and batch conversion are not yet available. Image decoding depends on installed Glycin format loaders and their supported codecs. Video playback depends on the system GTK/GStreamer media backend and available codecs. Individual formats and files may fail.
 
-Still-image loading is bounded to 64 MP (maximum 32,768 pixels per edge) and 64 MiB input size. Animated frames have additional bounds. Release testing and packaging validation should be completed before publishing v0.2.1.
+Still-image loading is bounded to 64 MP (maximum 32,768 pixels per edge) and 64 MiB input size. Animated frames have additional bounds. The automated tests and video-navigation stress test were exercised on the development build; compatibility across other Linux environments remains to be verified.
 
-See the [v0.2.1 release notes](docs/releases/PIVRA_V0.2.1_RELEASE_NOTES.md) for changes in this update.
+See the [v0.2.1 release notes](docs/releases/PIVRA_V0.2.1_RELEASE_NOTES.md).
 
 ## License
 

@@ -240,7 +240,7 @@ fn open(app: &adw::Application) -> (adw::ApplicationWindow, image_view::ImageVie
         .unwrap();
     wait(|| p.paintable().is_some());
     if std::env::args().any(|s| s == "--fullscreen-regression") {
-        window::fullscreen::install(&w, &p, &[header.clone().upcast()]);
+        window::fullscreen::install(&w, &p, view.video_widget(), &[header.clone().upcast()]);
     }
     let row: gtk::Box = find(view.widget().upcast_ref(), "thumbnail-items");
     while let Some(child) = row.first_child() {

@@ -1,5 +1,8 @@
 # Pivra — Planlı Commit ve İlerleme Takibi
 
+**Aktif kaynak sürümü: `dev` v0.2.3 (unreleased).** Faz 2/PIV-18 DONE (31.10.2026). Erken önizleme kapsam dışı; 64 MP kabul edildi. `main` ve yayımlanmış AUR v0.2.1 çizgisindedir; eski 0.1.0/0.2.1 test kayıtları ilgili tarihlerinin kanıtıdır, v0.2.3 yayın iddiası değildir. GitHub Release, etiket ve AUR güncellemesi yapılmadı.
+
+
 ## Faz 2 ve PIV-18 resmî kapanış — 31.10.2026 — DONE
 
 **Proje sahibi Faz 2'yi kapattı: PIV-18 DONE, Faz 2 DONE.** Erken önizleme yapılmayacak; kabul şartından çıkarıldı. 64 MP görüntü desteği kullanıcı tarafından test edilip kabul edildi. PIV-13–17 onaylı kabul kayıtları geçerlidir. 31.10.2026 toplu RAW/DNG kabulü: 36/36 Rust testi, release derleme, dört negatif giriş, iptal, staged kurulum ve gerçek Ricoh 6020×4024 DNG çözümlemesi PASS. Son küçük uyarı temizliği 4b4d64d commit'indedir ve ardından yeniden native koşu iddiası yoktur.

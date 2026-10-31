@@ -8,7 +8,7 @@ mod imp {
     use super::*;
     #[derive(Default)]
     pub struct ActualPaintable {
-        pub texture: OnceCell<gdk::Texture>,
+        pub texture: RefCell<Option<gdk::Texture>>,
         pub media: OnceCell<gdk::Paintable>,
         pub transform: OnceCell<Rc<RefCell<pivra::viewing::Transform>>>,
         pub mode: std::cell::Cell<pivra::viewing::ViewMode>,
@@ -23,19 +23,19 @@ mod imp {
     impl ObjectImpl for ActualPaintable {}
     impl gdk::subclass::prelude::PaintableImpl for ActualPaintable {
         fn intrinsic_width(&self) -> i32 {
-            self.texture.get().map_or_else(
+            self.texture.borrow().as_ref().map_or_else(
                 || self.media.get().map_or(0, |m| m.intrinsic_width()),
                 |t| t.width(),
             )
         }
         fn intrinsic_height(&self) -> i32 {
-            self.texture.get().map_or_else(
+            self.texture.borrow().as_ref().map_or_else(
                 || self.media.get().map_or(0, |m| m.intrinsic_height()),
                 |t| t.height(),
             )
         }
         fn snapshot(&self, snapshot: &gdk::Snapshot, width: f64, height: f64) {
-            let image = if let Some(texture) = self.texture.get() {
+            let image = if let Some(texture) = self.texture.borrow().as_ref() {
                 (texture.width() as f64, texture.height() as f64)
             } else if let Some(media) = self.media.get() {
                 (
@@ -68,7 +68,7 @@ mod imp {
                 .filter
                 .get()
                 .map_or(pivra::viewing::Resampling::default(), |f| f.get());
-            if let Some(texture) = self.texture.get() {
+            if let Some(texture) = self.texture.borrow().as_ref() {
                 snapshot.append_scaled_texture(
                     texture,
                     match filter {
@@ -126,13 +126,23 @@ impl ActualPaintable {
         });
         object
     }
+    /// Replace an animation frame without replacing the paintable or its zoom state.
+    pub fn update_texture(&self, texture: &gdk::Texture) {
+        let old_size = self.imp().texture.borrow().as_ref().map(|old| (old.width(), old.height()));
+        self.imp().texture.replace(Some(texture.clone()));
+        if old_size != Some((texture.width(), texture.height())) {
+            self.invalidate_size();
+        }
+        self.invalidate_contents();
+    }
     pub fn set_mode(&self, mode: pivra::viewing::ViewMode) {
         self.imp().mode.set(mode);
     }
     pub fn has_texture(&self, texture: &gdk::Texture) -> bool {
         self.imp()
             .texture
-            .get()
+            .borrow()
+            .as_ref()
             .is_some_and(|current| current == texture)
     }
     pub fn has_transform(&self, transform: &Rc<RefCell<pivra::viewing::Transform>>) -> bool {
@@ -159,11 +169,7 @@ impl ActualPaintable {
     }
     pub fn new(texture: &gdk::Texture) -> Self {
         let object: Self = glib::Object::new();
-        object
-            .imp()
-            .texture
-            .set(texture.clone())
-            .expect("new paintable");
+        object.imp().texture.replace(Some(texture.clone()));
         object
     }
 }

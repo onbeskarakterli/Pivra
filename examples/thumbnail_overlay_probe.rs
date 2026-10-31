@@ -1,4 +1,6 @@
 //! TH-02 only: synthetic main image + explicitly labelled TEST PLACEHOLDERS.
+#[path = "../src/raw_ppm.rs"]
+mod raw_ppm;
 #[path = "../src/raw_loader.rs"]
 mod raw_loader;
 #[path = "support/thumbnail_catalog.rs"]

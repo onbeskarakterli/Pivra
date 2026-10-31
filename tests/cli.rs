@@ -20,11 +20,11 @@ fn run_on_backend(args: &[&str], backend: &str) -> Output {
 
 #[test]
 fn help_and_alias_work_without_a_display() {
-    let expected = b"Pivra 0.2.0\nUsage: pivra [--help | --version]\n       pivra <local-photo-path | file://URI>\nJPEG/PNG viewing requires a working sandboxed Glycin loader.\nAccepts one local .jpg/.jpeg/.png file; reports loading and decoder errors.\n";
+    let expected = format!("Pivra {}\nUsage: pivra [--help | --version]\n       pivra <local-photo-path | file://URI>\nJPEG/PNG viewing requires a working sandboxed Glycin loader.\nAccepts one local .jpg/.jpeg/.png file; reports loading and decoder errors.\n", env!("CARGO_PKG_VERSION"));
     for flag in ["--help", "-h"] {
         let output = run(&[flag]);
         assert_eq!(output.status.code(), Some(0));
-        assert_eq!(output.stdout, expected);
+        assert_eq!(output.stdout, expected.as_bytes());
         assert!(output.stderr.is_empty());
     }
 }
@@ -34,7 +34,7 @@ fn version_and_alias_work_without_a_display() {
     for flag in ["--version", "-V"] {
         let output = run(&[flag]);
         assert_eq!(output.status.code(), Some(0));
-        assert_eq!(output.stdout, b"Pivra 0.2.0\n");
+        assert_eq!(output.stdout, format!("Pivra {}\n", env!("CARGO_PKG_VERSION")).as_bytes());
         assert!(output.stderr.is_empty());
     }
 }

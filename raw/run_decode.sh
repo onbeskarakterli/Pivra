@@ -1,11 +1,13 @@
 #!/usr/bin/env bash
-# Native LibRaw feasibility under mandatory Bubblewrap mount/network isolation.
-# This is an experimental helper, NOT integrated into Pivra's rendering pipeline.
+# Experimental LibRaw runtime launcher with mandatory Bubblewrap isolation.
 set -euo pipefail
 script_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
-source_root="$(cd -- "$script_dir/.." && pwd)"
-if [[ "${PIVRA_RAW_INSTALLED:-0}" != 1 ]]; then
-    cd "$source_root"
+if [[ "${PIVRA_RAW_INSTALLED:-0}" == 1 ]]; then
+    # Installed runtime must never use sample inputs or development defaults.
+    [[ "$#" == 2 ]] || { echo "Usage: pivra-raw-runner INPUT OUTPUT" >&2; exit 2; }
+else
+    cd "$script_dir/.."
+    [[ "$#" -le 2 ]] || { echo "Usage: run_decode.sh [INPUT] [OUTPUT]" >&2; exit 2; }
 fi
 input="${1:-$HOME/Downloads/Ricoh-GR-III.DNG}"
 [[ -f "$input" ]] || { printf 'Missing RAW input: %s\n' "$input" >&2; exit 2; }

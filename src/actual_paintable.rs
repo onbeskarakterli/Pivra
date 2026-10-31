@@ -86,7 +86,7 @@ mod imp {
                 snapshot.save();
                 snapshot.translate(&gtk::graphene::Point::new(g.x as f32, g.y as f32));
                 snapshot.scale((g.width / image.0) as f32, (g.height / image.1) as f32);
-                media.snapshot(snapshot.upcast_ref(), image.0, image.1);
+                media.snapshot(snapshot, image.0, image.1);
                 snapshot.restore();
             }
             snapshot.pop();

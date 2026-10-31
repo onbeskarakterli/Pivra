@@ -20,13 +20,13 @@ for iteration in 1 2 3; do
     # startup/compile costs from decoder time before drawing performance claims.
     if [[ "$timing" == gnu ]]; then
         /usr/bin/time -f 'ELAPSED_SECONDS=%e PEAK_RSS_KB=%M EXIT=%x' \
-            bash tests/run_raw_sandbox_probe.sh "$input" "$tmp/frame-$iteration.ppm"
+            env PIVRA_RAW_METRICS=1 bash tests/run_raw_sandbox_probe.sh "$input" "$tmp/frame-$iteration.ppm"
     else
         python3 -c 'import os, sys, time; start=time.monotonic(); pid=os.fork();
 if pid == 0:
     os.execvp(sys.argv[1], sys.argv[1:]);
 _, status, usage=os.wait4(pid, 0); code=os.waitstatus_to_exitcode(status); print(f"ELAPSED_SECONDS={time.monotonic()-start:.3f} PEAK_CHILD_RSS_KB={usage.ru_maxrss} EXIT={code}", flush=True); sys.exit(code)' \
-            bash tests/run_raw_sandbox_probe.sh "$input" "$tmp/frame-$iteration.ppm"
+            env PIVRA_RAW_METRICS=1 bash tests/run_raw_sandbox_probe.sh "$input" "$tmp/frame-$iteration.ppm"
     fi
     python3 tests/validate_raw_ppm.py "$tmp/frame-$iteration.ppm"
     echo "OUTPUT_BYTES=$(stat -c %s "$tmp/frame-$iteration.ppm")"
@@ -37,4 +37,4 @@ if pgrep -af '[r]aw_decode_probe|[r]un_raw_sandbox_probe.sh|[b]wrap.*raw-probe';
 else
     echo 'PASS no matching RAW helper processes'
 fi
-echo 'OBSERVATION COMPLETE: elapsed time includes compilation, RSS refers to wrapper process tree peak and is not whole Pivra RSS.'
+echo 'OBSERVATION COMPLETE: RAW_DECODER_PEAK_RSS_KB is the actual sandboxed LibRaw child peak; wrapper metrics and Pivra process memory are separate.'

@@ -7,6 +7,7 @@ mod image_view;
 mod input;
 #[allow(dead_code)] // Staged RAW integration; no decoder enabled in UI yet.
 mod raw_ppm;
+mod raw_loader;
 mod window;
 
 use pivra::APP_NAME;

@@ -42,6 +42,7 @@ timeout 90s bwrap \
 printf 'PASS isolated native LibRaw decode (no Pivra integration or syscall audit yet).\n'
 if [[ -n "$output" ]]; then
     test -s "$tmp/image.ppm"
+    python3 tests/validate_raw_ppm.py "$tmp/image.ppm"
     cp --no-clobber -- "$tmp/image.ppm" "$output"
     printf 'PPM output: %s\n' "$output"
 fi

@@ -19,7 +19,7 @@ ln -s "$tmp/does-not-exist.dng" "$tmp/missing link.dng"
 fail_case() {
     local label="$1" input="$2" output="$tmp/$1.ppm"
     local status=0
-    PIVRA_RAW_INSTALLED=1 PIVRA_RAW_HELPER="$helper" \
+    PIVRA_RAW_INSTALLED=0 PIVRA_RAW_HELPER="$helper" \
         bash "$runner" "$input" "$output" >"$tmp/log-$label" 2>&1 || status=$?
     if [[ "$status" == 0 || -e "$output" ]]; then
         printf 'FAIL %s: status=%s output=%s\n' "$label" "$status" "$output" >&2

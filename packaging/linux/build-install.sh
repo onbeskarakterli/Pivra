@@ -79,11 +79,11 @@ case "$action" in
     sharedir="$destdir$prefix/share"
     install -Dm755 "$viewer" "$bindir/pivra"
     install -Dm755 "$helper" "$bindir/pivra-thumbnail-factory"
-    # Never install experimental RAW into ordinary releases. The standalone
-    # decoder has not yet been wired to an installed runtime launcher.
+    # Experimental RAW is installed only when explicitly requested.
     if [[ "${PIVRA_INSTALL_EXPERIMENTAL_RAW:-0}" == 1 ]]; then
       [[ -x "$raw_helper" ]] || { echo "ERROR: experimental RAW helper missing; rebuild with PIVRA_BUILD_EXPERIMENTAL_RAW=1" >&2; exit 1; }
       install -Dm755 "$raw_helper" "$bindir/pivra-raw-decoder"
+      install -Dm755 raw/run_decode.sh "$bindir/pivra-raw-runner"
     fi
     install -Dm644 data/io.github.onbeskarakterli.Pivra.desktop \
       "$sharedir/applications/io.github.onbeskarakterli.Pivra.desktop"

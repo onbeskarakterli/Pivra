@@ -539,7 +539,23 @@ impl Inner {
                 // The hidden pass uses the SAME verified decode/resize path as
                 // the visible scheduler. Merely resolving disk cache entries
                 // leaves the GTK cells pending and forces a second decode.
-                let work = match Manager::session().resolve(&path, &worker_token) {
+                let work = if crate::raw_loader::enabled() && crate::raw_loader::is_dng(&path) {
+                    match (FileKey::read(&path), crate::raw_loader::load(&path, &worker_token)) {
+                        (Ok(key), Ok(texture)) if !worker_token.is_cancelled()
+                            && FileKey::read(&path).ok().as_ref() == Some(&key) => {
+                            let decoded = texture_cost(texture.width() as u32, texture.height() as u32)
+                                .unwrap_or(usize::MAX);
+                            match display_texture(&texture, scale) {
+                                Ok(small) => Work::Hit(small, key, None, decoded),
+                                Err(e) => Work::Failed(e),
+                            }
+                        }
+                        (_, _) if worker_token.is_cancelled() => Work::Cancelled,
+                        (Err(e), _) => Work::Failed(format!("DNG identity: {e}")),
+                        (_, Err(e)) => Work::Failed(e),
+                        _ => Work::Failed("DNG source changed during hidden decode".into()),
+                    }
+                } else { match Manager::session().resolve(&path, &worker_token) {
                     Ok(response) => {
                         if let Some(candidate) = response.candidate() {
                             let cached =
@@ -560,7 +576,7 @@ impl Inner {
                     Err(Error::Busy) => Work::Busy,
                     Err(Error::Cancelled) => Work::Cancelled,
                     Err(error) => provider_failure(error),
-                };
+                } };
                 pivra::thumbnail_diagnostics::trace(
                     "hidden-result",
                     Some(&path),

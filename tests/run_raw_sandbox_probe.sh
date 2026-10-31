@@ -40,6 +40,7 @@ printf 'SANDBOX: mandatory=bwrap, unshare-all, input-only read-only mount\n'
 timeout 90s bwrap \
     --die-with-parent --new-session --unshare-all --clearenv \
     --setenv PATH /usr/bin --setenv HOME /tmp \
+    --setenv PIVRA_RAW_METRICS "${PIVRA_RAW_METRICS:-0}" \
     --ro-bind /usr /usr \
     --ro-bind /etc /etc \
     --ro-bind-try /lib /lib --ro-bind-try /lib64 /lib64 \
@@ -52,6 +53,17 @@ timeout 90s bwrap \
         test ! -e /mnt || { echo "FAIL: host mounts visible"; exit 1; }
         echo "PASS mount isolation: host home/mnt unavailable"
         ulimit -v 1572864
+        if test "$PIVRA_RAW_METRICS" = 1; then
+            # wait4 measures the actual LibRaw executable, not the bash wrapper.
+            exec /usr/bin/python3 -c "import os,sys
+pid=os.fork()
+if pid==0:
+    os.execv(\"/raw-probe\", [\"/raw-probe\",\"/input.dng\",\"/output/image.ppm\"])
+_,status,usage=os.wait4(pid,0)
+code=os.waitstatus_to_exitcode(status)
+print(f\"RAW_DECODER_PEAK_RSS_KB={usage.ru_maxrss} RAW_DECODER_EXIT={code}\", flush=True)
+sys.exit(code)"
+        fi
         exec /raw-probe /input.dng /output/image.ppm
     '
 printf 'PASS isolated native LibRaw decode (no Pivra integration or syscall audit yet).\n'

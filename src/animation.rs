@@ -167,6 +167,7 @@ impl Controls {
     }
 }
 
+#[allow(clippy::too_many_arguments)]
 pub(super) fn start(
     path: PathBuf,
     generation: Rc<Cell<u64>>,
@@ -197,7 +198,8 @@ pub(super) fn start(
 
         // Start foreground playback immediately. Index frame durations in a
         // separate cooperative task so a long GIF never blocks first playback.
-        let timeline: Rc<RefCell<Option<(Rc<Vec<f64>>, f64)>>> = Rc::new(RefCell::new(None));
+        type AnimationTimeline = Rc<RefCell<Option<(Rc<Vec<f64>>, f64)>>>;
+        let timeline: AnimationTimeline = Rc::new(RefCell::new(None));
         let probe_timeline = timeline.clone();
         let probe_controls = controls.clone();
         let probe_generation = generation.clone();

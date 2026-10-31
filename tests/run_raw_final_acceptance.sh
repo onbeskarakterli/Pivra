@@ -50,6 +50,12 @@ for name in pivra pivra-thumbnail-factory pivra-raw-decoder pivra-raw-runner; do
         exit 1
     }
 done
+# Check the actual installed launcher and packaged decoder with a real DNG.
+# TMPDIR places the decoder scratch and the final output on one filesystem.
+mkdir -p "$stage/work"
+TMPDIR="$stage/work" PIVRA_RAW_INSTALLED=1 \
+    bash "$stage/usr/bin/pivra-raw-runner" "$sample" "$stage/work/accepted.ppm"
+python3 tests/validate_raw_ppm.py "$stage/work/accepted.ppm"
 
-echo 'PASS: static checks, Rust RAW tests, negative inputs, cancellation and staged packaging'
+echo 'PASS: static checks, Rust RAW tests, negative inputs, cancellation, staged packaging and real installed DNG decoding'
 echo 'NOTE: GUI DNG rendering and orphan-free cancellation still require separate observation.'

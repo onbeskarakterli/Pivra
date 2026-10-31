@@ -1,4 +1,6 @@
-//! TH-04/05 stable cells and bounded, viewport-prioritized thumbnail work.
+//! TH-04/05 stable cells and bounded, viewport-prioritized thumbnail work.                        Err(Error::Busy) => Work::Busy,
+                        Err(Error::Cancelled) => Work::Cancelled,
+                        Err(error) => provider_failure(error),
 use super::{CELL_HEIGHT, CELL_WIDTH};
 use gtk::{gdk, gio, glib, prelude::*};
 use pivra::{
@@ -508,9 +510,7 @@ impl Inner {
         // Prioritize the selected image, then the neighbors actually expected
         // in the initial viewport, not unrelated images at the folder start.
         if let Some(n) = selected {
-            if entries[n].phase == Phase::Pending
-                && !crate::raw_loader::is_dng(&entries[n].path)
-            {
+            if entries[n].phase == Phase::Pending && !crate::raw_loader::is_dng(&entries[n].path) {
                 paths.push(entries[n].path.clone());
             }
         }
@@ -549,11 +549,17 @@ impl Inner {
                 // the visible scheduler. Merely resolving disk cache entries
                 // leaves the GTK cells pending and forces a second decode.
                 let work = if crate::raw_loader::enabled() && crate::raw_loader::is_dng(&path) {
-                    match (FileKey::read(&path), crate::raw_loader::load(&path, &worker_token)) {
-                        (Ok(key), Ok(texture)) if !worker_token.is_cancelled()
-                            && FileKey::read(&path).ok().as_ref() == Some(&key) => {
-                            let decoded = texture_cost(texture.width() as u32, texture.height() as u32)
-                                .unwrap_or(usize::MAX);
+                    match (
+                        FileKey::read(&path),
+                        crate::raw_loader::load(&path, &worker_token),
+                    ) {
+                        (Ok(key), Ok(texture))
+                            if !worker_token.is_cancelled()
+                                && FileKey::read(&path).ok().as_ref() == Some(&key) =>
+                        {
+                            let decoded =
+                                texture_cost(texture.width() as u32, texture.height() as u32)
+                                    .unwrap_or(usize::MAX);
                             match display_texture(&texture, scale) {
                                 Ok(small) => Work::Hit(small, key, None, decoded),
                                 Err(e) => Work::Failed(e),
@@ -564,28 +570,37 @@ impl Inner {
                         (_, Err(e)) => Work::Failed(e),
                         _ => Work::Failed("DNG source changed during hidden decode".into()),
                     }
-                } else { match Manager::session().resolve(&path, &worker_token) {
-                    Ok(response) => {
-                        if let Some(candidate) = response.candidate() {
-                            let cached =
-                                cache_work(candidate, &worker_token, response.deadline(), scale);
-                            if matches!(cached, Work::Hit(..)) {
-                                cached
+                } else {
+                    match Manager::session().resolve(&path, &worker_token) {
+                        Ok(response) => {
+                            if let Some(candidate) = response.candidate() {
+                                let cached = cache_work(
+                                    candidate,
+                                    &worker_token,
+                                    response.deadline(),
+                                    scale,
+                                );
+                                if matches!(cached, Work::Hit(..)) {
+                                    Work::Failed("Thumbnail unavailable".into())
+                                } else if let Some(generated) = response.memory() {
+                                    memory_work(
+                                        generated,
+                                        &worker_token,
+                                        response.deadline(),
+                                        scale,
+                                    )
+                                } else {
+                                    cached
+                                }
                             } else if let Some(generated) = response.memory() {
                                 memory_work(generated, &worker_token, response.deadline(), scale)
                             } else {
                                 cached
                             }
-                        } else if let Some(generated) = response.memory() {
-                            memory_work(generated, &worker_token, response.deadline(), scale)
-                        } else {
-                            Work::Failed("Thumbnail unavailable".into())
+
                         }
                     }
-                    Err(Error::Busy) => Work::Busy,
-                    Err(Error::Cancelled) => Work::Cancelled,
-                    Err(error) => provider_failure(error),
-                } };
+                };
                 pivra::thumbnail_diagnostics::trace(
                     "hidden-result",
                     Some(&path),
@@ -1161,9 +1176,14 @@ impl Inner {
             }
             if crate::raw_loader::enabled() && crate::raw_loader::is_dng(&worker_path) {
                 let identity = FileKey::read(&worker_path);
-                return match (identity, crate::raw_loader::load(&worker_path, &worker_token)) {
-                    (Ok(key), Ok(texture)) if !worker_token.is_cancelled()
-                        && FileKey::read(&worker_path).ok().as_ref() == Some(&key) => {
+                return match (
+                    identity,
+                    crate::raw_loader::load(&worker_path, &worker_token),
+                ) {
+                    (Ok(key), Ok(texture))
+                        if !worker_token.is_cancelled()
+                            && FileKey::read(&worker_path).ok().as_ref() == Some(&key) =>
+                    {
                         let decoded = texture_cost(texture.width() as u32, texture.height() as u32)
                             .unwrap_or(usize::MAX);
                         match display_texture(&texture, scale) {

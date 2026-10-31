@@ -20,7 +20,9 @@ fn terminate_group(child: &mut std::process::Child) {
     let pid = child.id();
     if let Ok(group) = i32::try_from(pid) {
         // SAFETY: this child was spawned as leader of a fresh process group.
-        unsafe { kill(-group, 9); }
+        unsafe {
+            kill(-group, 9);
+        }
     }
     let _ = child.kill();
     let _ = child.wait();
@@ -32,7 +34,9 @@ pub(crate) fn enabled() -> bool {
     std::env::var_os("PIVRA_EXPERIMENTAL_DNG").as_deref() == Some(std::ffi::OsStr::new("1"))
 }
 pub(crate) fn is_dng(path: &Path) -> bool {
-    path.extension().and_then(|e| e.to_str()).is_some_and(|e| e.eq_ignore_ascii_case("dng"))
+    path.extension()
+        .and_then(|e| e.to_str())
+        .is_some_and(|e| e.eq_ignore_ascii_case("dng"))
 }
 pub(crate) fn load(path: &Path, cancel: &gio::Cancellable) -> Result<gdk::Texture, String> {
     if !enabled() || !is_dng(path) {
@@ -46,8 +50,8 @@ pub(crate) fn load(path: &Path, cancel: &gio::Cancellable) -> Result<gdk::Textur
     // Never open or delete a directory that this process did not create.
     let directory = loop {
         let serial = SERIAL.fetch_add(1, Ordering::Relaxed);
-        let candidate = std::env::temp_dir()
-            .join(format!("pivra-dng-{}-{serial}", std::process::id()));
+        let candidate =
+            std::env::temp_dir().join(format!("pivra-dng-{}-{serial}", std::process::id()));
         match std::fs::DirBuilder::new().mode(0o700).create(&candidate) {
             Ok(()) => break candidate,
             Err(error) if error.kind() == std::io::ErrorKind::AlreadyExists => continue,
@@ -56,7 +60,9 @@ pub(crate) fn load(path: &Path, cancel: &gio::Cancellable) -> Result<gdk::Textur
     };
     struct Cleanup(std::path::PathBuf);
     impl Drop for Cleanup {
-        fn drop(&mut self) { let _ = std::fs::remove_dir_all(&self.0); }
+        fn drop(&mut self) {
+            let _ = std::fs::remove_dir_all(&self.0);
+        }
     }
     let _cleanup = Cleanup(directory.clone());
     let output = directory.join("frame.ppm");
@@ -72,9 +78,9 @@ pub(crate) fn load(path: &Path, cancel: &gio::Cancellable) -> Result<gdk::Textur
     if option_env!("PIVRA_DISTRIBUTION_RAW").is_some() && installed_runner.is_none() {
         return Err("Experimental RAW sandbox runner is not installed".into());
     }
-    let script = installed_runner.clone().unwrap_or_else(|| {
-        Path::new(env!("CARGO_MANIFEST_DIR")).join("raw/run_decode.sh")
-    });
+    let script = installed_runner
+        .clone()
+        .unwrap_or_else(|| Path::new(env!("CARGO_MANIFEST_DIR")).join("raw/run_decode.sh"));
     let mut command = Command::new("bash");
     command.arg(&script).arg(path).arg(&output);
     // Scope all runner scratch directories to this load. The RAII cleanup
@@ -102,7 +108,8 @@ pub(crate) fn load(path: &Path, cancel: &gio::Cancellable) -> Result<gdk::Textur
         .map_err(|e| format!("DNG diagnostics: {e}"))?;
     let mut child = command
         .process_group(0)
-        .stdout(Stdio::null()).stderr(Stdio::from(log))
+        .stdout(Stdio::null())
+        .stderr(Stdio::from(log))
         .spawn()
         .map_err(|e| format!("DNG sandbox process: {e}"))?;
     let started = Instant::now();
@@ -168,8 +175,14 @@ pub(crate) fn load(path: &Path, cancel: &gio::Cancellable) -> Result<gdk::Textur
     bytes.drain(..offset);
     let stride = usize::try_from(width).map_err(|e| e.to_string())? * 3;
     let pixels = glib::Bytes::from_owned(bytes);
-    Ok(gdk::MemoryTexture::new(width as i32, height as i32,
-        gdk::MemoryFormat::R8g8b8, &pixels, stride).upcast())
+    Ok(gdk::MemoryTexture::new(
+        width as i32,
+        height as i32,
+        gdk::MemoryFormat::R8g8b8,
+        &pixels,
+        stride,
+    )
+    .upcast())
 }
 
 #[cfg(test)]

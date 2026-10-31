@@ -87,6 +87,33 @@ corresponding-source material. Binary redistributors must review and fulfill
 GPL/LGPL and third-party license obligations, include required notices and
 corresponding sources, and establish a suitable uninstall/upgrade story.
 
+## Experimental DNG/LibRaw packaging (dev only)
+
+DNG is opt-in and is not part of the published AUR package. To build and
+stage the isolated LibRaw decoder alongside Pivra on a supported development
+machine:
+
+```bash
+PIVRA_BUILD_EXPERIMENTAL_RAW=1 bash packaging/linux/dependencies.sh check
+PIVRA_BUILD_EXPERIMENTAL_RAW=1 bash packaging/linux/build-install.sh build
+PIVRA_INSTALL_EXPERIMENTAL_RAW=1 PREFIX=/usr DESTDIR=/tmp/pivra-raw-stage \
+  bash packaging/linux/build-install.sh install
+PIVRA_EXPERIMENTAL_DNG=1 /tmp/pivra-raw-stage/usr/bin/pivra /path/to/photo.DNG
+```
+
+The experimental build additionally requires C++, LibRaw development files
+(`pkg-config libraw`), Bubblewrap and `timeout`. The staged installation
+places `pivra-raw-decoder` and `pivra-raw-runner` next to the viewer, and
+uses the mandatory Bubblewrap sandbox at runtime. Ordinary builds do not build
+or install those companions. Staging without RAW opt-in removes any stale
+experimental companions in that *staging directory only*.
+
+Only DNG has been validated so far with a real Ricoh GR III sample. Other RAW
+extensions are not enabled; malformed-input and interruption tests do not
+constitute a full security audit. Do not promote this opt-in workflow to a
+public release without cross-distribution checks, license review and a full
+regression pass.
+
 ## Known limitations
 
 - Only JPEG and PNG still images are supported in v0.1.0.

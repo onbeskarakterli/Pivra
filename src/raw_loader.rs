@@ -63,7 +63,10 @@ pub(crate) fn load(path: &Path, cancel: &gio::Cancellable) -> Result<gdk::Textur
     // removes them even when the entire process group is killed on cancel.
     command.env("TMPDIR", &directory);
     if installed_runner.is_some() {
+        // Installed Pivra must use its packaged decoder, not an inherited
+        // development override pointing to an arbitrary host executable.
         command.env("PIVRA_RAW_INSTALLED", "1");
+        command.env_remove("PIVRA_RAW_HELPER");
     }
     // Filenames are passed as individual argv values, never shell-interpolated.
     let mut child = command

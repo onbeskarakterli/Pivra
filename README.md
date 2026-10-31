@@ -81,9 +81,7 @@ The AUR package builds Pivra from a pinned source revision. GitHub releases also
 | Playback/pause, volume, mute, seek bar, and keyboard controls | ✅ Available |
 | Remember volume and playback position within a window | ✅ Available |
 | Approximate frame stepping via seeking | ✅ Available |
-| Timeline hover previews | ⏳ Planned |
-| Embedded/external SRT/ASS subtitles and audio-track selection | ⏳ Planned |
-| Subtitle appearance settings | ⏳ Planned |
+| Audio-track selection | ⏳ Planned |
 | Video zoom/pan and still-frame capture | ⏳ Planned |
 | Auto-hiding playback controls | ✅ Available |
 | Display sleep inhibition during playback | ⏳ Planned |
@@ -120,7 +118,7 @@ The [detailed development roadmap](docs/PIVRA_DEVELOPMENT_ROADMAP.md) retains hi
 
 ## Current limitations
 
-Version 0.2.1 is a Linux/GNOME-focused viewer, not an image editor. Advanced subtitles, timeline hover previews, slideshow, HDR/ICC workflows, and batch conversion are not yet available. Image decoding depends on installed Glycin format loaders and their supported codecs. Video playback depends on the system GTK/GStreamer media backend and available codecs. Individual formats and files may fail.
+Version 0.2.1 is a Linux/GNOME-focused viewer, not an image editor. Slideshow, HDR/ICC workflows, and batch conversion are not yet available. Image decoding depends on installed Glycin format loaders and their supported codecs. Video playback depends on the system GTK/GStreamer media backend and available codecs. Individual formats and files may fail.
 
 Still-image loading is bounded to 64 MP (maximum 32,768 pixels per edge) and 64 MiB input size. Animated frames have additional bounds. The automated tests and video-navigation stress test were exercised on the development build; compatibility across other Linux environments remains to be verified.
 

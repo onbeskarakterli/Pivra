@@ -1,9 +1,15 @@
 //! Experimental DNG bridge. The RAW decoder only runs under mandatory Bubblewrap.
 //! RAW support is opt-in; distribution builds require an installed helper.
 use gtk::{gdk, gio, glib, prelude::*};
-use std::fs::OpenOptions;
-use std::io::Read;
-use std::os::unix::{fs::DirBuilderExt, process::CommandExt};
+use std::{
+    fs::OpenOptions,
+    io::Read,
+    os::unix::{fs::DirBuilderExt, process::CommandExt},
+    path::Path,
+    process::{Command, Stdio},
+    sync::atomic::{AtomicU64, Ordering},
+    time::{Duration, Instant},
+};
 
 unsafe extern "C" {
     fn kill(pid: i32, signal: i32) -> i32;
@@ -20,7 +26,6 @@ fn terminate_group(child: &mut std::process::Child) {
     let _ = child.wait();
 }
 
-use std::{path::Path, process::{Command, Stdio}, sync::atomic::{AtomicU64, Ordering}, time::{Duration, Instant}};
 static SERIAL: AtomicU64 = AtomicU64::new(0);
 
 pub(crate) fn enabled() -> bool {

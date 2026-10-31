@@ -128,7 +128,12 @@ impl ActualPaintable {
     }
     /// Replace an animation frame without replacing the paintable or its zoom state.
     pub fn update_texture(&self, texture: &gdk::Texture) {
-        let old_size = self.imp().texture.borrow().as_ref().map(|old| (old.width(), old.height()));
+        let old_size = self
+            .imp()
+            .texture
+            .borrow()
+            .as_ref()
+            .map(|old| (old.width(), old.height()));
         self.imp().texture.replace(Some(texture.clone()));
         if old_size != Some((texture.width(), texture.height())) {
             self.invalidate_size();

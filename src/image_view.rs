@@ -341,7 +341,10 @@ impl ImageView {
 
     #[allow(dead_code)] // Used by the fullscreen thumbnail probe.
     /// Capture the current animation texture or the live video frame, not the zoomed UI.
-    pub(super) fn capture_frame(&self, path: &std::path::Path) -> Result<gtk::gdk::Texture, String> {
+    pub(super) fn capture_frame(
+        &self,
+        path: &std::path::Path,
+    ) -> Result<gtk::gdk::Texture, String> {
         if self.video_path.borrow().as_deref() == Some(path) {
             let stream = self.video_stream.borrow();
             let media = stream.as_ref().ok_or("Video is not ready")?;
@@ -369,7 +372,11 @@ impl ImageView {
             return Ok(renderer.render_texture(&node, None));
         }
         if self.requested.borrow().as_deref() == Some(path) && animation::is_animated_file(path) {
-            return self.texture.borrow().clone().ok_or("Animation frame is not ready".into());
+            return self
+                .texture
+                .borrow()
+                .clone()
+                .ok_or("Animation frame is not ready".into());
         }
         Err("Frame capture is only available for videos and animations".into())
     }

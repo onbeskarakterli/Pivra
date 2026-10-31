@@ -1,4 +1,6 @@
 //! Controlled mode is synthetic. Default requires the real secure loader.
+#[path = "../src/raw_loader.rs"]
+mod raw_loader;
 #[path = "../src/image_view.rs"]
 mod image_view;
 #[path = "../src/image_loader.rs"]

@@ -1,6 +1,23 @@
 //! Experimental DNG bridge. The RAW decoder only runs under mandatory Bubblewrap.
 //! This development-tree helper is deliberately opt-in; no packaged RAW support.
 use gtk::{gdk, gio, glib, prelude::*};
+use std::os::unix::process::CommandExt;
+
+unsafe extern "C" {
+    fn kill(pid: i32, signal: i32) -> i32;
+}
+
+// Terminate the complete script/timeout/bwrap process group, not just bash.
+fn terminate_group(child: &mut std::process::Child) {
+    let pid = child.id();
+    if let Ok(group) = i32::try_from(pid) {
+        // SAFETY: this child was spawned as leader of a fresh process group.
+        unsafe { kill(-group, 9); }
+    }
+    let _ = child.kill();
+    let _ = child.wait();
+}
+
 use std::{path::Path, process::{Command, Stdio}, sync::atomic::{AtomicU64, Ordering}, time::{Duration, Instant}};
 static SERIAL: AtomicU64 = AtomicU64::new(0);
 
@@ -30,13 +47,13 @@ pub(crate) fn load(path: &Path, cancel: &gio::Cancellable) -> Result<gdk::Textur
     // Never use a shell to interpolate the source filename. This experiment
     // invokes a known repository script that enforces Bwrap isolation.
     let mut child = Command::new("bash").arg(script).arg(path).arg(&output)
+        .process_group(0)
         .stdout(Stdio::null()).stderr(Stdio::null())
         .spawn().map_err(|e| format!("DNG sandbox process: {e}"))?;
     let started = Instant::now();
     let status = loop {
         if cancel.is_cancelled() || started.elapsed() > Duration::from_secs(100) {
-            let _ = child.kill();
-            let _ = child.wait();
+            terminate_group(&mut child);
             return Err(if cancel.is_cancelled() {
                 "DNG loading cancelled".into()
             } else {

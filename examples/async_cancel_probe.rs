@@ -1,4 +1,6 @@
 //! Default secure native gate. --controlled uses explicit synthetic successes/errors.
+#[path = "../src/raw_ppm.rs"]
+mod raw_ppm;
 #[path = "../src/raw_loader.rs"]
 mod raw_loader;
 #[path = "../src/image_view.rs"]

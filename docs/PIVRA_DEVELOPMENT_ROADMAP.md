@@ -127,7 +127,7 @@ PIV-19 ve sonraki aşamalar başlamadı.
 - **app/ui:** GTK4/libadwaita pencereleri, overlay kontroller, input ve paneller.
 - **catalog:** klasör tarama, doğal ad sırası, dosya sistemi olayları, gezinme ve pencere bağımsızlığı.
 - **image:** fotoğraf çözümleme adaptörleri, kaynak çözünürlüğü, fit/fill/100%, zoom/pan, renk.
-- **video:** GStreamer oynatma yaşam döngüsü, seek, frame-step, ses/altyazı, render.
+- **video:** GStreamer oynatma yaşam döngüsü, seek, frame-step, ses, render.
 - **jobs/cache:** iptal edilebilir ön yükleme, RAM içi thumbnail, kaynak önceliği, toplu kuyruk.
 - **settings/platform:** GSettings, GNOME/GIO, HiDPI, güç yönetimi, tema, dosya ilişkileri.
 - **edit:** kullanıcı `Edit` dediğinde aktive edilen ayrı tahribatsız düzenleme hattı; yalnız en son faz.
@@ -143,7 +143,7 @@ Bu isimler mantıksal modüllerdir; gerçek Rust crate/dizin yapısı PIV-01/02 
 | 1 — Fotoğraf çekirdeği | PIV-06–12 | Nautilus'tan açılan görüntü, klasörde doğal sırada gezinme, fotoğraf render, fit/fill/100% | JPEG/PNG açılışı, 1/2/10 sıralama, kararlı gezinme, doğru yön, bozuk dosyada çökme yok |
 | 2 — Zoom ve kaynak yönetimi | PIV-13–18 | İmleç odaklı zoom/pan, RAM cache/ön yükleme, büyük görsel tepkiselliği, mini harita temeli | Büyük fotoğrafta UI donmaz; zoom sınırları ve iptal edilen decode doğrulanır |
 | 3 — Video çekirdeği | PIV-19–24 | Aynı dosya sırası içinde video, otomatik oynatma/temiz kapatma, ses ve zaman çubuğu | Fotoğraf → video → fotoğraf akışı, kaynakların serbest kalması, sessiz geçiş |
-| 4 — Gelişmiş video | PIV-25–31 | Frame-step, hover scrub önizleme, altyazı/ses izleri, video zoom, kare kaydetme | Video test matrisi ve mümkün/uygulanamayan özellikler belgeli |
+| 4 — Gelişmiş video | PIV-25–31 | Frame-step, ses izi seçimi, video zoom, kare kaydetme | Video test matrisi ve mümkün/uygulanamayan özellikler belgeli |
 | 5 — Tam görüntüleyici arayüzü | PIV-32–39 | Şerit ve seçim modu, mini harita, bilgi paneli, slayt, kısayollar, touchpad/HiDPI, karşılaştırma | Tüm temel kullanım senaryoları GNOME'da manuel doğrulanmış |
 | 6 — Uyumluluk ve yayın hazırlığı | PIV-40–47 | Format genişletme, ICC/HDR, hata dayanıklılığı, performans regresyonu, native paketler | Destek matrisi, paket kurulum testi, tekrarlanabilir testler, görüntüleme/video test sürümü |
 | 7 — **Edit ve toplu işleme (son faz)** | PIV-48–57 | Ayrı Edit modu, dönüş/kırp/boyut/renk/iyileştirme/karşılaştırma, güvenli kayıt ve toplu dönüştürme | Orijinal koruması, undo, güvenli kayıt, job iptali/çakışma testleri; normal viewer sade kalır |
@@ -188,7 +188,7 @@ Deterministik küçük fixture'lar, kaynak/lisans durumu ve SHA-256 manifesti `t
 | Risk | Karşılık / karar kapısı |
 |---|---|
 | Glycin format/RAW/HDR yetenekleri | Hedef örnek dosya seti; eksik özellik için alternatif adapter; kullanıcıya kapsam bildirimi |
-| GStreamer frame-step, ASS, timeline önizlemesi | Küçük doğrulama prototipleri; kısıt kanıtlanırsa çözüm/alternatif görüşülür |
+| GStreamer frame-step, ses izi seçimi, video zoom | Küçük doğrulama prototipleri; kısıt kanıtlanırsa çözüm/alternatif görüşülür |
 | GTK4'te yüksek çözünürlüklü zoom/texture akışı | Benchmark, tiled/preview stratejisi, kontrollü bellek ve iptal |
 | Rust ↔ libvips bağlayıcısı / sistem sürümleri | Son Edit fazı öncesi bağımlılık ve bakım değerlendirmesi |
 | Native paket sürüm ayrışması | Arch/DEB/RPM için minimum sürüm ve smoke test matrisi, hedeflenen dağıtımlar için koşullu destek |

@@ -599,6 +599,61 @@ pub(super) fn build(app: &adw::Application, settings: &Settings, file: Option<Op
             toasts.add_toast(toast);
         });
         window.add_action(&delete);
+        // S saves the currently displayed video or animated-image frame beside its source.
+        let save_frame = gio::SimpleAction::new("save-current-frame", None);
+        let frame_context = context.clone();
+        let frame_view = view.clone();
+        let frame_toasts = toast_overlay.clone();
+        save_frame.connect_activate(move |_, _| {
+            let source = {
+                let state = frame_context.borrow();
+                state.collection.current().map(|item| item.path().to_owned())
+            };
+            let Some(source) = source else {
+                frame_toasts.add_toast(adw::Toast::new("Could not save frame: no media selected"));
+                return;
+            };
+            let result = (|| -> Result<std::path::PathBuf, String> {
+                let frame = frame_view.capture_frame(&source)?;
+                let parent = source.parent().ok_or("Source folder is unavailable")?;
+                let stem = source.file_stem().ok_or("Source filename is unavailable")?.to_string_lossy();
+                for index in 1..=9999 {
+                    let target = parent.join(format!("{stem}_frame_{index:03}.png"));
+                    if target.exists() {
+                        continue;
+                    }
+                    // Reserve each name without overwriting existing files.
+                    let mut file = match std::fs::OpenOptions::new()
+                        .write(true)
+                        .create_new(true)
+                        .open(&target)
+                    {
+                        Ok(file) => file,
+                        Err(error) if error.kind() == std::io::ErrorKind::AlreadyExists => continue,
+                        Err(error) => return Err(error.to_string()),
+                    };
+                    use std::io::Write;
+                    let bytes = frame.save_to_png_bytes();
+                    if let Err(error) = file.write_all(bytes.as_ref()) {
+                        drop(file);
+                        let _ = std::fs::remove_file(&target);
+                        return Err(error.to_string());
+                    }
+                    return Ok(target);
+                }
+                Err("Frame filename limit reached".into())
+            })();
+            match result {
+                Ok(target) => frame_toasts.add_toast(adw::Toast::new(&format!(
+                    "Frame saved: {}",
+                    target.file_name().unwrap_or_default().to_string_lossy()
+                ))),
+                Err(error) => frame_toasts.add_toast(adw::Toast::new(&format!(
+                    "Could not save frame: {error}"
+                ))),
+            }
+        });
+        window.add_action(&save_frame);
         let keys = gtk::EventControllerKey::new();
         keys.set_propagation_phase(gtk::PropagationPhase::Capture);
         let weak_window = window.downgrade();
@@ -615,6 +670,12 @@ pub(super) fn build(app: &adw::Application, settings: &Settings, file: Option<Op
                     | gdk::ModifierType::SUPER_MASK,
             ) {
                 return glib::Propagation::Proceed;
+            }
+            if matches!(key, gdk::Key::s | gdk::Key::S) {
+                if let Some(window) = weak_window.upgrade() {
+                    gio::prelude::ActionGroupExt::activate_action(&window, "save-current-frame", None);
+                }
+                return glib::Propagation::Stop;
             }
             if key == gdk::Key::Delete {
                 if let Some(window) = weak_window.upgrade() {

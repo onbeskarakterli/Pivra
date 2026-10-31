@@ -521,6 +521,6 @@ fn animation_kind(path: &std::path::Path) -> Option<AnimationKind> {
     None
 }
 
-fn is_animated_file(path: &std::path::Path) -> bool {
+pub(super) fn is_animated_file(path: &std::path::Path) -> bool {
     animation_kind(path).is_some()
 }

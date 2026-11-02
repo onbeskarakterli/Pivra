@@ -12,7 +12,7 @@ This is a development candidate on `dev`, not a published stable release.
 
 - User reported `cargo test --locked --all-targets`: 32 passed, 0 failed before the v0.2.4 version bump (2026-11-02).
 - After the version bump, native build and tests require revalidation.
-- Manual GNOME repeated-Delete test failed on the original 0.2.4 candidate (user report 2026-11-02). The HIGH-priority follow-up fix remains **untested** on native GNOME; do not publish until a passing retest.
+- Manual GNOME repeated-Delete test failed on the initial 0.2.4 candidate. After applying the HIGH-priority toast fix, the user confirmed that repeated deletion notifications behave correctly on native GNOME (2026-11-02): **PASS**.
 - Release packaging/source archive checks and publication authorization are separate.
 
 ## Release boundaries

@@ -27,6 +27,9 @@ fn show_latest_toast(
     if let Some(previous) = current.borrow_mut().take() {
         previous.dismiss();
     }
+    // NORMAL priority can enqueue a new toast behind an outgoing animation.
+    // HIGH displays the newest deletion result immediately instead of waiting.
+    toast.set_priority(adw::ToastPriority::High);
     *current.borrow_mut() = Some(toast.clone());
     overlay.add_toast(toast);
 }

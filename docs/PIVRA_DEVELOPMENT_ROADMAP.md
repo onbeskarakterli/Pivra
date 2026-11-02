@@ -2,10 +2,10 @@
 ## Dev TODO — example-target warnings (31.10.2026)
 
 - **CODED; validation pending:** `ImageView::video_widget()` is used by the production window but not by standalone example probes. A method-specific, reasoned `dead_code` allowance avoids warning noise without disabling the lint for other code. Validate with `cargo check --locked --all-targets` and `cargo test --locked --all-targets` on the native build environment; do not mark DONE until both pass.
-- This cleanup is for `dev` and does not block the v0.2.3-1 AUR package.
+- This cleanup is for `dev`; any v0.2.4 release/AUR update requires separate validation and approval.
 
 
-**Aktif geliştirme sürümü: v0.2.3 (`dev`, yayımlanmadı).** `Cargo.toml` ve `Cargo.lock` bu sürümü taşır. Kararlı `main` v0.2.1; AUR'daki yayımlanmış paket v0.2.1-3. **Faz 2 / PIV-18 DONE (31.10.2026).** Erken önizleme geliştirilmeyecek; 64 MP desteği kullanıcı tarafından test edilip kabul edildi. 31.10 tarihli DNG deneyi ayrıca başarılı test edildi, ancak varsayılan olarak kapalıdır. Sürüm numarası değişimi yeni yayın, etiket veya AUR güncellemesi değildir. Aşağıdaki eski sürüm ve TESTING kayıtları tarihsel kanıtlardır.
+**Aktif geliştirme sürümü: v0.2.4 (`dev`, yayımlanmadı).** `Cargo.toml` ve `Cargo.lock` bu sürümü taşır. Kararlı `main` v0.2.1; AUR'daki yayımlanmış paket v0.2.1-3. **Faz 2 / PIV-18 DONE (31.10.2026).** Erken önizleme geliştirilmeyecek; 64 MP desteği kullanıcı tarafından test edilip kabul edildi. 31.10 tarihli DNG deneyi ayrıca başarılı test edildi, ancak varsayılan olarak kapalıdır. Sürüm numarası değişimi yeni yayın, etiket veya AUR güncellemesi değildir. Aşağıdaki eski sürüm ve TESTING kayıtları tarihsel kanıtlardır.
 
 
 ## B6-F2 — Son RC kabulü: teknik GO — 29.10.2026

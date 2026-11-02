@@ -3,6 +3,8 @@
 pkgname=pivra
 pkgver=0.2.4
 pkgrel=1
+# Prevent makepkg from generating a separate pivra-debug package.
+options=('!debug')
 pkgdesc='Native GNOME photo, animation and video viewer'
 arch=('x86_64')
 url='https://github.com/onbeskarakterli/Pivra'

@@ -1,11 +1,11 @@
 //! Deterministic GTK/GIO late-result guard test, with controlled ERROR workers.
 //! Never decodes or simulates image pixels; not a Glycin/sandbox success gate.
-#[path = "../src/raw_ppm.rs"]
-mod raw_ppm;
-#[path = "../src/raw_loader.rs"]
-mod raw_loader;
 #[path = "../src/image_view.rs"]
 mod image_view;
+#[path = "../src/raw_loader.rs"]
+mod raw_loader;
+#[path = "../src/raw_ppm.rs"]
+mod raw_ppm;
 
 use adw::prelude::*;
 use gtk::{gio, glib};

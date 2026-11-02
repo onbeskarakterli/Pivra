@@ -562,9 +562,11 @@ pub(super) fn build(app: &adw::Application, settings: &Settings, file: Option<Op
             let old_entries = trash_entries(&path);
             let file = gio::File::for_path(&path);
             if let Err(error) = file.trash(None::<&gio::Cancellable>) {
-                show_latest_toast(&toasts, &current_toast, adw::Toast::new(&format!(
-                    "Could not move to Trash: {error}"
-                )));
+                show_latest_toast(
+                    &toasts,
+                    &current_toast,
+                    adw::Toast::new(&format!("Could not move to Trash: {error}")),
+                );
                 return;
             }
             let remaining: Vec<_> = context
@@ -595,14 +597,22 @@ pub(super) fn build(app: &adw::Application, settings: &Settings, file: Option<Op
             let undo_current_toast = current_toast.clone();
             toast.connect_button_clicked(move |_| {
                 if path.exists() {
-                    show_latest_toast(&undo_toasts, &undo_current_toast, adw::Toast::new("Undo failed: destination already exists"));
+                    show_latest_toast(
+                        &undo_toasts,
+                        &undo_current_toast,
+                        adw::Toast::new("Undo failed: destination already exists"),
+                    );
                     return;
                 }
                 let trashed = trash_entries(&path)
                     .into_iter()
                     .find(|entry| !old_entries.iter().any(|old| old.equal(entry)));
                 let Some(trashed) = trashed else {
-                    show_latest_toast(&undo_toasts, &undo_current_toast, adw::Toast::new("Undo failed: trashed file not found"));
+                    show_latest_toast(
+                        &undo_toasts,
+                        &undo_current_toast,
+                        adw::Toast::new("Undo failed: trashed file not found"),
+                    );
                     return;
                 };
                 if let Err(error) = trashed.move_(
@@ -611,7 +621,11 @@ pub(super) fn build(app: &adw::Application, settings: &Settings, file: Option<Op
                     None::<&gio::Cancellable>,
                     None,
                 ) {
-                    show_latest_toast(&undo_toasts, &undo_current_toast, adw::Toast::new(&format!("Undo failed: {error}")));
+                    show_latest_toast(
+                        &undo_toasts,
+                        &undo_current_toast,
+                        adw::Toast::new(&format!("Undo failed: {error}")),
+                    );
                 }
             });
             show_latest_toast(&toasts, &current_toast, toast);

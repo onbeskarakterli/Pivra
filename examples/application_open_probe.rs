@@ -1,8 +1,4 @@
 //! Actual app::launch/GIO-open path. No mock decoder, no automatic MIME override.
-#[path = "../src/raw_ppm.rs"]
-mod raw_ppm;
-#[path = "../src/raw_loader.rs"]
-mod raw_loader;
 #[path = "../src/app.rs"]
 mod app;
 #[path = "../src/image_loader.rs"]
@@ -11,6 +7,10 @@ mod image_loader;
 mod image_view;
 #[path = "../src/input.rs"]
 mod input;
+#[path = "../src/raw_loader.rs"]
+mod raw_loader;
+#[path = "../src/raw_ppm.rs"]
+mod raw_ppm;
 #[path = "../src/window.rs"]
 mod window;
 use adw::prelude::*;

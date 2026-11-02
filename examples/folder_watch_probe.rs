@@ -1,8 +1,4 @@
 //! Real GIO events and production windows. Default requires secure Glycin pixels.
-#[path = "../src/raw_ppm.rs"]
-mod raw_ppm;
-#[path = "../src/raw_loader.rs"]
-mod raw_loader;
 #[path = "../src/image_loader.rs"]
 mod image_loader;
 #[path = "../src/image_view.rs"]
@@ -11,6 +7,10 @@ mod image_view;
 mod input;
 #[path = "support/media_failure_cases.rs"]
 mod media_failure_cases;
+#[path = "../src/raw_loader.rs"]
+mod raw_loader;
+#[path = "../src/raw_ppm.rs"]
+mod raw_ppm;
 #[path = "../src/window.rs"]
 mod window;
 use adw::prelude::*;

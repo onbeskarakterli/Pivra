@@ -1,10 +1,10 @@
 //! Controlled mode is synthetic. Default requires the real secure loader.
-#[path = "../src/raw_ppm.rs"]
-mod raw_ppm;
-#[path = "../src/raw_loader.rs"]
-mod raw_loader;
 #[path = "../src/image_view.rs"]
 mod image_view;
+#[path = "../src/raw_loader.rs"]
+mod raw_loader;
+#[path = "../src/raw_ppm.rs"]
+mod raw_ppm;
 #[path = "../src/image_loader.rs"]
 mod secure_loader;
 use adw::prelude::*;

@@ -1,5 +1,11 @@
 # Issue #9 — real GTK/GStreamer backend candidate
 
+Current checkpoint: the user reports native Arch/GNOME CPU-reference acceptance
+with colors similar to MPV. GPU acceleration remains mandatory and unaccepted.
+See [the GPU candidate and exact remaining blockers](VIDEO_COLOR_GPU_CANDIDATE.md).
+The CPU experiment below is historical/reference work, never the product default.
+
+
 2026-11-02; continuation of `573bc2727960b96a2a66d08ca5eb563ae4158011`.
 **Status: CPU reference implementation tested on real H.264; production
 integration and final Arch/MPV visual acceptance remain OPEN.**

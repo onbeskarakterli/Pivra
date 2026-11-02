@@ -1,0 +1,301 @@
+--- a/gdk/gdkcolorstateprivate.h
++++ b/gdk/gdkcolorstateprivate.h
+@@ -107,0 +108,5 @@
++/* Video display intent is separate from the encoded CICP transfer tag. */
++GdkColorState * gdk_color_state_new_for_video_cicp      (const GdkCicp          *cicp,
++                                                         GError                **error);
++gboolean        gdk_color_state_is_video_bt1886        (GdkColorState          *self);
++
+--- a/gdk/gdkcolordefs.h
++++ b/gdk/gdkcolordefs.h
+@@ -366,0 +367,15 @@
++
++/* BT.1886 reference display, normalized white=1 and ideal black=0. */
++static inline void
++bt1886_eotf (float v[3])
++{
++  for (int i = 0; i < 3; i++)
++    v[i] = powf (MAX (v[i], 0.f), 2.4f);
++}
++
++static inline void
++bt1886_oetf (float v[3])
++{
++  for (int i = 0; i < 3; i++)
++    v[i] = powf (MAX (v[i], 0.f), 1.f / 2.4f);
++}
+--- a/gdk/gdkcolorstate.c
++++ b/gdk/gdkcolorstate.c
+@@ -741,0 +742 @@
++  gboolean video_bt1886;
+@@ -763,0 +765,7 @@
++  if (self->video_bt1886 && n_values > 1 && GDK_DEBUG_CHECK (MISC))
++    {
++      static gint samples;
++      if (g_atomic_int_add (&samples, 1) < 16)
++        gdk_debug_message ("video-bt1886 CPU transfer: %zu values (fallback/export)", n_values);
++    }
++
+@@ -818,0 +827,7 @@
++  if (self->video_bt1886 && n_values > 1 && GDK_DEBUG_CHECK (MISC))
++    {
++      static gint samples;
++      if (g_atomic_int_add (&samples, 1) < 16)
++        gdk_debug_message ("video-bt1886 CPU transfer: %zu values (fallback/export)", n_values);
++    }
++
+@@ -897 +912,2 @@
+-  return gdk_cicp_equal (&cs1->cicp, &cs2->cicp);
++  return cs1->video_bt1886 == cs2->video_bt1886 &&
++         gdk_cicp_equal (&cs1->cicp, &cs2->cicp);
+@@ -1238,0 +1255,38 @@
++
++/* Private constructor used by video sinks. Never mutate a published state or
++ * change the interpretation of image/CSS CICP transfer 1. */
++GdkColorState *
++gdk_color_state_new_for_video_cicp (const GdkCicp *cicp, GError **error)
++{
++  GdkColorState *state = gdk_color_state_new_for_cicp (cicp, error);
++  GdkCicpColorState *self;
++
++  if (state == NULL || cicp->color_primaries != 1 || cicp->transfer_function != 1 ||
++      !((cicp->matrix_coefficients == 0 && cicp->range == GDK_CICP_RANGE_FULL) ||
++        (cicp->matrix_coefficients == 1 &&
++         (cicp->range == GDK_CICP_RANGE_FULL || cicp->range == GDK_CICP_RANGE_NARROW))))
++    return state;
++
++  /* These tuples cannot be default/builtin states; the constructor above
++   * allocates a new CICP state, so initialization remains immutable/threadsafe. */
++  g_assert (state->klass == &GDK_CICP_COLOR_STATE_CLASS);
++  self = (GdkCicpColorState *) state;
++  self->video_bt1886 = TRUE;
++  /* BT.709 and sRGB primaries coincide exactly. Avoid numerical XYZ roundtrip
++   * cross-talk, which a display inverse EOTF would amplify near black. */
++  memcpy (self->to_srgb, identity, sizeof (self->to_srgb));
++  memcpy (self->from_srgb, identity, sizeof (self->from_srgb));
++  self->eotf = bt1886_eotf;
++  self->oetf = bt1886_oetf;
++  g_free (self->name);
++  self->name = g_strdup_printf ("video-bt1886-%u/%u/%u/%u", cicp->color_primaries,
++                                cicp->transfer_function, cicp->matrix_coefficients, cicp->range);
++  return state;
++}
++
++gboolean
++gdk_color_state_is_video_bt1886 (GdkColorState *state)
++{
++  return state->klass == &GDK_CICP_COLOR_STATE_CLASS &&
++         ((GdkCicpColorState *) state)->video_bt1886;
++}
+--- a/gtk/media/gtkgstsink.c
++++ b/gtk/media/gtkgstsink.c
+@@ -25,0 +26 @@
++#include "gdk/gdkcolorstateprivate.h"
+@@ -197 +198,5 @@
+-  color_state = gdk_cicp_params_build_color_state (params, &error);
++  if (colorimetry->primaries == GST_VIDEO_COLOR_PRIMARIES_BT709 &&
++      colorimetry->transfer == GST_VIDEO_TRANSFER_BT709)
++    color_state = gdk_color_state_new_for_video_cicp (gdk_cicp_params_get_cicp (params), &error);
++  else
++    color_state = gdk_cicp_params_build_color_state (params, &error);
+--- a/gsk/gpu/gskgpuutils.c
++++ b/gsk/gpu/gskgpuutils.c
+@@ -153,0 +154,4 @@
++        /* EGL/Vulkan may already have expanded range and converted YUV.
++         * Keep the display EOTF while replacing only those CICP fields. */
++        if (gdk_color_state_is_video_bt1886 (color_state))
++          return gdk_color_state_new_for_video_cicp (&converted, NULL);
+--- a/gsk/gpu/gskgpunodeprocessor.c
++++ b/gsk/gpu/gskgpunodeprocessor.c
+@@ -353,0 +354,8 @@
++      if (gdk_color_state_is_video_bt1886 (image_color_state) && GSK_DEBUG_CHECK (RENDERER))
++        {
++          static gint samples;
++          if (g_atomic_int_add (&samples, 1) < 16)
++            gdk_debug_message ("video-bt1886 GPU CICP op: primaries=%u matrix=%u range=%u",
++                               cicp->color_primaries, cicp->matrix_coefficients, cicp->range);
++        }
++
+@@ -366 +374,2 @@
+-                               cicp->range == GDK_CICP_RANGE_NARROW ? 0 : 1);
++                               cicp->range == GDK_CICP_RANGE_NARROW ? 0 : 1,
++                               gdk_color_state_is_video_bt1886 (image_color_state));
+@@ -4036 +4045,2 @@
+-                               cicp->range == GDK_CICP_RANGE_NARROW ? 0 : 1);
++                               cicp->range == GDK_CICP_RANGE_NARROW ? 0 : 1,
++                               gdk_color_state_is_video_bt1886 (self->ccs));
+--- a/gsk/gpu/gskglrenderer.c
++++ b/gsk/gpu/gskglrenderer.c
+@@ -1,0 +2 @@
++#include "gskdebugprivate.h"
+@@ -68,0 +70,4 @@
++  GSK_DEBUG (RENDERER, "video-color GL context: vendor=%s renderer=%s version=%s",
++             (const char *) glGetString (GL_VENDOR), (const char *) glGetString (GL_RENDERER),
++             (const char *) glGetString (GL_VERSION));
++
+--- a/gsk/gpu/gskgpuuploadop.c
++++ b/gsk/gpu/gskgpuuploadop.c
+@@ -18,0 +19 @@
++#include "gdk/gdkgltexture.h"
+@@ -305,0 +307,9 @@
++  if (gdk_color_state_is_video_bt1886 (gdk_texture_get_color_state (self->texture)) &&
++      (GDK_IS_GL_TEXTURE (self->texture) || GDK_IS_DMABUF_TEXTURE (self->texture)) &&
++      GSK_DEBUG_CHECK (FALLBACK))
++    {
++      static gint samples;
++      if (g_atomic_int_add (&samples, 1) < 16)
++        gdk_debug_message ("video-bt1886 GPU readback/upload fallback: %s", G_OBJECT_TYPE_NAME (self->texture));
++    }
++
+--- a/gsk/gpu/shaders/gskgpuconvertcicp.glsl
++++ b/gsk/gpu/shaders/gskgpuconvertcicp.glsl
+@@ -12,0 +13 @@
++guint32 video_bt1886;
+@@ -29 +30,10 @@
+-
++PASS_FLAT(13) uint _video_bt1886;
++
++
++/* Defense in depth: only the explicit SDR video intent may override transfer. */
++uint
++video_bt1886_intent (uint primaries, uint transfer, uint matrix, uint range, uint requested)
++{
++  return requested != 0u && primaries == 1u && transfer == 1u &&
++         ((matrix == 0u && range == 1u) || (matrix == 1u && range <= 1u)) ? 1u : 0u;
++}
+@@ -37,0 +48,6 @@
++
++mat3
++video_bt1886_matrix (mat3 matrix, uint video)
++{
++  return video != 0u && ALT_COLOR_SPACE == GDK_COLOR_STATE_ID_SRGB_LINEAR ? identity : matrix;
++}
+@@ -218,0 +235,2 @@
++  _video_bt1886 = video_bt1886_intent (in_color_primaries, in_transfer_function,
++                                        in_matrix_coefficients, in_range, in_video_bt1886);
+@@ -241,0 +260 @@
++  _mat = video_bt1886_matrix (_mat, _video_bt1886);
+@@ -248,0 +268,13 @@
++
++/* Same reference-display EOTF as GDK's CPU color-state conversion. */
++vec3
++bt1886_eotf (vec3 v)
++{
++  return pow (max (v, vec3 (0.0)), vec3 (2.4));
++}
++
++vec3
++bt1886_oetf (vec3 v)
++{
++  return pow (max (v, vec3 (0.0)), vec3 (1.0 / 2.4));
++}
+@@ -414 +446,2 @@
+-  color.rgb = apply_cicp_eotf (color.rgb, _transfer_function);
++  color.rgb = _video_bt1886 != 0u ? bt1886_eotf (color.rgb)
++                                  : apply_cicp_eotf (color.rgb, _transfer_function);
+@@ -428 +461,2 @@
+-  color.rgb = apply_cicp_oetf (color.rgb, _transfer_function);
++  color.rgb = _video_bt1886 != 0u ? bt1886_oetf (color.rgb)
++                                  : apply_cicp_oetf (color.rgb, _transfer_function);
+--- a/gsk/gskrendernodeparser.c
++++ b/gsk/gskrendernodeparser.c
+@@ -2446,0 +2447 @@
++  gboolean video_bt1886 = FALSE;
+@@ -2451,0 +2453 @@
++    { "video-bt1886", parse_boolean, NULL, &video_bt1886 },
+@@ -2484 +2486,8 @@
+-  cs = gdk_color_state_new_for_cicp (&cicp, &error);
++  cs = video_bt1886 ? gdk_color_state_new_for_video_cicp (&cicp, &error)
++                    : gdk_color_state_new_for_cicp (&cicp, &error);
++  if (cs && video_bt1886 && !gdk_color_state_is_video_bt1886 (cs))
++    {
++      g_clear_pointer (&cs, gdk_color_state_unref);
++      g_set_error_literal (&error, G_IO_ERROR, G_IO_ERROR_INVALID_DATA,
++                           "BT.1886 display intent requires supported BT.709 video metadata");
++    }
+@@ -7502,0 +7512,2 @@
++  if (gdk_color_state_is_video_bt1886 (color_state))
++    g_string_append (str, "  video-bt1886: true;\n");
+--- a/testsuite/gdk/colorstate-internal.c
++++ b/testsuite/gdk/colorstate-internal.c
+@@ -247,0 +248,44 @@
++static void
++test_video_bt1886 (void)
++{
++  GdkCicp cicp = { 1, 1, 0, GDK_CICP_RANGE_FULL };
++  GdkColorState *image = gdk_color_state_new_for_cicp (&cicp, NULL);
++  GdkColorState *video = gdk_color_state_new_for_video_cicp (&cicp, NULL);
++  GdkColorState *video2 = gdk_color_state_new_for_video_cicp (&cicp, NULL);
++  float v[4] = { 0.5f, 0.5f, 0.5f, 1.f }, linear[4];
++
++  g_assert_true (gdk_color_state_is_video_bt1886 (video));
++  g_assert_false (gdk_color_state_is_video_bt1886 (image));
++  g_assert_false (gdk_color_state_equal (image, video));
++  g_assert_true (gdk_color_state_equal (video, video2));
++  gdk_color_state_convert_color (video, v, GDK_COLOR_STATE_SRGB_LINEAR, linear);
++  g_assert_cmpfloat_with_epsilon (linear[0], powf (0.5f, 2.4f), 0.00001);
++  gdk_color_state_unref (video2);
++  gdk_color_state_unref (video);
++  gdk_color_state_unref (image);
++
++  /* Full/narrow YUV retain their source metadata, HDR and image states do not
++   * acquire this video intent. */
++  cicp.matrix_coefficients = 1;
++  for (guint range = 0; range <= 1; range++)
++    {
++      cicp.range = range;
++      video = gdk_color_state_new_for_video_cicp (&cicp, NULL);
++      g_assert_true (gdk_color_state_is_video_bt1886 (video));
++      g_assert_cmpuint (gdk_color_state_get_cicp (video)->range, ==, range);
++      gdk_color_state_unref (video);
++    }
++  cicp.matrix_coefficients = 0;
++  cicp.range = GDK_CICP_RANGE_FULL;
++  for (guint transfer = 0; transfer <= 18; transfer++)
++    {
++      cicp.transfer_function = transfer;
++      video = gdk_color_state_new_for_video_cicp (&cicp, NULL);
++      if (video)
++        {
++          g_assert_cmpint (gdk_color_state_is_video_bt1886 (video), ==, transfer == 1);
++          gdk_color_state_unref (video);
++        }
++    }
++}
++
+@@ -280,0 +325,2 @@
++  g_test_add_func ("/colorstate/video-bt1886", test_video_bt1886);
++
+--- a/testsuite/gsk/serialize.c
++++ b/testsuite/gsk/serialize.c
+@@ -40,0 +41,27 @@
++static void
++test_video_intent_roundtrip (void)
++{
++  const char data[] = "@cicp \042video\042 { primaries: 1; transfer: 1; matrix: 0; video-bt1886: true; }\n"
++                      "color { bounds: 0 0 10 10; color: color(\042video\042 0.5 0.5 0.5); }\n";
++  GBytes *input = g_bytes_new_static (data, sizeof (data) - 1);
++  GskRenderNode *node = gsk_render_node_deserialize (input, NULL, NULL);
++  GBytes *bytes, *again;
++  GskRenderNode *copy;
++  gsize size;
++  gconstpointer text;
++
++  g_assert_nonnull (node);
++  bytes = gsk_render_node_serialize (node);
++  text = g_bytes_get_data (bytes, &size);
++  g_assert_nonnull (g_strstr_len (text, size, "video-bt1886: true;"));
++  copy = gsk_render_node_deserialize (bytes, NULL, NULL);
++  g_assert_nonnull (copy);
++  again = gsk_render_node_serialize (copy);
++  g_assert_true (g_bytes_equal (bytes, again));
++  g_bytes_unref (again);
++  g_bytes_unref (bytes);
++  g_bytes_unref (input);
++  gsk_render_node_unref (copy);
++  gsk_render_node_unref (node);
++}
++
+@@ -48,0 +76,2 @@
++  g_test_add_func ("/node/serialize/video-bt1886", test_video_intent_roundtrip);
++

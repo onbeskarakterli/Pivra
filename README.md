@@ -2,7 +2,7 @@
 
 **Pivra** is a native image viewer for Linux, built with **Rust, GTK4, and libadwaita**. It is designed to feel at home on GNOME: open a photo, move through the folder, zoom in on details, and browse thumbnails without getting in the way.
 
-Pivra is free and open-source software. The **`dev` branch is version 0.2.3 (unreleased)**. The published stable release remains **0.2.1**. That stable release is a maintenance update to the 0.2 series, including removal of an obsolete video-playback warning and release consistency fixes. Mixed photo/video navigation, native video controls, animated-image playback, and Trash/Undo remain available. Editing and advanced media tools remain planned.
+Pivra is free and open-source software. The **`dev` branch is version 0.2.4 (unreleased)**. The published stable release remains **0.2.1**. That stable release is a maintenance update to the 0.2 series, including removal of an obsolete video-playback warning and release consistency fixes. Mixed photo/video navigation, native video controls, animated-image playback, and Trash/Undo remain available. Editing and advanced media tools remain planned.
 
 **[Latest published release](https://github.com/onbeskarakterli/Pivra/releases/latest)** · **[Arch Linux AUR](https://aur.archlinux.org/packages/pivra)** · **[Development roadmap](docs/PIVRA_DEVELOPMENT_ROADMAP.md)**
 
@@ -44,7 +44,7 @@ The AUR package builds Pivra from a pinned source revision. GitHub releases also
 
 ## Features and roadmap
 
-**Available** = implemented in the current `dev` source (v0.2.3, unreleased); the published v0.2.1 release may have a different feature set. **Partial** = some aspects implemented, with more work planned. **Planned** = not yet delivered. This is a feature-level snapshot, not a declaration that every numbered roadmap milestone is complete.
+**Available** = implemented in the current `dev` source (v0.2.4, unreleased); the published v0.2.1 release may have a different feature set. **Partial** = some aspects implemented, with more work planned. **Planned** = not yet delivered. This is a feature-level snapshot, not a declaration that every numbered roadmap milestone is complete.
 
 ### Photo viewing and navigation
 
@@ -115,7 +115,7 @@ Editing will live in a separate **Edit** mode so the normal viewer remains simpl
 | Safe Save As, metadata handling, and original-file protection | ⏳ Planned |
 | Background batch conversion with pause/cancel and collision handling | ⏳ Planned |
 
-The [detailed development roadmap](docs/PIVRA_DEVELOPMENT_ROADMAP.md) retains historical PIV milestone and release-gate records; its older status snapshots do not supersede the current v0.2.3 development status above. The [feature specification](docs/PIVRA_FEATURE_SPEC_TR.md) describes the longer-term goals.
+The [detailed development roadmap](docs/PIVRA_DEVELOPMENT_ROADMAP.md) retains historical PIV milestone and release-gate records; its older status snapshots do not supersede the current v0.2.4 development status above. The [feature specification](docs/PIVRA_FEATURE_SPEC_TR.md) describes the longer-term goals.
 
 ## Current limitations
 

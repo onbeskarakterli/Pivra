@@ -1,8 +1,4 @@
 //! TH-02 only: synthetic main image + explicitly labelled TEST PLACEHOLDERS.
-#[path = "../src/raw_ppm.rs"]
-mod raw_ppm;
-#[path = "../src/raw_loader.rs"]
-mod raw_loader;
 #[path = "support/thumbnail_catalog.rs"]
 mod catalog_probe;
 #[path = "support/fd06_close.rs"]
@@ -19,6 +15,10 @@ mod input;
 mod native_image_loader;
 #[path = "support/pool_trace.rs"]
 mod pool_trace;
+#[path = "../src/raw_loader.rs"]
+mod raw_loader;
+#[path = "../src/raw_ppm.rs"]
+mod raw_ppm;
 #[path = "support/render_frame.rs"]
 mod render_frame;
 #[path = "../src/window.rs"]

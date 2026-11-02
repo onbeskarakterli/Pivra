@@ -18,6 +18,22 @@ use std::{
 #[path = "fullscreen.rs"]
 pub(super) mod fullscreen;
 
+// Replace the previous deletion notification instead of queuing stale toasts.
+fn show_latest_toast(
+    overlay: &adw::ToastOverlay,
+    current: &Rc<RefCell<Option<adw::Toast>>>,
+    toast: adw::Toast,
+) {
+    if let Some(previous) = current.borrow_mut().take() {
+        previous.dismiss();
+    }
+    // NORMAL priority can enqueue a new toast behind an outgoing animation.
+    // HIGH displays the newest deletion result immediately instead of waiting.
+    toast.set_priority(adw::ToastPriority::High);
+    *current.borrow_mut() = Some(toast.clone());
+    overlay.add_toast(toast);
+}
+
 struct FileContext {
     collection: MediaCollection,
     suffix: Option<String>,
@@ -489,6 +505,7 @@ pub(super) fn build(app: &adw::Application, settings: &Settings, file: Option<Op
         });
         install_navigation_arrows(view.widget());
         let toast_overlay = adw::ToastOverlay::new();
+        let current_delete_toast = Rc::new(RefCell::new(None::<adw::Toast>));
         toast_overlay.set_child(Some(view.widget()));
         viewport.prepend(&toast_overlay);
         placeholder.set_vexpand(false);
@@ -531,6 +548,7 @@ pub(super) fn build(app: &adw::Application, settings: &Settings, file: Option<Op
         let trash_banner = banner.clone();
         let trash_window = window.downgrade();
         let toasts = toast_overlay.clone();
+        let current_toast = current_delete_toast.clone();
         delete.connect_activate(move |_, _| {
             let Some(window) = trash_window.upgrade() else {
                 return;
@@ -544,9 +562,11 @@ pub(super) fn build(app: &adw::Application, settings: &Settings, file: Option<Op
             let old_entries = trash_entries(&path);
             let file = gio::File::for_path(&path);
             if let Err(error) = file.trash(None::<&gio::Cancellable>) {
-                toasts.add_toast(adw::Toast::new(&format!(
-                    "Could not move to Trash: {error}"
-                )));
+                show_latest_toast(
+                    &toasts,
+                    &current_toast,
+                    adw::Toast::new(&format!("Could not move to Trash: {error}")),
+                );
                 return;
             }
             let remaining: Vec<_> = context
@@ -574,17 +594,25 @@ pub(super) fn build(app: &adw::Application, settings: &Settings, file: Option<Op
             // immediately after trash() returns.
             toast.set_button_label(Some("Undo"));
             let undo_toasts = toasts.clone();
+            let undo_current_toast = current_toast.clone();
             toast.connect_button_clicked(move |_| {
                 if path.exists() {
-                    undo_toasts
-                        .add_toast(adw::Toast::new("Undo failed: destination already exists"));
+                    show_latest_toast(
+                        &undo_toasts,
+                        &undo_current_toast,
+                        adw::Toast::new("Undo failed: destination already exists"),
+                    );
                     return;
                 }
                 let trashed = trash_entries(&path)
                     .into_iter()
                     .find(|entry| !old_entries.iter().any(|old| old.equal(entry)));
                 let Some(trashed) = trashed else {
-                    undo_toasts.add_toast(adw::Toast::new("Undo failed: trashed file not found"));
+                    show_latest_toast(
+                        &undo_toasts,
+                        &undo_current_toast,
+                        adw::Toast::new("Undo failed: trashed file not found"),
+                    );
                     return;
                 };
                 if let Err(error) = trashed.move_(
@@ -593,10 +621,14 @@ pub(super) fn build(app: &adw::Application, settings: &Settings, file: Option<Op
                     None::<&gio::Cancellable>,
                     None,
                 ) {
-                    undo_toasts.add_toast(adw::Toast::new(&format!("Undo failed: {error}")));
+                    show_latest_toast(
+                        &undo_toasts,
+                        &undo_current_toast,
+                        adw::Toast::new(&format!("Undo failed: {error}")),
+                    );
                 }
             });
-            toasts.add_toast(toast);
+            show_latest_toast(&toasts, &current_toast, toast);
         });
         window.add_action(&delete);
         // S saves the currently displayed video or animated-image frame beside its source.

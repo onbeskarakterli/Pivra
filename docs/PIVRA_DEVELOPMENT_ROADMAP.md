@@ -1,4 +1,13 @@
 # Pivra — Geliştirme Yol Haritası
+
+## Mandatory release preparation checks (from v0.2.5 onward)
+
+Before any `dev` -> `main` merge or release tag, run `make release-preflight VERSION=X.Y.Z` on the target development source. After review, optional `make release-preflight VERSION=X.Y.Z RELEASE_CLEAN_OLD=1` removes only untracked old-version packaging archives. The script never recursively deletes Cargo caches or build directories, and never removes `release-source.conf`, `.SRCINFO`, or the current release archives.
+
+The preflight must pass before proceeding. It checks Cargo manifest/lock versions, PKGBUILD version/pkgrel and persistent `!debug`, README/release notes consistency, tracked working-tree state, and obsolete packaging archives. Update documentation/source deliberately; the script does not silently rewrite project files.
+
+Also require native fmt, strict Clippy, all-target tests, actual GUI acceptance when appropriate, immutable source archive SHA-256, Arch `makepkg` verification, and explicit authorization before GitHub/AUR publication. No CI, automatic release, or automatic push is enabled.
+
 ## Dev TODO — example-target warnings (31.10.2026)
 
 - **CODED; validation pending:** `ImageView::video_widget()` is used by the production window but not by standalone example probes. A method-specific, reasoned `dead_code` allowance avoids warning noise without disabling the lint for other code. Validate with `cargo check --locked --all-targets` and `cargo test --locked --all-targets` on the native build environment; do not mark DONE until both pass.

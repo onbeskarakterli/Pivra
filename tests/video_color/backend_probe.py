@@ -43,6 +43,55 @@ def flags(option):
     return shlex.split(result.stdout)
 
 
+def cpu_reference_transport(source, variant):
+    """Match RGB transport in color controls; capture installed GPU separately."""
+    key = 'g_strcmp0 (g_getenv ("PIVRA_GTK_COLOR_CPU_TRANSPORT"), "1")'
+    path = source / "gtkgstsink.c"
+    text = path.read_text()
+    start = text.index("static GstCaps *\ngtk_gst_sink_get_caps")
+    end = text.index("static gboolean", start)
+    caps = text[start:end]
+    if variant == "stock":
+        caps = caps.replace("if (self->gdk_display)", "if (self->gdk_display && " + key + " != 0)")
+        caps = caps.replace("if (self->gdk_context)", "if (self->gdk_context && " + key + " != 0)")
+        caps = caps.replace("gst_caps_from_string (MEMORY_TEXTURE_CAPS)", "gst_caps_from_string (" + key + ' == 0 ? GST_VIDEO_CAPS_MAKE ("RGB") : MEMORY_TEXTURE_CAPS)')
+    else:
+        flag = 'g_strcmp0 (g_getenv ("PIVRA_GTK_BT1886_CPU"), "1")'
+        caps = caps.replace(flag + " != 0", "(" + flag + " != 0 && " + key + " != 0)")
+        caps = caps.replace(flag + " == 0", "(" + flag + " == 0 || " + key + " == 0)")
+    assert key in caps
+    path.write_text(text[:start] + caps + text[end:])
+    path = source / "gtkgstpaintable.c"
+    text = path.read_text()
+    if variant == "stock":
+        text = text.replace("if (uses_gl)", "if (uses_gl && " + key + " != 0)")
+    else:
+        text = text.replace('if (uses_gl && g_strcmp0 (g_getenv ("PIVRA_GTK_BT1886_CPU"), "1") != 0)', 'if (uses_gl && g_strcmp0 (g_getenv ("PIVRA_GTK_BT1886_CPU"), "1") != 0 && ' + key + " != 0)")
+    assert key in text
+    path.write_text(text)
+
+
+def isolate_symbols(source, variant):
+    """Avoid both GType-name collisions and ELF symbol interposition with GTK."""
+    title = variant.title()
+    for path in source.glob("gtkgst*.[ch]"):
+        text = path.read_text()
+        text = text.replace("GTK_TYPE_GST", "PIVRA_TYPE_" + variant.upper())
+        text = text.replace("GTK_GST", "PIVRA_" + variant.upper())
+        text = text.replace("GtkGst", "Pivra" + title)
+        for symbol in ["media_file", "paintable", "sink"]:
+            text = text.replace("gtk_gst_" + symbol, "pivra_" + variant + "_" + symbol)
+        text = text.replace("gtk_debug_gst_sink", "pivra_" + variant + "_debug_sink")
+        for suffix in ["MEDIA_FILE", "PAINTABLE"]:
+            text = text.replace("GTK, GST_" + suffix, "PIVRA, " + variant.upper() + "_" + suffix)
+        if path.name == "gtkgstmediafile.c":
+            text = text.replace('"gstreamer",', '"pivra-color-' + variant + '",')
+            needle = "  self->paintable = pivra_" + variant + "_paintable_new ();"
+            assert needle in text
+            text = text.replace(needle, '  g_printerr ("PIVRA_COLOR_IMPL id=pivra-color-' + variant + ' source=4.18.6\\n");\n' + needle)
+        path.write_text(text)
+
+
 def build(root, cache):
     versions = run(["pkg-config", "--modversion", *MODULES], capture_output=True).stdout
     print("Build versions (GTK/player/GL/allocators):\n" + versions, flush=True)
@@ -66,7 +115,9 @@ def build(root, cache):
     cflags, libs = flags("--cflags"), flags("--libs")
     for variant, directory in [("stock", "stock-src"), ("candidate", "patched-src")]:
         source = root / directory / "modules" / "media"
-        module = root / variant / "gtk-4.0" / "4.0.0" / "media" / "libmedia-gstreamer.so"
+        cpu_reference_transport(source, variant)
+        isolate_symbols(source, variant)
+        module = root / variant / "modules" / ("libpivra-color-" + variant + ".so")
         module.parent.mkdir(parents=True)
         # Upstream callback/sign comparisons are not part of this patch.
         # Keep sign-compare warnings visible; the new policy test is fully strict.
@@ -74,6 +125,7 @@ def build(root, cache):
              "-DGTK_COMPILATION", "-I" + str(source), *cflags,
              *[str(source / ("gtkgst" + name + ".c")) for name in ("mediafile", "paintable", "sink")],
              "-o", str(module), *libs, "-lm", "-Wl,-z,defs"])
+        print("BUILT module=" + str(module) + " sha256=" + hashlib.sha256(module.read_bytes()).hexdigest(), flush=True)
     source = root / "patched-src" / "modules" / "media"
     unit = root / "policy-test"
     run([*cc, "-O2", "-Wall", "-Wextra", "-Werror", "-I" + str(source), *cflags,
@@ -105,9 +157,13 @@ def fixtures(root):
 
 def probe(root, binary, name, video, variant, enabled):
     env = os.environ.copy()
+    for key in ["PIVRA_VIDEO_TEST_MODULE_DIR", "PIVRA_GTK_COLOR_CPU_TRANSPORT", "GTK_MEDIA"]:
+        env.pop(key, None)
     if variant:
-        env["GTK_PATH"] = str(root / variant / "gtk-4.0")
-    env.update(GTK_MEDIA="gstreamer", PIVRA_GTK_BT1886_CPU="1" if enabled else "0",
+        env["PIVRA_VIDEO_TEST_MODULE_DIR"] = str(root / variant / "modules")
+        env["GTK_MEDIA"] = "pivra-color-" + variant
+        env["PIVRA_GTK_COLOR_CPU_TRANSPORT"] = "1"
+    env.update(PIVRA_GTK_BT1886_CPU="1" if enabled else "0",
                GST_DEBUG="gtkgstsink:5", GST_DEBUG_NO_COLOR="1")
     result = subprocess.run([str(binary), str(video), "--check-controls"], env=env, capture_output=True, text=True, timeout=30)
     (root / (name + ".log")).write_text(result.stdout + result.stderr)
@@ -120,6 +176,14 @@ def probe(root, binary, name, video, variant, enabled):
     assert result.returncode == 0, (name, result.returncode, result.stderr)
     assert "PASS MediaStream" in result.stdout, name
     assert "max channel difference=0" in result.stdout, name
+    if variant:
+        expected_class = "Pivra" + variant.title() + "MediaFile"
+        if ("BACKEND selected=" + expected_class) not in result.stdout or ("PIVRA_COLOR_IMPL id=pivra-color-" + variant) not in result.stderr:
+            raise RuntimeError(f"NOT RUN backend provenance unverified: {name}")
+        if "path=CPU-memory" not in result.stdout:
+            raise RuntimeError(f"NOT RUN CPU candidate inactive: {name}; actual source path is not CPU memory; see {root / (name + '.log')}")
+        if re.search(r"path=(?:DMA-BUF|GL|UNKNOWN)", result.stdout):
+            raise RuntimeError(f"NOT RUN mixed/non-CPU candidate path: {name}")
     samples = [ast.literal_eval(pixel) for pixel in re.findall(r"sample x=\d+ y=\d+ sRGB=(\[[^\n]+\])", result.stdout)]
     assert len(samples) == 3, name
     return samples
@@ -132,8 +196,11 @@ def main():
     parser.add_argument("--video", type=Path, help="also inspect the real installed backend and candidate using this read-only file")
     parser.add_argument("--build-only", action="store_true")
     parser.add_argument("--probe", type=Path, help="use an explicitly prebuilt video_color_probe")
+    parser.add_argument("--visual", action="store_true", help="after all gates pass, open the real production window with the verified test module")
     args = parser.parse_args()
-    for tool in ["pkg-config", "patch", *([] if args.build_only or args.probe else ["cargo"]), *([] if args.build_only else ["ffmpeg", "ffprobe"])]:
+    if args.visual and (not args.video or args.build_only):
+        parser.error("--visual requires --video and cannot be combined with --build-only")
+    for tool in ["pkg-config", "patch", *([] if args.build_only or (args.probe and not args.visual) else ["cargo"]), *([] if args.build_only else ["ffmpeg", "ffprobe"])]:
         if not shutil.which(tool):
             raise RuntimeError("NOT RUN missing " + tool)
     root = args.output.resolve() if args.output else Path(tempfile.mkdtemp(prefix="pivra-bt1886-"))
@@ -151,6 +218,11 @@ def main():
         binary = Path(os.environ.get("CARGO_TARGET_DIR", REPO / "target")) / "debug/examples/video_color_probe"
         if not binary.is_absolute():
             binary = REPO / binary
+    if args.visual:
+        run(["cargo", "build", "--locked", "--example", "video_color_window"], cwd=REPO)
+    video = args.video.resolve(strict=True) if args.video else None
+    if video:
+        probe(root, binary, "user-installed-backend", video, None, False)
     fixtures(root)
     for fixture in ["bt709", "srgb", "unknown", "full709"]:
         clip = root / (fixture + ".mp4")
@@ -166,14 +238,24 @@ def main():
                 assert pixel[3] == 255 and all(abs(channel - value) <= 2 for channel in pixel[:3]), (fixture, on, expected)
             assert stock[1][0] > on[1][0] + 10, ("transfer effect not demonstrated", stock, on)
         print("PASS real H.264 backend regression:", fixture, flush=True)
-    if args.video:
-        video = args.video.resolve(strict=True)
-        probe(root, binary, "user-installed-backend", video, None, False)
+    if video:
         probe(root, binary, "user-candidate-backend", video, "candidate", True)
     print("PASS automated CPU reference; Arch/MPV visual and GPU acceptance remain OPEN")
-    print("For an explicit temporary Pivra visual comparison (no installation):")
-    print("GTK_MEDIA=gstreamer PIVRA_GTK_BT1886_CPU=1 GTK_PATH=" + shlex.quote(str(root / "candidate/gtk-4.0")) +
-          " cargo run --locked -- " + shlex.quote(str(args.video.resolve()) if args.video else "/absolute/path/to/video.mp4"))
+    print("Verified candidate module directory:", root / "candidate/modules")
+    print("For a production-window comparison using test-only explicit loading:")
+    print("GTK_MEDIA=pivra-color-candidate PIVRA_GTK_BT1886_CPU=1 PIVRA_VIDEO_TEST_MODULE_DIR=" + shlex.quote(str(root / "candidate/modules")) +
+          " cargo run --locked --example video_color_window -- " + shlex.quote(str(video) if video else "/absolute/path/to/video.mp4"))
+    if args.visual:
+        env = os.environ.copy()
+        env.update(GTK_MEDIA="pivra-color-candidate", PIVRA_GTK_BT1886_CPU="1",
+                   PIVRA_VIDEO_TEST_MODULE_DIR=str(root / "candidate/modules"))
+        target = Path(os.environ.get("CARGO_TARGET_DIR", REPO / "target"))
+        if not target.is_absolute():
+            target = REPO / target
+        print("Opening production window through the verified test module; compare with MPV and close normally. Visual acceptance is manual.", flush=True)
+        run([str(target / "debug/examples/video_color_window"), str(video)], env=env)
+        print("Window closed; this is not a visual-color PASS. Report the comparison result explicitly.")
+
 
 
 if __name__ == "__main__":

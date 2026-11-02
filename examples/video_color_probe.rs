@@ -3,6 +3,8 @@
 #[path = "../src/actual_paintable.rs"]
 #[allow(dead_code)] // Other paintable operations are exercised by the existing viewing probes.
 mod actual_paintable;
+#[path = "support/video_backend.rs"]
+mod video_backend;
 use gtk::{gdk, glib, prelude::*};
 use pivra::viewing::{Transform, ViewMode};
 use std::{
@@ -215,13 +217,14 @@ fn check_controls(media: &gtk::MediaFile) -> Result<(), String> {
     result
 }
 
-fn native(path: &std::path::Path) -> Result<(), String> {
+fn native(path: &std::path::Path, expected: Option<glib::Type>) -> Result<(), String> {
     let window = gtk::Window::builder()
         .title("Pivra issue #9 color diagnostic")
         .default_width(640)
         .default_height(360)
         .build();
     let media = gtk::MediaFile::for_filename(path);
+    video_backend::verify(&media, expected)?;
     media.set_muted(true);
     let wrapped = actual_paintable::ActualPaintable::video(
         &media,
@@ -298,6 +301,13 @@ fn main() {
         eprintln!("NOT RUN GTK: {error}");
         std::process::exit(77);
     }
+    let expected = match video_backend::load() {
+        Ok(expected) => expected,
+        Err(reason) => {
+            eprintln!("NOT RUN backend loading: {reason}");
+            std::process::exit(77);
+        }
+    };
     synthetic();
     if let Some(path) = std::env::args_os().nth(1) {
         let path = std::path::Path::new(&path);
@@ -305,10 +315,12 @@ fn main() {
             eprintln!("FAIL input is not a file: {}", path.display());
             std::process::exit(1);
         }
-        if let Err(reason) = native(path) {
+        if let Err(reason) = native(path, expected) {
             // Only the explicit missing-backend condition is an environment skip.
             // Decoder errors and frame deadlines remain real failures.
-            if reason.contains("GTK could not find a media module") {
+            if reason.contains("GTK could not find a media module")
+                || reason.starts_with("backend selection failed")
+            {
                 eprintln!("NOT RUN native video color comparison: {reason}");
                 std::process::exit(77);
             }

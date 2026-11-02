@@ -6,6 +6,68 @@ integration and final Arch/MPV visual acceptance remain OPEN.**
 Application version remains 0.2.4. No production Rust, dependency, package,
 version, sandbox or default-backend change is included.
 
+## Native DMA-BUF failure and explicit-loader correction
+
+[Issue #9's latest native comment](https://github.com/onbeskarakterli/Pivra/issues/9#issuecomment-6581600333)
+reports **FAIL** on Arch GTK 4.24.1 / GStreamer 1.28.8. Even candidate-enabled
+playback remained `GdkDmabufTexture`, accepted caps
+`video/x-raw(memory:DMABuf), format=DMA_DRM, drm-format=YU12, colorimetry=bt709`,
+CICP `1/1/1/Narrow`; patches were `0 / 142 / 255` against CPU expectations
+`0 / 121 / 253`. This is user-reported native evidence, not a Codex execution.
+It establishes that the requested CPU experiment was not active; it neither
+refutes BT.1886 nor establishes that the original color issue is fixed. DMA-BUF
+identifies storage/import, not whether the decoder itself was hardware-assisted.
+
+The confirmed harness defect was selection/provenance: `GTK_MEDIA=gstreamer`
+and a duplicate `libmedia-gstreamer.so` name did not distinguish our module from
+the installed backend, and CPU activation was not checked before pixel assertions.
+The precise Arch loader mechanism (search order, built-in registration, symbol
+binding or newer integration) cannot be reconstructed from that comment alone.
+Do not claim a proven ABI incompatibility or change installed GTK libraries.
+
+The new isolation is independent of `GTK_PATH`:
+
+- Original-policy and candidate copies have unique module filenames, extension
+  IDs (`pivra-color-stock/candidate`), GTypes (`PivraStock/CandidateMediaFile`,
+  paintable and sink) and exported symbols. This prevents both GType collisions
+  and ELF symbol binding to the installed backend's implementation.
+- A shared **test-only** Rust helper explicitly scans the private directory with
+  public GIO APIs after GTK initialization, verifies the named extension/type,
+  and checks the factory-created MediaFile's actual type. The loaded file path,
+  module SHA-256, instantiated implementation marker and source texture are logged.
+- Missing/incorrect selection, absent provenance or DMA-BUF/GL/unknown source
+  storage returns **NOT RUN / 77 before CPU pixel expectations**. Real decode,
+  seeking and CPU pixel failures remain FAIL; assertions were not removed.
+- `video_color_window` reuses production `app`, window, loader, controls and
+  navigation code, with this helper called before application launch. It verifies
+  an empty MediaFile factory object (no extra decode) before showing the window.
+  The installed `pivra` binary and its default backend are unchanged.
+- Color controls use matched CPU RGB transport in **all three private variants**
+  (`PIVRA_GTK_COLOR_CPU_TRANSPORT=1`), while the correction flag remains separate.
+  Only the sink-capability/GL-wrapper negotiation code gets this transport flag;
+  the color-conversion predicate is unchanged. Thus opt-out still tests the
+  original color policy, without asserting exact equality across GPU and CPU
+  YUV rounding or relying on old YUV DMA-BUF import semantics. The installed
+  native backend is captured separately, before fixture controls, without either
+  test-module selection or the CPU transport override.
+
+Fresh local results with the original GStreamer module also available via
+`GTK_PATH`: **12 real H.264/control runs PASS on X11 and 12 on Sway**, selected
+`PivraCandidateMediaFile`, CPU memory and linear CICP transfer 8 on eligible
+converted frames. **13 harness unit tests PASS** (mocked output, not decoder
+proof), including stale native-class selection, missing markers, DMA-BUF/GL/mixed
+storage, real-failure preservation and visual-launch orchestration. A real empty
+GIO module-directory test returns NOT RUN/77 without falling back. The normal
+production application/window code mapped, negotiated candidate CPU RGB and
+closed through the X11 WM with exit 0; that smoke test is not visual acceptance.
+Rust fmt/check, zero-warning strict all-target Clippy, 205 Rust tests and release
+build also PASS. **Native Arch activation and MPV visual comparison are pending.**
+
+For the final native check, use the single `--visual` command below. It captures
+the installed backend first, runs all gates, and opens the production-code window
+only after verified candidate activation and successful regressions. Closing a
+window does not automatically record visual-color PASS.
+
 ## Evidence and root-cause boundary
 
 The user reports native Arch/GNOME `video_color_probe` PASS at 720×1142, maximum
@@ -81,7 +143,8 @@ The CPU reference path:
    queued/current frames and decoder allocations are separate costs.
 
 With the environment option absent, the patched module retains the original
-negotiation and texture path. The runner verifies opt-out pixel equivalence.
+negotiation and texture path. The runner verifies color-policy opt-out pixel equivalence on matched CPU
+transport; it does not claim CPU/GPU pixel equivalence.
 
 **Not enabled in Pivra's build/install or packaging.** The opt-in reference forces
 CPU/RGB negotiation for the process, including non-BT.709 streams; the conversion
@@ -93,8 +156,9 @@ private ABI pointer mutation, new decoder or system-wide override.
 ## Reproducible real-decode tests
 
 The runner pins all seven GTK 4.18.6 source/header SHA-256 values, retains upstream
-source/license notices, applies the patch with zero fuzz, and builds original and
-candidate modules in a private retained directory. It does not install modules
+source/license notices, applies the patch with zero fuzz, then adds unique
+identities and matched test-only CPU transport. It builds original-color-policy
+and candidate modules in a private retained directory. It does not install modules
 or edit user media/configuration. Sources are downloaded unless a verified local
 cache is supplied. Only existing native GTK/GStreamer libraries are linked.
 
@@ -108,7 +172,7 @@ these tests do not establish audible output, physical keyboard or UI interaction
 
 Measured sRGB neutral-patch channels on both local display backends:
 
-| Real H.264 metadata | Original | Candidate enabled |
+| Real H.264 metadata | Original-policy CPU | Candidate enabled |
 | --- | --- | --- |
 | BT.709 limited | 0 / 140 / 253 | 0 / 121 / 253 |
 | BT.709 full | 31 / 140 / 237 | 4 / 121 / 234 |
@@ -143,7 +207,7 @@ Run from the updated repository in the existing GNOME session:
 
 ```bash
 GDK_BACKEND=wayland python3 tests/video_color/backend_probe.py \
-  --video "/absolute/path/to/the/problematic.mp4"
+  --video "/absolute/path/to/the/problematic.mp4" --visual
 ```
 
 Requires the existing Rust/C toolchain, Python, patch, network/source cache,
@@ -156,9 +220,11 @@ pkg-config --modversion gtk4 gstreamer-player-1.0 gstreamer-gl-1.0 gstreamer-all
 Missing tools/modules are NOT RUN/77; compile, checksum, decode or assertion errors
 are failures. The runner prints the retained directory and accepted caps/source
 texture for the **installed native backend** on the user's file, then the
-candidate. It also prints an exact process-local `GTK_PATH` command for normal
-Pivra. Use that command for a side-by-side comparison with MPV on the same
-file/display/profile, and recheck seeking, audio, keys and navigation. The patch
+explicitly loaded candidate. With `--visual` it builds/opens the test-only
+`video_color_window` example using production application/window code and the
+verified private module. Compare with MPV on the same file/display/profile,
+and recheck seeking, audio, keys and navigation. This supersedes the previous
+`GTK_PATH`-only launch instructions, which failed to activate the Arch experiment. The patch
 can be compiled against a newer installed public GTK API, but that configuration
 has not been tested here. It is an experimental 4.18.6 media-module source, not a
 patched copy of the user's unknown GTK implementation.

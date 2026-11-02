@@ -1,7 +1,7 @@
 # Pivra — Geliştirme Yol Haritası
 ## Dev TODO — example-target warnings (31.10.2026)
 
-- **TODO, non-blocking:** Remove recurring `dead_code` warning for `ImageView::video_widget()` in example probes (navigation_race_probe, image_gui_probe, async_cancel_probe, active_decode_close_probe, preload_probe). Preserve production video functionality; avoid blanket suppression. Validate with `cargo check --locked --all-targets` and `cargo test --locked --all-targets`.
+- **CODED; validation pending:** `ImageView::video_widget()` is used by the production window but not by standalone example probes. A method-specific, reasoned `dead_code` allowance avoids warning noise without disabling the lint for other code. Validate with `cargo check --locked --all-targets` and `cargo test --locked --all-targets` on the native build environment; do not mark DONE until both pass.
 - This cleanup is for `dev` and does not block the v0.2.3-1 AUR package.
 
 

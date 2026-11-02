@@ -1,20 +1,24 @@
-# Pivra v0.2.4 — Development release notes (unreleased)
+# Pivra v0.2.4 — Stable release notes
 
-This is a development candidate on `dev`, not a published stable release.
+Published stable maintenance release for Linux/GNOME (2026-11-02).
 
 ## Changes
 
-- On repeated deletion or Undo-error notifications, dismiss the previous toast and show the new one with HIGH priority to avoid libadwaita's normal-priority toast queue.
-- Preserve the per-item Trash/Undo handling.
-- Remove standalone example-target `dead_code` warning noise for `ImageView::video_widget()` with a narrowly scoped, documented exception; production video behavior is unchanged.
+- Successive deletion and Undo-error notifications dismiss the previous toast and display the latest with HIGH priority, avoiding libadwaita's normal-priority notification queue.
+- Per-file Trash/Undo handling remains intact.
+- A targeted dead-code lint exception removes noise from standalone probe builds without changing production video functionality.
+- Rustfmt source formatting cleanup.
 
 ## Validation
 
-- User reported `cargo test --locked --all-targets`: 32 passed, 0 failed before the v0.2.4 version bump (2026-11-02).
-- After the version bump, native build and tests require revalidation.
-- Manual GNOME repeated-Delete test failed on the initial 0.2.4 candidate. After applying the HIGH-priority toast fix, the user confirmed that repeated deletion notifications behave correctly on native GNOME (2026-11-02): **PASS**.
-- Release packaging/source archive checks and publication authorization are separate.
+- Arch Linux native release build: PASS (user-reported).
+- Rustfmt and strict all-target Clippy: PASS (user-reported).
+- All-target Rust automated test suite: PASS, 0 failed (user-reported).
+- Repeated deletion notification behavior in the actual GNOME UI: PASS after HIGH-priority fix (user-reported).
+- Fixed-source archive SHA-256 verified for commit `2ce44567a81723a9cff3357f5130229574715c5e`: `7b125cad05328c1ff004febf6ab0c0e8cd48903ba104343d582a8d68cc334ef4` (user-reported).
 
-## Release boundaries
+## Distribution
 
-No automatic change to `main`, GitHub release/tag, or AUR. Publish only after final source and native acceptance.
+- GitHub tag/release: `v0.2.4`.
+- Arch AUR package: `pivra` `0.2.4-1` (user-reported website verification).
+- This documentation revision on `dev` postdates the published tag; it does not amend the immutable v0.2.4 release source.

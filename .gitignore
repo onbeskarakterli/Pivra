@@ -13,3 +13,6 @@ Thumbs.db
 
 # Python smoke-test caches
 /tests/**/__pycache__/
+
+# Local Arch packaging build cache
+/packaging/arch/.pivra-cache/

@@ -2,7 +2,7 @@
 
 **Pivra** is a native image viewer for Linux, built with **Rust, GTK4, and libadwaita**. It is designed to feel at home on GNOME: open a photo, move through the folder, zoom in on details, and browse thumbnails without getting in the way.
 
-Pivra is free and open-source software. The **`dev` branch is version 0.2.4 (unreleased)**. The published stable release remains **0.2.1**. That stable release is a maintenance update to the 0.2 series, including removal of an obsolete video-playback warning and release consistency fixes. Mixed photo/video navigation, native video controls, animated-image playback, and Trash/Undo remain available. Editing and advanced media tools remain planned.
+Pivra is free and open-source software. The **`dev` branch currently carries version 0.2.4**. The latest published stable release is **v0.2.4**, a maintenance update that fixes consecutive Trash/Undo notifications and cleans up example-target compiler warnings. Mixed photo/video navigation, native video controls, animated-image playback, and Trash/Undo remain available. Editing and advanced media tools remain planned.
 
 **[Latest published release](https://github.com/onbeskarakterli/Pivra/releases/latest)** · **[Arch Linux AUR](https://aur.archlinux.org/packages/pivra)** · **[Development roadmap](docs/PIVRA_DEVELOPMENT_ROADMAP.md)**
 
@@ -123,7 +123,7 @@ Pivra is a Linux/GNOME-focused viewer, not an image editor. Slideshow, HDR/ICC w
 
 Still-image loading is bounded to 64 MP (maximum 32,768 pixels per edge) and 64 MiB input size. Animated frames have additional bounds. The automated tests and video-navigation stress test were exercised on the development build; compatibility across other Linux environments remains to be verified.
 
-The `dev` branch is unreleased v0.2.3; these [v0.2.1 release notes](docs/releases/PIVRA_V0.2.1_RELEASE_NOTES.md) describe the last published stable release, not the development branch.
+The published stable release is [v0.2.4](docs/releases/PIVRA_V0.2.4_RELEASE_NOTES.md). The `dev` branch includes subsequent development-only packaging housekeeping.
 
 ## License
 

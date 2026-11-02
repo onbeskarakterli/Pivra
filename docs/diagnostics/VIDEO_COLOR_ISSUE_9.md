@@ -1,6 +1,13 @@
 # Issue #9 — SDR video color investigation (2026-11-02)
 
-Status: **BLOCKED for a verified product fix; native visual acceptance NOT RUN.**
+Current continuation: [real H.264 backend candidate and evidence](VIDEO_COLOR_BACKEND_CANDIDATE.md).
+The initial missing-module blocker below has since been resolved locally. The
+issue remains OPEN pending native visual/GPU acceptance; no default backend
+change has been enabled.
+
+## Initial investigation at 573bc27 (historical)
+
+Initial status: **BLOCKED for a verified product fix; native visual acceptance NOT RUN.**
 Reviewed source: `45b4d65418bad0be685d95d414f3ecf09cb3bde6` (`dev`).
 Cargo version remains **0.2.4**; the requested v0.2.5 investigation does not bump it.
 No production code, dependencies, playback policy, sandbox, or release metadata

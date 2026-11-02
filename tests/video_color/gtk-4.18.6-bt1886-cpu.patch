@@ -1,0 +1,127 @@
+--- a/modules/media/gtkgstsink.c
++++ b/modules/media/gtkgstsink.c
+@@ -25,0 +26 @@
++#include "gtkgstbt1886private.h"
+@@ -218 +219 @@
+-  if (self->gdk_display)
++  if (self->gdk_display && g_strcmp0 (g_getenv ("PIVRA_GTK_BT1886_CPU"), "1") != 0)
+@@ -230 +231 @@
+-  if (self->gdk_context)
++  if (self->gdk_context && g_strcmp0 (g_getenv ("PIVRA_GTK_BT1886_CPU"), "1") != 0)
+@@ -236 +237,3 @@
+-  tmp = gst_caps_from_string (MEMORY_TEXTURE_CAPS);
++  tmp = gst_caps_from_string (
++      g_strcmp0 (g_getenv ("PIVRA_GTK_BT1886_CPU"), "1") == 0
++      ? GST_VIDEO_CAPS_MAKE ("RGB") : MEMORY_TEXTURE_CAPS);
+@@ -434,0 +438,57 @@
++/* CPU reference implementation, opt-in only. No GL readback or YUV relabeling.
++ * A shipping implementation should represent this display EOTF in GDK and
++ * apply it identically to CPU/GL/DMABUF, rather than forcing CPU negotiation.
++ */
++static GdkTexture *
++gtk_gst_sink_bt1886_texture (GtkGstSink *self, GstVideoFrame *frame)
++{
++  const gsize width = frame->info.width;
++  const gsize height = frame->info.height;
++  gsize size;
++  float *data;
++  static float lut[256];
++  static gsize initialized;
++  GBytes *bytes;
++  GdkMemoryTextureBuilder *builder;
++  GdkTexture *texture;
++
++  if (!gtk_gst_bt1886_frame_size (width, height, &size) ||
++      !(data = g_try_malloc (size)))
++    {
++      GST_ELEMENT_ERROR (self, RESOURCE, NO_SPACE_LEFT,
++                         ("BT.1886 reference frame exceeds allocation budget"), (NULL));
++      return NULL;
++    }
++  if (g_once_init_enter (&initialized))
++    {
++      for (guint i = 0; i < 256; i++)
++        lut[i] = gtk_gst_bt1886_linear (i);
++      g_once_init_leave (&initialized, 1);
++    }
++  for (gsize y = 0; y < height; y++)
++    {
++      const guint8 *row = (const guint8 *) frame->data[0] +
++                         (gssize) y * frame->info.stride[0];
++      for (gsize x = 0; x < width; x++)
++        {
++          float *pixel = data + (y * width + x) * 4;
++          pixel[0] = lut[row[x * 3]];
++          pixel[1] = lut[row[x * 3 + 1]];
++          pixel[2] = lut[row[x * 3 + 2]];
++          pixel[3] = 1.f;
++        }
++    }
++  bytes = g_bytes_new_take (data, size);
++  builder = gdk_memory_texture_builder_new ();
++  gdk_memory_texture_builder_set_width (builder, width);
++  gdk_memory_texture_builder_set_height (builder, height);
++  gdk_memory_texture_builder_set_format (builder, GDK_MEMORY_R32G32B32A32_FLOAT);
++  gdk_memory_texture_builder_set_stride (builder, width * 4 * sizeof (float));
++  gdk_memory_texture_builder_set_bytes (builder, bytes);
++  gdk_memory_texture_builder_set_color_state (builder, gdk_color_state_get_srgb_linear ());
++  texture = gdk_memory_texture_builder_build (builder);
++  g_object_unref (builder);
++  g_bytes_unref (bytes);
++  return texture;
++}
++
+@@ -550,0 +611,9 @@
++      if (g_strcmp0 (g_getenv ("PIVRA_GTK_BT1886_CPU"), "1") == 0 &&
++          gtk_gst_bt1886_eligible (&frame->info))
++        {
++          texture = gtk_gst_sink_bt1886_texture (self, frame);
++          *pixel_aspect_ratio = (double) frame->info.par_n / frame->info.par_d;
++          video_frame_free (frame);
++          return texture;
++        }
++
+--- a/modules/media/gtkgstpaintable.c
++++ b/modules/media/gtkgstpaintable.c
+@@ -241 +241 @@
+-  if (uses_gl)
++  if (uses_gl && g_strcmp0 (g_getenv ("PIVRA_GTK_BT1886_CPU"), "1") != 0)
+--- /dev/null
++++ b/modules/media/gtkgstbt1886private.h
+@@ -0,0 +1,36 @@
++/* Experimental video-display policy; not a change to image CICP semantics.
++ * BT.1886 ideal-black reference display (Lb=0): L = V^2.4.
++ * Only explicitly tagged, already range-expanded BT.709 RGB8 is eligible.
++ * This header accompanies an opt-in GTK backend experiment, not Pivra's build.
++ */
++#pragma once
++#include <gst/video/video.h>
++#include <math.h>
++
++static inline gboolean
++gtk_gst_bt1886_eligible (const GstVideoInfo *info)
++{
++  const GstVideoColorimetry *c = &info->colorimetry;
++  return GST_VIDEO_INFO_FORMAT (info) == GST_VIDEO_FORMAT_RGB &&
++         c->range == GST_VIDEO_COLOR_RANGE_0_255 &&
++         c->matrix == GST_VIDEO_COLOR_MATRIX_RGB &&
++         c->primaries == GST_VIDEO_COLOR_PRIMARIES_BT709 &&
++         c->transfer == GST_VIDEO_TRANSFER_BT709;
++}
++
++static inline float
++gtk_gst_bt1886_linear (guint8 code)
++{
++  return powf ((float) code / 255.f, 2.4f);
++}
++
++/* A per-frame bound, not a claim about total decoder/process RSS. */
++static inline gboolean
++gtk_gst_bt1886_frame_size (gsize width, gsize height, gsize *size)
++{
++  gsize pixels;
++  return width > 0 && height > 0 &&
++         g_size_checked_mul (&pixels, width, height) &&
++         g_size_checked_mul (size, pixels, 4 * sizeof (float)) &&
++         *size <= 256 * 1024 * 1024;
++}

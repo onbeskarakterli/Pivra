@@ -6,7 +6,7 @@ mod actual_paintable;
 use gtk::{gdk, glib, prelude::*};
 use pivra::viewing::{Transform, ViewMode};
 use std::{
-    cell::RefCell,
+    cell::{Cell, RefCell},
     rc::Rc,
     time::{Duration, Instant},
 };
@@ -68,6 +68,75 @@ fn synthetic() {
     println!("PASS synthetic GDK BT.709-to-sRGB transfer; this is not a video range test");
 }
 
+// Inspect the source texture before rendering/downloading changes its storage.
+// Advertising GL/DMABUF caps does not prove that either path was negotiated.
+fn inspect_node(node: &gtk::gsk::RenderNode, depth: usize) -> usize {
+    if depth > 32 {
+        return 0;
+    }
+    let texture = node
+        .downcast_ref::<gtk::gsk::TextureNode>()
+        .map(|node| node.texture())
+        .or_else(|| {
+            node.downcast_ref::<gtk::gsk::TextureScaleNode>()
+                .map(|node| node.texture())
+        });
+    if let Some(texture) = texture {
+        let kind = texture.type_().name();
+        let path = match kind {
+            "GdkMemoryTexture" => "CPU-memory",
+            "GdkGLTexture" => "GL",
+            "GdkDmabufTexture" => "DMA-BUF",
+            _ => "UNKNOWN",
+        };
+        if let Some(cicp) = texture.color_state().create_cicp_params() {
+            println!(
+                "SOURCE texture={kind} path={path} size={}x{} CICP primaries={} transfer={} matrix={} range={:?}",
+                texture.width(),
+                texture.height(),
+                cicp.color_primaries(),
+                cicp.transfer_function(),
+                cicp.matrix_coefficients(),
+                cicp.range()
+            );
+        } else {
+            println!("SOURCE texture={kind} path={path} CICP=unavailable");
+        }
+        return 1;
+    }
+    if let Some(container) = node.downcast_ref::<gtk::gsk::ContainerNode>() {
+        return (0..container.n_children())
+            .map(|i| inspect_node(&container.child(i), depth + 1))
+            .sum();
+    }
+    let child = node
+        .downcast_ref::<gtk::gsk::TransformNode>()
+        .map(|n| n.child())
+        .or_else(|| node.downcast_ref::<gtk::gsk::ClipNode>().map(|n| n.child()))
+        .or_else(|| {
+            node.downcast_ref::<gtk::gsk::RoundedClipNode>()
+                .map(|n| n.child())
+        })
+        .or_else(|| {
+            node.downcast_ref::<gtk::gsk::OpacityNode>()
+                .map(|n| n.child())
+        })
+        .or_else(|| {
+            node.downcast_ref::<gtk::gsk::DebugNode>()
+                .map(|n| n.child())
+        });
+    child.map_or_else(
+        || {
+            println!(
+                "SOURCE unresolved node={:?}; do not infer a memory path",
+                node.node_type()
+            );
+            0
+        },
+        |child| inspect_node(&child, depth + 1),
+    )
+}
+
 fn render(
     paintable: &impl IsA<gdk::Paintable>,
     renderer: &gtk::gsk::Renderer,
@@ -77,11 +146,73 @@ fn render(
     let snapshot = gtk::Snapshot::new();
     paintable.snapshot(&snapshot, f64::from(w), f64::from(h));
     snapshot.to_node().map(|node| {
+        inspect_node(&node, 0);
         renderer.render_texture(
             &node,
             Some(&gtk::graphene::Rect::new(0., 0., w as f32, h as f32)),
         )
     })
+}
+
+fn check_controls(media: &gtk::MediaFile) -> Result<(), String> {
+    if !media.is_prepared() || !media.is_seekable() || media.duration() <= 0 {
+        return Err("control gate requires a prepared, seekable finite video".into());
+    }
+    media.set_volume(0.375);
+    if (media.volume() - 0.375).abs() > f64::EPSILON || !media.is_muted() {
+        return Err("volume/mute state did not persist".into());
+    }
+    media.set_loop(true);
+    if !media.is_loop() {
+        return Err("loop state did not persist".into());
+    }
+    media.set_loop(false);
+    media.play();
+    if !media.is_playing() {
+        return Err("play state did not update".into());
+    }
+    media.pause();
+    if media.is_playing() {
+        return Err("pause state did not update".into());
+    }
+    let transitions = Rc::new(Cell::new(0));
+    let observed = transitions.clone();
+    let handler = media.connect_seeking_notify(move |_| observed.set(observed.get() + 1));
+    let target = media.duration() / 2;
+    media.seek(target);
+    let deadline = Instant::now() + Duration::from_secs(5);
+    let result = loop {
+        for _ in 0..100 {
+            if !glib::MainContext::default().pending() {
+                break;
+            }
+            glib::MainContext::default().iteration(false);
+        }
+        if let Some(error) = media.error() {
+            break Err(format!("seek error: {error}"));
+        }
+        if transitions.get() >= 2
+            && !media.is_seeking()
+            && media.timestamp().abs_diff(target) <= 150_000
+        {
+            println!(
+                "PASS MediaStream play/pause/loop/volume/mute state and completed seek target={target} timestamp={}",
+                media.timestamp()
+            );
+            break Ok(());
+        }
+        if Instant::now() >= deadline {
+            break Err(format!(
+                "seek completion deadline: transitions={} seeking={} target={target} timestamp={}",
+                transitions.get(),
+                media.is_seeking(),
+                media.timestamp()
+            ));
+        }
+        std::thread::sleep(Duration::from_millis(1));
+    };
+    media.disconnect(handler);
+    result
 }
 
 fn native(path: &std::path::Path) -> Result<(), String> {
@@ -149,6 +280,13 @@ fn native(path: &std::path::Path) -> Result<(), String> {
         }
         std::thread::sleep(Duration::from_millis(1));
     };
+    let result = result.and_then(|()| {
+        if std::env::args().any(|arg| arg == "--check-controls") {
+            check_controls(&media)
+        } else {
+            Ok(())
+        }
+    });
     media.pause();
     picture.set_paintable(None::<&gdk::Paintable>);
     media.clear();

@@ -4,7 +4,7 @@ This is a development candidate on `dev`, not a published stable release.
 
 ## Changes
 
-- Replace the previous deletion toast immediately when a newer deletion or Undo-error toast arrives, rather than allowing stale deletion notifications to queue.
+- On repeated deletion or Undo-error notifications, dismiss the previous toast and show the new one with HIGH priority to avoid libadwaita's normal-priority toast queue.
 - Preserve the per-item Trash/Undo handling.
 - Remove standalone example-target `dead_code` warning noise for `ImageView::video_widget()` with a narrowly scoped, documented exception; production video behavior is unchanged.
 
@@ -12,7 +12,7 @@ This is a development candidate on `dev`, not a published stable release.
 
 - User reported `cargo test --locked --all-targets`: 32 passed, 0 failed before the v0.2.4 version bump (2026-11-02).
 - After the version bump, native build and tests require revalidation.
-- Manual GNOME repeated-Delete toast replacement test remains to be confirmed specifically for this release candidate.
+- Manual GNOME repeated-Delete test failed on the original 0.2.4 candidate (user report 2026-11-02). The HIGH-priority follow-up fix remains **untested** on native GNOME; do not publish until a passing retest.
 - Release packaging/source archive checks and publication authorization are separate.
 
 ## Release boundaries

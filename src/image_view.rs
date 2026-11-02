@@ -381,6 +381,7 @@ impl ImageView {
         Err("Frame capture is only available for videos and animations".into())
     }
 
+    #[allow(dead_code, reason = "Used by the production window, not standalone example probes")]
     pub(super) fn video_widget(&self) -> &gtk::Picture {
         &self.video
     }

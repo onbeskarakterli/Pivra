@@ -4,6 +4,8 @@
 mod actual_paintable;
 #[path = "animation.rs"]
 mod animation;
+#[path = "gpu_video.rs"]
+mod gpu_video;
 #[path = "thumbnail_overlay.rs"]
 pub(crate) mod thumbnail_overlay;
 #[path = "video_controls.rs"]
@@ -78,6 +80,25 @@ impl ImageView {
         video.set_overflow(gtk::Overflow::Hidden);
         video.set_visible(false);
         let video_stream: Rc<RefCell<Option<gtk::MediaFile>>> = Rc::default();
+        let closing_video = video_stream.clone();
+        let closing_picture = video.downgrade();
+        window.connect_close_request(move |_| {
+            let owned = closing_video
+                .borrow()
+                .as_ref()
+                .is_some_and(gpu_video::is_owned);
+            if owned {
+                if let Some(picture) = closing_picture.upgrade() {
+                    picture.set_paintable(None::<&gtk::gdk::Paintable>);
+                }
+                let media = closing_video.borrow_mut().take();
+                if let Some(media) = media {
+                    media.pause();
+                    media.clear();
+                }
+            }
+            glib::Propagation::Proceed
+        });
         let video_path = Rc::default();
         let video_positions = Rc::default();
         overlay.add_overlay(&video);
@@ -444,7 +465,15 @@ impl ImageView {
     #[allow(dead_code)] // Standalone image probes do not open videos.
     pub(super) fn load_video(&self, path: &std::path::Path) {
         self.prepare("", true);
-        let media = gtk::MediaFile::for_filename(path);
+        let media = match gpu_video::open(path) {
+            Ok(media) => media,
+            Err(error) => {
+                self.status
+                    .set_text(&format!("GPU video prototype: {error}"));
+                self.status.set_visible(true);
+                return;
+            }
+        };
         media.set_loop(false);
         let resume_at = self
             .video_positions
@@ -498,7 +527,8 @@ impl ImageView {
         // GStreamer/GTK frame delivery during rapid video navigation.
         self.video.set_visible(false);
         self.video.set_paintable(None::<&gtk::gdk::Paintable>);
-        if let Some(stream) = self.video_stream.borrow_mut().take() {
+        let stream = self.video_stream.borrow_mut().take();
+        if let Some(stream) = stream {
             stream.pause();
             if let Some(path) = path {
                 let timestamp = stream.timestamp();
@@ -506,8 +536,13 @@ impl ImageView {
                     self.video_positions.borrow_mut().insert(path, timestamp);
                 }
             }
-            // The media file owns its playback pipeline and is released when
-            // references are dropped; don't synchronously clear it here.
+            // The owned prototype must stop even if a UI signal retains its
+            // stream. Preserve the stock backend's asynchronous drop policy.
+            if gpu_video::is_owned(&stream) {
+                stream.clear();
+            }
+            // Stock MediaFile owns its pipeline and is released when references
+            // are dropped; don't synchronously clear the native backend here.
         }
     }
     fn prepare(&self, message: &str, cancel: bool) {

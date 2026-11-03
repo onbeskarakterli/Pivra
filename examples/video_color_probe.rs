@@ -3,6 +3,8 @@
 #[path = "../src/actual_paintable.rs"]
 #[allow(dead_code)] // Other paintable operations are exercised by the existing viewing probes.
 mod actual_paintable;
+#[path = "../src/gpu_video.rs"]
+mod gpu_video;
 #[path = "support/video_backend.rs"]
 mod video_backend;
 use gtk::{gdk, glib, prelude::*};
@@ -223,7 +225,7 @@ fn native(path: &std::path::Path, expected: Option<glib::Type>) -> Result<(), St
         .default_width(640)
         .default_height(360)
         .build();
-    let media = gtk::MediaFile::for_filename(path);
+    let media = gpu_video::open(path)?;
     video_backend::verify(&media, expected)?;
     media.set_muted(true);
     let wrapped = actual_paintable::ActualPaintable::video(
@@ -273,6 +275,29 @@ fn native(path: &std::path::Path, expected: Option<glib::Type>) -> Result<(), St
                         let offset = ((h / 2 * w + x) * 4) as usize;
                         println!("sample x={x} y={} sRGB={:?}", h / 2, &a[offset..offset + 4]);
                     }
+                    if std::env::args().any(|arg| arg == "--check-bt1886-ramp") {
+                        assert_eq!((w, h), (256, 64), "known full-range ramp required");
+                        for x in 0..256 {
+                            let linear = (f64::from(x) / 255.).powf(2.4);
+                            let srgb = if linear <= 0.0031308 {
+                                12.92 * linear
+                            } else {
+                                1.055 * linear.powf(1. / 2.4) - 0.055
+                            };
+                            let expected = (srgb * 255.).round() as u8;
+                            let offset = ((h / 2 * w + x) * 4) as usize;
+                            assert!(
+                                a[offset..offset + 3]
+                                    .iter()
+                                    .all(|c| c.abs_diff(expected) <= 2),
+                                "BT1886 ramp x={x}: {:?}, expected={expected}",
+                                &a[offset..offset + 4]
+                            );
+                        }
+                        println!(
+                            "PASS 256 real decoded full-range ramp levels vs independent BT1886 reference (2 LSB)"
+                        );
+                    }
                     break Ok(());
                 }
                 media.play();
@@ -293,6 +318,24 @@ fn native(path: &std::path::Path, expected: Option<glib::Type>) -> Result<(), St
     media.pause();
     picture.set_paintable(None::<&gdk::Paintable>);
     media.clear();
+    let args: Vec<_> = std::env::args_os().collect();
+    if let Some(index) = args.iter().position(|a| a == "--verify-stock-fallback") {
+        let path = args.get(index + 1).expect("fallback file argument");
+        let fallback = gpu_video::open(std::path::Path::new(path))?;
+        assert_ne!(
+            fallback.type_().name(),
+            "PivraGpuMediaFile",
+            "GPU factory leaked into stock route"
+        );
+        if fallback.type_().name() == "GtkNoMediaFile" {
+            println!("NOT RUN non-target decode: installed GTK has no native media backend");
+        }
+        println!(
+            "PASS non-target file routed to stock {}",
+            fallback.type_().name()
+        );
+        fallback.clear();
+    }
     window.close();
     result
 }

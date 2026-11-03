@@ -757,3 +757,12 @@ Issue #9 update prepared for posting:
 Posting attempt in this session: GitHub CLI/API returned **Forbidden** even for
 reading Issue #9. No GitHub issue edit/comment is claimed. The text above is
 retained in the repository so the update is reviewable without claiming success.
+
+## Application-owned implementation checkpoint
+
+See [the stock-GTK GPU prototype](VIDEO_COLOR_STOCK_GTK_PROTOTYPE.md). An opt-in
+public MediaFile subclass now executes an application-owned GL filter and presents
+synchronized GdkGLTexture frames in Pivra, without patched GTK or CPU color fallback.
+Earlier architecture-only statements are historical. The prototype is file-scoped
+and GL-only; default behavior, native GPU/visual acceptance and Vulkan interop
+are not silently promoted to production readiness.

@@ -116,13 +116,41 @@ static void unchanged_cases(GLuint patched,GLuint original) {
   float data[N][4],a[N][4],b[N][4];targets(N,1,1);vectors(data,0,1,0,0);
   for(unsigned prim=0;prim<G_N_ELEMENTS(primaries);prim++)for(unsigned t=0;t<G_N_ELEMENTS(transfers);t++) {
     unsigned cp=primaries[prim],tf=transfers[t];
-    for(unsigned requested=0;requested<=1;requested++) {
-      if(requested && cp==1 && tf==1)continue;
-      controls(original,cp,tf,0,1,0,0,0);draw(original,data,a);
-      controls(patched,cp,tf,0,1,requested,0,0);draw(patched,data,b);
+    for(unsigned matrix=0;matrix<=1;matrix++)for(unsigned range=0;range<=1;range++)
+    for(int reverse=0;reverse<=1;reverse++)for(unsigned requested=0;requested<=1;requested++) {
+      if(requested && cp==1 && tf==1 && (matrix==1 || range==1))continue;
+      vectors(data,matrix,range,reverse,0);
+      controls(original,cp,tf,matrix,range,0,reverse,0);draw(original,data,a);
+      controls(patched,cp,tf,matrix,range,requested,reverse,0);draw(patched,data,b);
       for(int i=0;i<N;i++)for(int c=0;c<4;c++) CHECK(isfinite(b[i][c]) && fabs(a[i][c]-b[i][c])<=0.00003);
       cases++;
     }
+  }
+}
+/* Model the sample values after a YCbCr import has expanded range and
+ * applied the matrix. Compare against shader-side conversion exactly once.
+ * This is arithmetic coverage for GL/Vulkan's shared CICP op, not an actual
+ * EGL/Vulkan import or hardware decoder test. */
+static void import_cases(GLuint patched) {
+  float raw[N][4],rgb[N][4],a[N][4],b[N][4];targets(N,1,1);
+  for(unsigned range=0;range<=1;range++) {
+    vectors(raw,1,range,0,0);
+    for(int i=0;i<N;i++) {
+      float yuv[3];
+      for(int c=0;c<3;c++) yuv[c]=raw[i][c];
+      if(!range) {
+        yuv[0]=(yuv[0]-16.f/255.f)*255.f/224.f;
+        yuv[1]=(yuv[1]-16.f/255.f)*255.f/219.f;
+        yuv[2]=(yuv[2]-16.f/255.f)*255.f/224.f;
+      }
+      yuv[0]-=0.5f;yuv[2]-=0.5f;
+      for(int c=0;c<3;c++)rgb[i][c]=bt709_to_rgb[3*c]*yuv[0]+bt709_to_rgb[3*c+1]*yuv[1]+bt709_to_rgb[3*c+2]*yuv[2];
+      rgb[i][3]=1.f;
+    }
+    controls(patched,1,1,1,range,1,0,0);draw(patched,raw,a);
+    controls(patched,1,1,0,1,1,0,0);draw(patched,rgb,b);
+    for(int i=0;i<N;i++)for(int c=0;c<4;c++) CHECK(fabs(a[i][c]-b[i][c])<=0.00003);
+    cases++;
   }
 }
 static void bench(GLuint p,unsigned video,uint64_t *gpu,uint64_t *cpu) {
@@ -155,7 +183,7 @@ int main(int argc,char **argv) {
   char *ov=read_source(argv[1]),*of=read_source(argv[2]),*nv=read_source(argv[3]),*nf=read_source(argv[4]);
   GLuint original=program(ov,of),patched=program(nv,nf);g_free(ov);g_free(of);g_free(nv);g_free(nf);
   GLuint vao;glGenVertexArrays(1,&vao);glBindVertexArray(vao);glGenTextures(1,&input);glGenTextures(1,&target);glGenFramebuffers(1,&framebuffer);
-  long before=rss();video_cases(patched,original);unchanged_cases(patched,original);
+  long before=rss();video_cases(patched,original);unchanged_cases(patched,original);import_cases(patched);
   uint64_t a,b,c,d;bench(original,0,&a,&b);bench(patched,1,&c,&d);long peak=rss();
   printf("{\"vendor\":");json_string(vendor);printf(",\"renderer\":");json_string(renderer);printf(",\"gl_version\":");json_string(version);printf(",\"drm_render_node\":");json_string(device);
   printf(",\"instance_bytes_original\":%zu,\"instance_bytes_candidate\":%zu", sizeof(struct PivraOriginalInstance), sizeof(struct PivraCandidateInstance));

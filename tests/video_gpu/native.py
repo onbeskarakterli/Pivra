@@ -14,13 +14,13 @@ CPU_ENV = ('GTK_MEDIA', 'GTK_PATH', 'GIO_EXTRA_MODULES',
            'PIVRA_GTK_COLOR_CPU_TRANSPORT')
 
 
-def environment(libdir):
+def environment(libdir, renderer="gl"):
     env = os.environ.copy()
     for key in CPU_ENV:
         env.pop(key, None)
     # No inherited private SDK or module directories in this comparison.
     env.update(LD_LIBRARY_PATH=str(libdir) if libdir else '',
-               GDK_BACKEND='wayland', GSK_RENDERER='gl',
+               GDK_BACKEND='wayland', GSK_RENDERER=renderer,
                GDK_DEBUG='misc,opengl,dmabuf', GSK_DEBUG='renderer,fallback',
                GST_DEBUG='gtkgstsink:5', GST_DEBUG_NO_COLOR='1')
     env.pop('LD_PRELOAD', None)
@@ -49,6 +49,7 @@ def command(argv, env, output, timeout=120):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument('--renderer', choices=('gl', 'vulkan'), default='gl')
     parser.add_argument('--prefix', type=Path, required=True)
     parser.add_argument('--video', type=Path, required=True)
     parser.add_argument('--output', type=Path, required=True)
@@ -69,10 +70,11 @@ def main():
     args.output.mkdir(parents=True, exist_ok=False)
     out = args.output.resolve()
     report = {'patched_library': str(lib), 'gtk_sha256': hashlib.sha256(lib.read_bytes()).hexdigest(),
+              'renderer_requested': args.renderer,
               'visual_acceptance': 'NOT RUN: requires owner comparison with mpv',
               'gpu_and_no_readback': 'NOT PROVEN: inspect traces and native GPU profiler',
               'sigbus_classification': 'OPEN: no clean baseline comparison yet'}
-    stock, patched = environment(None), environment(lib.parent)
+    stock, patched = environment(None, args.renderer), environment(lib.parent, args.renderer)
     try:
         subprocess.run(['cargo', 'build', '--locked'], cwd=root, check=True)
         app = str(root / 'target/debug/pivra')
@@ -86,7 +88,7 @@ def main():
                 report[name + '_colorstate'] = command(
                     [str(build.resolve() / 'testsuite/gdk/colorstate'),
                      '-p', args.colorstate_path],
-                    environment((build.resolve() / 'gtk')), out / f'{name}-colorstate.log')
+                    environment((build.resolve() / 'gtk'), args.renderer), out / f'{name}-colorstate.log')
         processes = []
         try:
             sessions = [('stock', stock, video), ('patched', patched, video)]

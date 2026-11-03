@@ -344,3 +344,185 @@ DMA-BUF/profiler evidence and MPV visual acceptance: **NOT RUN in Codex**.
 Full native suite remains partly failing as reported above. Issue #9 stays OPEN;
 production integration is blocked on the targeted crash classification and
 end-to-end GPU/native visual acceptance. No system GTK replacement is proposed.
+
+## GL/Vulkan acceptance checkpoint and portable integration — 2026-11-03
+
+### Native evidence supplied by the owner
+
+These are **user-reported Arch/GNOME results**, not Codex hardware measurements:
+
+| Gate | Result |
+| --- | --- |
+| Patched GTK runtime mapping | PASS for GL and Vulkan |
+| GL playback | 16 BT.1886 GPU CICP traces; 0 CPU transfer; 0 readback/upload fallback traces |
+| Physical GL visual comparison | User reports much better, MPV-like colors |
+| Vulkan playback | `Vulkan uploaded 720x1142 YU12 ... YUV dmabuf`; 16 GPU CICP traces; 0 CPU transfer/fallback traces |
+| Stock and patched process exits | Successful |
+| Hardware decoding / continuous zero-copy | **NOT PROVEN** |
+| Other GPU vendors / HDR display acceptance | **NOT RUN** |
+| `gtk:colorstate` DMA-BUF SIGBUS attribution | **OPEN**, still unclassified |
+
+The trace counters saturate at 16; they establish execution of the corrected
+operation, not frame count or a full capture of every possible readback. Vulkan
+`uploaded` is GTK's log wording, not proof of a CPU upload nor continuous
+zero-copy. Do not infer physical Vulkan visual acceptance from GL acceptance.
+
+### GL/Vulkan range and metadata audit
+
+Reviewed the pinned GTK 4.24.1 sources and the existing patch:
+
+- `gtk/media/gtkgstsink.c:gtk_gst_color_state_from_colorimetry()` retains CICP
+  primaries/transfer/matrix/range; only the BT.709 video constructor adds intent.
+  Ordinary image construction is unchanged. No global transfer-1 reinterpretation.
+- `gsk/gpu/gskglframe.c` single-image EGL YUV import supplies REC709 plus
+  **full or narrow range hints**, and records the applied conversion on the image.
+  Its multi-plane import records `GSK_GPU_CONVERSION_NONE`; conversion therefore
+  remains in the shader. The patch does not force single-plane import.
+- `gsk/gpu/gskvulkanframe.c` passes the source conversion into
+  `gsk_vulkan_image_new_for_dmabuf()`. `gskvulkanimage.c` constructs the YCbCr
+  sampler conversion when needed. Device format/modifier/YCbCr support may reject
+  an import; hardware support is not created by the color patch.
+- `gsk/gpu/gskgpuutils.c:gsk_gpu_cicp_apply_conversion()` validates the conversion
+  against the incoming tuple. Applied BT709 narrow conversion becomes matrix 0,
+  full range; BT709 full becomes matrix 0 without a second range expansion.
+  The patched `gsk_gpu_color_state_apply_conversion()` retains the video intent
+  when rebuilding that normalized state. NONE retains the original state.
+- Both backends use `gskgpuconvertcicp.glsl` and the generated instance field.
+  Raw YUV gets one matrix/range conversion before EOTF; sampler-converted RGB
+  must not get it again. No GL-only texture color-state mutation is introduced.
+  Driver precision, chroma siting, modifiers and synchronization still need
+  native coverage; arithmetic equivalence does not exercise these mechanisms.
+
+No proven production defect was found in this review, so the upstream patch and
+production defaults are unchanged. Supported intent remains primaries 1,
+transfer 1, matrix 1 full/narrow or matrix 0 full. Limited RGB, unknown metadata,
+other primaries, sRGB, PQ and HLG retain original behavior. That is preservation
+of existing implementation, not new HDR correctness certification. General
+GtkMediaFile image streams remain an upstream policy question; Pivra's photos
+continue to use the untouched Glycin path.
+
+### Additional executable regressions
+
+`gpu_probe.c` now compares original versus patched shader output for non-target
+primaries/transfers across **both matrix and range values and forward/reverse**
+conversion. It includes intent-disabled BT.709 image states and rejected
+limited-RGB intent. The original 3e-5 tolerance and CPU-reference assertions are
+unchanged. Additional cases compare raw full/narrow YUV shader conversion with
+pre-normalized RGB plus retained intent, checking that import conversion must
+happen exactly once. These are shared GL/Vulkan shader **arithmetic** checks;
+no Vulkan device execution or real DMA-BUF import is simulated as PASS.
+
+Codex run: **532 batches × 264 vectors**, maximum video/reference error
+**2.38418579e-7**, PASS on llvmpipe. Hardware gate remains NOT RUN. No Vulkan
+shader compiler/device tooling is available here. Existing native AMD GL/Vulkan
+playback evidence is kept separately. Intel and NVIDIA, proprietary NVIDIA EGL
+import/modifiers, Vulkan YCbCr support, Intel VA-API interop, HDR/wide-gamut
+outputs and source chroma/bit-depth permutations remain untested.
+
+`native.py --renderer gl|vulkan` now selects the renderer process-locally for
+stock, patched and optional non-target playback, and records the request. A
+requested renderer alone is not verification of actual backend choice: retain
+GTK renderer/import logs. Default remains GL for compatibility with the earlier
+command. No environment or system library is modified persistently.
+
+### Exact SIGBUS baseline control
+
+`tests/video_gpu/baseline.py` is a standalone control with **no video windows or
+full-suite run**. It requires an exact registered test leaf (checked with `-l`),
+checks the baseline's pinned upstream touched-source hashes, rejects swapped
+patched/clean libraries, validates `ldd` GTK resolution, and records loader logs,
+library hashes, build options, exits and skip status. Timeout/skip/other signals
+are inconclusive. Matching SIGBUS results establish baseline reproduction;
+**they do not exonerate every patch-specific effect**. A clean PASS versus patched
+SIGBUS blocks integration. Both PASS means not reproduced, not fixed.
+
+```bash
+python3 tests/video_gpu/baseline.py \
+  --baseline-build /absolute/path/to/unmodified-gtk-4.24.1/_build \
+  --patched-build /absolute/path/to/patched-gtk-4.24.1/_build \
+  --case '/exact/failing/colorstate/leaf' \
+  --output "$HOME/pivra-sigbus-$(date +%Y%m%d-%H%M%S)"
+```
+
+Use the same Mesa, session, renderer, build configuration and original failing
+case/seed for both. Source checks cover the pinned files, not arbitrary edits
+elsewhere: clean archive provenance and matching build options still require
+review. No exact failing leaf, clean native build or baseline result is available
+in Codex. SDK prerequisites remain insufficient to build GTK 4.24.1 here; do not
+substitute a different GTK/Mesa version or run thousands of tests to guess.
+**Actual classification: BLOCKED pending this native evidence.** The two stacks
+alone do not prove a Mesa-only bug. Preserve a reproducing GDB backtrace/core.
+
+### Portable deployment design (not enabled)
+
+The current patch uses private GTK/GDK APIs and a generated GPU instance ABI.
+It cannot safely be injected into arbitrary system GTK with LD_PRELOAD or a
+MediaFile extension. Stock GTK's public API does not expose the required video
+viewing intent. A standalone shader over a MediaFile paintable lacks reliable
+original color metadata/import semantics; adding an arbitrary gamma node would
+not implement this patch correctly. Replacing the entire player with a custom
+GStreamer/GL sink would duplicate control/synchronization/audio/capture ownership
+and is not a small accepted change.
+
+Two supported deployment routes should be reviewed before production:
+
+1. **Preferred upstream route:** submit the video-intent design, import-state
+   preservation, serialization and tests to GTK; resolve opt-in semantics for
+   other GtkMediaFile users. Depend on a released distribution GTK containing
+   the accepted API/behavior, with an explicit minimum version/capability gate.
+   This requires no end-user GTK build or system-library replacement by Pivra.
+   Until upstream acceptance exists, do not invent a released capability/version.
+2. **Interim, separately approved binary distribution:** build the reviewed GTK
+   patch once in a reproducible release environment and ship it as an
+   application-private runtime, e.g. `/opt/pivra/lib/`, with the Pivra launcher
+   and executable also inside that isolated tree. Use a private RUNPATH/launcher,
+   never `/usr/lib` replacement or a global `ldconfig`/LD_LIBRARY_PATH change.
+   Ship matching private GTK support libraries, media resources and any minimum
+   GLib/Pango/GStreamer runtime needed; inventory the complete ELF dependency
+   closure and plugins rather than assuming the host ABI is new enough. Resolve
+   all GTK-using plugins to this same GTK. Keep GPU vendor drivers, kernel DRM
+   and Mesa/Vulkan ICD integration host-provided; do not bundle a vendor driver
+   or silently load two GTK builds in one process. The user installs a prebuilt
+   package, not a compiler toolchain or custom system GTK. This is a deployment
+   design only; no new package, AUR, release metadata or defaults are enabled.
+
+For the interim route, pin source/patch/build options and checksums, provide GTK
+LGPL corresponding source/build instructions and notices, retain GPL Pivra
+source, audit redistributed dependency licenses, and own security updates for
+**every** bundled library. Make decoder plugin discovery and helper dependencies
+explicit without changing Glycin/Bubblewrap security. CI/release artifacts are
+not created by this experiment. Accept clean native installation, ELF resolution,
+GL/Vulkan and other-vendor tests, non-target/HDR preservation and SIGBUS control
+before approving this route. No mandatory CPU fallback is acceptable: if required
+GPU capabilities cannot be established, block the experimental corrected path
+with a clear diagnostic rather than silently switching rendering to the CPU.
+
+### Short native playback acceptance command
+
+```bash
+python3 tests/video_gpu/native.py --prefix "$HOME/.local/opt/pivra-video-gpu/gtk-4.24.1" --video "/path/original.mp4" --renderer vulkan --output "$HOME/pivra-vk-$(date +%s)"
+```
+
+Use `--renderer gl` for GL and `--control-video /path/non-target.mp4` for actual
+metadata controls. Do not repeat already accepted original-video tests solely
+to generate another log; the outstanding SIGBUS needs the separate exact-case
+command above. No universal one-command baseline can identify an unknown failing
+leaf or manufacture a missing native build.
+
+New tooling checks: **21 Python tests PASS**, including isolation, renderer
+selection and crash-classification negatives; no fabricated native controls.
+Issue #9 remains OPEN / experimental integration PARTIAL. Native GL visual
+acceptance is recorded; portable packaging approval, SIGBUS classification,
+non-target native display coverage and other-GPU testing remain open.
+
+Follow-up verification on source base
+`03fab1d4eabf6a9bff028533d0c4550da98b4b39`: fmt, locked check,
+strict all-target Clippy (zero warnings), **205 Rust tests** and the existing
+**13 CPU-harness Python tests** PASS. The 21 GPU-tooling Python tests above are
+additional (34 Python tests total). No application Rust, dependencies, loader,
+controls, version or production default changed. Baseline control uses the same
+GLib random seed for both runs; supply `--seed R02S...` from the failing log to
+reproduce its seed exactly. The new control is preferable to the older optional
+unvalidated in-session baseline loop when investigating SIGBUS.
+Locked release build also PASS for this follow-up; generated build artifacts
+remain outside the tracked change set. No new physical GPU acceptance is claimed.

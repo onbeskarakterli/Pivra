@@ -36,3 +36,12 @@ class IsolationTests(unittest.TestCase):
             result = native.command(['/bin/sleep', '1'], os.environ.copy(),
                                     Path(directory) / 'log', timeout=0.01)
         self.assertEqual(result['status'], 'FAIL timeout')
+
+
+class RendererTests(unittest.TestCase):
+    def test_vulkan_is_process_local_and_cpu_overrides_cleared(self):
+        with patch.dict(os.environ, {'GSK_RENDERER': 'cairo', 'PIVRA_GTK_BT1886_CPU': '1'}):
+            env = native.environment(Path('/private/lib'), 'vulkan')
+            self.assertEqual(os.environ['GSK_RENDERER'], 'cairo')
+        self.assertEqual(env['GSK_RENDERER'], 'vulkan')
+        self.assertNotIn('PIVRA_GTK_BT1886_CPU', env)

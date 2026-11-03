@@ -526,3 +526,39 @@ reproduce its seed exactly. The new control is preferable to the older optional
 unvalidated in-session baseline loop when investigating SIGBUS.
 Locked release build also PASS for this follow-up; generated build artifacts
 remain outside the tracked change set. No new physical GPU acceptance is claimed.
+
+### Exact native SIGBUS reproduction supplied subsequently
+
+The owner independently reproduced **SIGBUS** on patched GTK 4.24.1 with the
+exact leaf **`/colorstate/convert-dmabuf/srgb/srgb`**, under Wayland, patched
+build-tree `LD_LIBRARY_PATH`, build/source `testsuite/gdk` directories,
+`GIO_USE_VFS=local` and `GIO_USE_VOLUME_MONITOR=unix`. Clean GTK has **not** been
+built or tested. This supersedes the earlier statement that the leaf was unknown;
+causality remains OPEN. The control now defaults to this leaf and sets those
+same G_TEST/GIO variables separately for each build. No other case is executed.
+
+Smallest next native control:
+
+1. Extract the pinned, SHA-256-verified **unmodified** GTK 4.24.1 archive into a
+   new private source directory. Configure a separate `_build` using the **same
+   Meson options/toolchain** as the patched build. Never reuse the patched tree,
+   install it over system GTK, or change Mesa between the two runs. Compare
+   `meson-info/intro-buildoptions.json` files; retain any differences.
+2. Build only the baseline test and its dependencies:
+   `ninja -C /path/to/clean-gtk-4.24.1/_build testsuite/gdk/colorstate`.
+   No `meson test` suite run or installation is required.
+3. Run this one command (two executions of the same leaf, one per build):
+
+```bash
+python3 tests/video_gpu/baseline.py \
+  --baseline-build /path/to/clean-gtk-4.24.1/_build \
+  --patched-build /path/to/patched-gtk-4.24.1/_build \
+  --output "$HOME/pivra-sigbus-control-$(date +%s)"
+```
+
+The command explicitly uses the GL renderer; the reported backtrace is the GL
+DMA-BUF downloader. Preserve the original GLib seed with `--seed R02S...` if
+available. The sRGB case does not request video BT.1886 intent, but this fact
+alone does **not** rule out shared ABI/download/driver interactions from the
+patch. Only the clean control provides baseline evidence. New environment/default
+changes are test tooling only; no production or GTK patch code changed.

@@ -29,7 +29,8 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--baseline-build', required=True, type=Path)
     parser.add_argument('--patched-build', required=True, type=Path)
-    parser.add_argument('--case', required=True, help='Exact /colorstate/... case, not a prefix')
+    parser.add_argument('--case', default='/colorstate/convert-dmabuf/srgb/srgb',
+                        help='Exact /colorstate/... case, not a prefix')
     parser.add_argument('--seed', help='Original GLib R02S seed; otherwise one shared seed is generated')
     parser.add_argument('--renderer', choices=('gl', 'vulkan'), default='gl')
     parser.add_argument('--output', required=True, type=Path)
@@ -52,6 +53,9 @@ def main():
             if marker != (label == 'patched'):
                 raise RuntimeError(label + ': unexpected patch instrumentation')
             env = environment(lib.parent, args.renderer)
+            env.update(G_TEST_BUILDDIR=str(build / 'testsuite/gdk'),
+                       G_TEST_SRCDIR=str(source / 'testsuite/gdk'),
+                       GIO_USE_VFS='local', GIO_USE_VOLUME_MONITOR='unix')
             listed = subprocess.run([str(binary), '-l'], env=env, capture_output=True,
                                     text=True, timeout=30, check=True)
             cases = [line.strip() for line in listed.stdout.splitlines() if line.startswith('/colorstate/')]

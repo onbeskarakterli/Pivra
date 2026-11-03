@@ -3,6 +3,7 @@
 import argparse
 import hashlib
 import json
+import re
 import secrets
 from pathlib import Path
 import signal
@@ -10,6 +11,22 @@ import subprocess
 
 from native import command, environment
 from probe import SOURCE_SHA256
+
+
+def registered_cases(output):
+    """GTK lists test paths as TAP comments; older listings use bare paths."""
+    cases = []
+    for line in output.splitlines():
+        path = line.strip().removeprefix('#').strip()
+        if re.fullmatch(r'/colorstate/\S+', path):
+            cases.append(path)
+    return cases
+
+
+def skipped(output):
+    """Recognize TAP skip directives, not diagnostic mentions of skipping."""
+    return bool(re.search(r'^(?:(?:not )?ok\s+\d+\b[^\n]*|1\.\.0\s*)#\s*skip\b',
+                          output, re.IGNORECASE | re.MULTILINE))
 
 
 def classify(baseline, patched):
@@ -58,7 +75,7 @@ def main():
                        GIO_USE_VFS='local', GIO_USE_VOLUME_MONITOR='unix')
             listed = subprocess.run([str(binary), '-l'], env=env, capture_output=True,
                                     text=True, timeout=30, check=True)
-            cases = [line.strip() for line in listed.stdout.splitlines() if line.startswith('/colorstate/')]
+            cases = registered_cases(listed.stdout)
             if args.case not in cases or any(c.startswith(args.case + '/') for c in cases):
                 raise RuntimeError('not an exact registered test leaf: ' + args.case)
             loader = subprocess.run(['ldd', str(binary)], env=env, capture_output=True,
@@ -76,7 +93,7 @@ def main():
                              args.output / f'{label}.log')
             log = (args.output / f'{label}.log').read_text(errors='replace')
             result.update(library=str(lib), sha256=hashlib.sha256(lib.read_bytes()).hexdigest(),
-                          source=str(source), skipped='# SKIP' in log.upper())
+                          source=str(source), skipped=skipped(log))
             report[label] = result
         b, p = report['baseline'], report['patched']
         report['status'] = classify(None if b['skipped'] else b.get('exit'),

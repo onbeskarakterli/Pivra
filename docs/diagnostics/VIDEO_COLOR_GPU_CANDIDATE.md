@@ -10,6 +10,12 @@ reference is not enabled or proposed as Pivra's default. Issue #9 remains OPEN.
 No production Rust, Cargo dependency/lockfile, default backend, packaging, main,
 tag, release, AUR or CI change is made by this work.
 
+**Latest checkpoint:** the owner has now reproduced the exact sRGB DMA-BUF
+SIGBUS on both clean and patched GTK 4.24.1. It is baseline-reproducible, with
+patch-specific effects not excluded. See the final checkpoint below; earlier
+NOT RUN/unknown-leaf statements are historical records. Portable production
+integration remains unimplemented; accepted AMD native playback uses private GTK.
+
 ## Verified GTK 4.24.1 architecture
 
 The earlier investigation used 4.18 module sources because the old
@@ -562,3 +568,192 @@ available. The sRGB case does not request video BT.1886 intent, but this fact
 alone does **not** rule out shared ABI/download/driver interactions from the
 patch. Only the clean control provides baseline evidence. New environment/default
 changes are test tooling only; no production or GTK patch code changed.
+
+## Baseline comparison completed; production architecture decision record
+
+2026-11-03. Documentation source base:
+`b5b4455e65fd0a120c561a217c8b3e58d843f18e`.
+
+### New native evidence and precise classification
+
+The owner reports running `tests/video_gpu/baseline.py` against independently
+built **unmodified GTK 4.24.1** and **patched GTK 4.24.1**, for the exact leaf
+`/colorstate/convert-dmabuf/srgb/srgb`. Result:
+
+```text
+BASELINE REPRODUCIBLE SIGBUS; patch-specific effects not excluded
+```
+
+**Classification: baseline-reproducible native DMA-BUF download SIGBUS.** The
+BT.1886 patch is not necessary to reproduce this crash. This does not prove a
+Mesa-only root cause, clear all patch effects, or make the 109 previously reported
+GTK failures PASS. No production assertion, DMA-BUF path or GPU gate is disabled.
+The baseline comparison requirement is satisfied by **user-reported evidence**;
+Codex has not independently reviewed the raw native artifacts. Earlier statements
+that no clean baseline was built are superseded, not erased.
+
+Preserve the native output directory unchanged, including `REPORT.json`,
+`baseline.log`, `patched.log`, `baseline-ldd.log`, `patched-ldd.log`,
+`baseline-loader.*`, `patched-loader.*`, and both `*-buildoptions.json` files.
+Keep the source archive/patch checksums, GDB backtrace/core, original GLib seed,
+Mesa version and session details with it. The runner's report records resolved
+GTK paths, library SHA-256 hashes, source directories and direct subprocess
+signal exits (SIGBUS is normally `-7`). The supplied summary does not contain
+these raw fields, so **no hashes, filenames outside the defined runner outputs,
+build-option equivalence or independently observed signal numbers are invented**.
+Do not delete these artifacts because the crash is baseline-reproducible.
+Native artifacts have not been uploaded to this Codex workspace or committed.
+
+Existing AMD GL/Vulkan execution and GL physical MPV-like visual acceptance
+remain recorded above. Hardware decoding, continuous zero-copy and Intel/NVIDIA
+acceptance remain unproven. The baseline crash no longer supports attributing
+this exact failure solely to the video patch; it remains an upstream/platform
+risk, particularly for texture exports/capture/download operations.
+
+### Proposed stock-GTK production architecture
+
+**Requirement:** regular users install Pivra and normal runtime dependencies,
+not a privately compiled/replacement GTK. A private GTK package is therefore not
+the proposed stock-GTK solution. Upstream GTK integration is the least duplicate
+implementation in the long term, but cannot supply an immediate stock-GTK fix
+until a supported release exists. No such release/capability is assumed here.
+
+For an independently deployable implementation, use an **application-owned
+GStreamer playback adapter and GPU video sink**, outside GTK's built-in MediaFile
+backend. This is a concrete proposal, **not implemented or accepted production
+code**. It requires a bounded playback-backend project, not a paintable filter:
+
+1. **Control adapter:** retain a `GtkMediaStream`-compatible object (subclass) as
+   the control/paintable boundary, backed by GstPlay or playbin with an explicitly
+   selected custom sink. Reuse existing `VideoControls::attach(MediaStream)`;
+   implement prepared/error/duration/timestamp/seekable/ended state, audio,
+   seek completion, mute/volume and cancellation on the GTK main context. Keep
+   one pipeline/clock per video, not a second parallel decoder.
+2. **Negotiation and ownership:** receive the actual negotiated GstVideoInfo,
+   colorimetry, bit depth, crop/orientation, memory features and buffer identity.
+   Preserve DMA-BUF fds, modifier/plane strides/offsets and GstBuffer lifetime
+   until GPU completion. Accept GLMemory with compatible context sharing, or
+   import supported DMA-BUF using EGL. Reject unsupported modifiers/formats
+   explicitly; do not secretly call a frame-download/CPU-conversion API. GPU
+   rendering does not imply hardware decoding. A decoder delivering CPU memory
+   may require upload; that must be measured/disclosed, not called zero-copy.
+3. **One metadata-aware GPU color stage:** on the original video samples, apply
+   source range normalization and YUV matrix **exactly once**, followed by the
+   validated BT.1886 EOTF only for the eligible BT.709 SDR tuple. If EGL sampling
+   already normalized/matrix-converted, select the normalized-RGB variant, as
+   validated by the import arithmetic cases. Do not apply it to the already
+   color-managed snapshot of MediaFile. Carry a per-frame/generation metadata
+   key so source/caps changes cannot reuse stale shader state.
+4. **Tagged output:** render into a GPU RGB texture and hand it to stock GDK
+   through public GL texture/color-state interfaces. For the corrected BT.709
+   path, store sRGB-encoded values and tag sRGB (or a validated supported linear
+   RGB equivalent); GDK then performs ordinary output-display color management.
+   Never tag BT.1886-processed samples as encoded BT.709 or apply another gamma
+   node. No public CICP tag is invented for the viewing intent.
+5. **Non-target route:** keep the existing MediaFile backend for sRGB/other
+   primaries/PQ/HLG/unknown or unsupported metadata until the new sink's passthrough
+   is independently verified. Determine eligibility from a bounded metadata
+   inspection/probe, not a filename or container MIME type; treat incomplete
+   metadata conservatively. Such a probe has I/O/cancellation/stream-selection
+   implications and is itself a blocker until implemented. Do not switch between
+   two active decoders mid-frame or relabel HDR as sRGB. If metadata changes after
+   startup, pause/retire the corrected pipeline under a generation barrier and
+   transition explicitly, preserving position/controls. Do not silently apply SDR
+   correction to an HDR segment. Existing Glycin image rendering stays untouched.
+6. **Rendering backends:** a shared EGL/GL context and `GdkGLTexture` is the first
+   portable path; stock GSK GL can consume it. GSK Vulkan cannot be assumed to
+   consume a GL texture without a readback. For Vulkan presentation, export the
+   corrected RGB GPU image as a synchronized, supported DMA-BUF and present a
+   tagged `GdkDmabufTexture`, or implement a native Vulkan compute/render sink.
+   Verify importability, fences, queue ownership and lifetime on each backend.
+   If cross-API sharing is unsupported, report that capability as unavailable;
+   do not make CPU copies the hidden interoperability fallback. A pure GL-only
+   first prototype must be labelled GL-only, not portable Vulkan acceptance.
+7. **Lifetime and resource policy:** bounded in-flight GPU buffers, explicit
+   GPU-completion ownership, weak UI callbacks plus per-load generation, and
+   teardown on navigation/window close. No decoder stop or GL allocation from a
+   GTK callback that can deadlock a streaming thread. Instrument imports, uploads,
+   texture downloads, CPU conversions, outstanding buffers and driver identity.
+
+Source integration boundaries verified in this checkout:
+`src/image_view.rs::load_video()` creates `gtk::MediaFile` and retains that
+concrete type; stop/resume/capture paths also depend on it.
+`src/actual_paintable.rs::ActualPaintable::video()` takes `&gtk::MediaFile` while
+internally storing a generic paintable. `src/video_controls.rs` already attaches
+the base `gtk::MediaStream`. These concrete MediaFile boundaries need narrow
+adapter changes; simply replacing the texture wrapper would not supply negotiated
+metadata or control a GPU sink. No such production changes are made now.
+
+New GStreamer/GL bindings and runtime plugin requirements must be audited for
+version, license and packaging cost before adding dependencies. No decoder,
+Glycin sandbox, provider priority, existing safety limit or release metadata is
+changed by this architecture record. A libmpv replacement was not selected: it
+would introduce another playback backend/dependency and control/lifetime work
+rather than finishing the current GTK/GStreamer integration.
+
+### Implementation sequence and exact remaining blockers
+
+1. **Prototype control/negotiation adapter against stock GTK**, disabled by
+   default. Preserve playback controls/resume/loop/window teardown in controlled
+   tests before routing user media to it. No custom GTK installation permitted.
+2. **GL sink prototype:** import real negotiated video frames and run the shared
+   metadata-aware color kernel. Compare the same decoded samples/PTS against the
+   accepted CPU reference at the existing numeric tolerance; verify native video
+   pixel tolerances separately from shader floating-point tolerance. No CPU
+   readback in steady playback (test-only readback allowed for assertions).
+3. **Interop prototype:** prove zero-readback presentation into both stock GSK GL
+   and Vulkan, including synchronization and memory bounds. Current native
+   patched-GTK Vulkan evidence does not validate this new adapter.
+4. **Non-target/HDR policy and regressions:** accurate eligibility routing,
+   renegotiation and original-path preservation; real HDR output and images,
+   source ranges and bit depths. Existing shader comparisons alone are not
+   physical HDR acceptance.
+5. **Native release gate:** original MPV comparison on stock GTK, audio/seek/
+   navigation/loop/zoom/two-window/close/capture, measured GPU/memory behavior,
+   installable dependency closure, and explicit Intel/NVIDIA/AMD support matrix.
+   Until tested, Intel/NVIDIA are NOT RUN; no cross-GPU claim.
+6. **Platform risk disposition:** retain the baseline-reproducible download
+   SIGBUS as open; obtain an upstream GTK/Mesa issue/reproducer and decide its
+   impact on capture/export separately. Baseline reproducibility is not an
+   authorization to ignore it or an automatic production GO.
+
+**Current status:** GPU transfer correction has user-reported AMD native evidence
+with patched GTK; portable stock-GTK production integration is **BLOCKED /
+UNIMPLEMENTED**, not ready for ordinary users. No version/default is changed.
+The above steps are outstanding engineering/acceptance, not completed work.
+
+### Shortest current acceptance test and issue update text
+
+The current test still requires the experimental private GTK prefix; there is
+**no truthful stock-GTK acceptance command for an unimplemented sink**:
+
+```bash
+python3 tests/video_gpu/native.py --prefix "$HOME/.local/opt/pivra-video-gpu/gtk-4.24.1" --video /path/original.mp4 --renderer vulkan --output "$HOME/pivra-accept-$(date +%s)"
+```
+
+Use GL for the already physically accepted path; add `--control-video` for a
+known non-target source. No baseline rerun or whole-suite run is needed merely
+to record this completed comparison. A future stock-GTK acceptance runner must
+fail if it resolves a private patched GTK, otherwise it would not establish
+portable integration.
+
+Issue #9 update prepared for posting:
+
+> Native owner report: the exact
+> `/colorstate/convert-dmabuf/srgb/srgb` control SIGBUS reproduces on independently
+> built unmodified and patched GTK 4.24.1. Runner classification is
+> `BASELINE REPRODUCIBLE SIGBUS; patch-specific effects not excluded`.
+> The patch is not necessary to reproduce this crash, but it is not fully cleared.
+> Preserve both logs, loader/library provenance, build options, seed and signal
+> exits; raw artifacts have not been independently reviewed by Codex.
+> AMD GL/Vulkan GPU execution and GL MPV-like visual acceptance remain
+> user-reported PASS. Hardware decoding and continuous zero-copy remain unproven.
+> Issue stays open: portable stock-GTK integration requires an application-owned
+> metadata-aware GStreamer GPU sink/control adapter or an accepted upstream GTK
+> release. Neither is production-ready here. No CPU fallback or system GTK
+> replacement is enabled. See `docs/diagnostics/VIDEO_COLOR_GPU_CANDIDATE.md`
+> for the architecture, staged blockers and existing experimental test command.
+
+Posting attempt in this session: GitHub CLI/API returned **Forbidden** even for
+reading Issue #9. No GitHub issue edit/comment is claimed. The text above is
+retained in the repository so the update is reviewable without claiming success.

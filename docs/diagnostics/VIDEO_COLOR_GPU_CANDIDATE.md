@@ -244,3 +244,103 @@ how general GtkMediaFile users opt into video display intent (including image
 streams through GStreamer) and how raw texture exports communicate it. Pivra's
 normal images use Glycin and are not changed by this prototype. Do not ship a
 private GTK fork or enable the CPU reference by default to bypass these gates.
+
+## Native integration checkpoint — 2026-11-03
+
+**User-reported native Arch evidence**, not independently executed in Codex:
+patched GTK 4.24.1 built successfully; the hardware shader probe passed on
+AMD/Mesa. GTK tests: **8108 PASS, 109 FAIL, 457 SKIP**. Dedicated
+`/colorstate/video-bt1886` and render-node serialization tests passed.
+This supersedes the earlier *native build not yet tested* checkpoint, but does
+not turn the entire suite or physical video comparison into PASS.
+
+`gtk:colorstate` reproducibly receives **SIGBUS** during DMA-BUF download:
+`gdk_gl_context_download()` (`gdkglcontext.c:2621`) →
+`gsk_gpu_download_into_op_gl_command()` →
+`gsk_gpu_renderer_dmabuf_downloader_download()` →
+`gdk_dmabuf_texture_download()`, with Mesa
+`libgallium-26.2.6-arch1.1.so` and libc in the crashing stack.
+**Attribution OPEN**: this is not evidence that the patch is innocent, nor that
+it caused the crash. No core, complete test path, or clean native baseline
+result has been supplied. Do not disable DMA-BUF to turn this gate green.
+
+### Single isolated Arch comparison command
+
+After building/installing the patched GTK into a **private user prefix only**
+using the previous section, run from the Pivra checkout:
+
+```bash
+python3 tests/video_gpu/native.py \
+  --prefix "$HOME/.local/opt/pivra-video-gpu/gtk-4.24.1" \
+  --video "/absolute/path/to/original-bt709-video.mp4" \
+  --output "$HOME/pivra-gpu-native-$(date +%Y%m%d-%H%M%S)"
+```
+
+Requires native Wayland, cargo, ffprobe and mpv. Does not install GTK or change
+system settings. Builds ordinary Pivra with `cargo build --locked`; no CPU
+reference switch or application source change. It clears inherited private
+library/module paths and CPU-reference overrides, uses process-local library
+selection and verifies `/proc/PID/maps` for **both** Pivra instances. The private
+library must contain patch tracing. A patched stock/system library fails the
+stock check. No version-number-only acceptance is used. Logs retain ffprobe
+stream metadata, actual loaded paths, private library checksum, GTK/GStreamer
+traces and process exits. mpv uses `--no-config`; compositor/output profile must
+remain the same for all windows. Close all windows when finished; interrupt
+cleans up launched process groups. No unattended visual PASS is emitted.
+
+Add `--control-video /path/to/known-srgb-or-PQ-or-HLG.mp4` to open a non-target
+control. Verify negotiated metadata in logs (source ffprobe tags alone are not
+negotiated sink caps). Eligible BT.709 playback must produce the GPU CICP trace;
+the non-target must not produce it. No CPU-transfer or readback fallback traces
+are allowed during steady playback. Bounded trace absence alone is not proof:
+record actual hardware renderer, DMA-BUF import versus fallback, and native GPU
+profiler/readback observations. Hardware shader success alone does not establish
+hardware video decoding, end-to-end DMA-BUF use or zero-copy playback.
+
+Compare black levels and colors on the **original clip**, stock versus patched
+versus mpv, with matched pause/frame/display conditions. Exercise sound, seek,
+pause/resume, loop, navigation, zoom and two windows. Record frame timing and
+parent/decoder/GPU memory separately. Return `REPORT.json` and logs plus visual
+acceptance explicitly; the runner deliberately leaves acceptance NOT RUN/NOT
+PROVEN rather than inferring it from windows opening.
+
+### Narrow SIGBUS control (no whole-suite rerun)
+
+Build a second **unmodified** GTK 4.24.1 from the pinned archive above into a
+separate clean workspace/prefix. Use the same compiler, Meson options, environment
+and Mesa packages as the patched build. Retain archive checksum, Meson logs and
+`meson-info/intro-buildoptions.json` for both; never reuse the patched build tree.
+Obtain the exact failing `/colorstate/...` path from the native test log or list
+`testsuite/gdk/colorstate -l`; source registers DMA-BUF cases under both
+`/colorstate/convert-dmabuf/srgb/...` and `/colorstate/convert/dmabuf/srgb/cicp/...`.
+Do not guess which case crashed based solely on the stack.
+
+Extend the **same launcher command** with:
+
+```bash
+  --baseline-build /absolute/path/to/clean-gtk/_build \
+  --patched-build /absolute/path/to/patched-gtk/_build \
+  --colorstate-path '/exact/failing/test/path'
+```
+
+Only this exact GLib `-p` case is run once per build, under the same GL/Wayland
+settings, with its build-tree GTK library directory; stdout/stderr and signal
+exit codes are retained. Inspect loader resolution for each control (for example
+`LD_DEBUG=libs`) before attributing results: clean source/options and runtime
+library provenance are obligations, not automatically certified by directory
+names. If both crash, preserve this as baseline-reproducible but still audit
+patch-specific changes; if patched-only crashes, block integration and inspect
+color-state identity, conversion/import and download strides/mappings. If neither
+crashes, reproduction remains incomplete. A SKIP is not a crash PASS. Obtain
+GDB `bt full`, the exact test seed/path and mapping/stride/format details for a
+reproducing case; do not raise timeouts or remove assertions.
+
+### Checks for this launcher change
+
+Codex: **15 Python tests PASS** (existing GPU tests plus five isolation/control
+regressions); Python syntax PASS. No Rust/product or GTK patch changes were
+made. Native launcher, clean/patched SIGBUS comparison, physical video playback,
+DMA-BUF/profiler evidence and MPV visual acceptance: **NOT RUN in Codex**.
+Full native suite remains partly failing as reported above. Issue #9 stays OPEN;
+production integration is blocked on the targeted crash classification and
+end-to-end GPU/native visual acceptance. No system GTK replacement is proposed.

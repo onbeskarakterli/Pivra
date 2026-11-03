@@ -5,7 +5,7 @@ mod actual_paintable;
 #[path = "animation.rs"]
 mod animation;
 #[path = "gpu_video.rs"]
-mod gpu_video;
+pub(crate) mod gpu_video;
 #[path = "thumbnail_overlay.rs"]
 pub(crate) mod thumbnail_overlay;
 #[path = "video_controls.rs"]
@@ -465,15 +465,60 @@ impl ImageView {
     #[allow(dead_code)] // Standalone image probes do not open videos.
     pub(super) fn load_video(&self, path: &std::path::Path) {
         self.prepare("", true);
-        let media = match gpu_video::open(path) {
+        self.loading_spinner.set_visible(true);
+        let expected = self.animation_generation.get();
+        let this = self.clone();
+        let path = path.to_owned();
+        glib::MainContext::default().spawn_local(async move {
+            let current = || this.animation_generation.get() == expected;
+            let selected = gpu_video::choose(path.clone(), current).await;
+            if !current() {
+                return;
+            }
+            this.loading_spinner.set_visible(false);
+            if let Some(selected) = selected {
+                this.start_video(&path, selected);
+            }
+        });
+    }
+    fn start_video(&self, path: &std::path::Path, backend: gpu_video::Backend) {
+        let media = match gpu_video::open_selected(path, backend) {
             Ok(media) => media,
             Err(error) => {
-                self.status
-                    .set_text(&format!("GPU video prototype: {error}"));
+                self.status.set_text(&format!("Video: {error}"));
                 self.status.set_visible(true);
                 return;
             }
         };
+        let expected = self.animation_generation.get();
+        let generation = self.animation_generation.clone();
+        let status = self.status.downgrade();
+        let picture = self.video.downgrade();
+        media.connect_notify_local(Some("error"), move |media, _| {
+            if generation.get() != expected {
+                return;
+            }
+            if let Some(error) = media.error() {
+                eprintln!("Pivra video: {error}; stock override: PIVRA_VIDEO_BACKEND=stock");
+                if let Some(status) = status.upgrade() {
+                    status.set_text(&format!("Video: {error}"));
+                    status.set_visible(true);
+                }
+                if let Some(picture) = picture.upgrade() {
+                    picture.set_visible(false);
+                    picture.set_paintable(None::<&gtk::gdk::Paintable>);
+                }
+                if gpu_video::is_owned(media) {
+                    let weak = media.downgrade();
+                    glib::idle_add_local_once(move || {
+                        if let Some(media) = weak.upgrade() {
+                            media.pause();
+                            media.clear();
+                        }
+                    });
+                }
+            }
+        });
         media.set_loop(false);
         let resume_at = self
             .video_positions

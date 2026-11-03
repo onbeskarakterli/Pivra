@@ -13,6 +13,30 @@ mod window;
 use pivra::APP_NAME;
 
 fn main() {
+    // Select GL before native threads exist; respect an explicit renderer override.
+    if cfg!(pivra_gpu_backend)
+        && std::env::var_os("GSK_RENDERER").is_none()
+        && std::env::var("PIVRA_VIDEO_BACKEND").as_deref() != Ok("stock")
+    {
+        use std::os::unix::process::CommandExt;
+        match std::env::current_exe() {
+            Ok(exe) => {
+                let error = std::process::Command::new(exe)
+                    .args(std::env::args_os().skip(1))
+                    .env(
+                        "GSK_RENDERER",
+                        if gtk::minor_version() < 20 {
+                            "ngl"
+                        } else {
+                            "gl"
+                        },
+                    )
+                    .exec();
+                eprintln!("Pivra: GL re-exec failed: {error}; stock video retained");
+            }
+            Err(error) => eprintln!("Pivra: renderer selection unavailable: {error}"),
+        }
+    }
     match cli::parse_args(std::env::args_os().skip(1)) {
         cli::Command::Version => println!("{APP_NAME} {}", env!("CARGO_PKG_VERSION")),
         cli::Command::Help => cli::print_help(),

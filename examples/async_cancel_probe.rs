@@ -139,7 +139,10 @@ fn picture(v: &image_view::ImageView) -> gtk::Picture {
     v.widget().child().unwrap().downcast().unwrap()
 }
 fn status(v: &image_view::ImageView) -> gtk::Label {
-    picture(v).next_sibling().unwrap().downcast().unwrap()
+    // A video Picture also overlays the photo; do not mistake it for the status.
+    std::iter::successors(picture(v).next_sibling(), |w| w.next_sibling())
+        .find_map(|w| w.downcast::<gtk::Label>().ok())
+        .expect("image status overlay")
 }
 fn choose(w: &adw::ApplicationWindow, action: &str, id: &str) {
     gio::prelude::ActionGroupExt::activate_action(w, action, Some(&id.to_variant()));

@@ -1,7 +1,10 @@
 // Optional native GNOME factory sidecar. Compile against ONE real public API;
 // absence leaves the viewer/cache reader functional, never selects another decoder.
 use std::{env, path::PathBuf, process::Command};
+#[path = "native/video/build.rs"]
+mod video;
 fn main() {
+    video::build();
     println!("cargo:rerun-if-changed=native/thumbnail_factory.c");
     println!("cargo:rerun-if-env-changed=PKG_CONFIG_PATH");
     println!("cargo:rerun-if-env-changed=PKG_CONFIG_SYSROOT_DIR");

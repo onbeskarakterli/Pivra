@@ -183,6 +183,8 @@ fn check_controls(media: &gtk::MediaFile) -> Result<(), String> {
     let observed = transitions.clone();
     let handler = media.connect_seeking_notify(move |_| observed.set(observed.get() + 1));
     let target = media.duration() / 2;
+    media.seek(target / 3);
+    media.seek(target / 2);
     media.seek(target);
     let deadline = Instant::now() + Duration::from_secs(5);
     let result = loop {
@@ -225,7 +227,16 @@ fn native(path: &std::path::Path, expected: Option<glib::Type>) -> Result<(), St
         .default_width(640)
         .default_height(360)
         .build();
-    let media = gpu_video::open(path)?;
+    let media = if expected.is_some() {
+        gtk::MediaFile::for_filename(path)
+    } else {
+        gpu_video::open_selected(
+            path,
+            glib::MainContext::default()
+                .block_on(gpu_video::choose(path.to_owned(), || true))
+                .expect("current selection"),
+        )?
+    };
     video_backend::verify(&media, expected)?;
     media.set_muted(true);
     let wrapped = actual_paintable::ActualPaintable::video(
@@ -321,7 +332,11 @@ fn native(path: &std::path::Path, expected: Option<glib::Type>) -> Result<(), St
     let args: Vec<_> = std::env::args_os().collect();
     if let Some(index) = args.iter().position(|a| a == "--verify-stock-fallback") {
         let path = args.get(index + 1).expect("fallback file argument");
-        let fallback = gpu_video::open(std::path::Path::new(path))?;
+        let path = std::path::Path::new(path);
+        let backend = glib::MainContext::default()
+            .block_on(gpu_video::choose(path.to_owned(), || true))
+            .expect("current selection");
+        let fallback = gpu_video::open_selected(path, backend)?;
         assert_ne!(
             fallback.type_().name(),
             "PivraGpuMediaFile",

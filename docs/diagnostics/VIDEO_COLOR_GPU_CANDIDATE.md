@@ -766,3 +766,11 @@ synchronized GdkGLTexture frames in Pivra, without patched GTK or CPU color fall
 Earlier architecture-only statements are historical. The prototype is file-scoped
 and GL-only; default behavior, native GPU/visual acceptance and Vulkan interop
 are not silently promoted to production readiness.
+
+## Normal stock-GTK integration successor
+
+The application-owned, automatic GL integration based on `785a4f3` is documented
+in [VIDEO_COLOR_STOCK_GTK_INTEGRATION.md](VIDEO_COLOR_STOCK_GTK_INTEGRATION.md).
+It does not load or install patched GTK. Historical patched-GL/Vulkan acceptance
+and the clean/patched DMA-BUF SIGBUS remain separate evidence. New-controller
+native acceptance remains pending; Issue #9 is not closed by headless tests.

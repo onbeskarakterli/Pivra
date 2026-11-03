@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Build and launch the file-scoped GPU prototype with stock GTK (no install)."""
+"""Build and launch integrated metadata-gated GPU video with stock GTK (no install)."""
 import argparse
 import hashlib
 import json
@@ -9,7 +9,7 @@ from pathlib import Path
 import subprocess
 import tempfile
 
-from build import ROOT, build
+from build import ROOT
 
 
 def eligible(stream):
@@ -25,7 +25,7 @@ def main():
     p = argparse.ArgumentParser(description=__doc__)
     p.add_argument('video', type=Path)
     p.add_argument('--fallback-file', type=Path, help='verify non-target file uses stock backend in the same process')
-    p.add_argument('--source-cache', type=Path)
+    p.add_argument('--source-cache', type=Path, help='legacy argument; integrated build does not download sources')
     p.add_argument('--output', type=Path)
     p.add_argument('--ramp', action='store_true', help='assert known full-range 256x64 ramp fixture')
     p.add_argument('--bars', action='store_true', help='assert known 192x96 limited-range 16/128/235 fixture pixels')
@@ -40,17 +40,17 @@ def main():
     if len(videos) != 1 or not eligible(videos[0]):
         p.error('prototype restricted to one explicit 8-bit BT709 SDR video stream; use stock Pivra for this source')
     root = a.output or (Path(tempfile.mkdtemp(prefix='pivra-owned-gpu-')) / 'session')
-    module = build(root, a.source_cache)
+    root.mkdir(parents=True, exist_ok=False)
     (root / 'metadata.json').write_text(json.dumps(videos[0], indent=2) + '\n')
     env = os.environ.copy()
     for key in ('GTK_MEDIA', 'GTK_PATH', 'GIO_EXTRA_MODULES', 'PIVRA_VIDEO_TEST_MODULE_DIR',
-                'PIVRA_GTK_BT1886_CPU', 'PIVRA_GTK_COLOR_CPU_TRANSPORT', 'LD_PRELOAD'):
+                'PIVRA_GTK_BT1886_CPU', 'PIVRA_GTK_COLOR_CPU_TRANSPORT', 'LD_PRELOAD',
+                'PIVRA_GPU_VIDEO_TARGET', 'PIVRA_GPU_VIDEO_MODULE_DIR'):
         env.pop(key, None)
     version = subprocess.run(['pkg-config', '--modversion', 'gtk4'], capture_output=True,
                              text=True, check=True).stdout.strip()
     env['GSK_RENDERER'] = 'ngl' if int(version.split('.')[1]) < 20 else 'gl'
-    env.update(PIVRA_GPU_VIDEO_TARGET=str(video), PIVRA_GPU_VIDEO_MODULE_DIR=str(module.parent),
-               GST_DEBUG_NO_COLOR='1')
+    env.update(PIVRA_TRACE_VIDEO='1', GST_DEBUG_NO_COLOR='1')
     if a.check:
         subprocess.run(['cargo', 'build', '--locked', '--example', 'video_color_probe'], cwd=ROOT, check=True)
         # The production factory constructs the subtype explicitly. No global
@@ -74,7 +74,7 @@ def main():
     (root / 'gtk-provenance.json').write_text(json.dumps(dict(path=paths[0],
         sha256=hashlib.sha256(data).hexdigest(), version=version), indent=2) + '\n')
     print('Retained session:', root, flush=True)
-    print('GPU prototype applies only to this target; other files use stock GTK. Close window to finish.', flush=True)
+    print('Integrated metadata selection active; close window to finish.', flush=True)
     with (root / 'playback.log').open('w') as log:
         result = subprocess.run(argv, env=env, cwd=ROOT, stdout=log, stderr=subprocess.STDOUT,
                                 timeout=45 if a.check else None, check=False)

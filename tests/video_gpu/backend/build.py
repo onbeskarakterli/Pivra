@@ -16,7 +16,7 @@ ref = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(ref)
 
 
-def build(root, cache=None):
+def build(root, cache=None, prepare_only=False):
     root.mkdir(parents=True, exist_ok=False)
     source = root / 'source'
     source.mkdir()
@@ -113,7 +113,10 @@ def build(root, cache=None):
     text = text.replace('#include <gdk/gdkdmabuffourccprivate.h>', '')
     text = text.replace('i < vmeta->n_planes', 'i < (int) vmeta->n_planes')
     path.write_text(text)
-    shutil.copy(Path(__file__).with_name('filter.c'), source / 'filter.c')
+    shutil.copy(ROOT / 'native/video/filter.c', source / 'filter.c')
+    if prepare_only:
+        print('PREPARED pinned adapter sources; compilation NOT RUN')
+        return source
     module = root / 'modules/libpivra-color-gpu.so'
     module.parent.mkdir()
     subprocess.run([*shlex.split(os.environ.get('CC', 'cc')), '-shared', '-fPIC', '-O2', '-Wall', '-Wextra', '-Werror',
@@ -133,5 +136,6 @@ if __name__ == '__main__':
     p = argparse.ArgumentParser(description=__doc__)
     p.add_argument('--output', type=Path, required=True)
     p.add_argument('--source-cache', type=Path)
+    p.add_argument('--prepare-only', action='store_true')
     a = p.parse_args()
-    print(build(a.output, a.source_cache))
+    print(build(a.output, a.source_cache, a.prepare_only))

@@ -83,11 +83,10 @@ fn status(w: &adw::ApplicationWindow) -> String {
         .into_iter()
         .find_map(|w| w.downcast::<gtk::Picture>().ok())
         .unwrap();
-    picture
-        .next_sibling()
-        .unwrap()
-        .downcast::<gtk::Label>()
-        .unwrap()
+    // Keep the error assertions independent of the intervening video overlay.
+    std::iter::successors(picture.next_sibling(), |w| w.next_sibling())
+        .find_map(|w| w.downcast::<gtk::Label>().ok())
+        .expect("image status overlay")
         .text()
         .to_string()
 }

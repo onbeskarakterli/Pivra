@@ -14,17 +14,16 @@ from gui_smoke import request_close
 def main():
     p = argparse.ArgumentParser(description=__doc__)
     p.add_argument('--binary', type=Path, default=Path('target/debug/pivra'))
-    p.add_argument('--module-dir', type=Path, required=True)
+    p.add_argument('--module-dir', type=Path, help='legacy argument; integrated build does not load a module')
     p.add_argument('--video', type=Path, required=True)
     p.add_argument('--log', type=Path, required=True)
     a = p.parse_args()
     if a.log.exists():
         p.error('log must be new; existing evidence is not overwritten')
     env = os.environ.copy()
-    for key in ('GTK_MEDIA', 'GTK_PATH', 'PIVRA_VIDEO_TEST_MODULE_DIR'):
+    for key in ('GTK_MEDIA', 'GTK_PATH', 'PIVRA_VIDEO_TEST_MODULE_DIR', 'PIVRA_GPU_VIDEO_TARGET', 'PIVRA_GPU_VIDEO_MODULE_DIR'):
         env.pop(key, None)
-    env.update(PIVRA_GPU_VIDEO_TARGET=str(a.video.resolve(strict=True)),
-               PIVRA_GPU_VIDEO_MODULE_DIR=str(a.module_dir.resolve(strict=True)))
+    env['PIVRA_TRACE_VIDEO'] = '1'
     with a.log.open('w') as log:
         process = subprocess.Popen([str(a.binary.resolve()), str(a.video.resolve())],
                                    env=env, stdout=log, stderr=log)

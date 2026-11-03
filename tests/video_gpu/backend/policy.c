@@ -1,4 +1,5 @@
 #include "filter.c"
+#include "../../../native/video/policy.h"
 int main(int argc, char **argv) {
   GstVideoInfo info;
   gst_init(&argc, &argv);
@@ -28,5 +29,23 @@ int main(int argc, char **argv) {
   event = gst_event_new_caps(caps); probe.data = event;
   g_assert_cmpint(source_metadata(NULL, &probe, bin), ==, GST_PAD_PROBE_DROP);
   gst_event_unref(event); gst_caps_unref(caps); gst_object_unref(bin);
+  const char *encoded[] = {
+    "video/x-h264,width=192,height=96,bit-depth-luma=(uint)8,colorimetry=bt709",
+    "video/x-h264,width=192,height=96,bit-depth-luma=(int)8,colorimetry=1:3:5:1",
+    "video/x-h264,width=192,height=96,bit-depth-luma=(uint)10,colorimetry=bt709",
+    "video/x-h264,width=192,height=96,bit-depth-luma=(uint)8",
+    "video/x-h264,width=100000,height=960,bit-depth-luma=(uint)8,colorimetry=bt709",
+    "video/x-h265,width=192,height=96,bit-depth-luma=(uint)8,colorimetry=bt709",
+    "video/x-h264,width=192,height=96,bit-depth-luma=(uint)8,colorimetry=bt2020",
+    "video/x-h264,width=192,height=96,bit-depth-luma=(uint)8,colorimetry=1:3:7:1",
+    "video/x-h264,width=192,height=96,bit-depth-luma=(uint)8,colorimetry=1:3:14:1",
+    "video/x-h264,width=192,height=96,bit-depth-luma=(uint)8,colorimetry=1:3:15:1"
+  };
+  for(guint i=0;i<G_N_ELEMENTS(encoded);i++) {
+    caps=gst_caps_from_string(encoded[i]);
+    g_assert_cmpint(pivra_gpu_caps_eligible(caps),==,i<2);
+    gst_caps_unref(caps);
+  }
+  g_print("PASS encoded and raw metadata policy, HDR/unknown/depth/size negatives\n");
   return 0;
 }

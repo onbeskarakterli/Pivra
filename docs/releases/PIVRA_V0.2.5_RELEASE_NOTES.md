@@ -1,8 +1,8 @@
-# Pivra v0.2.5 — Release candidate
+# Pivra v0.2.5 — Stable-release source
 
-**Status: Release candidate (not published).**
+**Status: Stable-release source prepared for approval.**
 Linux/GNOME, GPL-3.0-only. No release date, tag, immutable source archive/hash or
-AUR publication is approved by this candidate preparation.
+AUR publication is approved by this source preparation.
 
 ## Changes
 
@@ -65,10 +65,11 @@ not certify physical hardware acceleration or replace native visual acceptance.
 - Immutable source approval, actual Arch makepkg/.SRCINFO/package acceptance and
   publication authorization remain separate release gates.
 
-## Publication handoff
+## Source and publication evidence
 
-Once publication is explicitly authorized, update this status/title and README
-to identify **v0.2.5 as the current stable release**; do not publish with an
-unreleased/development/RC headline. Review those final documentation changes
-before approving the immutable source archive/hash. Final preflight requires
-stable wording; candidate preflight deliberately does not authorize publication.
+README and these notes carry the prepared v0.2.5 stable-release wording. They do
+not assert that a tag, GitHub Release or AUR update exists. The exact immutable
+commit/archive digest is presented for explicit owner approval using the
+[source review procedure](PIVRA_V0.2.5_SOURCE_APPROVAL.md). Archive/source approval,
+actual makepkg acceptance and publication are separate decisions. No hash or
+commit is predicted inside its own source tree.

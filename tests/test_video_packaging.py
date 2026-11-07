@@ -169,6 +169,15 @@ class ReleasePreflight(unittest.TestCase):
             self.assertIn('requires --binary or --staging-root', errors.getvalue())
             self.assertNotIn('Publication handoff', errors.getvalue())
 
+    def test_prepared_stable_source_does_not_claim_publication(self):
+        with tempfile.TemporaryDirectory() as d:
+            root = Path(d); self.fixture(root, stable=True)
+            notes = root / 'docs/releases/PIVRA_V0.2.5_RELEASE_NOTES.md'
+            notes.write_text(notes.read_text().replace('Published stable release.', 'Stable-release source prepared for approval.'))
+            self.assertEqual(self.invoke(root, True), 0)
+            # Full mode still requires an actual ELF independently of wording.
+            self.assertEqual(self.invoke(root, False), 1)
+
     def test_arch_source_approval_still_mandatory(self):
         with tempfile.TemporaryDirectory() as d:
             recipe = Path(d) / 'PKGBUILD'; shutil.copyfile(ROOT / 'packaging/arch/PKGBUILD', recipe)

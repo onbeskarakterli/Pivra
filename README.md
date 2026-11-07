@@ -2,9 +2,9 @@
 
 **Pivra** is a native image viewer for Linux, built with **Rust, GTK4, and libadwaita**. It is designed to feel at home on GNOME: open a photo, move through the folder, zoom in on details, and browse thumbnails without getting in the way.
 
-**Upcoming release candidate: v0.2.5.** The `dev` branch carries version 0.2.5 with automatic GPU-accelerated BT.709 SDR video color correction on stock GTK. This candidate has not been published; immutable source approval and actual Arch `makepkg` validation remain separate gates.
+**Current stable release: v0.2.5.** Pivra includes automatic GPU-accelerated BT.709 SDR video color correction on stock GTK and is free software under GPL-3.0-only.
 
-The latest published stable release remains **v0.2.4**. Pivra is free and open-source software under GPL-3.0-only. See the [v0.2.5 candidate release notes](docs/releases/PIVRA_V0.2.5_RELEASE_NOTES.md) and [candidate validation record](docs/releases/PIVRA_V0.2.5_RC_VALIDATION.md).
+This is the prepared v0.2.5 stable-release handoff. Source approval, native package validation and publication evidence are tracked separately in the [source review procedure](docs/releases/PIVRA_V0.2.5_SOURCE_APPROVAL.md); this README is not evidence that GitHub/AUR publication has occurred. See the [v0.2.5 release notes](docs/releases/PIVRA_V0.2.5_RELEASE_NOTES.md).
 
 **[Latest published release](https://github.com/onbeskarakterli/Pivra/releases/latest)** · **[Arch Linux AUR](https://aur.archlinux.org/packages/pivra)** · **[Development roadmap](docs/PIVRA_DEVELOPMENT_ROADMAP.md)**
 
@@ -12,7 +12,7 @@ The latest published stable release remains **v0.2.4**. Pivra is free and open-s
 
 ### Linux — build from source
 
-The following workflow builds the `dev` release candidate; published stable sources remain available through the release link above. You will need a compatible Linux desktop, Rust 1.85 or newer, GTK 4.16+, libadwaita 1.2+, GStreamer GL 1.24+ development/runtime components, and the necessary native libraries.
+Use the approved v0.2.5 source archive for release builds; the workflow below describes a development checkout, not an immutable release input. You will need a compatible Linux desktop, Rust 1.85 or newer, GTK 4.16+, libadwaita 1.2+, GStreamer GL 1.24+ development/runtime components, and the necessary native libraries.
 
 ```bash
 git clone --branch dev https://github.com/onbeskarakterli/Pivra.git
@@ -46,7 +46,7 @@ The AUR package builds Pivra from a pinned source revision. GitHub releases also
 
 ## Features and roadmap
 
-**Available** = implemented in the current `dev` source (v0.2.5 release candidate); this includes changes beyond the published v0.2.4 stable release. **Partial** = some aspects implemented, with more work planned. **Planned** = not yet delivered. This is a feature-level snapshot, not a declaration that every numbered roadmap milestone is complete.
+**Available** = implemented in the current `dev` source (v0.2.5 source); publication is tracked separately from implemented functionality. **Partial** = some aspects implemented, with more work planned. **Planned** = not yet delivered. This is a feature-level snapshot, not a declaration that every numbered roadmap milestone is complete.
 
 ### Photo viewing and navigation
 
@@ -119,7 +119,7 @@ Editing will live in a separate **Edit** mode so the normal viewer remains simpl
 | Safe Save As, metadata handling, and original-file protection | ⏳ Planned |
 | Background batch conversion with pause/cancel and collision handling | ⏳ Planned |
 
-The [detailed development roadmap](docs/PIVRA_DEVELOPMENT_ROADMAP.md) retains historical PIV milestone and release-gate records; its older status snapshots do not supersede the current v0.2.5 candidate status above. The [feature specification](docs/PIVRA_FEATURE_SPEC_TR.md) describes the longer-term goals.
+The [detailed development roadmap](docs/PIVRA_DEVELOPMENT_ROADMAP.md) retains historical PIV milestone and release-gate records; its older status snapshots do not supersede the v0.2.5 source scope above. The [feature specification](docs/PIVRA_FEATURE_SPEC_TR.md) describes the longer-term goals.
 
 ## Current limitations
 
@@ -127,7 +127,7 @@ Pivra is a Linux/GNOME-focused viewer, not an image editor. Slideshow, HDR/ICC w
 
 Still-image loading is bounded to 64 MP (maximum 32,768 pixels per edge) and 64 MiB input size. Animated frames have additional bounds. The automated tests and video-navigation stress test were exercised on the development build; compatibility across other Linux environments remains to be verified.
 
-The upcoming candidate is [v0.2.5](docs/releases/PIVRA_V0.2.5_RELEASE_NOTES.md). The latest published stable release remains [v0.2.4](docs/releases/PIVRA_V0.2.4_RELEASE_NOTES.md); no v0.2.5 publication is implied.
+The v0.2.5 release scope is described in the [release notes](docs/releases/PIVRA_V0.2.5_RELEASE_NOTES.md). Source/package/publication approval is recorded separately; historical release records remain in docs/releases.
 
 The v0.2.5 GPU adapter currently targets the validated OpenGL path. Intel/NVIDIA are untested; Vulkan interop is not implemented; native HDR visual preservation and end-to-end zero-copy remain unproven. Other color metadata/codecs retain stock playback.
 

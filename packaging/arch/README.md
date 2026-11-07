@@ -44,7 +44,8 @@ There is no SKIP digest, invented release checksum, moving dev URL or silently
 selected snapshot. The collector's fixed SHA-256 in the recipe is real and
 must be updated whenever the collector changes.
 
-Later, **only after owner approval of the immutable main release commit**:
+Later, **only after owner approval of the exact immutable candidate/release commit**
+(source approval does not authorize a main merge, tag or publication):
 
 1. Download and inspect its GitHub commit archive; establish the real SHA-256
    from those bytes, verify the approved tag-to-commit relation if a tag exists,
@@ -321,3 +322,21 @@ authorized publication, change them to current stable v0.2.5, update the source
 clone example to the stable line and run final preflight before approving the
 final immutable archive. Do not publish dev's candidate/unreleased wording as
 current stable, and do not silently change a previously approved source hash.
+
+## Final immutable-source review
+
+The v0.2.5 stable README/notes handoff is prepared on dev; no publication is
+performed. See [source approval and package validation](../../docs/releases/PIVRA_V0.2.5_SOURCE_APPROVAL.md).
+The exact source SHA and real archive SHA-256 must be explicitly approved.
+Proposed source configuration belongs outside the application checkout until
+that decision. No generated .SRCINFO is committed to this repository.
+
+After approval, the single native command is:
+
+`python3 packaging/arch/validate-release.py --approved-source FULL_SHA --sha256 REAL_SHA256`
+
+It uses the pinned archive's own recipe, an isolated config/output workspace,
+actual makepkg source verification/.SRCINFO/clean checked build, one non-debug
+package, and ELF/helper/desktop/icons/LGPL/locked-source checks. It does not
+install dependencies or packages, modify main or publish anything. Native logs
+and actual artifacts remain for review. Missing tools fail explicitly.

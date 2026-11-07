@@ -76,10 +76,10 @@ def main():
         if f"# Pivra v{version}" not in text:
             errors.append("Release notes version differs from target")
         if not args.candidate and (
-            "**Status: Published stable release.**" not in text
+            not any(marker in text for marker in ("**Status: Published stable release.**", "**Status: Stable-release source prepared for approval.**"))
             or "release candidate" in text.splitlines()[0].lower()
         ):
-            errors.append("Publication handoff: release notes must carry published stable status")
+            errors.append("Publication handoff: release notes must carry stable-release source wording, not RC status")
     if notes_name not in recipe:
         errors.append("PKGBUILD must install target-version release notes")
 

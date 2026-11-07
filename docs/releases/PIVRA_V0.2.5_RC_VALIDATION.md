@@ -1,4 +1,18 @@
-# Pivra v0.2.5 preparation — stock-GTK GPU packaging candidate
+# Pivra v0.2.5 — Final release candidate preparation
+
+Current base: `c15e0af082ff52cef577ec226d1d12be20c8e0cf`, dev.
+Cargo.toml, the Pivra Cargo.lock entry and PKGBUILD now consistently declare
+**0.2.5**; pkgrel=1 and options=('!debug') remain. This is an **upcoming candidate**,
+not a published stable release. No main merge, tag, AUR update or release occurs.
+The GPU backend and production thumbnail behavior are unchanged by version work.
+
+The final preparation record is appended below. Earlier 0.2.4 version statements,
+open cache failure and initial OpenGL owner table are historical: cache closure is
+recorded in c15e0af; current Arch OpenGL ownership is gst-plugins-base-libs (90f13b5).
+Native AMD and Arch staging are user-reported PASS before this bump, not a claim
+that the newly versioned source has already passed actual makepkg acceptance.
+
+## Historical pre-version preparation record
 
 Base integration: `4dcd84c30013cacc884bd99de9244087d27f635d`.
 Status: **development candidate / PARTIAL**, not publication approval.
@@ -87,7 +101,7 @@ or publish anything and **does not claim a makepkg binary package was built**.
 Retain the printed staging path and logs. Fedora/Debian installation branches
 have capability gates; their native installation is not certified by Arch tests.
 
-## Release procedure after explicit approval
+## Historical pre-bump procedure (superseded by the final handoff below)
 
 1. Review final dev SHA and native staging logs. Keep the accepted GPU backend.
 2. Separately authorize and reconcile the 0.2.5 version in Cargo.toml/Cargo.lock,
@@ -208,3 +222,106 @@ preparation may now be considered as a separate authorized task. No version bump
 immutable release-source checksum, makepkg artifact, main/tag/AUR action or
 publication approval follows from this closure. Existing GPU/platform/HDR and
 zero-copy limitations remain as documented.
+
+## Final version handoff and source/package audit
+
+- Version source is 0.2.5 everywhere; only the Pivra lockfile version changed,
+  with the complete dependency graph and registry checksums preserved.
+- README says upcoming v0.2.5 candidate and accurately retains v0.2.4 as the
+  latest published stable release. New 0.2.5 notes describe the implemented GPU
+  selection/transfer/lifecycle work and explicit limitations, not speculative
+  Vulkan/HDR/zero-copy support.
+- Arch pkgname remains only pivra, pkgver=0.2.5, pkgrel=1, options=('!debug').
+  Actual makepkg output enumeration is pending, so no package/debug-archive result
+  is invented. The recipe installs 0.2.5 release notes and the candidate report.
+- Native APIs/plugins/ELF/ownership remain mandatory. The portable frontend also
+  installs version-matched notes and binds source collection to artifact version;
+  installing an old 0.2.4 build after the bump fails before writing the destination.
+- Both LGPL texts, upstream notices, modified static adapter sources, complete
+  application source and 184 locked crate archives remain required. Rebuild/relink
+  instructions use the complete-source approach; no relink-obstructing dependency
+  or opaque-only object distribution is introduced. The full license/source
+  collector is unchanged and its real recipe checksum remains valid.
+- No release-source.conf or .SRCINFO is created/committed. The immutable-source
+  guard remains active even for metadata generation. makepkg/pacman are not
+  available in Codex, so real .SRCINFO/package/install testing is NOT RUN.
+- Candidate preflight now requires the exact target version, current release notes
+  and README candidate/stable identity. Stage validation checks actual ELF **and
+  executable --version**, plus release notes and source/notice presence. It does
+  not authorize publication. Final preflight rejects candidate-only wording.
+
+### Next native verification
+
+From clean updated dev with native dependencies installed:
+
+```sh
+bash packaging/arch/stage-video-candidate.sh
+```
+
+This rebuilds/stages 0.2.5 and runs candidate preflight; it does not install or
+run makepkg. Preserve its output before separately authorizing immutable-source
+approval and actual package validation. Existing native AMD acceptance is retained;
+there is no need to repeat the GPU investigation for a version-only change.
+
+### Separate final publication procedure
+
+1. Review this final candidate dev SHA and new native staging evidence.
+2. On explicit publication authorization, update README to
+   `**Current stable release: v0.2.5.**`, remove the upcoming-candidate headline,
+   switch its source-clone example to the stable line, and change the release-note
+   title/status to stable. Do not retain misleading unreleased/development labels
+   once published. Review this documentation handoff before final source approval.
+3. Run final preflight without --candidate against the actual staged binary.
+   This does not substitute for immutable source/actual package gates.
+4. Approve the immutable source commit separately, obtain its real archive and
+   independently verify SHA-256. Fill local release-source.conf in a controlled
+   release workspace; never manufacture a digest or silently change an old one.
+5. Run `makepkg --verifysource --force`, then
+   `makepkg --printsrcinfo > .SRCINFO.tmp && mv -- .SRCINFO.tmp .SRCINFO`;
+   verify version/license/depends/!debug/source/checksums and one pkgname=pivra.
+   Run a clean checked makepkg build, inspect --packagelist (no pivra-debug),
+   package files/ELF/source/notices and native install/remove acceptance.
+6. Main promotion, tag, GitHub Release and AUR remain separate authorized actions.
+
+Intel/NVIDIA untested; Vulkan GPU adapter absent; native HDR visual preservation,
+hardware decoding and end-to-end zero-copy unproven. No new platform guarantees.
+
+### Final candidate execution record
+
+Codex private Debian SDK, GTK 4.18.6 / GStreamer 1.26.2, 2026-11-07:
+
+| Check | Actual result |
+|---|---|
+| `cargo fmt --check`, `cargo check --locked` | PASS |
+| Strict all-target Clippy, -D warnings | PASS, exit 0, zero warnings |
+| `CARGO_INCREMENTAL=0 cargo test --locked` | 210 PASS, zero failures |
+| Python root / thumbnail / FD05A / GPU / color | 54 / 59 / 9 / 32 / 13 PASS; **167 total**, zero failures |
+| Packaging tests within root count | 21 PASS; exact-target versions, stable/RC wording, notes and source-approval negatives included |
+| Strict C metadata policy | PASS |
+| All examples compile | PASS |
+| GPU-required release frontend build and GNOME helper | PASS |
+| New PREFIX=/usr DESTDIR staging | PASS: actual `Pivra 0.2.5`, native ELF contract and desktop validation |
+| Source/license collection | PASS: 184 locked crate archives, 284 application-source files, notices/LGPL/static-adapter/relink instructions |
+| Old-version install negative | PASS: prior 0.2.4 artifacts rejected before destination writes |
+| X11/Xvfb | PASS: nine verified metadata routes, two-window/rapid-navigation/delete/close lifecycle, 256-level pixels/seek, synthetic view/zoom/pan, controlled async cancellation and window failure races |
+| Staged 0.2.5 real window on X11 | PASS: automatic renderer/backend selection, synchronized texture draw, normal WM close/filter retirement |
+| Sway/Wayland | PASS: lifecycle, pixels/seek, synthetic view/zoom/pan, controlled async cancellation and window failure races |
+| Bash syntax / desktop-file-validate | PASS |
+| Native 0.2.5 Arch makepkg/.SRCINFO/install | NOT RUN, tooling absent and immutable source approval pending |
+| ShellCheck | NOT RUN, unavailable |
+
+Controlled rendering uses explicitly permitted software GL; it is not new native
+hardware or HDR acceptance. Physical AMD and native Arch staging acceptance
+remain the user's pre-bump evidence. No complete GTK suite was run.
+
+Cargo.lock audit confirms only Pivra's own version changed; all other package
+versions/registry checksums are identical. The license collector is unchanged.
+Neither .SRCINFO nor a release-source config/archive hash is synthesized. Static
+recipe assertions confirm one pkgname=pivra and exact options=('!debug'); a real
+makepkg package/debug-archive result cannot be claimed until that separate test.
+
+After committing the clean reviewed tree, run candidate preflight against the
+actual staging tree; final preflight must still reject RC-only documentation.
+The final source SHA is the resulting Git commit reported to the owner, not a
+predicted value written into source approval. **GO for native 0.2.5 candidate
+staging; publication is not authorized.**

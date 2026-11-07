@@ -21,7 +21,7 @@ def main():
     parser.add_argument("--version", required=True, help="Release version, e.g. 0.2.5")
     parser.add_argument("--binary", type=Path, help="Inspect an actual GPU-enabled distribution ELF")
     parser.add_argument("--staging-root", type=Path, help="Inspect an actual PREFIX=/usr DESTDIR staging tree")
-    parser.add_argument("--candidate", action="store_true", help="Preparation only: require current versions consistent, leave target bump/source approval pending")
+    parser.add_argument("--candidate", action="store_true", help="Validate the exact target candidate; publication/source approval remain separate")
     parser.add_argument("--clean-old-packages", action="store_true", help="Delete ONLY old, untracked package archives under packaging/arch")
     args = parser.parse_args()
     version = args.version
@@ -41,7 +41,7 @@ def main():
 
     cargo = tomllib.loads((ROOT / "Cargo.toml").read_text())
     source_version = cargo["package"]["version"]
-    checked_version = source_version if args.candidate else version
+    checked_version = version
     if source_version != checked_version:
         errors.append("Cargo.toml version differs from release version")
     lock = (ROOT / "Cargo.lock").read_text()
@@ -57,24 +57,37 @@ def main():
         errors.append("Check PKGBUILD pkgrel (expected 1 for a new upstream release)")
 
     readme = (ROOT / "README.md").read_text()
-    if not args.candidate and f"v{version}" not in readme and f"version {version}" not in readme:
-        errors.append("README does not mention target release")
-    notes = ROOT / "docs" / "releases" / f"PIVRA_V{version}_RELEASE_NOTES.md"
+    candidate_marker = f"**Upcoming release candidate: v{version}.**"
+    stable_marker = f"**Current stable release: v{version}.**"
     if args.candidate:
-        notes = ROOT / "docs" / "releases" / f"PIVRA_V{version}_RC_VALIDATION.md"
+        if candidate_marker not in readme and stable_marker not in readme:
+            errors.append("README must identify the exact target candidate or current stable release")
+        report = ROOT / "docs" / "releases" / f"PIVRA_V{version}_RC_VALIDATION.md"
+        if not report.is_file():
+            errors.append("Missing candidate validation report")
+    elif stable_marker not in readme or candidate_marker in readme:
+        errors.append("Publication handoff: README must identify target as current stable, not upcoming/unreleased")
+    notes_name = f"PIVRA_V{version}_RELEASE_NOTES.md"
+    notes = ROOT / "docs" / "releases" / notes_name
     if not notes.is_file():
         errors.append(f"Missing release notes: {notes.relative_to(ROOT)}")
     else:
-        s = notes.read_text().lower()
-        if not args.candidate and ("unreleased" in s or "development candidate" in s):
-            errors.append("Release notes still contain draft/unreleased wording")
-    if "unreleased" in readme.lower() and f"v{version}, unreleased" in readme.lower():
-        errors.append("README still labels the release as unreleased")
+        text = notes.read_text()
+        if f"# Pivra v{version}" not in text:
+            errors.append("Release notes version differs from target")
+        if not args.candidate and (
+            "**Status: Published stable release.**" not in text
+            or "release candidate" in text.splitlines()[0].lower()
+        ):
+            errors.append("Publication handoff: release notes must carry published stable status")
+    if notes_name not in recipe:
+        errors.append("PKGBUILD must install target-version release notes")
 
     binary = args.binary
     if args.staging_root:
         shared = args.staging_root / "usr/share"
         required = [
+            f"doc/pivra/{notes_name}",
             "licenses/pivra/LICENSE", "licenses/pivra/video-adapter/COPYING.LGPL-2.1",
             "licenses/pivra/video-adapter/COPYING.LGPL-2",
             "licenses/pivra/third-party/inventory.json",
@@ -97,8 +110,11 @@ def main():
         spec.loader.exec_module(verifier)
         try:
             verifier.verify(binary)
-            print("PASS: actual GPU-enabled distribution ELF")
-        except (ValueError, OSError, subprocess.CalledProcessError) as exc:
+            output = subprocess.run([str(binary.resolve()), "--version"], capture_output=True, text=True, timeout=10, check=True)
+            if output.stdout.strip() != f"Pivra {version}":
+                raise ValueError(f"staged binary version differs: {output.stdout.strip()!r}")
+            print("PASS: actual GPU-enabled distribution ELF and exact binary version")
+        except (ValueError, OSError, subprocess.SubprocessError) as exc:
             errors.append("GPU ELF validation: " + str(exc))
     elif not args.candidate:
         errors.append("Final release preflight requires --binary or --staging-root")
@@ -129,7 +145,7 @@ def main():
         return 1
     if args.candidate:
         print(f"PASS: v{version} preparation preflight; actual source/package version {source_version}")
-        print("BLOCKED publication: explicit version approval/bump, immutable source/hash, native makepkg/package acceptance remain required")
+        print("BLOCKED publication: immutable source/hash approval, actual makepkg/package acceptance and stable-documentation handoff remain required")
         return 0
     print(f"PASS: Pivra v{version} source/document/package preflight")
     print("NEXT: native fmt, Clippy, tests, verified commit archive, makepkg, and explicit publication approval")

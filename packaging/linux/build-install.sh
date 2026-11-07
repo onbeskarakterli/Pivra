@@ -45,6 +45,9 @@ helper="$build_dir/pivra-thumbnail-factory"
 # or scanned even when Cargo built into a different directory.
 cargo_target_dir="$(cargo metadata --locked --no-deps --format-version 1 | python3 -c 'import json,sys; print(json.load(sys.stdin)["target_directory"])')"
 viewer="$cargo_target_dir/release/pivra"
+version=$(python3 -c 'import pathlib,tomllib; print(tomllib.loads(pathlib.Path("Cargo.toml").read_text())["package"]["version"])')
+release_notes="docs/releases/PIVRA_V${version}_RELEASE_NOTES.md"
+[[ -s "$release_notes" ]] || { echo "ERROR: missing release notes for $version" >&2; exit 1; }
 raw_helper="$build_dir/pivra-raw-decoder"
 
 build_all() {
@@ -81,10 +84,10 @@ build_all() {
   distribution=$(mktemp -d "$build_dir/distribution.XXXXXXXX")
   python3 packaging/linux/collect-distribution.py --metadata "$build_dir/metadata.json" \
     --cargo-home "${CARGO_HOME:-$HOME/.cargo}" --output "$distribution/content"
-  python3 - "$viewer" "$helper" "$distribution/content/artifacts.json" <<'PYTHON'
+  python3 - "$viewer" "$helper" "$distribution/content/artifacts.json" "$version" <<'PYTHON'
 import hashlib, json, pathlib, sys
 pathlib.Path(sys.argv[3]).write_text(json.dumps({key: hashlib.sha256(pathlib.Path(path).read_bytes()).hexdigest()
-    for key, path in zip(('viewer', 'helper'), sys.argv[1:3])}) + '\n')
+    for key, path in zip(('viewer', 'helper'), sys.argv[1:3])} | {'version': sys.argv[4]}) + '\n')
 PYTHON
   printf '%s\n' "$distribution/content" > "$build_dir/distribution-current"
   echo 'PASS: Pivra and thumbnail helper built, sources/notices collected'
@@ -106,9 +109,11 @@ case "$action" in
     distribution=$(cat "$build_dir/distribution-current")
     [[ -f "$distribution/Pivra-source.tar.gz" && -f "$distribution/notices/inventory.json" ]] ||
       { echo 'ERROR: incomplete corresponding source collection' >&2; exit 1; }
-    python3 - "$viewer" "$helper" "$distribution/artifacts.json" <<'PYTHON'
+    python3 - "$viewer" "$helper" "$distribution/artifacts.json" "$version" <<'PYTHON'
 import hashlib, json, pathlib, sys
 expected = json.loads(pathlib.Path(sys.argv[3]).read_text())
+if expected.get('version') != sys.argv[4]:
+    sys.exit('FAIL: source version changed since build; rebuild before installation')
 for key, path in zip(('viewer', 'helper'), sys.argv[1:3]):
     if hashlib.sha256(pathlib.Path(path).read_bytes()).hexdigest() != expected[key]:
         sys.exit('FAIL: artifact changed since corresponding source collection: ' + key)
@@ -135,6 +140,7 @@ PYTHON
         "$sharedir/icons/hicolor/$variant/apps/$name.svg"
     done
     install -Dm644 LICENSE "$sharedir/licenses/pivra/LICENSE"
+    install -Dm644 "$release_notes" "$sharedir/doc/pivra/$(basename -- "$release_notes")"
     install -d "$sharedir/licenses/pivra/third-party" "$sharedir/licenses/pivra/video-adapter" \
       "$sharedir/doc/pivra/corresponding-source/crates" "$sharedir/doc/pivra/corresponding-source/video-adapter"
     cp -r --no-preserve=ownership "$distribution/notices/." "$sharedir/licenses/pivra/third-party/"

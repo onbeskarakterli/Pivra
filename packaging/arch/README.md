@@ -261,8 +261,8 @@ Arch release package bytes and installed-helper generation remain NOT RUN here.
 
 ## v0.2.5 GPU distribution preparation
 
-The unchanged development version is still 0.2.4 until a separate bump is
-approved. GPU distribution builds are mandatory and check native GStreamer
+The current development release candidate is 0.2.5. Version preparation is
+authorized; immutable source approval and actual makepkg validation remain separate. GPU distribution builds are mandatory and check native GStreamer
 headers, runtime plugins, actual Arch file ownership and the resulting ELF.
 Both LGPL texts and corresponding modified adapter sources are installed.
 See [the candidate report](../../docs/releases/PIVRA_V0.2.5_RC_VALIDATION.md)
@@ -292,3 +292,32 @@ stock codec/audio dependency set; it is no longer described as the GL provider.
 No codec dependency is removed on the basis of this single ownership correction.
 The old archived split-recipe evidence in the release preparation report remains
 historical; this native finding supersedes its OpenGL ownership entry.
+
+## 0.2.5 final candidate version handoff
+
+Cargo.toml, the Pivra entry in Cargo.lock and PKGBUILD now declare 0.2.5; pkgrel=1
+and options=('!debug') are preserved. The recipe installs the 0.2.5 release notes
+and candidate report, not the old 0.2.4 notes. It defines one pkgname=pivra and
+must not produce pivra-debug. A real makepkg package list is still a native gate.
+
+No release-source.conf, application archive checksum or .SRCINFO is invented.
+Keep local approval inputs/generated metadata out of the application repository.
+After separate source approval, in an isolated release workspace:
+
+```sh
+makepkg --verifysource --force
+makepkg --printsrcinfo > .SRCINFO.tmp && mv -- .SRCINFO.tmp .SRCINFO
+makepkg --cleanbuild --force
+makepkg --packagelist
+```
+
+Inspect the actual .SRCINFO: pkgver=0.2.5, pkgrel=1, only pkgname=pivra, the
+approved immutable source and both real SHA-256 values, !debug, native dependencies
+and license. Inspect actual package contents/ELF/notices/sources; no pivra-debug
+archive is expected. These commands are not claimed executed in Codex.
+
+README and release notes intentionally say release candidate now. On separately
+authorized publication, change them to current stable v0.2.5, update the source
+clone example to the stable line and run final preflight before approving the
+final immutable archive. Do not publish dev's candidate/unreleased wording as
+current stable, and do not silently change a previously approved source hash.

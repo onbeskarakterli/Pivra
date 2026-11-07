@@ -17,4 +17,4 @@ test -s "$stage/usr/share/doc/pivra/corresponding-source/Pivra-source.tar.gz"
 desktop-file-validate "$stage/usr/share/applications/io.github.onbeskarakterli.Pivra.desktop"
 python3 scripts/release_preflight.py --version 0.2.5 --candidate --staging-root "$stage"
 printf 'PASS native Arch DESTDIR staging: %s\n' "$stage"
-echo 'NOT RUN: makepkg/installation. This is the current development version, not an approved 0.2.5 release.'
+echo 'NOT RUN: makepkg/installation. Version 0.2.5 is a release candidate; source approval and publication remain separate.'

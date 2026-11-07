@@ -117,16 +117,57 @@ class ReleasePreflight(unittest.TestCase):
              contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(io.StringIO()):
             return preflight.main()
 
-    def test_candidate_does_not_approve_unbumped_release(self):
+    def fixture(self, root, version='0.2.5', stable=False):
+        (root / 'packaging/arch').mkdir(parents=True)
+        (root / 'docs/releases').mkdir(parents=True)
+        (root / 'Cargo.toml').write_text(f'[package]\nversion="{version}"\n')
+        (root / 'Cargo.lock').write_text(f'name = "pivra"\nversion = "{version}"\n')
+        (root / 'packaging/arch/PKGBUILD').write_text(
+            f"pkgver={version}\npkgrel=1\noptions=('!debug')\n# Install PIVRA_V0.2.5_RELEASE_NOTES.md\n")
+        marker = 'Current stable release' if stable else 'Upcoming release candidate'
+        (root / 'README.md').write_text(f'**{marker}: v0.2.5.**')
+        (root / 'docs/releases/PIVRA_V0.2.5_RC_VALIDATION.md').write_text('candidate validation')
+        status = 'Published stable release.' if stable else 'Release candidate (not published).'
+        title = 'Stable release' if stable else 'Release candidate'
+        (root / 'docs/releases/PIVRA_V0.2.5_RELEASE_NOTES.md').write_text(f'# Pivra v0.2.5 — {title}\n**Status: {status}**\n')
+
+    def test_candidate_rejects_unbumped_source(self):
         with tempfile.TemporaryDirectory() as d:
-            root = Path(d); (root / 'packaging/arch').mkdir(parents=True); (root / 'docs/releases').mkdir(parents=True)
-            (root / 'Cargo.toml').write_text('[package]\nversion="0.2.4"\n')
-            (root / 'Cargo.lock').write_text('name = "pivra"\nversion = "0.2.4"\n')
-            (root / 'packaging/arch/PKGBUILD').write_text("pkgver=0.2.4\npkgrel=1\noptions=('!debug')\n")
-            (root / 'README.md').write_text('v0.2.4')
-            (root / 'docs/releases/PIVRA_V0.2.5_RC_VALIDATION.md').write_text('development candidate')
+            root = Path(d); self.fixture(root, version='0.2.4')
+            self.assertEqual(self.invoke(root, True), 1)
+            self.assertEqual(self.invoke(root, False), 1)
+
+    def test_exact_candidate_passes_without_publication_approval(self):
+        with tempfile.TemporaryDirectory() as d:
+            root = Path(d); self.fixture(root)
             self.assertEqual(self.invoke(root, True), 0)
             self.assertEqual(self.invoke(root, False), 1)
+
+    def test_lock_recipe_versions_must_match_target(self):
+        for name in ('Cargo.lock', 'packaging/arch/PKGBUILD'):
+            with self.subTest(name=name), tempfile.TemporaryDirectory() as d:
+                root = Path(d); self.fixture(root)
+                path = root / name; path.write_text(path.read_text().replace('0.2.5', '0.2.4'))
+                self.assertEqual(self.invoke(root, True), 1)
+
+    def test_candidate_requires_actual_target_release_notes(self):
+        with tempfile.TemporaryDirectory() as d:
+            root = Path(d); self.fixture(root)
+            (root / 'docs/releases/PIVRA_V0.2.5_RELEASE_NOTES.md').unlink()
+            self.assertEqual(self.invoke(root, True), 1)
+
+    def test_stable_status_requires_both_readme_and_notes(self):
+        with tempfile.TemporaryDirectory() as d:
+            root = Path(d); self.fixture(root, stable=True)
+            # A consistent stable header passes wording checks; an ELF is still
+            # mandatory. Capture diagnostics to distinguish the independent gate.
+            with mock.patch.object(preflight, 'ROOT', root), mock.patch.object(preflight, 'ARCH', root/'packaging/arch'), \
+                 mock.patch.object(preflight, 'git', side_effect=lambda *a: 'dev' if a[0]=='branch' else ''), \
+                 mock.patch('sys.argv', ['preflight','--version','0.2.5']), \
+                 contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(io.StringIO()) as errors:
+                self.assertEqual(preflight.main(), 1)
+            self.assertIn('requires --binary or --staging-root', errors.getvalue())
+            self.assertNotIn('Publication handoff', errors.getvalue())
 
     def test_arch_source_approval_still_mandatory(self):
         with tempfile.TemporaryDirectory() as d:
@@ -200,6 +241,9 @@ class ArchOwnershipGate(unittest.TestCase):
                         'gst-plugins-good', 'gst-plugins-bad-libs', 'gst-libav'):
             self.assertIn("'" + package + "'", depends)
         self.assertIn("options=('!debug')", recipe)
+        self.assertRegex(recipe, r'(?m)^pkgname=pivra$')
+        self.assertNotIn('pkgname=(', recipe)
+        self.assertNotIn('package_pivra-debug()', recipe)
 
 class RuntimeGate(unittest.TestCase):
     def test_missing_h264_decoder_fails_without_retry(self):

@@ -23,9 +23,17 @@ class BuildHelperPolicy(unittest.TestCase):
                         '-o', str(cls.build_script)], check=True)
         cls.tools = cls.root / 'tools'
         cls.tools.mkdir()
-        (cls.tools / 'pkg-config').write_text('#!/bin/sh\nexit "${NO_API:-0}"\n')
+        (cls.tools / 'pkg-config').write_text('#!/bin/sh\ncase "$*" in *gstreamer*) exit 0;; *) exit "${NO_API:-0}";; esac\n')
+        # These tests isolate the GNOME helper policy, not native GPU compilation.
+        # Model successful GPU objects so root build.rs still exercises its real
+        # mandatory GPU branch; actual C/Cargo GPU builds are separate gates.
         (cls.tools / 'cc').write_text(
-            '#!/bin/sh\nprintf "called\\n" >> "$CC_LOG"\nexit "${CC_FAIL:-0}"\n')
+            '#!/bin/sh\ncase " $* " in *" native/video/"*)\n'
+            '  output=""; previous=""\n'
+            '  for arg in "$@"; do [ "$previous" != -o ] || output="$arg"; previous="$arg"; done\n'
+            '  printf "modeled GPU object\\n" > "$output"\n'
+            '  printf "gpu\\n" >> "$GPU_CC_LOG"; exit 0;; esac\n'
+            'printf "called\\n" >> "$CC_LOG"\nexit "${CC_FAIL:-0}"\n')
         for path in cls.tools.iterdir():
             path.chmod(0o755)
         source = (ROOT / 'src/thumbnail.rs').read_text()
@@ -49,11 +57,14 @@ class BuildHelperPolicy(unittest.TestCase):
         env.pop('PIVRA_DISTRIBUTION_BUILD', None)
         env.update(PATH=str(self.tools) + os.pathsep + env['PATH'],
                    OUT_DIR=str(out), CC_LOG=str(log), NO_API=str(int(no_api)),
-                   CC_FAIL=str(int(fail_build)))
+                   CC_FAIL=str(int(fail_build)), GPU_CC_LOG=str(folder / 'gpu-cc.log'),
+                   CC=str(self.tools / 'cc'), AR=shutil.which('ar'))
         if mode is not None:
             env['PIVRA_DISTRIBUTION_BUILD'] = mode
         result = subprocess.run([str(self.build_script)], env=env, check=True,
                                 capture_output=True, text=True)
+        self.assertEqual((folder / 'gpu-cc.log').read_text().splitlines(), ['gpu'] * 4)
+        self.assertTrue((out / 'libpivra_video_gpu.a').is_file())
         self.assertIn('cargo:rerun-if-env-changed=PIVRA_DISTRIBUTION_BUILD', result.stdout)
         self.last_build_output = result.stdout
         status = ('runtime-sibling' if mode == '1' else

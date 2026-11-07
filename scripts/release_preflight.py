@@ -1,11 +1,14 @@
 #!/usr/bin/env python3
 """Release preflight for Pivra; stdlib-only and safe by default."""
 import argparse
+import importlib.util
 from pathlib import Path
 import re
 import subprocess
 import sys
 import tomllib
+
+sys.dont_write_bytecode = True
 
 ROOT = Path(__file__).resolve().parents[1]
 ARCH = ROOT / "packaging" / "arch"
@@ -16,6 +19,9 @@ def git(*args):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--version", required=True, help="Release version, e.g. 0.2.5")
+    parser.add_argument("--binary", type=Path, help="Inspect an actual GPU-enabled distribution ELF")
+    parser.add_argument("--staging-root", type=Path, help="Inspect an actual PREFIX=/usr DESTDIR staging tree")
+    parser.add_argument("--candidate", action="store_true", help="Preparation only: require current versions consistent, leave target bump/source approval pending")
     parser.add_argument("--clean-old-packages", action="store_true", help="Delete ONLY old, untracked package archives under packaging/arch")
     args = parser.parse_args()
     version = args.version
@@ -34,14 +40,16 @@ def main():
         errors.append(f"Git status unavailable: {exc}")
 
     cargo = tomllib.loads((ROOT / "Cargo.toml").read_text())
-    if cargo["package"]["version"] != version:
+    source_version = cargo["package"]["version"]
+    checked_version = source_version if args.candidate else version
+    if source_version != checked_version:
         errors.append("Cargo.toml version differs from release version")
     lock = (ROOT / "Cargo.lock").read_text()
-    if not re.search(r'(?m)^name = "pivra"\nversion = "' + re.escape(version) + r'"$', lock):
+    if not re.search(r'(?m)^name = "pivra"\nversion = "' + re.escape(checked_version) + r'"$', lock):
         errors.append("Cargo.lock pivra package version differs")
 
     recipe = (ARCH / "PKGBUILD").read_text()
-    if not re.search(r"(?m)^pkgver=" + re.escape(version) + r"$", recipe):
+    if not re.search(r"(?m)^pkgver=" + re.escape(checked_version) + r"$", recipe):
         errors.append("PKGBUILD pkgver differs")
     if not re.search(r"(?m)^options=\(['\"]!debug['\"]\)$", recipe):
         errors.append("PKGBUILD must contain options=('!debug')")
@@ -49,17 +57,51 @@ def main():
         errors.append("Check PKGBUILD pkgrel (expected 1 for a new upstream release)")
 
     readme = (ROOT / "README.md").read_text()
-    if f"v{version}" not in readme and f"version {version}" not in readme:
+    if not args.candidate and f"v{version}" not in readme and f"version {version}" not in readme:
         errors.append("README does not mention target release")
     notes = ROOT / "docs" / "releases" / f"PIVRA_V{version}_RELEASE_NOTES.md"
+    if args.candidate:
+        notes = ROOT / "docs" / "releases" / f"PIVRA_V{version}_RC_VALIDATION.md"
     if not notes.is_file():
         errors.append(f"Missing release notes: {notes.relative_to(ROOT)}")
     else:
         s = notes.read_text().lower()
-        if "unreleased" in s or "development candidate" in s:
+        if not args.candidate and ("unreleased" in s or "development candidate" in s):
             errors.append("Release notes still contain draft/unreleased wording")
     if "unreleased" in readme.lower() and f"v{version}, unreleased" in readme.lower():
         errors.append("README still labels the release as unreleased")
+
+    binary = args.binary
+    if args.staging_root:
+        shared = args.staging_root / "usr/share"
+        required = [
+            "licenses/pivra/LICENSE", "licenses/pivra/video-adapter/COPYING.LGPL-2.1",
+            "licenses/pivra/video-adapter/COPYING.LGPL-2",
+            "licenses/pivra/third-party/inventory.json",
+            "doc/pivra/corresponding-source/VIDEO_ADAPTER_REBUILD.md",
+            "doc/pivra/corresponding-source/video-adapter/gtkgstmediafile.c",
+        ]
+        for name in required:
+            if not (shared / name).is_file() or (shared / name).stat().st_size == 0:
+                errors.append("Missing staged source/notice: " + name)
+        source_dir = shared / "doc/pivra/corresponding-source"
+        if not any((source_dir / name).is_file() and (source_dir / name).stat().st_size
+                   for name in ("Pivra-source.tar.gz", f"pivra-{source_version}.tar.gz")):
+            errors.append("Missing staged application corresponding source archive")
+        if not (args.staging_root / "usr/bin/pivra-thumbnail-factory").is_file():
+            errors.append("Missing staged GNOME thumbnail helper")
+        binary = binary or args.staging_root / "usr/bin/pivra"
+    if binary:
+        spec = importlib.util.spec_from_file_location("video_elf_contract", ROOT / "packaging/linux/verify-video-binary.py")
+        verifier = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(verifier)
+        try:
+            verifier.verify(binary)
+            print("PASS: actual GPU-enabled distribution ELF")
+        except (ValueError, OSError, subprocess.CalledProcessError) as exc:
+            errors.append("GPU ELF validation: " + str(exc))
+    elif not args.candidate:
+        errors.append("Final release preflight requires --binary or --staging-root")
 
     old = sorted(set(ARCH.glob("pivra-*.pkg.tar.*")) | set(ARCH.glob("pivra-*.tar.gz")))
     old = [p for p in old if not p.name.startswith(f"pivra-{version}-") and p.name != f"pivra-{version}.tar.gz"]
@@ -85,6 +127,10 @@ def main():
         for msg in errors:
             print(f"FAIL: {msg}", file=sys.stderr)
         return 1
+    if args.candidate:
+        print(f"PASS: v{version} preparation preflight; actual source/package version {source_version}")
+        print("BLOCKED publication: explicit version approval/bump, immutable source/hash, native makepkg/package acceptance remain required")
+        return 0
     print(f"PASS: Pivra v{version} source/document/package preflight")
     print("NEXT: native fmt, Clippy, tests, verified commit archive, makepkg, and explicit publication approval")
     return 0

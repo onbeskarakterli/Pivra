@@ -166,3 +166,13 @@ playback benchmark, and no stock-vs-integrated memory delta is established.
 The sink proposes 2–8 buffers, bounds pending presentation callbacks to two,
 and accepts at most 32 MiB RGBA frames; discovery is limited to two active jobs.
 Native high-resolution performance/VRAM measurement remains open.
+
+## Subsequent native acceptance and packaging preparation
+
+The user subsequently accepted the integrated automatic backend on AMD RX 7900 XT
+with three BT.709 H.264 videos (720×1142, 1080×1712, 1080×1920), GLMemory/sync,
+MPV-like colors, sound, controls and navigation, without a custom GTK or manual
+backend enablement. This supersedes the pending AMD integration acceptance above;
+it does not extend acceptance to Intel/NVIDIA/Vulkan/HDR/zero-copy.
+The distribution build gate, source/license collection, staging results and open
+release gates are in [v0.2.5 preparation](../releases/PIVRA_V0.2.5_RC_VALIDATION.md).

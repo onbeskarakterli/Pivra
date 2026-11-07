@@ -72,6 +72,23 @@ fn main() {
         .build();
     app.register(None::<&gio::Cancellable>).unwrap();
     let args: Vec<_> = std::env::args_os().skip(1).collect();
+    if args.first().is_some_and(|arg| arg == "--routing-only") {
+        for argument in &args[1..] {
+            let argument = argument.to_str().expect("routing fixture UTF-8 path");
+            let (expected, path) = argument.split_once('=').expect("gpu=path or stock=path");
+            let expected = match expected {
+                "gpu" => image_view::gpu_video::Backend::Gpu,
+                "stock" => image_view::gpu_video::Backend::Stock,
+                _ => panic!("unknown expected route"),
+            };
+            let actual = glib::MainContext::default()
+                .block_on(image_view::gpu_video::choose(path.into(), || true));
+            assert_eq!(actual, Some(expected), "metadata route: {path}");
+            println!("PASS production metadata route {expected:?}: {path}");
+        }
+        assert_eq!(stats().filters, 0, "routing does not start a GPU player");
+        return;
+    }
     assert_eq!(
         args.len(),
         4,

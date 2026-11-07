@@ -8,7 +8,7 @@ mode="${1:-check}"
 
 check() {
   local failed=0 bin module
-  for bin in cargo rustc cc pkg-config python3 bwrap; do
+  for bin in cargo rustc cc ar readelf pkg-config python3 bwrap gst-inspect-1.0; do
     if ! command -v "$bin" >/dev/null 2>&1; then
       echo "MISSING COMMAND: $bin"; failed=1
     fi
@@ -25,11 +25,14 @@ check() {
       { echo 'REQUIRES GTK4 >= 4.16 development package'; failed=1; }
     pkg-config --atleast-version=1.2 libadwaita-1 ||
       { echo 'REQUIRES libadwaita >= 1.2 development package'; failed=1; }
-    for module in gnome-desktop-4 gio-2.0 gobject-2.0 gdk-pixbuf-2.0 lcms2 libseccomp; do
+    for module in gnome-desktop-4 gio-2.0 gobject-2.0 gdk-pixbuf-2.0 lcms2 libseccomp gstreamer-video-1.0 gstreamer-gl-1.0 gstreamer-allocators-1.0 gstreamer-pbutils-1.0; do
       pkg-config --exists "$module" ||
         { echo "MISSING NATIVE MODULE: $module"; failed=1; }
     done
   fi
+  pkg-config --atleast-version=1.24 gstreamer-gl-1.0 2>/dev/null ||
+    { echo 'REQUIRES GStreamer GL >= 1.24 development package'; failed=1; }
+  if ! bash "$(dirname -- "${BASH_SOURCE[0]}")/video-runtime-check.sh"; then failed=1; fi
   if [[ "${PIVRA_BUILD_EXPERIMENTAL_RAW:-0}" == 1 ]]; then
     command -v c++ >/dev/null 2>&1 ||
       { echo 'MISSING COMMAND: c++ (experimental RAW build)'; failed=1; }
@@ -50,19 +53,25 @@ ids=" ${ID:-} ${ID_LIKE:-} "
 if [[ "$ids" == *" arch "* ]]; then
   sudo pacman -S --needed -- base-devel rust cargo pkgconf python gtk4 libadwaita \
     gnome-desktop-4 gdk-pixbuf2 glycin bubblewrap libseccomp lcms2 \
-    fontconfig cairo graphene hicolor-icon-theme
+    fontconfig cairo graphene hicolor-icon-theme \
+    gstreamer gst-plugins-base-libs gst-plugins-base gst-plugins-good gst-plugins-bad-libs gst-libav
 elif [[ "$ids" == *" fedora "* || "$ids" == *" rhel "* ]]; then
   sudo dnf install -- gcc make rust cargo pkgconf-pkg-config python3 \
     gtk4-devel libadwaita-devel gnome-desktop4-devel glib2-devel \
     gdk-pixbuf2-devel lcms2-devel libseccomp-devel glycin-loaders \
-    bubblewrap fontconfig-devel cairo-devel graphene-devel hicolor-icon-theme
+    bubblewrap fontconfig-devel cairo-devel graphene-devel hicolor-icon-theme \
+    gstreamer1-devel gstreamer1-plugins-base-devel gstreamer1-plugins-base \
+    gstreamer1-plugins-good gstreamer1-plugins-bad-free
+  echo 'H.264 decoder availability depends on Fedora codec repositories; runtime gate remains mandatory.'
 elif [[ "$ids" == *" debian "* || "$ids" == *" ubuntu "* ]]; then
   sudo apt-get update
   sudo apt-get install -- build-essential rustc cargo pkg-config python3 \
     libgtk-4-dev libadwaita-1-dev libgnome-desktop-4-dev libglib2.0-dev \
     libgdk-pixbuf-2.0-dev liblcms2-dev libseccomp-dev glycin-loaders \
     bubblewrap libfontconfig-dev libcairo2-dev libgraphene-1.0-dev \
-    hicolor-icon-theme
+    hicolor-icon-theme libgstreamer1.0-dev libgstreamer-plugins-base1.0-dev \
+    gstreamer1.0-tools gstreamer1.0-gl gstreamer1.0-plugins-base \
+    gstreamer1.0-plugins-good gstreamer1.0-plugins-bad gstreamer1.0-libav
 elif [[ "$ids" == *" opensuse "* || "$ids" == *" suse "* ]]; then
   echo 'openSUSE package names vary by repository; install prerequisites manually.'
   echo 'Check required APIs with: make check'

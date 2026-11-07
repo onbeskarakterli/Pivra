@@ -19,17 +19,19 @@ The normal Cargo build compiles these C sources into a static adapter archive
 and links system GTK/GStreamer shared libraries. No downloaded source, runtime
 module path, Python or custom GTK build is required. Build requires a C compiler,
 `ar`, pkg-config, GTK development files and GStreamer >=1.24 GL, video,
-allocators and pbutils development APIs. Missing APIs retain stock-only support
-with a diagnostic. C compilation errors stop the build. For a controlled
+allocators and pbutils development APIs. Missing APIs retain stock-only support in ordinary development builds
+with a diagnostic; `PIVRA_DISTRIBUTION_BUILD=1` makes them fatal and rejects the
+GPU-build opt-out. C compilation errors stop the build. For a controlled
 stock-only build: `PIVRA_DISABLE_GPU_BUILD=1 cargo build --locked`.
 
 Distributors must retain upstream notices/license texts, provide corresponding
 modified adapter source and build instructions, and satisfy applicable LGPL
 relinking obligations. Rebuilding this GPL application from complete source
 with modified LGPL adapter sources is supported by `cargo build --locked` with
-the same native development APIs. Distribution/license-document collection and
-Arch packaging changes remain a separate task; no packaging files are changed
-by this integration.
+the same native development APIs. The Arch and portable source frontends now collect adapter notices/sources and
+locked crate sources. See `docs/diagnostics/VIDEO_ADAPTER_REBUILD.md` for the
+complete-source rebuilding/relinking procedure and package paths. Actual native
+Arch package validation remains a separate acceptance step.
 
 See `docs/diagnostics/VIDEO_COLOR_STOCK_GTK_INTEGRATION.md` for eligibility,
 lifecycle, test evidence and remaining native acceptance requirements.

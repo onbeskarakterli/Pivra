@@ -25,13 +25,18 @@ if [[ -n "$destdir" && "$destdir" != /* ]]; then
   exit 2
 fi
 
-for cmd in cargo rustc cc pkg-config install python3; do
+for cmd in cargo rustc cc ar readelf pkg-config install python3; do
   command -v "$cmd" >/dev/null || { printf 'ERROR: missing command: %s\n' "$cmd" >&2; exit 1; }
 done
 pkg-config --atleast-version=4.16 gtk4 || { echo 'ERROR: GTK >= 4.16 required' >&2; exit 1; }
 pkg-config --atleast-version=1.2 libadwaita-1 || { echo 'ERROR: libadwaita >= 1.2 required' >&2; exit 1; }
 pkg-config --exists gnome-desktop-4 gio-2.0 gobject-2.0 gdk-pixbuf-2.0 lcms2 libseccomp ||
   { echo 'ERROR: missing native development libraries (GNOME Desktop 4, GLib/GDK, LCMS2 or libseccomp)' >&2; exit 1; }
+
+pkg-config --atleast-version=1.24 gstreamer-gl-1.0 || { echo 'ERROR: GStreamer GL >= 1.24 required' >&2; exit 1; }
+pkg-config --exists gstreamer-video-1.0 gstreamer-allocators-1.0 gstreamer-pbutils-1.0 ||
+  { echo 'ERROR: GPU adapter development APIs required' >&2; exit 1; }
+bash packaging/linux/video-runtime-check.sh
 
 build_dir="$root/target/pivra-native"
 helper="$build_dir/pivra-thumbnail-factory"
@@ -46,6 +51,7 @@ build_all() {
   [[ -z "${LCMS2_STATIC+x}" && -z "${LCMS2_LIB_DIR+x}" ]] ||
     { echo 'ERROR: LCMS2 overrides are not supported for distribution builds' >&2; return 1; }
   mkdir -p "$build_dir"
+  rm -f -- "$build_dir/distribution-current"
   # The helper must be installed alongside the viewer; never embed Cargo OUT_DIR.
   read -r -a cc_args <<< "${CC:-cc}"
   read -r -a cpp_args <<< "${CPPFLAGS:-}"
@@ -69,7 +75,19 @@ build_all() {
     echo 'ERROR: viewer embeds temporary thumbnail helper path' >&2
     return 1
   fi
-  echo 'PASS: Pivra and thumbnail helper built'
+  python3 packaging/linux/verify-video-binary.py "$viewer"
+  cargo metadata --locked --offline --format-version 1 > "$build_dir/metadata.json"
+  # New evidence directory per build; failure never makes partial evidence installable.
+  distribution=$(mktemp -d "$build_dir/distribution.XXXXXXXX")
+  python3 packaging/linux/collect-distribution.py --metadata "$build_dir/metadata.json" \
+    --cargo-home "${CARGO_HOME:-$HOME/.cargo}" --output "$distribution/content"
+  python3 - "$viewer" "$helper" "$distribution/content/artifacts.json" <<'PYTHON'
+import hashlib, json, pathlib, sys
+pathlib.Path(sys.argv[3]).write_text(json.dumps({key: hashlib.sha256(pathlib.Path(path).read_bytes()).hexdigest()
+    for key, path in zip(('viewer', 'helper'), sys.argv[1:3])}) + '\n')
+PYTHON
+  printf '%s\n' "$distribution/content" > "$build_dir/distribution-current"
+  echo 'PASS: Pivra and thumbnail helper built, sources/notices collected'
   [[ "${PIVRA_BUILD_EXPERIMENTAL_RAW:-0}" != 1 ]] || echo 'PASS: experimental RAW helper built (not installed by default)'
 }
 
@@ -83,6 +101,18 @@ case "$action" in
       echo "ERROR: experimental RAW helper missing; rebuild with PIVRA_BUILD_EXPERIMENTAL_RAW=1" >&2
       exit 1
     fi
+    python3 packaging/linux/verify-video-binary.py "$viewer"
+    [[ -r "$build_dir/distribution-current" ]] || { echo 'ERROR: build distribution sources first' >&2; exit 1; }
+    distribution=$(cat "$build_dir/distribution-current")
+    [[ -f "$distribution/Pivra-source.tar.gz" && -f "$distribution/notices/inventory.json" ]] ||
+      { echo 'ERROR: incomplete corresponding source collection' >&2; exit 1; }
+    python3 - "$viewer" "$helper" "$distribution/artifacts.json" <<'PYTHON'
+import hashlib, json, pathlib, sys
+expected = json.loads(pathlib.Path(sys.argv[3]).read_text())
+for key, path in zip(('viewer', 'helper'), sys.argv[1:3]):
+    if hashlib.sha256(pathlib.Path(path).read_bytes()).hexdigest() != expected[key]:
+        sys.exit('FAIL: artifact changed since corresponding source collection: ' + key)
+PYTHON
     bindir="$destdir$prefix/bin"
     sharedir="$destdir$prefix/share"
     install -Dm755 "$viewer" "$bindir/pivra"
@@ -105,7 +135,15 @@ case "$action" in
         "$sharedir/icons/hicolor/$variant/apps/$name.svg"
     done
     install -Dm644 LICENSE "$sharedir/licenses/pivra/LICENSE"
+    install -d "$sharedir/licenses/pivra/third-party" "$sharedir/licenses/pivra/video-adapter" \
+      "$sharedir/doc/pivra/corresponding-source/crates" "$sharedir/doc/pivra/corresponding-source/video-adapter"
+    cp -r --no-preserve=ownership "$distribution/notices/." "$sharedir/licenses/pivra/third-party/"
+    cp -r --no-preserve=ownership "$distribution/crates/." "$sharedir/doc/pivra/corresponding-source/crates/"
+    install -m644 "$distribution/Pivra-source.tar.gz" "$distribution/source-manifest.json" "$sharedir/doc/pivra/corresponding-source/"
+    install -m644 native/video/COPYING.LGPL-* "$sharedir/licenses/pivra/video-adapter/"
+    cp -r --no-preserve=ownership native/video/. "$sharedir/doc/pivra/corresponding-source/video-adapter/"
+    install -m644 docs/diagnostics/VIDEO_ADAPTER_REBUILD.md "$sharedir/doc/pivra/corresponding-source/"
     echo "PASS: Pivra installed to $destdir$prefix"
-    echo 'NOTE: If distributing binaries, review third-party license and corresponding-source obligations.'
+    echo 'Source snapshot is a staging artifact, not an approved release archive.'
     ;;
 esac

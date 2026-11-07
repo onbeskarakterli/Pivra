@@ -1,4 +1,10 @@
 use std::{env, path::PathBuf, process::Command};
+fn unavailable(reason: &str) {
+    if env::var("PIVRA_DISTRIBUTION_BUILD").as_deref() == Ok("1") {
+        panic!("GPU backend REQUIRED for distribution build: {reason}");
+    }
+    println!("cargo::metadata=video-gpu-status=unavailable:{reason}");
+}
 pub fn build() {
     println!("cargo:rustc-check-cfg=cfg(pivra_gpu_backend)");
     println!("cargo:rerun-if-changed=native/video");
@@ -9,10 +15,14 @@ pub fn build() {
         "AR",
         "PKG_CONFIG_LIBDIR",
         "PIVRA_DISABLE_GPU_BUILD",
+        "PIVRA_DISTRIBUTION_BUILD",
+        "PKG_CONFIG_PATH",
+        "PKG_CONFIG_SYSROOT_DIR",
     ] {
         println!("cargo:rerun-if-env-changed={name}");
     }
     if env::var_os("PIVRA_DISABLE_GPU_BUILD").is_some_and(|v| v == "1") {
+        unavailable("PIVRA_DISABLE_GPU_BUILD=1 conflicts with mandatory GPU support");
         return;
     }
     if !Command::new("pkg-config")
@@ -20,7 +30,7 @@ pub fn build() {
         .status()
         .is_ok_and(|s| s.success())
     {
-        println!("cargo::metadata=video-gpu-status=unavailable:requires-native-gstreamer-1.24");
+        unavailable("requires native GStreamer GL >=1.24 development APIs (pkg-config)");
         return;
     }
     let packages = [
@@ -37,10 +47,11 @@ pub fn build() {
             .output()
     };
     let (Ok(cflags), Ok(libs)) = (flags("--cflags"), flags("--libs")) else {
+        unavailable("cannot execute pkg-config for GPU native APIs");
         return;
     };
     if !cflags.status.success() || !libs.status.success() {
-        println!("cargo::metadata=video-gpu-status=unavailable:missing-native-development-api");
+        unavailable("missing GTK/GStreamer video, GL, allocators or pbutils development APIs");
         return;
     }
     let out = PathBuf::from(env::var_os("OUT_DIR").unwrap());

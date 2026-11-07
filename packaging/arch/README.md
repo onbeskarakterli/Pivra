@@ -258,3 +258,16 @@ Real Cargo distribution-mode debug build and byte scan PASS. The exact recipe
 artifact guard accepts a clean controlled file and rejects a leaked-path file;
 Bash syntax and missing-source-approval negative checks PASS. Actual updated
 Arch release package bytes and installed-helper generation remain NOT RUN here.
+
+## v0.2.5 GPU distribution preparation
+
+The unchanged development version is still 0.2.4 until a separate bump is
+approved. GPU distribution builds are mandatory and check native GStreamer
+headers, runtime plugins, actual Arch file ownership and the resulting ELF.
+Both LGPL texts and corresponding modified adapter sources are installed.
+See [the candidate report](../../docs/releases/PIVRA_V0.2.5_RC_VALIDATION.md)
+and [rebuild/relink instructions](../../docs/diagnostics/VIDEO_ADAPTER_REBUILD.md).
+For clean native Arch **DESTDIR staging only**, run
+`bash packaging/arch/stage-video-candidate.sh` from the repository root.
+The immutable release-source.conf/hash guard and options=('!debug') remain;
+this staging command is not makepkg, AUR or publication approval.

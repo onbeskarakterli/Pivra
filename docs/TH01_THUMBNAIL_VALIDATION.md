@@ -1,5 +1,11 @@
 # PIV-18 / TH-01 — GNOME thumbnail sağlayıcısı — NATIVE ACCEPTED
 
+**Freshness policy update:** The ctime-vs-cache-mtime rule in historical acceptance
+item 5 below was intentionally removed in `d9bbcc1` to preserve valid cache reuse
+after Trash restore. The current GNOME contract and corrected regressions are in
+[THUMBNAIL_CACHE_FRESHNESS.md](THUMBNAIL_CACHE_FRESHNESS.md). Earlier results below
+remain historical; in-flight FileKey/cancellation checks are still required.
+
 Güncel durum: Kullanıcı 25.10.2026 TH-02 talimatında TH-01 native kabulünün
 başarılı olduğunu bildirdi. Bu kullanıcı kaynaklı kabul, Codex tarafından
 bağımsız GNOME testi değildir; ayrıntılı yeni çıktı veya test SHA’sı verilmedi.

@@ -741,6 +741,30 @@ mod tests {
         token.cancel();
         assert!(png_container(bytes, &token).is_err());
     }
+    fn candidate(source: &Path, cache: &Path) -> Candidate {
+        Candidate {
+            uri: gio::File::for_path(source).uri().to_string(),
+            source: FileKey::read(source).unwrap(),
+            thumbnail: FileKey::read(cache).unwrap(),
+            png: vec![],
+        }
+    }
+    fn replace_with_mtime(path: &Path, content: &[u8]) {
+        let before = fs::metadata(path).unwrap();
+        let temp = path.with_extension("replacement");
+        fs::write(&temp, content).unwrap();
+        fs::File::options()
+            .write(true)
+            .open(&temp)
+            .unwrap()
+            .set_times(fs::FileTimes::new().set_modified(before.modified().unwrap()))
+            .unwrap();
+        fs::rename(&temp, path).unwrap();
+        assert_eq!(
+            fs::metadata(path).unwrap().modified().unwrap(),
+            before.modified().unwrap()
+        );
+    }
     #[test]
     fn candidate_identity_catches_replace_rename_and_cache_delete() {
         let d = tempfile::tempdir().unwrap();
@@ -748,22 +772,54 @@ mod tests {
         let cache = d.path().join("cache.png");
         fs::write(&source, b"original").unwrap();
         fs::write(&cache, b"cached").unwrap();
-        let candidate = Candidate {
-            uri: gio::File::for_path(&source).uri().to_string(),
-            source: FileKey::read(&source).unwrap(),
-            thumbnail: FileKey::read(&cache).unwrap(),
-            png: vec![],
-        };
         let token = gio::Cancellable::new();
-        assert!(candidate.still_current(&token));
-        let temp = d.path().join("save");
-        fs::write(&temp, b"original").unwrap();
-        fs::rename(&temp, &source).unwrap();
-        assert!(!candidate.still_current(&token));
-        fs::rename(&source, d.path().join("renamed")).unwrap();
-        assert!(!candidate.still_current(&token));
+        let previous = candidate(&source, &cache);
+        assert!(previous.still_current(&token));
+        replace_with_mtime(&source, b"original");
+        assert!(!previous.still_current(&token));
+        // Fresh snapshots keep each following invalidation assertion independent.
+        let previous = candidate(&source, &cache);
+        assert!(previous.still_current(&token));
+        let renamed = d.path().join("renamed");
+        fs::rename(&source, &renamed).unwrap();
+        assert!(!previous.still_current(&token));
+        fs::rename(&renamed, &source).unwrap();
+        let previous = candidate(&source, &cache);
+        assert!(previous.still_current(&token));
         fs::remove_file(cache).unwrap();
-        assert!(!candidate.still_current(&token));
+        assert!(!previous.still_current(&token));
+    }
+    #[test]
+    fn candidate_rejects_changed_same_size_source_with_preserved_mtime() {
+        let d = tempfile::tempdir().unwrap();
+        let source = d.path().join("source.png");
+        let cache = d.path().join("cache.png");
+        fs::write(&source, b"original").unwrap();
+        fs::write(&cache, b"cached").unwrap();
+        let previous = candidate(&source, &cache);
+        let token = gio::Cancellable::new();
+        assert!(previous.still_current(&token));
+        replace_with_mtime(&source, b"modified");
+        assert_eq!(fs::metadata(&source).unwrap().len(), 8);
+        assert_eq!(fs::read(&source).unwrap(), b"modified");
+        assert!(!previous.still_current(&token));
+    }
+    #[test]
+    fn candidate_rejects_replaced_cache_with_preserved_size_and_mtime() {
+        let d = tempfile::tempdir().unwrap();
+        let source = d.path().join("source.png");
+        let cache = d.path().join("cache.png");
+        fs::write(&source, b"original").unwrap();
+        fs::write(&cache, b"cached").unwrap();
+        let previous = candidate(&source, &cache);
+        let token = gio::Cancellable::new();
+        assert!(previous.still_current(&token));
+        replace_with_mtime(&cache, b"cached");
+        assert!(!previous.still_current(&token));
+        let fresh = candidate(&source, &cache);
+        assert!(fresh.still_current(&token));
+        token.cancel();
+        assert!(!fresh.still_current(&token));
     }
     #[test]
     fn factory_success_then_loss_is_transient_without_affecting_cache_query() {

@@ -54,10 +54,116 @@ class Cache(unittest.TestCase):
     def test_rename_changes_uri(self):
         self.thumbnail();renamed=self.source.with_name('renamed.png');self.source.rename(renamed)
         self.run_query('OUTCOME Missing',source=renamed)
-    def test_atomic_same_path_same_mtime_replacement_is_stale(self):
-        self.thumbnail();old=self.source.stat();new=self.root/'save'
-        new.write_bytes(PIXELS);os.utime(new,ns=(old.st_atime_ns,old.st_mtime_ns));new.replace(self.source)
+    def assert_hit(self):
+        out = self.run_query('HIT metadata/container valid')
+        self.assertIn('current=true', out)
+        self.assertNotIn('OUTCOME ', out)
+
+    def replace(self, data, mtime_ns):
+        old = self.source.stat()
+        new = self.root / 'save'
+        new.write_bytes(data)
+        os.utime(new, ns=(old.st_atime_ns, mtime_ns))
+        new.replace(self.source)
+        self.assertNotEqual(self.source.stat().st_ino, old.st_ino)
+        self.assertEqual(self.source.stat().st_mtime_ns, mtime_ns)
+
+    def pixel_png(self, rgb):
+        # Valid 2x2 RGB PNG; level=0 keeps differently colored files equal-size.
+        header = struct.pack('>IIBBBBB', 2, 2, 8, 2, 0, 0, 0)
+        rows = (b'\0' + bytes(rgb) * 2) * 2
+        return (b'\x89PNG\r\n\x1a\n' + chunk(b'IHDR', header)
+                + chunk(b'IDAT', zlib.compress(rows, level=0)) + chunk(b'IEND', b''))
+
+    def changed_pixels(self):
+        before = self.pixel_png((20, 80, 140))
+        after = self.pixel_png((200, 30, 90))
+        self.assertEqual(len(before), len(after))
+        self.assertNotEqual(before, after)
+        self.source.write_bytes(before)
+        return before, after
+
+    def test_identical_atomic_replacement_preserved_mtime_reuses_valid_cache(self):
+        cache = self.thumbnail()
+        old = self.source.stat()
+        cache_bytes = cache.read_bytes()
+        cache_identity = (cache.stat().st_ino, cache.stat().st_mtime_ns)
+        self.assert_hit()
+        self.replace(PIXELS, old.st_mtime_ns)
+        self.assertEqual(self.source.read_bytes(), PIXELS)
+        self.assertEqual(self.source.stat().st_size, old.st_size)
+        self.assert_hit()
+        self.assertEqual(cache.read_bytes(), cache_bytes)
+        self.assertEqual((cache.stat().st_ino, cache.stat().st_mtime_ns), cache_identity)
+
+    def test_changed_pixels_in_place_new_mtime_is_stale(self):
+        before, after = self.changed_pixels()
+        self.thumbnail()
+        old = self.source.stat()
+        self.source.write_bytes(after)
+        os.utime(self.source, ns=(old.st_atime_ns, old.st_mtime_ns + 2_000_000_000))
+        self.assertEqual(self.source.stat().st_ino, old.st_ino)
+        self.assertEqual(self.source.stat().st_size, old.st_size)
+        self.assertNotEqual(self.source.read_bytes(), before)
         self.run_query('OUTCOME Stale')
+
+    def test_same_size_atomic_replacement_changed_pixels_new_mtime_is_stale(self):
+        before, after = self.changed_pixels()
+        self.thumbnail()
+        old = self.source.stat()
+        self.replace(after, old.st_mtime_ns + 2_000_000_000)
+        self.assertEqual(self.source.stat().st_size, old.st_size)
+        self.assertNotEqual(self.source.read_bytes(), before)
+        self.run_query('OUTCOME Stale')
+
+    def test_changed_size_preserved_mtime_is_stale(self):
+        self.thumbnail()
+        old = self.source.stat()
+        # Add a valid ancillary chunk: source is still PNG, but Thumb::Size is old.
+        enlarged = PIXELS[:33] + chunk(b'tEXt', b'Comment\0changed') + PIXELS[33:]
+        self.replace(enlarged, old.st_mtime_ns)
+        self.assertNotEqual(self.source.stat().st_size, old.st_size)
+        self.run_query('OUTCOME Stale')
+
+    def test_mtime_only_change_invalidates_identical_pixels(self):
+        self.thumbnail()
+        old = self.source.stat()
+        os.utime(self.source, ns=(old.st_atime_ns, old.st_mtime_ns + 2_000_000_000))
+        self.assertEqual(self.source.read_bytes(), PIXELS)
+        self.run_query('OUTCOME Stale')
+
+    def test_trash_like_move_and_restore_reuses_valid_cache(self):
+        # Private rename/restore models filesystem effects, not desktop Trash UI.
+        cache = self.thumbnail()
+        os.utime(cache, ns=(1_000_000_000, 1_000_000_000))
+        old = self.source.stat()
+        cached = cache.read_bytes()
+        trash = self.root / 'private-trash'
+        trash.mkdir()
+        moved = trash / self.source.name
+        self.source.rename(moved)
+        self.run_query('OUTCOME SourceUnavailable')
+        moved.rename(self.source)
+        self.assertEqual(self.source.stat().st_ino, old.st_ino)
+        self.assertEqual(self.source.stat().st_mtime_ns, old.st_mtime_ns)
+        self.assertEqual(self.source.read_bytes(), PIXELS)
+        self.assertGreater(self.source.stat().st_ctime_ns, cache.stat().st_mtime_ns)
+        self.assert_hit()
+        self.assertEqual(cache.read_bytes(), cached)
+        self.assertEqual(cache.stat().st_mtime_ns, 1_000_000_000)
+
+    def test_permission_metadata_change_does_not_invalidate_pixels(self):
+        cache = self.thumbnail()
+        os.utime(cache, ns=(1_000_000_000, 1_000_000_000))
+        old = self.source.stat()
+        self.source.chmod((old.st_mode & 0o777) ^ 0o040)
+        self.assertNotEqual(self.source.stat().st_mode, old.st_mode)
+        self.assertEqual(self.source.stat().st_ino, old.st_ino)
+        self.assertEqual(self.source.stat().st_mtime_ns, old.st_mtime_ns)
+        self.assertEqual(self.source.read_bytes(), PIXELS)
+        self.assertGreater(self.source.stat().st_ctime_ns, cache.stat().st_mtime_ns)
+        self.assert_hit()
+
     def test_unsupported_desktop(self):
         self.run_query('capability=Unavailable',desktop='KDE')
     def factory(self,output='1',status=0):

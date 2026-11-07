@@ -184,3 +184,27 @@ AMD acceptance is recorded. The pre-existing cache test FAIL, current native Arc
 ownership/makepkg/installation, explicit 0.2.5 version/source approval and actual
 immutable archive checksum/metadata remain open. Candidate-mode preflight success
 is preparation evidence, never a claim that these release gates are closed.
+
+## Follow-up — native staging acceptance and GNOME cache gate closure
+
+The user subsequently reports physical Arch native staging PASS: GStreamer
+ownership/runtime plugins, mandatory GPU release build/ELF, collection of 184
+locked crate sources and 282 application files at that staging revision, LGPL
+notices, DESTDIR staging and preparation preflight. This is **user-reported
+native acceptance**, not an independent Codex run. No actual makepkg/publication
+is reported; the version remains intentionally 0.2.4.
+
+The one cache FAIL above is now historical. See the focused
+[GNOME cache freshness decision](../THUMBNAIL_CACHE_FRESHNESS.md): identical-byte
+replacement with unchanged URI/mtime/size remains a valid persistent HIT, per
+`d9bbcc1`'s intended Trash-restore fix. The obsolete test expectation was corrected
+and changed-content/mtime/size, restored-file, metadata and in-flight identity
+regressions were strengthened. Production cache logic is unchanged; assertions
+are not bypassed. Codex results: thumbnail Python 59 PASS; all relevant Python
+163 PASS; Rust 210 PASS; fmt/check and strict all-target Clippy PASS, zero warnings.
+
+**The last known cache regression gate is closed.** Explicit v0.2.5 version/source
+preparation may now be considered as a separate authorized task. No version bump,
+immutable release-source checksum, makepkg artifact, main/tag/AUR action or
+publication approval follows from this closure. Existing GPU/platform/HDR and
+zero-copy limitations remain as documented.

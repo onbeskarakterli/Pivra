@@ -271,3 +271,24 @@ For clean native Arch **DESTDIR staging only**, run
 `bash packaging/arch/stage-video-candidate.sh` from the repository root.
 The immutable release-source.conf/hash guard and options=('!debug') remain;
 this staging command is not makepkg, AUR or publication approval.
+
+### Current Arch OpenGL ownership correction
+
+Native user evidence identifies `/usr/lib/gstreamer-1.0/libgstopengl.so` as
+owned by **gst-plugins-base-libs**, not gst-plugins-base. Both glupload and
+glcolorconvert register in this same plugin (also verified against upstream
+GStreamer 1.26.2 `subprojects/gst-plugins-base/ext/gl/gstopengl.c` and local
+`gst-inspect-1.0`). The ownership gate now requires that owner for both elements,
+checks their exact plugin basename, and rejects the former owner. Existing
+playback/demux/parser/decoder/audio file expectations remain strictly checked;
+local plugin filenames are verified, but local Debian ownership is never used
+as evidence for Arch ownership. Current official Arch file lists, GitLab recipe
+and mirror access remain blocked by HTTP 403 here; native ownership of later
+checks is not claimed verified. The next native staging run must execute them.
+
+The recipe already required gst-plugins-base-libs>=1.24, so no additional package
+is needed for GL. gst-plugins-base remains installed to preserve the existing
+stock codec/audio dependency set; it is no longer described as the GL provider.
+No codec dependency is removed on the basis of this single ownership correction.
+The old archived split-recipe evidence in the release preparation report remains
+historical; this native finding supersedes its OpenGL ownership entry.

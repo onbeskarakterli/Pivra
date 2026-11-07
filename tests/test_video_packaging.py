@@ -137,28 +137,69 @@ class ReleasePreflight(unittest.TestCase):
 
 
 class ArchOwnershipGate(unittest.TestCase):
-    def run_gate(self, wrong=False):
+    def run_gate(self, wrong=False, gl_owner=None, gl_file=None):
         with tempfile.TemporaryDirectory() as d:
             path = Path(d)
             tools = {
                 'pkg-config': '#!/bin/sh\necho /usr/lib/pkgconfig\n',
-                'gst-inspect-1.0': '#!/bin/sh\nprintf "  Filename /plugins/%s.so\\n" "$1"\n',
-                'pacman': '#!/bin/sh\ncase "$3" in *pkgconfig/*|*playbin3.so) echo gst-plugins-base-libs;; *glupload.so|*glcolorconvert.so) echo gst-plugins-base;; *qtdemux.so|*autoaudiosink.so) echo gst-plugins-good;; *h264parse.so) echo "${PARSER_OWNER:-gst-plugins-bad-libs}";; *avdec_h264.so) echo gst-libav;; *gst-inspect-1.0) echo gstreamer;; *) exit 1;; esac\n',
+                'gst-inspect-1.0': (
+                    '#!/bin/sh\ncase "$1" in '
+                    'playbin3) file=libgstplayback.so;; '
+                    'glupload|glcolorconvert) file="${GL_PLUGIN_FILE:-libgstopengl.so}";; '
+                    'qtdemux) file=libgstisomp4.so;; '
+                    'h264parse) file=libgstvideoparsersbad.so;; '
+                    'avdec_h264) file=libgstlibav.so;; '
+                    'autoaudiosink) file=libgstautodetect.so;; *) exit 1;; esac\n'
+                    'printf "  Filename /usr/lib/gstreamer-1.0/%s\\n" "$file"\n'),
+                'pacman': (
+                    '#!/bin/sh\ncase "$3" in '
+                    '*pkgconfig/*|*libgstplayback.so) echo gst-plugins-base-libs;; '
+                    '*libgstopengl.so) echo "${OPENGL_OWNER:-gst-plugins-base-libs}";; '
+                    '*libgstisomp4.so|*libgstautodetect.so) echo gst-plugins-good;; '
+                    '*libgstvideoparsersbad.so) echo "${PARSER_OWNER:-gst-plugins-bad-libs}";; '
+                    '*libgstlibav.so) echo gst-libav;; '
+                    '*gst-inspect-1.0) echo gstreamer;; *) exit 1;; esac\n'),
             }
             for name, text in tools.items():
                 (path / name).write_text(text); (path / name).chmod(0o755)
             env = dict(os.environ, PATH=d+':/usr/bin:/bin')
+            for key in ('PARSER_OWNER', 'OPENGL_OWNER', 'GL_PLUGIN_FILE'):
+                env.pop(key, None)
             if wrong: env['PARSER_OWNER'] = 'unexpected-package'
+            if gl_owner: env['OPENGL_OWNER'] = gl_owner
+            if gl_file: env['GL_PLUGIN_FILE'] = gl_file
             return subprocess.run(['/bin/bash', str(ROOT / 'packaging/arch/verify-video-dependencies.sh')], env=env, capture_output=True, text=True)
 
     def test_controlled_correct_ownership(self):
         result = self.run_gate()
         self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(result.stdout.count('libgstopengl.so -> gst-plugins-base-libs'), 2)
+        for filename in ('libgstplayback.so', 'libgstisomp4.so', 'libgstvideoparsersbad.so',
+                         'libgstlibav.so', 'libgstautodetect.so'):
+            self.assertIn(filename, result.stdout)
+
+    def test_old_opengl_owner_is_rejected(self):
+        result = self.run_gate(gl_owner='gst-plugins-base')
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn('expected=gst-plugins-base-libs actual=gst-plugins-base', result.stderr)
+
+    def test_unexpected_opengl_file_is_rejected(self):
+        result = self.run_gate(gl_file='libdifferent.so')
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn('expected=libgstopengl.so actual=', result.stderr)
 
     def test_changed_split_fails_explicitly(self):
         result = self.run_gate(True)
         self.assertNotEqual(result.returncode, 0)
         self.assertIn('expected=gst-plugins-bad-libs actual=unexpected-package', result.stderr)
+
+    def test_recipe_retains_required_libraries_and_existing_codec_coverage(self):
+        recipe = (ROOT / 'packaging/arch/PKGBUILD').read_text()
+        depends = recipe.split('depends=(', 1)[1].split(')\n', 1)[0]
+        for package in ('gst-plugins-base-libs>=1.24', 'gst-plugins-base',
+                        'gst-plugins-good', 'gst-plugins-bad-libs', 'gst-libav'):
+            self.assertIn("'" + package + "'", depends)
+        self.assertIn("options=('!debug')", recipe)
 
 class RuntimeGate(unittest.TestCase):
     def test_missing_h264_decoder_fails_without_retry(self):

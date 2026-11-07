@@ -14,8 +14,10 @@ license=('GPL-3.0-only')
 depends=('gtk4>=4.16' 'libadwaita>=1.2' 'glib2' 'gdk-pixbuf2'
          'gnome-desktop-4' 'glycin' 'bubblewrap' 'libseccomp' 'lcms2'
          'fontconfig' 'cairo' 'graphene' 'glibc' 'gcc-libs' 'hicolor-icon-theme'
-         'gstreamer>=1.24' 'gst-plugins-base-libs>=1.24' 'gst-plugins-base'
-         'gst-plugins-good' 'gst-plugins-bad-libs' 'gst-libav')
+         # Current Arch: -base-libs owns GL APIs AND libgstopengl.so.
+         'gstreamer>=1.24' 'gst-plugins-base-libs>=1.24'
+         # Retain existing stock codec/audio coverage; not the OpenGL owner.
+         'gst-plugins-base' 'gst-plugins-good' 'gst-plugins-bad-libs' 'gst-libav')
 makedepends=('cargo' 'pkgconf' 'python>=3.11')
 checkdepends=('desktop-file-utils')
 _target='x86_64-unknown-linux-gnu'

@@ -118,6 +118,9 @@ impl State {
         }
     }
     pub fn close(&mut self) {
+        if pivra::performance::enabled() {
+            let _ = self.stats();
+        }
         self.closed = true;
         self.invalidate();
         if let Some(id) = self.handler.take() {
@@ -125,6 +128,23 @@ impl State {
         }
     }
     pub fn stats(&self) -> PreloadStats {
+        if pivra::performance::enabled() {
+            let cache = self.cache.lock().unwrap().stats();
+            for (event, value) in [
+                ("preload_queue_depth", self.queue.len() as u64),
+                ("preload_active", u64::from(self.background.is_some())),
+                ("image_cache_evictions", cache.evictions),
+                ("image_cache_entries", cache.entries as u64),
+                ("preload_started", self.stats.started),
+                ("preload_completed", self.stats.completed),
+                ("preload_cancelled", self.stats.cancelled),
+                ("image_cache_charge_estimate", cache.bytes as u64),
+                ("image_cache_hits", cache.hits),
+                ("image_cache_misses", cache.misses),
+            ] {
+                pivra::performance::emit(event, "snapshot", 0, value);
+            }
+        }
         PreloadStats {
             cache: self.cache.lock().unwrap().stats(),
             preload_active: self.background.is_some(),
@@ -199,6 +219,9 @@ pub(super) fn fetch(
     (result, true)
 }
 pub(super) fn maybe_start(state: &Rc<RefCell<State>>, slot: &Rc<LoadSlot>, has_image: bool) {
+    if pivra::performance::enabled() {
+        let _ = state.borrow().stats();
+    }
     if !has_image || slot.stats().running != 0 || slot.stats().pending != 0 {
         return;
     }

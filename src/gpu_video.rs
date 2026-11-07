@@ -58,6 +58,7 @@ unsafe extern "C" {
     fn pivra_gpu_live_filters() -> std::ffi::c_int;
 }
 fn discover(path: &Path) -> Backend {
+    let _measurement = pivra::performance::Span::new("video_metadata_discovery");
     PROBES.fetch_add(1, Ordering::SeqCst);
     #[cfg(pivra_gpu_backend)]
     {
@@ -144,6 +145,7 @@ pub fn stats() -> Stats {
     let filters = unsafe { pivra_gpu_live_filters() }.max(0) as usize;
     #[cfg(not(pivra_gpu_backend))]
     let filters = 0;
+    pivra::performance::emit("video_live_filters", "observed_count", 0, filters as u64);
     Stats {
         workers: ACTIVE.load(Ordering::SeqCst),
         pending: c.pending.len(),

@@ -38,6 +38,7 @@ fn bounded(value: impl fmt::Display) -> String {
         .to_string()
 }
 pub fn trace(stage: &str, path: Option<&Path>, details: impl fmt::Display) {
+    crate::performance::emit(stage, "thumbnail_stage", 0, 1);
     if !enabled() {
         return;
     }

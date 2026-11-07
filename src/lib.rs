@@ -23,3 +23,5 @@ pub mod thumbnail_manager;
 pub mod thumbnail_provider;
 
 pub mod thumbnail_diagnostics;
+
+pub mod performance;

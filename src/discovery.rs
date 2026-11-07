@@ -75,6 +75,7 @@ pub fn scan_neighbors(opened: &Path, cancelled: &AtomicBool) -> io::Result<ScanR
 
 /// Blocking filesystem work: callers must keep this off the GTK main thread.
 pub fn scan_directory(directory: &Path, cancelled: &AtomicBool) -> io::Result<ScanReport> {
+    let _measurement = crate::performance::Span::new("directory_scan_total");
     check_cancelled(cancelled)?;
     let directory = std::path::absolute(directory)?;
     let entries = fs::read_dir(&directory)?;
@@ -134,7 +135,11 @@ fn collect_entries(
         }
     }
     check_cancelled(cancelled)?;
-    items.sort_unstable_by(|a, b| crate::natural::compare_paths(a.path(), b.path()));
+    {
+        let _sort = crate::performance::Span::new("natural_sort");
+        items.sort_unstable_by(|a, b| crate::natural::compare_paths(a.path(), b.path()));
+    }
+    crate::performance::emit("catalog_entries", "count", 0, items.len() as u64);
     check_cancelled(cancelled)?;
     Ok(ScanReport {
         collection: MediaCollection::new(items),

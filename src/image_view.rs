@@ -729,6 +729,13 @@ impl ImageView {
         on_completion: impl FnOnce() + 'static,
         on_result: impl FnOnce(bool) + 'static,
     ) {
+        let mut measurement = pivra::performance::Span::new("image_request_to_ready_callback");
+        measurement.status("abandoned");
+        let on_result = move |success| {
+            measurement.status(if success { "ready" } else { "error" });
+            drop(measurement);
+            on_result(success);
+        };
         self.stop_video();
         self.animation_controls.reset();
         let animation_controls = self.animation_controls.clone();

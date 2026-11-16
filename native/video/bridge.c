@@ -2,6 +2,26 @@
 #include <gst/pbutils/pbutils.h>
 #include "gtkgstmediafileprivate.h"
 #include "policy.h"
+#include "current_context.h"
+#include "lifecycle.h"
+
+void pivra_gpu_trace_binding(const char *stage) {
+  static gint samples;
+  if (!g_getenv("PIVRA_TRACE_VIDEO") || g_atomic_int_add(&samples,1) >= 128) return;
+  /* Native getters do not make a context current or issue GL queries. */
+  guintptr egl = gst_gl_context_get_current_gl_context(GST_GL_PLATFORM_EGL);
+  guintptr glx = gst_gl_context_get_current_gl_context(GST_GL_PLATFORM_GLX);
+  g_printerr("PIVRA_GPU_BINDING time_us=%" G_GINT64_FORMAT " stage=%s thread=%p gdk=%p egl=%" G_GUINTPTR_FORMAT " glx=%" G_GUINTPTR_FORMAT "\n",
+             g_get_monotonic_time(),stage,(void *)g_thread_self(),(void *)gdk_gl_context_get_current(),egl,glx);
+}
+static void stock_retired(gpointer unused, GObject *object) {
+  (void)unused;
+  /* Finalization can run on a player thread: no GTK/GL calls here. */
+  pivra_video_lifecycle("stock-stream-retired",object);
+}
+void pivra_gpu_watch_stock(GObject *stream) {
+  if (g_getenv("PIVRA_TRACE_VIDEO")) g_object_weak_ref(stream,stock_retired,NULL);
+}
 GType pivra_gpu_backend_type(void) {
   if(!gst_init_check(NULL,NULL,NULL)) return G_TYPE_INVALID;
   return pivra_gpu_media_file_get_type();

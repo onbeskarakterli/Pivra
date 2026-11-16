@@ -1,6 +1,9 @@
 # v0.2.6 Task 01B — stock/GPU lifecycle regression
 
 Status: **controlled regression PASS; native AMD acceptance pending**.
+Follow-up: the user reported **8 PASS / mixed-lifecycle SIGABRT** on native AMD
+at this implementation. [Task 01C](V026_NATIVE_AMD_CONTEXT_FAILURE.md) records
+the stock GTK 4.24.1 ownership investigation; Task 01B did not close native acceptance.
 Reference: `9adca85940c09a31d200211ad2ab1314277f510a` on `dev`.
 This is a focused lifecycle correction, not a performance optimization or a
 release/version change. The [Task 01 baseline](V026_BASELINE.md) remains historical.

@@ -60,6 +60,17 @@ unsafe extern "C" {
     fn pivra_gpu_live_contexts() -> std::ffi::c_int;
     fn pivra_gpu_held_frames() -> std::ffi::c_int;
     fn pivra_gpu_pending_presentations() -> std::ffi::c_int;
+    fn pivra_gpu_trace_binding(stage: *const std::ffi::c_char);
+    fn pivra_gpu_watch_stock(stream: *mut glib::gobject_ffi::GObject);
+}
+
+pub fn trace_binding(stage: &std::ffi::CStr) {
+    #[cfg(pivra_gpu_backend)]
+    if std::env::var_os("PIVRA_TRACE_VIDEO").is_some() {
+        unsafe { pivra_gpu_trace_binding(stage.as_ptr()) };
+    }
+    #[cfg(not(pivra_gpu_backend))]
+    let _ = stage;
 }
 fn discover(path: &Path) -> Backend {
     let _measurement = pivra::performance::Span::new("video_metadata_discovery");
@@ -189,7 +200,13 @@ pub fn is_owned(media: &gtk::MediaFile) -> bool {
 }
 fn stock(path: &Path) -> gtk::MediaFile {
     STOCK.fetch_add(1, Ordering::SeqCst);
+    trace_binding(c"stock-open-begin");
     let media = gtk::MediaFile::for_filename(path);
+    trace_binding(c"stock-open-end");
+    #[cfg(pivra_gpu_backend)]
+    unsafe {
+        pivra_gpu_watch_stock(media.as_ptr().cast());
+    }
     if std::env::var_os("PIVRA_TRACE_VIDEO").is_some() {
         eprintln!(
             "PIVRA_GPU_STOCK type={} file={}",

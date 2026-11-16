@@ -2,12 +2,14 @@
 """Isolated mixed stock/GPU lifecycle gate. Never installs GTK or changes media."""
 import argparse
 import contextlib
+import hashlib
 import importlib.util
 import json
 import os
 from pathlib import Path
 import select
 import shlex
+import shutil
 import signal
 import subprocess
 import sys
@@ -64,7 +66,7 @@ def session(kind, env, out):
             except subprocess.TimeoutExpired:
                 proc.kill(); proc.wait()
 
-def run(name, command, env, out, timeout=90, expected_gpu_errors=0):
+def run(name, command, env, out, timeout=90, expected_gpu_errors=0, expected_context_failures=0):
     with (out/(name+'.log')).open('w') as log:
         proc = subprocess.Popen([str(v) for v in command], cwd=ROOT, env=env, stdout=log, stderr=subprocess.STDOUT, start_new_session=True)
         try:
@@ -81,15 +83,29 @@ def run(name, command, env, out, timeout=90, expected_gpu_errors=0):
     diagnostics = sum(line.startswith('{"pivra_perf":1,') for line in log.splitlines())
     context_errors = log.count('gdk_gl_context_make_current() failed')
     gpu_errors = log.count('PIVRA_GPU_FAIL') + log.count('PIVRA_GPU_SHADER_FAIL')
+    context_failures = log.count('PIVRA_GPU_CONTEXT_FAILURE')
     reasons = []
-    if context_errors or gpu_errors != expected_gpu_errors:
+    if context_errors or gpu_errors != expected_gpu_errors or context_failures != expected_context_failures:
         reasons.append('native context/GPU failure logged')
     if diagnostics >= 4096:
         reasons.append('diagnostic cap reached')
     if code == 0 and reasons:
         status = 'FAIL'
     print(f'{status} {name}: exit={code}; {"; ".join(reasons)}; {out/(name+".log")}', flush=True)
-    return dict(name=name, exit=code, status=status, diagnostic_events=diagnostics, context_errors=context_errors, gpu_errors=gpu_errors, reasons=reasons)
+    lines = log.splitlines()
+    stages = [line for line in lines if line.startswith('LIFECYCLE_STAGE')]
+    bindings = [line for line in lines if line.startswith('PIVRA_GPU_BINDING')]
+    signals = [line.removeprefix('GDB_INFERIOR_SIGNAL ') for line in lines if line.startswith('GDB_INFERIOR_SIGNAL ')]
+    libraries = {}
+    for line in lines:
+        if line.startswith('LIFECYCLE_LIBRARY '):
+            path = Path(line.removeprefix('LIFECYCLE_LIBRARY '))
+            try: libraries[str(path)] = hashlib.sha256(path.read_bytes()).hexdigest()
+            except OSError: libraries[str(path)] = None
+    if status == 'FAIL':
+        print('FAIL last transition:', stages[-1] if stages else 'not reached', flush=True)
+        print('\n'.join(lines[-12:]), flush=True)
+    return dict(name=name, exit=code, status=status, diagnostic_events=diagnostics, context_errors=context_errors, context_failures=context_failures,gpu_errors=gpu_errors, reasons=reasons,last_stage=stages[-1] if stages else None,last_bindings=bindings[-8:],inferior_signals=signals,libraries_sha256=libraries)
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
@@ -97,7 +113,12 @@ def main():
     parser.add_argument('--software', action='store_true', help='explicit llvmpipe control, never hardware acceptance')
     parser.add_argument('--api', choices=['gles2','opengl3'], help='optional controlled GL API')
     parser.add_argument('--ownership-only', action='store_true')
+    parser.add_argument('--retirement-control', action='store_true', help='separate destructive EGL mechanism control, not native acceptance')
+    parser.add_argument('--debug-mixed', action='store_true', help='run mixed-lifecycle under GDB, preserving fatal signal and EGL teardown stacks')
     args = parser.parse_args()
+    if args.debug_mixed and not shutil.which('gdb'):
+        print('NOT RUN debugger: gdb is not installed; ordinary nine-gate command is unchanged')
+        return 77
     out = Path(tempfile.mkdtemp(prefix='pivra-video-context-'))
     print('Logs:', out, flush=True)
     env = os.environ.copy()
@@ -111,6 +132,22 @@ def main():
     if args.api:
         env['GST_GL_API'] = args.api
     ctest = out/'context-lifecycle'
+    if args.retirement_control:
+        print('NEGATIVE EGL MECHANISM CONTROL: not a native lifecycle acceptance run',flush=True)
+        ctest = out/'stock-retirement'
+        extra_cflags = shlex.split(subprocess.check_output(['pkg-config','--cflags','epoxy'],text=True))
+        extra_libs = shlex.split(subprocess.check_output(['pkg-config','--libs','epoxy'],text=True))
+        subprocess.run([*shlex.split(env.get('CC','cc')),'-O2','-Wall','-Wextra','-Werror','-DGST_USE_UNSTABLE_API',*shlex.split(env.get('CPPFLAGS','')),*flags('--cflags'),*extra_cflags,'tests/video_gpu/stock_egl_retirement.c','-o',str(ctest),*shlex.split(env.get('LDFLAGS','')),*flags('--libs'),*extra_libs],cwd=ROOT,check=True)
+        with session(args.session,env,out) as active:
+            rows=[run('retirement-'+mode,[ctest,mode],active,out) for mode in ['legacy','borrowed']]
+        for row in rows:
+            if row['name']=='retirement-legacy' and row['status']=='PASS': row['status']='MECHANISM REPRODUCED'
+        (out/'retirement-report.json').write_text(json.dumps(dict(native_acceptance=False,results=rows),indent=2)+'\n')
+        print('EGL mechanism control only; NOT a native lifecycle acceptance result',flush=True)
+        return 1 if any(r['status']=='FAIL' for r in rows) else 77 if any(r['status']=='NOT RUN' for r in rows) else 0
+    policy = out/'current-api-policy'
+    subprocess.run([*shlex.split(env.get('CC','cc')),'-O2','-Wall','-Wextra','-Werror','-Inative/video',*shlex.split(env.get('CPPFLAGS','')),*flags('--cflags'),'tests/video_gpu/current_api_policy.c','-o',str(policy),*shlex.split(env.get('LDFLAGS','')),*flags('--libs')],cwd=ROOT,check=True)
+    subprocess.run([str(policy)],cwd=ROOT,check=True)
     subprocess.run([*shlex.split(env.get('CC','cc')), '-O2','-Wall','-Wextra','-Werror','-Wno-unused-parameter','-DGTK_COMPILATION','-Inative/video', *shlex.split(env.get('CPPFLAGS','')), *flags('--cflags'), 'tests/video_gpu/context_lifecycle.c','native/video/gtkgstpaintable.c','native/video/gtkgstsink.c','-o',str(ctest), *shlex.split(env.get('LDFLAGS','')), *flags('--libs'), '-lm'], cwd=ROOT, check=True)
     if not args.ownership_only:
         subprocess.run(['cargo','build','--locked','--example','integrated_video_probe','--example','video_color_probe'], cwd=ROOT, check=True)
@@ -122,9 +159,12 @@ def main():
     results = []
     with session(args.session, env, out) as active:
         for check in ['foreign','release','current','presentation','failure']:
-            results.append(run('ownership-'+check, [ctest,check], active, out, expected_gpu_errors=8 if check=='failure' else 0))
+            results.append(run('ownership-'+check, [ctest,check], active, out, expected_gpu_errors=8 if check=='failure' else 0,expected_context_failures=8 if check=='failure' else 0))
         if not args.ownership_only:
-            results.append(run('mixed-lifecycle', [target/'integrated_video_probe', *[media/(n+'.mp4') for n in ['bt709','srgb','unknown','full709']]], active, out))
+            mixed = [target/'integrated_video_probe', *[media/(n+'.mp4') for n in ['bt709','srgb','unknown','full709']]]
+            if args.debug_mixed:
+                mixed = ['gdb','--batch','--return-child-result','-x',ROOT/'tests/video_gpu/context_trace.gdb','--args',*mixed]
+            results.append(run('mixed-lifecycle',mixed,active,out))
             results.append(run('error-cleanup', [target/'integrated_video_probe','--error-path'], active, out))
             results.append(run('limited-presentation-controls', [target/'video_color_probe',media/'bt709.mp4','--check-controls'], active, out))
             results.append(run('full-ramp-shader-controls', [target/'video_color_probe',out/'ramps/ramp.mp4','--check-bt1886-ramp','--check-controls'], active, out))

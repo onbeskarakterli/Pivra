@@ -1,5 +1,6 @@
 """Runner integrity: real child exits/logs, not GPU or shader acceptance."""
 import contextlib
+import hashlib
 import importlib.util
 import io
 import os
@@ -29,6 +30,31 @@ class LifecycleRunner(unittest.TestCase):
         r = self.run_child('print("gdk_gl_context_make_current() failed")')
         self.assertEqual(r['status'], 'FAIL')
         self.assertEqual(r['context_errors'], 1)
+
+    def test_context_restore_failure_cannot_pass_on_exit_zero(self):
+        r = self.run_child('print("PIVRA_GPU_CONTEXT_FAILURE stage=restore-previous")')
+        self.assertEqual(r['status'], 'FAIL')
+        self.assertEqual(r['context_failures'], 1)
+
+    def test_native_abort_and_last_transition_preserved(self):
+        r = self.run_child('import os,resource,signal; resource.setrlimit(resource.RLIMIT_CORE,(0,0)); print("LIFECYCLE_STAGE unknown stock route begin",flush=True); os.kill(os.getpid(),signal.SIGABRT)')
+        self.assertEqual((r['status'],r['exit']), ('FAIL',-6))
+        self.assertEqual(r['last_stage'],'LIFECYCLE_STAGE unknown stock route begin')
+
+    def test_debugger_signal_is_distinct_from_wrapper_exit(self):
+        r = self.run_child('print("GDB_INFERIOR_SIGNAL SIGABRT"); raise SystemExit(134)')
+        self.assertEqual(r['inferior_signals'], ['SIGABRT'])
+        self.assertEqual(r['exit'],134)
+
+    def test_expected_context_error_count_is_exact(self):
+        self.assertEqual(self.run_child('print("PIVRA_GPU_CONTEXT_FAILURE injected")', expected_context_failures=1)['status'],'PASS')
+        self.assertEqual(self.run_child('print("gdk_gl_context_make_current() failed"); print("PIVRA_GPU_CONTEXT_FAILURE injected")', expected_context_failures=1)['status'],'FAIL')
+
+    def test_library_provenance_hashes_the_observed_file(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory)/'library.so'; path.write_bytes(b'provenance fixture')
+            result = self.run_child('print('+repr('LIFECYCLE_LIBRARY '+str(path))+')')
+            self.assertEqual(result['libraries_sha256'][str(path)], hashlib.sha256(b'provenance fixture').hexdigest())
 
     def test_cap_exhaustion_is_explicit(self):
         r = self.run_child('print(\'{"pivra_perf":1,"event":"poll"}\\n\'*4096,end="")')

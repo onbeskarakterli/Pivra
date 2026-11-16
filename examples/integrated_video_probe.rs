@@ -20,6 +20,7 @@ use std::{
 };
 fn wait(label: &str, ready: impl Fn() -> bool) {
     eprintln!("LIFECYCLE_STAGE {label} begin");
+    image_view::gpu_video::trace_binding(c"wait-begin");
     let deadline = Instant::now() + Duration::from_secs(10);
     loop {
         for _ in 0..100 {
@@ -34,6 +35,7 @@ fn wait(label: &str, ready: impl Fn() -> bool) {
                 "LIFECYCLE_STAGE {label} ready contexts={} frames={} presentations={}",
                 s.contexts, s.frames, s.presentations
             );
+            image_view::gpu_video::trace_binding(c"wait-ready");
             return;
         }
         assert!(
@@ -74,10 +76,44 @@ fn open(app: &adw::Application, path: &Path) -> adw::ApplicationWindow {
     app.active_window().unwrap().downcast().unwrap()
 }
 fn action(w: &adw::ApplicationWindow, name: &str) {
+    eprintln!("LIFECYCLE_ACTION {name}");
+    image_view::gpu_video::trace_binding(c"action-before");
     gio::prelude::ActionGroupExt::activate_action(w, name, None);
+    image_view::gpu_video::trace_binding(c"action-after");
+}
+fn runtime_provenance() {
+    eprintln!(
+        "LIFECYCLE_RUNTIME gtk={}.{}.{}",
+        gtk::major_version(),
+        gtk::minor_version(),
+        gtk::micro_version()
+    );
+    let maps = std::fs::read_to_string("/proc/self/maps").unwrap_or_default();
+    let libraries: std::collections::BTreeSet<_> = maps
+        .lines()
+        .filter_map(|line| {
+            let path = line.get(line.find('/')?..)?;
+            [
+                "libgtk-4.so",
+                "libgstreamer-1.0.so",
+                "libgstgl-1.0.so",
+                "libEGL",
+                "libGLX",
+                "libepoxy",
+                "libgallium",
+            ]
+            .iter()
+            .any(|name| path.contains(name))
+            .then_some(path)
+        })
+        .collect();
+    for path in libraries {
+        eprintln!("LIFECYCLE_LIBRARY {path}");
+    }
 }
 fn main() {
     adw::init().unwrap();
+    runtime_provenance();
     let app = adw::Application::builder()
         .application_id("io.github.onbeskarakterli.Pivra.GpuTest")
         .flags(gio::ApplicationFlags::NON_UNIQUE)
@@ -140,6 +176,7 @@ fn main() {
     wait("two independent GPU windows", || {
         stats().filters == 2 && frame(first.upcast_ref()) && frame(second.upcast_ref())
     });
+    runtime_provenance();
     assert_eq!(stats().probes, 1, "same-source discovery deduplicated");
     let stock = stats().stock;
     action(&first, "next-media");

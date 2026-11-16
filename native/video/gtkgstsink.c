@@ -24,6 +24,7 @@
 
 #include "gtkgstpaintableprivate.h"
 #include "lifecycle.h"
+#include "current_context.h"
 
 #if GST_GL_HAVE_WINDOW_X11 && (GST_GL_HAVE_PLATFORM_GLX || GST_GL_HAVE_PLATFORM_EGL) && defined (GDK_WINDOWING_X11)
 #define HAVE_GST_X11_SUPPORT
@@ -453,9 +454,21 @@ pivra_gpu_sink_initialize_gl (PivraGpuSink *self)
   gboolean wrapped_active = FALSE;
   const char *phase = "make-current";
   GdkGLContext *previous = gdk_gl_context_get_current();
+  GstGLPlatform previous_platform = GST_GL_PLATFORM_EGL | GST_GL_PLATFORM_GLX;
   if (previous) g_object_ref(previous);
 
   display = gdk_gl_context_get_display (self->gdk_context);
+#ifdef HAVE_GST_WAYLAND_SUPPORT
+  if (GDK_IS_WAYLAND_DISPLAY(display)) previous_platform = GST_GL_PLATFORM_EGL;
+#endif
+#ifdef HAVE_GST_X11_SUPPORT
+  /* Same GTK 4.16-compatible native-platform query used below for wrapping. */
+G_GNUC_BEGIN_IGNORE_DEPRECATIONS
+  if (GDK_IS_X11_DISPLAY(display))
+    previous_platform = gdk_x11_display_get_egl_display(display) ? GST_GL_PLATFORM_EGL : GST_GL_PLATFORM_GLX;
+G_GNUC_END_IGNORE_DEPRECATIONS
+#endif
+  guintptr previous_native = gst_gl_context_get_current_gl_context(previous_platform);
 
   pivra_video_lifecycle("context-make-current-begin", self);
   gdk_gl_context_make_current (self->gdk_context);
@@ -489,8 +502,7 @@ G_GNUC_BEGIN_IGNORE_DEPRECATIONS
         }
 #endif
 
-      gl_api = gst_gl_context_get_current_gl_api (platform, NULL, NULL);
-      gl_handle = gst_gl_context_get_current_gl_context (platform);
+      gl_api = pivra_gpu_current_api(platform, &gl_handle);
 
       if (gl_handle)
         {
@@ -514,8 +526,7 @@ G_GNUC_END_IGNORE_DEPRECATIONS
 
       GST_DEBUG_OBJECT (self, "got EGL on Wayland!");
 
-      gl_api = gst_gl_context_get_current_gl_api (platform, NULL, NULL);
-      gl_handle = gst_gl_context_get_current_gl_context (platform);
+      gl_api = pivra_gpu_current_api(platform, &gl_handle);
 
       if (gl_handle)
         {
@@ -541,8 +552,7 @@ G_GNUC_END_IGNORE_DEPRECATIONS
 
       GST_DEBUG_OBJECT (self, "got CGL on macOS!");
 
-      gl_api = gst_gl_context_get_current_gl_api (platform, NULL, NULL);
-      gl_handle = gst_gl_context_get_current_gl_context (platform);
+      gl_api = pivra_gpu_current_api(platform, &gl_handle);
 
       if (gl_handle)
         {
@@ -564,11 +574,9 @@ G_GNUC_END_IGNORE_DEPRECATIONS
       const char *gl_type = is_gles ? "EGL" : "WGL";
 
       platform = is_gles ? GST_GL_PLATFORM_EGL : GST_GL_PLATFORM_WGL;
-      gl_api = gst_gl_context_get_current_gl_api (platform, NULL, NULL);
+      gl_api = pivra_gpu_current_api(platform, &gl_handle);
 
       GST_DEBUG_OBJECT (self, "got %s on Win32!", gl_type);
-
-      gl_handle = gst_gl_context_get_current_gl_context (platform);
 
       if (gl_handle)
         {
@@ -609,7 +617,7 @@ G_GNUC_END_IGNORE_DEPRECATIONS
       goto out;
     }
 
-  if (!self->gst_gdk_context) goto out;
+  if (!self->gst_gdk_context || gl_api == GST_GL_API_NONE) goto out;
 
   phase = "activate-wrapped-context";
   wrapped_active = gst_gl_context_activate (self->gst_gdk_context, TRUE);
@@ -651,7 +659,17 @@ out:
   if (wrapped_active) gst_gl_context_activate(self->gst_gdk_context, FALSE);
   /* Clear GDK's TLS too: Gst activation may already have unbound native GL. */
   gdk_gl_context_clear_current();
-  if (previous) gdk_gl_context_make_current(previous);
+  if (previous && previous_native) {
+    gdk_gl_context_make_current(previous);
+    guintptr restored = gst_gl_context_get_current_gl_context(previous_platform);
+    if (restored != previous_native) {
+      g_printerr("PIVRA_GPU_CONTEXT_FAILURE stage=restore-previous expected=%" G_GUINTPTR_FORMAT " actual=%" G_GUINTPTR_FORMAT "\n", previous_native, restored);
+      succeeded = FALSE;
+    }
+  } else if (previous) {
+    g_printerr("PIVRA_GPU_CONTEXT_FAILURE stage=previous-binding-missing; stale GDK pointer not restored\n");
+    succeeded = FALSE;
+  }
   g_clear_object(&previous);
   if (!succeeded) {
     g_clear_object(&self->gst_context);

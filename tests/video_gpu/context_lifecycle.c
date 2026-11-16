@@ -2,6 +2,7 @@
 #include "gtkgstsinkprivate.h"
 #include <gtk/gtk.h>
 #include <gst/gl/egl/gstgldisplay_egl.h>
+#include "current_context.h"
 int pivra_gpu_pending_presentations(void);
 int pivra_gpu_live_contexts(void);
 
@@ -97,6 +98,16 @@ int main(int argc, char **argv) {
     if (!g_strcmp0(check, "all") || !g_strcmp0(check, "current"))
       g_assert_true(gdk_gl_context_get_current() == caller);
     gdk_gl_context_clear_current();
+    if (!g_strcmp0(check, "current")) {
+      guintptr native = 1;
+      GstGLPlatform platform = GST_GL_PLATFORM_EGL | GST_GL_PLATFORM_GLX;
+      g_assert_cmpint(pivra_gpu_current_api(platform, &native), ==, GST_GL_API_NONE);
+      g_assert_cmpuint(native, ==, 0);
+      gdk_gl_context_make_current(caller);
+      g_assert_cmpint(pivra_gpu_current_api(platform, &native), !=, GST_GL_API_NONE);
+      g_assert_cmpuint(native, !=, 0);
+      gdk_gl_context_clear_current();
+    }
     g_object_unref(caller);
   }
   g_print("PASS context control=%s (8 cycles)\n", check);

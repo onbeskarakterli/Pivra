@@ -566,6 +566,7 @@ impl ImageView {
         media.play();
     }
     fn stop_video(&self) {
+        gpu_video::trace_binding(c"video-retire-begin");
         self.video_controls.attach(None);
         let path = self.video_path.borrow_mut().take();
         // Detach the render surface before stopping the native decoder.
@@ -590,6 +591,7 @@ impl ImageView {
             // Stock MediaFile owns its pipeline and is released when references
             // are dropped; don't synchronously clear the native backend here.
         }
+        gpu_video::trace_binding(c"video-retire-end");
     }
     fn prepare(&self, message: &str, cancel: bool) {
         self.stop_video();

@@ -2,6 +2,7 @@
 
 Status: **native acceptance BLOCKED / pending; not declared fixed**.
 Base: `0ec645b69ab92e8426e8e6056f0a49cdda3263bb`, branch `dev`.
+Verified implementation commit: `3988c40c14d61a4ac3f0b6f362049733ac844043`.
 Recorded 2026-11-17. No version, release, packaging or main-branch changes.
 
 ## User-reported evidence
@@ -116,6 +117,9 @@ in Wayland-only builds. It applies with `patch --dry-run --fuzz=0 -p1` to the
 exact upstream file above. It is an **unapplied review artifact**, not a runtime
 dependency, bundled custom GTK or instruction to replace system GTK. No patched
 GTK build/native acceptance is claimed for it.
+The final patch uses zero context to avoid whitespace-only context records in the
+repository; its exact source SHA-256 above must be checked before use. This
+documentation normalization changes no patch operation or application behavior.
 
 The public GtkMediaFile API does not expose its internal GstPlay pipeline/sink
 to Pivra for scoped GstContext injection. Fixing that object's private ownership

@@ -22,6 +22,7 @@
 #include "gtkgstmediafileprivate.h"
 #include "gtkgstpaintableprivate.h"
 #include <gst/gst.h>
+#include "lifecycle.h"
 struct _PivraGpuMediaFile {
   GtkMediaFile parent_instance;
   GdkPaintable *paintable;
@@ -31,6 +32,7 @@ struct _PivraGpuMediaFile {
   gint64 seek_target, active_target;
 };
 static void close_file(GtkMediaFile *file);
+static void pipeline_retired(gpointer unused, GObject *object) { (void)unused;pivra_video_lifecycle("pipeline-retired",object); }
 static void seek(GtkMediaStream *stream,gint64 timestamp);
 static void snapshot(GdkPaintable *p,GdkSnapshot *s,double w,double h) { gdk_paintable_snapshot(PIVRA_GPU_MEDIA_FILE(p)->paintable,s,w,h); }
 static GdkPaintable *current_image(GdkPaintable *p) { return gdk_paintable_get_current_image(PIVRA_GPU_MEDIA_FILE(p)->paintable); }
@@ -72,6 +74,7 @@ static void failure(PivraGpuMediaFile *self,GstMessage *message) {
   if(!gtk_media_stream_get_error(GTK_MEDIA_STREAM(self))) gtk_media_stream_gerror(GTK_MEDIA_STREAM(self),error);
   else g_error_free(error);
   g_free(debug);
+  close_file(GTK_MEDIA_FILE(self));
 }
 static gboolean bus_message(GstBus *bus,GstMessage *message,gpointer data) {
   (void)bus;
@@ -120,6 +123,7 @@ static void open_file(GtkMediaFile *file) {
   self->pipeline=gst_element_factory_make("playbin3",NULL);
   if(!self->pipeline) { gtk_media_stream_error(GTK_MEDIA_STREAM(self),G_IO_ERROR,G_IO_ERROR_NOT_SUPPORTED,"Missing GStreamer playbin3");return; }
   gst_object_ref_sink(self->pipeline);
+  g_object_weak_ref(G_OBJECT(self->pipeline),pipeline_retired,NULL);
   GstElement *sink=pivra_gpu_paintable_create_sink(PIVRA_GPU_PAINTABLE(self->paintable));
   /* A NULL sink must never select playbin's automatic/CPU/other-window sink. */
   if(!sink) { close_file(file);gtk_media_stream_error(GTK_MEDIA_STREAM(self),G_IO_ERROR,G_IO_ERROR_FAILED,"GPU sink construction failed; stock override: PIVRA_VIDEO_BACKEND=stock");return; }
@@ -141,10 +145,17 @@ static void open_file(GtkMediaFile *file) {
 }
 static void close_file(GtkMediaFile *file) {
   PivraGpuMediaFile *self=PIVRA_GPU_MEDIA_FILE(file);
+  pivra_video_lifecycle("stream-close-begin", self);
   if(self->tick) { g_source_remove(self->tick);self->tick=0; }
   if(self->bus_watch) { g_source_remove(self->bus_watch);self->bus_watch=0; }
   GstElement *pipeline=self->pipeline;self->pipeline=NULL;self->seeking=FALSE;
-  if(pipeline) { gst_element_set_state(pipeline,GST_STATE_NULL);gst_object_unref(pipeline); }
+  if(pipeline) {
+    gst_element_set_state(pipeline,GST_STATE_NULL);
+    if(g_getenv("PIVRA_TRACE_VIDEO")) g_printerr("PIVRA_GPU_CLOSE pipeline=%p refs=%d\n",(void *)pipeline,GST_OBJECT_REFCOUNT_VALUE(pipeline));
+    gst_object_unref(pipeline);
+  }
+  if(self->paintable) pivra_gpu_paintable_reset(PIVRA_GPU_PAINTABLE(self->paintable));
+  pivra_video_lifecycle("stream-close-end", self);
 }
 static gboolean play(GtkMediaStream *stream) {
   PivraGpuMediaFile *self=PIVRA_GPU_MEDIA_FILE(stream);

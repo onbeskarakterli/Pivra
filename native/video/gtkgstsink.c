@@ -23,6 +23,7 @@
 #include "gtkgstsinkprivate.h"
 
 #include "gtkgstpaintableprivate.h"
+#include "lifecycle.h"
 
 #if GST_GL_HAVE_WINDOW_X11 && (GST_GL_HAVE_PLATFORM_GLX || GST_GL_HAVE_PLATFORM_EGL) && defined (GDK_WINDOWING_X11)
 #define HAVE_GST_X11_SUPPORT
@@ -42,7 +43,7 @@
 #include <gdk/win32/gdkwin32.h>
 #endif
 
-#if GST_GL_HAVE_PLATFORM_EGL && (GST_GL_HAVE_WINDOW_WIN32 || GST_GL_HAVE_WINDOW_X11)
+#if GST_GL_HAVE_PLATFORM_EGL && (GST_GL_HAVE_WINDOW_WIN32 || GST_GL_HAVE_WINDOW_X11 || GST_GL_HAVE_WINDOW_WAYLAND)
 #include <gst/gl/egl/gstgldisplay_egl.h>
 #endif
 
@@ -99,6 +100,15 @@ G_DEFINE_TYPE_WITH_CODE (PivraGpuSink, pivra_gpu_sink,
         "gtkgstsink", 0, "PivraGpuMediaFile Video Sink"));
 
 static GParamSpec *properties[N_PROPS] = { NULL, };
+
+static gint live_contexts, held_frames;
+int pivra_gpu_live_contexts(void) { return g_atomic_int_get(&live_contexts); }
+int pivra_gpu_held_frames(void) { return g_atomic_int_get(&held_frames); }
+static void context_retired(gpointer data, GObject *object) {
+  (void)data;
+  pivra_video_lifecycle("context-retired", object);
+  g_atomic_int_add(&live_contexts, -1);
+}
 
 
 static void
@@ -332,6 +342,7 @@ static void
 video_frame_free (GstVideoFrame *frame)
 {
   gst_video_frame_unmap (frame);
+  g_atomic_int_add(&held_frames, -1);
   g_free (frame);
 }
 
@@ -357,6 +368,8 @@ pivra_gpu_sink_texture_from_buffer (PivraGpuSink      *self,
     {
       GstGLSyncMeta *sync_meta;
       GdkGLTextureBuilder *builder;
+
+      g_atomic_int_inc(&held_frames);
 
       sync_meta = gst_buffer_get_gl_sync_meta (buffer);
       if (!sync_meta) { video_frame_free(frame); return NULL; }
@@ -437,10 +450,17 @@ pivra_gpu_sink_initialize_gl (PivraGpuSink *self)
   GstGLAPI gl_api = GST_GL_API_NONE;
   guintptr gl_handle = 0;
   gboolean succeeded = FALSE;
+  gboolean wrapped_active = FALSE;
+  const char *phase = "make-current";
+  GdkGLContext *previous = gdk_gl_context_get_current();
+  if (previous) g_object_ref(previous);
 
   display = gdk_gl_context_get_display (self->gdk_context);
 
+  pivra_video_lifecycle("context-make-current-begin", self);
   gdk_gl_context_make_current (self->gdk_context);
+  if (gdk_gl_context_get_current() != self->gdk_context) goto out;
+  phase = "wrap-native-display";
 
 #ifdef HAVE_GST_X11_SUPPORT
 
@@ -479,7 +499,7 @@ G_GNUC_BEGIN_IGNORE_DEPRECATIONS
       else
         {
           GST_ERROR_OBJECT (self, "Failed to get handle from GdkGLContext");
-          return FALSE;
+          goto out;
         }
     }
   else
@@ -499,16 +519,17 @@ G_GNUC_END_IGNORE_DEPRECATIONS
 
       if (gl_handle)
         {
-          struct wl_display *wayland_display;
-
-          wayland_display = gdk_wayland_display_get_wl_display (display);
-          self->gst_display = GST_GL_DISPLAY (gst_gl_display_wayland_new_with_display (wayland_display));
+          /* GTK owns this EGLDisplay. Wrapping only wl_display would let a
+           * GstGLDisplayEGL created later call eglTerminate on GTK's display. */
+          gpointer egl_display = gdk_wayland_display_get_egl_display(display);
+          if (!egl_display) goto out;
+          self->gst_display = GST_GL_DISPLAY (gst_gl_display_egl_new_with_egl_display (egl_display));
           self->gst_gdk_context = gst_gl_context_new_wrapped (self->gst_display, gl_handle, platform, gl_api);
         }
       else
         {
           GST_ERROR_OBJECT (self, "Failed to get handle from GdkGLContext, not using Wayland EGL");
-          return FALSE;
+          goto out;
         }
     }
   else
@@ -531,7 +552,7 @@ G_GNUC_END_IGNORE_DEPRECATIONS
       else
         {
           GST_ERROR_OBJECT (self, "Failed to get handle from GdkGLContext, not using macOS CGL");
-          return FALSE;
+          goto out;
         }
     }
   else
@@ -578,45 +599,66 @@ G_GNUC_END_IGNORE_DEPRECATIONS
       else
         {
           GST_ERROR_OBJECT (self, "Failed to get handle from GdkGLContext, not using %s", gl_type);
-	      return FALSE;
+          goto out;
         }
     }
   else
 #endif
     {
       GST_INFO_OBJECT (self, "Unsupported GDK display %s for GL", G_OBJECT_TYPE_NAME (display));
-      return FALSE;
+      goto out;
     }
 
-  g_assert (self->gst_gdk_context != NULL);
+  if (!self->gst_gdk_context) goto out;
 
-  gst_gl_context_activate (self->gst_gdk_context, TRUE);
+  phase = "activate-wrapped-context";
+  wrapped_active = gst_gl_context_activate (self->gst_gdk_context, TRUE);
+  if (!wrapped_active) goto out;
 
+  phase = "fill-context-info";
   if (!gst_gl_context_fill_info (self->gst_gdk_context, &error))
     {
       GST_ERROR_OBJECT (self, "failed to retrieve GDK context info: %s", error->message);
-      g_clear_error (&error);
-      g_clear_object (&self->gst_gdk_context);
-      g_clear_object (&self->gst_display);
-
-      return FALSE;
+      goto out;
     }
   else
     {
-      gdk_gl_context_clear_current ();
       gst_gl_context_activate (self->gst_gdk_context, FALSE);
+      wrapped_active = FALSE;
+      gdk_gl_context_clear_current ();
     }
 
+  phase = "create-shared-context";
+  GST_OBJECT_LOCK(self->gst_display);
   succeeded = gst_gl_display_create_context (self->gst_display, self->gst_gdk_context, &self->gst_context, &error);
+  GST_OBJECT_UNLOCK(self->gst_display);
+  if (self->gst_context) {
+    if (g_getenv("PIVRA_TRACE_VIDEO")) g_printerr("PIVRA_GPU_CONTEXT_OWNER context=%s owner=%p refs=%d\n", GST_OBJECT_NAME(self->gst_context), (void *)self, GST_OBJECT_REFCOUNT_VALUE(self->gst_context));
+    g_atomic_int_inc(&live_contexts);
+    g_object_weak_ref(G_OBJECT(self->gst_context), context_retired, NULL);
+  }
 
   if (!succeeded)
     {
-      GST_ERROR_OBJECT (self, "Couldn't create GL context: %s", error->message);
-      g_error_free (error);
-      g_clear_object (&self->gst_gdk_context);
-      g_clear_object (&self->gst_display);
+      GST_ERROR_OBJECT (self, "Couldn't create GL context: %s", error ? error->message : "unknown error");
     }
 
+out:
+  if (!succeeded)
+    g_printerr("PIVRA_GPU_CONTEXT_FAILURE stage=%s platform=%u api=%u native_handle=%" G_GUINTPTR_FORMAT " reason=%s\n",
+               phase, (guint)platform, (guint)gl_api, gl_handle, error ? error->message : "native context unavailable");
+  g_clear_error(&error);
+  if (wrapped_active) gst_gl_context_activate(self->gst_gdk_context, FALSE);
+  /* Clear GDK's TLS too: Gst activation may already have unbound native GL. */
+  gdk_gl_context_clear_current();
+  if (previous) gdk_gl_context_make_current(previous);
+  g_clear_object(&previous);
+  if (!succeeded) {
+    g_clear_object(&self->gst_context);
+    g_clear_object(&self->gst_gdk_context);
+    g_clear_object(&self->gst_display);
+  }
+  pivra_video_lifecycle(succeeded ? "context-ready" : "context-init-failed", self);
   return succeeded;
 }
 
@@ -691,8 +733,11 @@ pivra_gpu_sink_dispose (GObject *object)
 {
   PivraGpuSink *self = PIVRA_GPU_SINK (object);
 
+  pivra_video_lifecycle("sink-dispose", self);
+  if (self->gst_context && g_getenv("PIVRA_TRACE_VIDEO")) g_printerr("PIVRA_GPU_CONTEXT_RELEASE context=%s owner=%p refs=%d\n", GST_OBJECT_NAME(self->gst_context), (void *)self, GST_OBJECT_REFCOUNT_VALUE(self->gst_context));
   g_clear_pointer (&self->color_state, gdk_color_state_unref);
   g_clear_object (&self->paintable);
+  g_clear_object (&self->gst_context);
   g_clear_object (&self->gst_gdk_context);
   g_clear_object (&self->gst_display);
   g_clear_object (&self->gdk_context);

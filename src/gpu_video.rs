@@ -51,11 +51,15 @@ static ACTIVE: AtomicUsize = AtomicUsize::new(0);
 static PROBES: AtomicUsize = AtomicUsize::new(0);
 static STOCK: AtomicUsize = AtomicUsize::new(0);
 static GPU: AtomicUsize = AtomicUsize::new(0);
+static LAST_FILTERS: AtomicUsize = AtomicUsize::new(usize::MAX);
 #[cfg(pivra_gpu_backend)]
 unsafe extern "C" {
     fn pivra_gpu_backend_type() -> glib::ffi::GType;
     fn pivra_gpu_eligible(uri: *const std::ffi::c_char) -> std::ffi::c_int;
     fn pivra_gpu_live_filters() -> std::ffi::c_int;
+    fn pivra_gpu_live_contexts() -> std::ffi::c_int;
+    fn pivra_gpu_held_frames() -> std::ffi::c_int;
+    fn pivra_gpu_pending_presentations() -> std::ffi::c_int;
 }
 fn discover(path: &Path) -> Backend {
     let _measurement = pivra::performance::Span::new("video_metadata_discovery");
@@ -124,8 +128,17 @@ pub async fn choose(path: PathBuf, current: impl Fn() -> bool) -> Option<Backend
     if std::env::var_os("PIVRA_TRACE_VIDEO").is_some() {
         let s = stats();
         eprintln!(
-            "PIVRA_VIDEO_SELECTION {result:?} workers={} pending={} cached={} filters={} probes={} stock={} gpu={}",
-            s.workers, s.pending, s.cached, s.filters, s.probes, s.stock, s.gpu
+            "PIVRA_VIDEO_SELECTION {result:?} workers={} pending={} cached={} filters={} contexts={} frames={} presentations={} probes={} stock={} gpu={}",
+            s.workers,
+            s.pending,
+            s.cached,
+            s.filters,
+            s.contexts,
+            s.frames,
+            s.presentations,
+            s.probes,
+            s.stock,
+            s.gpu
         );
     }
     current().then_some(result)
@@ -135,6 +148,9 @@ pub struct Stats {
     pub pending: usize,
     pub cached: usize,
     pub filters: usize,
+    pub contexts: usize,
+    pub frames: usize,
+    pub presentations: usize,
     pub probes: usize,
     pub stock: usize,
     pub gpu: usize,
@@ -142,15 +158,27 @@ pub struct Stats {
 pub fn stats() -> Stats {
     let c = cache().lock().unwrap();
     #[cfg(pivra_gpu_backend)]
-    let filters = unsafe { pivra_gpu_live_filters() }.max(0) as usize;
+    let (filters, contexts, frames, presentations) = unsafe {
+        (
+            pivra_gpu_live_filters().max(0) as usize,
+            pivra_gpu_live_contexts().max(0) as usize,
+            pivra_gpu_held_frames().max(0) as usize,
+            pivra_gpu_pending_presentations().max(0) as usize,
+        )
+    };
     #[cfg(not(pivra_gpu_backend))]
-    let filters = 0;
-    pivra::performance::emit("video_live_filters", "observed_count", 0, filters as u64);
+    let (filters, contexts, frames, presentations) = (0, 0, 0, 0);
+    if pivra::performance::enabled() && LAST_FILTERS.swap(filters, Ordering::Relaxed) != filters {
+        pivra::performance::emit("video_live_filters", "observed_count", 0, filters as u64);
+    }
     Stats {
         workers: ACTIVE.load(Ordering::SeqCst),
         pending: c.pending.len(),
         cached: c.entries.len(),
         filters,
+        contexts,
+        frames,
+        presentations,
         probes: PROBES.load(Ordering::SeqCst),
         stock: STOCK.load(Ordering::SeqCst),
         gpu: GPU.load(Ordering::SeqCst),

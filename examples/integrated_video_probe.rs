@@ -19,6 +19,7 @@ use std::{
     time::{Duration, Instant},
 };
 fn wait(label: &str, ready: impl Fn() -> bool) {
+    eprintln!("LIFECYCLE_STAGE {label} begin");
     let deadline = Instant::now() + Duration::from_secs(10);
     loop {
         for _ in 0..100 {
@@ -28,21 +29,32 @@ fn wait(label: &str, ready: impl Fn() -> bool) {
             glib::MainContext::default().iteration(false);
         }
         if ready() {
+            let s = stats();
+            eprintln!(
+                "LIFECYCLE_STAGE {label} ready contexts={} frames={} presentations={}",
+                s.contexts, s.frames, s.presentations
+            );
             return;
         }
         assert!(
             Instant::now() < deadline,
-            "{label}: filters={} workers={} pending={}",
+            "FAIL {label}: filters={} workers={} pending={} contexts={} frames={} presentations={}",
             stats().filters,
             stats().workers,
-            stats().pending
+            stats().pending,
+            stats().contexts,
+            stats().frames,
+            stats().presentations
         );
         std::thread::sleep(Duration::from_millis(1));
     }
 }
 fn frame(w: &gtk::Widget) -> bool {
     if let Some(p) = w.downcast_ref::<gtk::Picture>() {
-        if p.is_visible() && p.paintable().is_some_and(|p| p.intrinsic_width() > 0) {
+        if p.widget_name() == "video-content"
+            && p.is_visible()
+            && p.paintable().is_some_and(|p| p.intrinsic_width() > 0)
+        {
             return true;
         }
     }
@@ -72,6 +84,25 @@ fn main() {
         .build();
     app.register(None::<&gio::Cancellable>).unwrap();
     let args: Vec<_> = std::env::args_os().skip(1).collect();
+    if args.first().is_some_and(|arg| arg == "--error-path") {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("invalid.mp4");
+        std::fs::write(&path, b"controlled malformed input, not a valid video").unwrap();
+        // Deliberate decoder-error injection in this probe only. Production
+        // metadata admission remains unchanged.
+        match image_view::gpu_video::open_selected(&path, image_view::gpu_video::Backend::Gpu) {
+            Ok(media) => {
+                wait("controlled pipeline error", || media.error().is_some());
+                media.clear();
+            }
+            Err(error) => eprintln!("EXPECTED controlled pipeline error: {error}"),
+        }
+        wait("error resources retired", drained);
+        println!(
+            "PASS malformed GPU input error, no retained contexts/frames/presentations/workers"
+        );
+        return;
+    }
     if args.first().is_some_and(|arg| arg == "--routing-only") {
         for argument in &args[1..] {
             let argument = argument.to_str().expect("routing fixture UTF-8 path");
@@ -88,6 +119,12 @@ fn main() {
         }
         assert_eq!(stats().filters, 0, "routing does not start a GPU player");
         return;
+    }
+    if gtk::MediaFile::new().type_().name() == "GtkNoMediaFile" {
+        eprintln!(
+            "NOT RUN: real stock GTK media backend is missing; mixed lifecycle cannot be certified"
+        );
+        std::process::exit(77);
     }
     assert_eq!(
         args.len(),
@@ -111,6 +148,7 @@ fn main() {
             && stats().stock == stock + 1
             && stats().filters == 1
             && stats().workers == 0
+            && frame(first.upcast_ref())
     });
     action(&first, "next-media");
     wait("unknown stock route", || {
@@ -118,10 +156,13 @@ fn main() {
             && stats().stock == stock + 2
             && stats().filters == 1
             && stats().workers == 0
+            && frame(first.upcast_ref())
     });
     action(&first, "next-media");
     wait("full-range GPU", || {
-        stats().filters == 2 && frame(first.upcast_ref())
+        first.title().is_some_and(|t| t.contains("4.mp4"))
+            && stats().filters == 2
+            && frame(first.upcast_ref())
     });
     for _ in 0..4 {
         for name in [
@@ -143,16 +184,14 @@ fn main() {
         stats().filters == 1 && frame(second.upcast_ref())
     });
     second.close();
-    wait("all filters retired", || {
-        stats().filters == 0 && stats().workers == 0 && stats().pending == 0
-    });
+    wait("all filters retired", drained);
     for _ in 0..3 {
         let w = open(&app, &dir.path().join("1.mp4"));
         wait("reopen frame", || {
             stats().filters == 1 && frame(w.upcast_ref())
         });
         w.close();
-        wait("reopen cleanup", || stats().filters == 0);
+        wait("reopen cleanup", drained);
     }
     let fresh = dir.path().join("5.mp4");
     std::fs::copy(&args[0], &fresh).unwrap();
@@ -169,10 +208,18 @@ fn main() {
     );
     std::fs::remove_file(fresh).unwrap();
     w.close();
-    wait("delete and close cleanup", || {
-        stats().filters == 0 && stats().workers == 0 && stats().pending == 0
-    });
+    wait("delete and close cleanup", drained);
     println!(
         "PASS automatic routing, discovery dedup/cache, rapid navigation, two-window isolation, repeated close, delete-during-selection; stock pixels/native hardware NOT certified"
     );
+}
+
+fn drained() -> bool {
+    let s = stats();
+    s.filters == 0
+        && s.workers == 0
+        && s.pending == 0
+        && s.contexts == 0
+        && s.frames == 0
+        && s.presentations == 0
 }

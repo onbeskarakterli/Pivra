@@ -22,6 +22,7 @@
 #include "gtkgstpaintableprivate.h"
 #include "gtkgstsinkprivate.h"
 #include "filter.c"
+#include "lifecycle.h"
 
 #include <gtk/gtk.h>
 
@@ -40,7 +41,11 @@ struct _PivraGpuPaintable
 
   GdkSurface *surface;
   gint pending;
+  gint epoch;
 };
+
+static gint pending_presentations;
+int pivra_gpu_pending_presentations(void) { return g_atomic_int_get(&pending_presentations); }
 
 struct _PivraGpuPaintableClass
 {
@@ -329,6 +334,16 @@ pivra_gpu_paintable_unrealize (PivraGpuPaintable *self,
     self->surface = NULL;
 }
 
+/* Called on GTK's thread after the pipeline has reached NULL. Queued frame
+ * callbacks still own/release their buffers but cannot republish a closed frame. */
+void pivra_gpu_paintable_reset(PivraGpuPaintable *self) {
+  g_atomic_int_inc(&self->epoch);
+  g_clear_object(&self->image);
+  gdk_paintable_invalidate_size(GDK_PAINTABLE(self));
+  gdk_paintable_invalidate_contents(GDK_PAINTABLE(self));
+  pivra_video_lifecycle("paintable-reset", self);
+}
+
 static void
 pivra_gpu_paintable_set_paintable (PivraGpuPaintable       *self,
                                  GdkPaintable          *paintable,
@@ -374,12 +389,14 @@ struct _SetTextureInvocation {
   double           pixel_aspect_ratio;
   graphene_rect_t  viewport;
   int              orientation;
+  gint             epoch;
 };
 
 static void
 set_texture_invocation_free (SetTextureInvocation *invoke)
 {
   g_atomic_int_add (&invoke->paintable->pending, -1);
+  g_atomic_int_add (&pending_presentations, -1);
   g_object_unref (invoke->paintable);
   g_object_unref (invoke->texture);
 
@@ -391,7 +408,8 @@ pivra_gpu_paintable_set_texture_invoke (gpointer data)
 {
   SetTextureInvocation *invoke = data;
 
-  pivra_gpu_paintable_set_paintable (invoke->paintable,
+  if (invoke->epoch == g_atomic_int_get(&invoke->paintable->epoch))
+    pivra_gpu_paintable_set_paintable (invoke->paintable,
                                    GDK_PAINTABLE (invoke->texture),
                                    invoke->pixel_aspect_ratio,
                                    &invoke->viewport,
@@ -416,11 +434,17 @@ pivra_gpu_paintable_queue_set_texture (PivraGpuPaintable       *self,
   invoke->pixel_aspect_ratio = pixel_aspect_ratio;
   invoke->viewport = *viewport;
   invoke->orientation = orientation;
+  invoke->epoch = g_atomic_int_get(&self->epoch);
+  g_atomic_int_inc(&pending_presentations);
 
-  g_main_context_invoke_full (NULL,
-                              G_PRIORITY_DEFAULT,
-                              pivra_gpu_paintable_set_texture_invoke,
-                              invoke,
-                              (GDestroyNotify) set_texture_invocation_free);
+  /* invoke_full can execute inline on the producer when the main context is
+   * unowned (e.g. between probe iterations). GTK invalidation must be dispatched
+   * by the UI thread, never opportunistically run by GStreamer's GL thread. */
+  GSource *source = g_idle_source_new();
+  g_source_set_priority(source, G_PRIORITY_DEFAULT);
+  g_source_set_callback(source, pivra_gpu_paintable_set_texture_invoke, invoke,
+                        (GDestroyNotify)set_texture_invocation_free);
+  g_source_attach(source, g_main_context_default());
+  g_source_unref(source);
 }
 

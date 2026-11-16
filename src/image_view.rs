@@ -73,6 +73,7 @@ impl ImageView {
         // Native GTK media playback is an intentionally small first video
         // milestone. The backend depends on installed media codecs.
         let video = gtk::Picture::new();
+        video.set_widget_name("video-content");
         video.set_hexpand(true);
         video.set_vexpand(true);
         video.set_content_fit(gtk::ContentFit::Fill);

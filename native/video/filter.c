@@ -105,6 +105,9 @@ static void stop (GstGLBaseFilter *base) {
   g_printerr ("PIVRA_GPU_STOP frames=%u\n", self->frames);
   if (self->shader) g_atomic_int_add(&live_filters,-1);
   gst_clear_object (&self->shader);
+  /* GstGLFilter owns the render-target FBO and GL buffers created by
+   * render_to_target_with_shader(). Its cleanup must run on the GL thread too. */
+  GST_GL_BASE_FILTER_CLASS(pivra_transfer_parent_class)->gl_stop(base);
 }
 static gboolean draw (GstGLFilter *filter, GstGLMemory *in, GstGLMemory *out) {
   PivraTransfer *self = (PivraTransfer *)filter;

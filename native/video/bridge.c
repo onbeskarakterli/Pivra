@@ -11,8 +11,8 @@ void pivra_gpu_trace_binding(const char *stage) {
   /* Native getters do not make a context current or issue GL queries. */
   guintptr egl = gst_gl_context_get_current_gl_context(GST_GL_PLATFORM_EGL);
   guintptr glx = gst_gl_context_get_current_gl_context(GST_GL_PLATFORM_GLX);
-  g_printerr("PIVRA_GPU_BINDING time_us=%" G_GINT64_FORMAT " stage=%s thread=%p gdk=%p egl=%" G_GUINTPTR_FORMAT " glx=%" G_GUINTPTR_FORMAT "\n",
-             g_get_monotonic_time(),stage,(void *)g_thread_self(),(void *)gdk_gl_context_get_current(),egl,glx);
+  g_printerr("PIVRA_GPU_BINDING time_us=%" G_GINT64_FORMAT " stage=%s thread=%p gdk=%p egl=%" G_GUINTPTR_FORMAT " glx=%" G_GUINTPTR_FORMAT " pid=%ld tid=%ld\n",
+             g_get_monotonic_time(),stage,(void *)g_thread_self(),(void *)gdk_gl_context_get_current(),egl,glx,(long)getpid(),pivra_video_tid());
 }
 static void stock_retired(gpointer unused, GObject *object) {
   (void)unused;

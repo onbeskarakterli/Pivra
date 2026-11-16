@@ -110,6 +110,10 @@ static void context_retired(gpointer data, GObject *object) {
   pivra_video_lifecycle("context-retired", object);
   g_atomic_int_add(&live_contexts, -1);
 }
+static void gdk_context_retired(gpointer data, GObject *object) {
+  (void)data;
+  pivra_video_lifecycle("gdk-context-retired",object);
+}
 
 
 static void
@@ -641,7 +645,13 @@ G_GNUC_END_IGNORE_DEPRECATIONS
   succeeded = gst_gl_display_create_context (self->gst_display, self->gst_gdk_context, &self->gst_context, &error);
   GST_OBJECT_UNLOCK(self->gst_display);
   if (self->gst_context) {
-    if (g_getenv("PIVRA_TRACE_VIDEO")) g_printerr("PIVRA_GPU_CONTEXT_OWNER context=%s owner=%p refs=%d\n", GST_OBJECT_NAME(self->gst_context), (void *)self, GST_OBJECT_REFCOUNT_VALUE(self->gst_context));
+    if (g_getenv("PIVRA_TRACE_VIDEO")) {
+      g_printerr("PIVRA_GPU_CONTEXT_OWNER context=%s object=%p owner=%p refs=%d native_context=%" G_GUINTPTR_FORMAT " native_display=%" G_GUINTPTR_FORMAT " share_context=%" G_GUINTPTR_FORMAT " gdk_object=%p platform=%u time_us=%" G_GINT64_FORMAT " pid=%ld tid=%ld\n",
+        GST_OBJECT_NAME(self->gst_context),(void *)self->gst_context,(void *)self,GST_OBJECT_REFCOUNT_VALUE(self->gst_context),
+        gst_gl_context_get_gl_context(self->gst_context),gst_gl_display_get_handle(self->gst_display),gl_handle,
+        (void *)self->gdk_context,(guint)platform,g_get_monotonic_time(),(long)getpid(),pivra_video_tid());
+      g_object_weak_ref(G_OBJECT(self->gdk_context),gdk_context_retired,NULL);
+    }
     g_atomic_int_inc(&live_contexts);
     g_object_weak_ref(G_OBJECT(self->gst_context), context_retired, NULL);
   }
@@ -752,7 +762,10 @@ pivra_gpu_sink_dispose (GObject *object)
   PivraGpuSink *self = PIVRA_GPU_SINK (object);
 
   pivra_video_lifecycle("sink-dispose", self);
-  if (self->gst_context && g_getenv("PIVRA_TRACE_VIDEO")) g_printerr("PIVRA_GPU_CONTEXT_RELEASE context=%s owner=%p refs=%d\n", GST_OBJECT_NAME(self->gst_context), (void *)self, GST_OBJECT_REFCOUNT_VALUE(self->gst_context));
+  if (self->gst_context && g_getenv("PIVRA_TRACE_VIDEO"))
+    g_printerr("PIVRA_GPU_CONTEXT_RELEASE context=%s object=%p owner=%p refs=%d native_context=%" G_GUINTPTR_FORMAT " native_display=%" G_GUINTPTR_FORMAT " time_us=%" G_GINT64_FORMAT " pid=%ld tid=%ld\n",
+      GST_OBJECT_NAME(self->gst_context),(void *)self->gst_context,(void *)self,GST_OBJECT_REFCOUNT_VALUE(self->gst_context),
+      gst_gl_context_get_gl_context(self->gst_context),gst_gl_display_get_handle(self->gst_display),g_get_monotonic_time(),(long)getpid(),pivra_video_tid());
   g_clear_pointer (&self->color_state, gdk_color_state_unref);
   g_clear_object (&self->paintable);
   g_clear_object (&self->gst_context);

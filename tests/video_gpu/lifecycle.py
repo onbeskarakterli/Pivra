@@ -15,6 +15,7 @@ import subprocess
 import sys
 import tempfile
 import time
+from gdb_report import records_from, outcome, ownership
 
 ROOT = Path(__file__).resolve().parents[2]
 MODULES = ['gtk4', 'gstreamer-gl-1.0', 'gstreamer-video-1.0', 'gstreamer-allocators-1.0']
@@ -66,12 +67,17 @@ def session(kind, env, out):
             except subprocess.TimeoutExpired:
                 proc.kill(); proc.wait()
 
-def run(name, command, env, out, timeout=90, expected_gpu_errors=0, expected_context_failures=0):
+def run(name, command, env, out, timeout=90, expected_gpu_errors=0, expected_context_failures=0, debugger=False):
+    event_file = out/(name+'.gdb.jsonl')
+    if debugger:
+        env = dict(env,PIVRA_GDB_EVENTS=str(event_file))
+    timed_out = False
     with (out/(name+'.log')).open('w') as log:
         proc = subprocess.Popen([str(v) for v in command], cwd=ROOT, env=env, stdout=log, stderr=subprocess.STDOUT, start_new_session=True)
         try:
             code = proc.wait(timeout=timeout)
         except subprocess.TimeoutExpired:
+            timed_out = True
             os.killpg(proc.pid, signal.SIGTERM)
             try:
                 proc.wait(timeout=5)
@@ -80,18 +86,26 @@ def run(name, command, env, out, timeout=90, expected_gpu_errors=0, expected_con
             code = 124
     status = 'PASS' if code == 0 else 'NOT RUN' if code == 77 else 'FAIL'
     log = (out/(name+'.log')).read_text(errors='replace')
+    debugger_records = records_from(log,event_file) if debugger else []
+    debugger_result = outcome(code,debugger_records) if debugger else None
+    if debugger_result: status = debugger_result['status']
     diagnostics = sum(line.startswith('{"pivra_perf":1,') for line in log.splitlines())
     context_errors = log.count('gdk_gl_context_make_current() failed')
     gpu_errors = log.count('PIVRA_GPU_FAIL') + log.count('PIVRA_GPU_SHADER_FAIL')
     context_failures = log.count('PIVRA_GPU_CONTEXT_FAILURE')
     reasons = []
+    if debugger_result and debugger_result['debugger_status']!='COMPLETE':
+        reasons.append(debugger_result['reason'])
+    if timed_out:
+        status='FAIL'; reasons.append('test deadline exceeded; inferior completion not established')
     if context_errors or gpu_errors != expected_gpu_errors or context_failures != expected_context_failures:
         reasons.append('native context/GPU failure logged')
     if diagnostics >= 4096:
         reasons.append('diagnostic cap reached')
-    if code == 0 and reasons:
+    if status=='PASS' and reasons:
         status = 'FAIL'
-    print(f'{status} {name}: exit={code}; {"; ".join(reasons)}; {out/(name+".log")}', flush=True)
+    detail = f'debugger_exit={code}; application={debugger_result["application_status"]}' if debugger else f'exit={code}'
+    print(f'{status} {name}: {detail}; {"; ".join(reasons)}; {out/(name+".log")}', flush=True)
     lines = log.splitlines()
     stages = [line for line in lines if line.startswith('LIFECYCLE_STAGE')]
     bindings = [line for line in lines if line.startswith('PIVRA_GPU_BINDING')]
@@ -102,10 +116,12 @@ def run(name, command, env, out, timeout=90, expected_gpu_errors=0, expected_con
             path = Path(line.removeprefix('LIFECYCLE_LIBRARY '))
             try: libraries[str(path)] = hashlib.sha256(path.read_bytes()).hexdigest()
             except OSError: libraries[str(path)] = None
-    if status == 'FAIL':
-        print('FAIL last transition:', stages[-1] if stages else 'not reached', flush=True)
+    if status in ('FAIL','BLOCKED'):
+        print(status+' last transition:', stages[-1] if stages else 'not reached', flush=True)
         print('\n'.join(lines[-12:]), flush=True)
-    return dict(name=name, exit=code, status=status, diagnostic_events=diagnostics, context_errors=context_errors, context_failures=context_failures,gpu_errors=gpu_errors, reasons=reasons,last_stage=stages[-1] if stages else None,last_bindings=bindings[-8:],inferior_signals=signals,libraries_sha256=libraries)
+    return dict(name=name, exit=code, status=status, diagnostic_events=diagnostics, context_errors=context_errors, context_failures=context_failures,gpu_errors=gpu_errors, reasons=reasons,last_stage=stages[-1] if stages else None,last_bindings=bindings[-8:],inferior_signals=signals,libraries_sha256=libraries,
+                timed_out=timed_out,exit_scope='debugger' if debugger else 'application',
+                debugger_exit=code if debugger else None,debugger_result=debugger_result,gdb_event_count=len(debugger_records),egl_requests=ownership(debugger_records,log))
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
@@ -163,13 +179,13 @@ def main():
         if not args.ownership_only:
             mixed = [target/'integrated_video_probe', *[media/(n+'.mp4') for n in ['bt709','srgb','unknown','full709']]]
             if args.debug_mixed:
-                mixed = ['gdb','--batch','--return-child-result','-x',ROOT/'tests/video_gpu/context_trace.gdb','--args',*mixed]
-            results.append(run('mixed-lifecycle',mixed,active,out))
+                mixed = ['gdb','-nx','--quiet','--batch','--return-child-result','-x',ROOT/'tests/video_gpu/context_trace.gdb','--args',*mixed]
+            results.append(run('mixed-lifecycle',mixed,active,out,debugger=args.debug_mixed))
             results.append(run('error-cleanup', [target/'integrated_video_probe','--error-path'], active, out))
             results.append(run('limited-presentation-controls', [target/'video_color_probe',media/'bt709.mp4','--check-controls'], active, out))
             results.append(run('full-ramp-shader-controls', [target/'video_color_probe',out/'ramps/ramp.mp4','--check-bt1886-ramp','--check-controls'], active, out))
-    (out/'report.json').write_text(json.dumps(dict(source=subprocess.check_output(['git','rev-parse','HEAD'],cwd=ROOT,text=True).strip(),dirty=bool(subprocess.check_output(['git','status','--porcelain'],cwd=ROOT)),session=args.session,software_control=args.software,api=args.api,results=results),indent=2)+'\n')
-    return 1 if any(r['status']=='FAIL' for r in results) else 77 if any(r['status']=='NOT RUN' for r in results) else 0
+    (out/'report.json').write_text(json.dumps(dict(source=subprocess.check_output(['git','rev-parse','HEAD'],cwd=ROOT,text=True).strip(),dirty=bool(subprocess.check_output(['git','status','--porcelain'],cwd=ROOT)),session=args.session,software_control=args.software,api=args.api,all_gates_pass=len(results)==9 and all(r['status']=='PASS' for r in results),results=results),indent=2)+'\n')
+    return 1 if any(r['status']=='FAIL' for r in results) else 77 if any(r['status'] in ('NOT RUN','BLOCKED') for r in results) else 0
 
 if __name__ == '__main__':
     raise SystemExit(main())

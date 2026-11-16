@@ -46,6 +46,17 @@ class LifecycleRunner(unittest.TestCase):
         self.assertEqual(r['inferior_signals'], ['SIGABRT'])
         self.assertEqual(r['exit'],134)
 
+    def test_debugger_abort_without_inferior_result_is_not_app_abort(self):
+        r = self.run_child('import os,resource,signal;resource.setrlimit(resource.RLIMIT_CORE,(0,0));os.kill(os.getpid(),signal.SIGABRT)', debugger=True)
+        self.assertEqual((r['status'],r['debugger_result']['application_status']),('BLOCKED','UNKNOWN'))
+        self.assertEqual((r['exit_scope'],r['debugger_exit']),('debugger',-6))
+
+    def test_confirmed_inferior_exit_does_not_hide_gl_warnings(self):
+        message='GDB_EVENT {"schema":1,"kind":"inferior_result","state":"exited","exit_code":0}'
+        r = self.run_child('print('+repr(message)+'); print("gdk_gl_context_make_current() failed")', debugger=True)
+        self.assertEqual(r['status'],'FAIL')
+        self.assertEqual(r['debugger_result']['application_status'],'PASS')
+
     def test_expected_context_error_count_is_exact(self):
         self.assertEqual(self.run_child('print("PIVRA_GPU_CONTEXT_FAILURE injected")', expected_context_failures=1)['status'],'PASS')
         self.assertEqual(self.run_child('print("gdk_gl_context_make_current() failed"); print("PIVRA_GPU_CONTEXT_FAILURE injected")', expected_context_failures=1)['status'],'FAIL')

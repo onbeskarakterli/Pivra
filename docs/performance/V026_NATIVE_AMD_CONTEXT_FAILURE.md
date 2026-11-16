@@ -1,6 +1,9 @@
 # v0.2.6 Task 01C — native AMD failure and stock EGL ownership
 
 Status: **native acceptance BLOCKED / pending; not declared fixed**.
+Latest native GDB follow-up: exit 255 at an observed `eglDestroyContext` stack
+does not identify an inferior failure or prove display termination; see
+[debugger stop classification](V026_GDB_STOP_CLASSIFICATION.md).
 Base: `0ec645b69ab92e8426e8e6056f0a49cdda3263bb`, branch `dev`.
 Verified implementation commit: `3988c40c14d61a4ac3f0b6f362049733ac844043`.
 Recorded 2026-11-17. No version, release, packaging or main-branch changes.

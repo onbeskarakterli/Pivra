@@ -139,6 +139,23 @@ fn main() {
         );
         return;
     }
+    if args.first().is_some_and(|arg| arg == "--normal-only") {
+        let path = Path::new(args.get(1).expect("normal-only video path"));
+        let first = open(&app, path);
+        wait("normal single GPU video", || {
+            stats().filters == 1
+                && stats().contexts == 1
+                && stats().workers == 0
+                && stats().pending == 0
+                && frame(first.upcast_ref())
+        });
+        first.close();
+        wait("normal single GPU cleanup", drained);
+        println!(
+            "PASS normal production GPU window/frame/close; no stock or mixed transition exercised"
+        );
+        return;
+    }
     if args.first().is_some_and(|arg| arg == "--routing-only") {
         for argument in &args[1..] {
             let argument = argument.to_str().expect("routing fixture UTF-8 path");

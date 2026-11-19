@@ -37,6 +37,7 @@
 #if GST_GL_HAVE_WINDOW_WAYLAND && GST_GL_HAVE_PLATFORM_EGL && defined (GDK_WINDOWING_WAYLAND)
 #define HAVE_GST_WAYLAND_SUPPORT
 #include <gdk/wayland/gdkwayland.h>
+#include "wayland_display.h"
 #include <gst/gl/wayland/gstgldisplay_wayland.h>
 #endif
 
@@ -115,6 +116,19 @@ static void gdk_context_retired(gpointer data, GObject *object) {
   pivra_video_lifecycle("gdk-context-retired",object);
 }
 
+
+/* Keep diagnostics in EGLDisplay units even when the native wrapper is Wayland. */
+static guintptr native_display_handle(PivraGpuSink *self) {
+#if GST_GL_HAVE_PLATFORM_EGL
+  if (gst_gl_context_get_gl_platform(self->gst_context) == GST_GL_PLATFORM_EGL) {
+    GstGLDisplayEGL *egl=gst_gl_display_egl_from_gl_display(self->gst_display);
+    guintptr handle=egl ? gst_gl_display_get_handle(GST_GL_DISPLAY(egl)) : 0;
+    gst_clear_object(&egl);
+    return handle;
+  }
+#endif
+  return gst_gl_display_get_handle(self->gst_display);
+}
 
 static void
 pivra_gpu_sink_get_times (GstBaseSink  *bsink,
@@ -534,11 +548,12 @@ G_GNUC_END_IGNORE_DEPRECATIONS
 
       if (gl_handle)
         {
-          /* GTK owns this EGLDisplay. Wrapping only wl_display would let a
-           * GstGLDisplayEGL created later call eglTerminate on GTK's display. */
-          gpointer egl_display = gdk_wayland_display_get_egl_display(display);
-          if (!egl_display) goto out;
-          self->gst_display = GST_GL_DISPLAY (gst_gl_display_egl_new_with_egl_display (egl_display));
+          /* Keep v0.2.5's native Wayland integration, with explicit borrowed
+           * EGL ownership. On pre-1.26 runtimes keep the safe direct wrapper. */
+          self->gst_display = pivra_wayland_display(
+              gdk_wayland_display_get_wl_display(display),
+              gdk_wayland_display_get_egl_display(display));
+          if (!self->gst_display) goto out;
           self->gst_gdk_context = gst_gl_context_new_wrapped (self->gst_display, gl_handle, platform, gl_api);
         }
       else
@@ -646,10 +661,10 @@ G_GNUC_END_IGNORE_DEPRECATIONS
   GST_OBJECT_UNLOCK(self->gst_display);
   if (self->gst_context) {
     if (g_getenv("PIVRA_TRACE_VIDEO")) {
-      g_printerr("PIVRA_GPU_CONTEXT_OWNER context=%s object=%p owner=%p refs=%d native_context=%" G_GUINTPTR_FORMAT " native_display=%" G_GUINTPTR_FORMAT " share_context=%" G_GUINTPTR_FORMAT " gdk_object=%p platform=%u time_us=%" G_GINT64_FORMAT " pid=%ld tid=%ld\n",
+      g_printerr("PIVRA_GPU_CONTEXT_OWNER context=%s object=%p owner=%p refs=%d native_context=%" G_GUINTPTR_FORMAT " native_display=%" G_GUINTPTR_FORMAT " share_context=%" G_GUINTPTR_FORMAT " gdk_object=%p platform=%u display_type=%s time_us=%" G_GINT64_FORMAT " pid=%ld tid=%ld\n",
         GST_OBJECT_NAME(self->gst_context),(void *)self->gst_context,(void *)self,GST_OBJECT_REFCOUNT_VALUE(self->gst_context),
-        gst_gl_context_get_gl_context(self->gst_context),gst_gl_display_get_handle(self->gst_display),gl_handle,
-        (void *)self->gdk_context,(guint)platform,g_get_monotonic_time(),(long)getpid(),pivra_video_tid());
+        gst_gl_context_get_gl_context(self->gst_context),native_display_handle(self),gl_handle,
+        (void *)self->gdk_context,(guint)platform,G_OBJECT_TYPE_NAME(self->gst_display),g_get_monotonic_time(),(long)getpid(),pivra_video_tid());
       g_object_weak_ref(G_OBJECT(self->gdk_context),gdk_context_retired,NULL);
     }
     g_atomic_int_inc(&live_contexts);
@@ -765,7 +780,7 @@ pivra_gpu_sink_dispose (GObject *object)
   if (self->gst_context && g_getenv("PIVRA_TRACE_VIDEO"))
     g_printerr("PIVRA_GPU_CONTEXT_RELEASE context=%s object=%p owner=%p refs=%d native_context=%" G_GUINTPTR_FORMAT " native_display=%" G_GUINTPTR_FORMAT " time_us=%" G_GINT64_FORMAT " pid=%ld tid=%ld\n",
       GST_OBJECT_NAME(self->gst_context),(void *)self->gst_context,(void *)self,GST_OBJECT_REFCOUNT_VALUE(self->gst_context),
-      gst_gl_context_get_gl_context(self->gst_context),gst_gl_display_get_handle(self->gst_display),g_get_monotonic_time(),(long)getpid(),pivra_video_tid());
+      gst_gl_context_get_gl_context(self->gst_context),native_display_handle(self),g_get_monotonic_time(),(long)getpid(),pivra_video_tid());
   g_clear_pointer (&self->color_state, gdk_color_state_unref);
   g_clear_object (&self->paintable);
   g_clear_object (&self->gst_context);

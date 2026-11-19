@@ -228,11 +228,13 @@ pivra_gpu_paintable_create_sink (PivraGpuPaintable *self)
   if (context == NULL)
     {
       GST_INFO ("failed to create GDK GL context: %s", error->message);
+      g_printerr("PIVRA_GPU_CONTEXT_FAILURE stage=create-gdk-context reason=%s\n",error->message);
       g_error_free (error);
     }
   else if (!gdk_gl_context_realize (context, &error))
     {
       GST_INFO ("failed to realize GDK GL context: %s", error->message);
+      g_printerr("PIVRA_GPU_CONTEXT_FAILURE stage=realize-gdk-context reason=%s\n",error->message);
       g_clear_object (&context);
       g_error_free (error);
     }

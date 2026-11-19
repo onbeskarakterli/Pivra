@@ -24,7 +24,7 @@ def flags(option):
     return shlex.split(subprocess.check_output(['pkg-config', option, *MODULES], text=True))
 
 @contextlib.contextmanager
-def session(kind, env, out):
+def session(kind, env, out, *, floating=False):
     if kind == 'native':
         yield env
         return
@@ -33,11 +33,11 @@ def session(kind, env, out):
     with (out/'compositor.log').open('w') as log:
         if kind == 'x11':
             read, write = os.pipe()
-            proc = subprocess.Popen(['Xvfb', '-displayfd', str(write), '-screen', '0', '1280x1024x24', '-nolisten', 'tcp'], pass_fds=(write,), stdout=log, stderr=log)
+            proc = subprocess.Popen(['Xvfb', '-displayfd', str(write), '-screen', '0', '1280x1024x24', '-noreset', '-nolisten', 'tcp'], pass_fds=(write,), stdout=log, stderr=log)
             os.close(write)
         else:
             conf = out/'sway.conf'
-            conf.write_text('xwayland disable\noutput HEADLESS-1 mode 1280x1024\ndefault_border none\n')
+            conf.write_text('xwayland disable\noutput HEADLESS-1 mode 1280x1024\ndefault_border none\n'+('for_window [app_id="^io.github.onbeskarakterli.Pivra"] floating enable\n' if floating else ''))
             env.update(WLR_BACKENDS='headless', WLR_RENDERER='pixman', WLR_LIBINPUT_NO_DEVICES='1')
             env.pop('DISPLAY', None)
             proc = subprocess.Popen(['sway', '-c', str(conf)], env=env, stdout=log, stderr=log)

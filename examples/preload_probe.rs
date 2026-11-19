@@ -117,7 +117,10 @@ fn picture(v: &image_view::ImageView) -> gtk::Picture {
     v.widget().child().unwrap().downcast().unwrap()
 }
 fn status(v: &image_view::ImageView) -> gtk::Label {
-    picture(v).next_sibling().unwrap().downcast().unwrap()
+    // The video Picture now precedes the image error label in the overlay.
+    std::iter::successors(picture(v).next_sibling(), |w| w.next_sibling())
+        .find_map(|w| w.downcast::<gtk::Label>().ok())
+        .expect("image status overlay")
 }
 fn loaded(v: &image_view::ImageView) {
     wait(|| {
@@ -456,8 +459,44 @@ fn native_priority(app: &adw::Application) {
     );
     other.close();
 }
+// Controlled scheduler/cache benchmark, not a secure decoder or VRAM result.
+fn cache_churn(app: &adw::Application) {
+    let (dir, paths) = setup(true);
+    let (w, v) = open(app);
+    v.configure_cache(256 * 1024, 96 * 1024);
+    v.set_neighbors(vec![paths[0].clone(), paths[2].clone()]);
+    v.load(paths[1].clone());
+    loaded(&v);
+    idle(&v);
+    assert_eq!(v.preload_stats().cache.entries, 3);
+    let calls = CALLS.load(Ordering::SeqCst);
+    let start = Instant::now();
+    for _ in 0..12 {
+        v.invalidate_cache_paths(&[dir.path().join("unrelated.png")]);
+        v.set_neighbors(vec![paths[0].clone(), paths[2].clone()]);
+        v.load(paths[1].clone());
+        loaded(&v);
+        idle(&v);
+        check_bound(&v);
+    }
+    assert_eq!(
+        CALLS.load(Ordering::SeqCst) - calls,
+        0,
+        "unrelated notifications re-decoded valid cached images"
+    );
+    println!(
+        "{{\"scenario\":\"unrelated-folder-churn\",\"controlled\":true,\"iterations\":12,\"extra_decodes\":{},\"elapsed_us\":{},\"cache_entries\":{}}}",
+        CALLS.load(Ordering::SeqCst) - calls,
+        start.elapsed().as_micros(),
+        v.preload_stats().cache.entries
+    );
+    w.close();
+    idle(&v);
+    assert_eq!(v.preload_stats().cache.entries, 0);
+}
 fn main() {
-    let controlled = std::env::args().any(|s| s == "--controlled");
+    let churn = std::env::args().any(|s| s == "--cache-churn-benchmark");
+    let controlled = churn || std::env::args().any(|s| s == "--controlled");
     CONTROLLED.store(controlled, Ordering::SeqCst);
     adw::init().unwrap();
     let app = adw::Application::builder()
@@ -465,6 +504,10 @@ fn main() {
         .flags(gio::ApplicationFlags::NON_UNIQUE)
         .build();
     app.register(None::<&gio::Cancellable>).unwrap();
+    if churn {
+        cache_churn(&app);
+        return;
+    }
     run(&app, controlled);
     if controlled {
         controlled_priority(&app);

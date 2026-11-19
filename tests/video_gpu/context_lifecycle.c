@@ -6,6 +6,8 @@
 int pivra_gpu_pending_presentations(void);
 int pivra_gpu_live_contexts(void);
 
+static void retired(gpointer data, GObject *object);
+
 typedef struct { PivraGpuPaintable *paintable; GdkTexture *texture; } Delivery;
 static gpointer enqueue(gpointer data) {
   Delivery *d = data;
@@ -14,6 +16,12 @@ static gpointer enqueue(gpointer data) {
     pivra_gpu_paintable_queue_set_texture(d->paintable, d->texture, 1, &viewport, 0);
   return NULL;
 }
+static void close_in_presentation(GdkPaintable *paintable, Delivery *d) {
+  g_signal_handlers_disconnect_by_func(paintable,close_in_presentation,d);
+  pivra_gpu_paintable_reset(PIVRA_GPU_PAINTABLE(paintable));
+  g_object_unref(d->texture);
+  g_object_unref(d->paintable);
+}
 static void presentation_check(void) {
   GMainContext *ctx = g_main_context_default();
   g_assert_true(g_main_context_acquire(ctx));
@@ -21,10 +29,15 @@ static void presentation_check(void) {
   Delivery d = { PIVRA_GPU_PAINTABLE(pivra_gpu_paintable_new()),
     gdk_memory_texture_new(1, 1, GDK_MEMORY_R8G8B8A8, bytes, 4) };
   g_bytes_unref(bytes);
+  gint texture_finalized=0, paintable_finalized=0;
+  g_object_weak_ref(G_OBJECT(d.texture),retired,&texture_finalized);
+  g_object_weak_ref(G_OBJECT(d.paintable),retired,&paintable_finalized);
   GThread *thread = g_thread_new("test-presentation", enqueue, &d);
   g_thread_join(thread);
   g_assert_cmpint(pivra_gpu_pending_presentations(), ==, 2);
   pivra_gpu_paintable_reset(d.paintable);
+  g_print("RESET_RESOURCE pending_after_reset=%d\n",pivra_gpu_pending_presentations());
+  g_assert_cmpint(pivra_gpu_pending_presentations(), ==, 0);
   while (g_main_context_pending(ctx)) g_main_context_iteration(ctx, FALSE);
   g_assert_cmpint(pivra_gpu_pending_presentations(), ==, 0);
   g_assert_cmpint(gdk_paintable_get_intrinsic_width(GDK_PAINTABLE(d.paintable)), ==, 0);
@@ -39,8 +52,33 @@ static void presentation_check(void) {
   /* New deliveries still work after reset; only the stale epoch is discarded. */
   g_assert_cmpint(gdk_paintable_get_intrinsic_width(GDK_PAINTABLE(d.paintable)), ==, 1);
   pivra_gpu_paintable_reset(d.paintable);
+  /* Close again with pending frames, without pumping GLib. No hidden source
+   * may retain the last texture or paintable until a future main-loop turn. */
+  thread = g_thread_new("test-close-pending", enqueue, &d);
+  g_thread_join(thread);
+  g_assert_cmpint(pivra_gpu_pending_presentations(), ==, 2);
+  pivra_gpu_paintable_reset(d.paintable);
+  g_assert_cmpint(pivra_gpu_pending_presentations(), ==, 0);
   g_object_unref(d.texture); g_object_unref(d.paintable);
-  g_print("PASS stale queued frames discarded, queue remains bounded, new epoch works\n");
+  g_assert_cmpint(g_atomic_int_get(&texture_finalized), ==, 1);
+  g_assert_cmpint(g_atomic_int_get(&paintable_finalized), ==, 1);
+  /* Invalidation may synchronously close the owner during publication. The
+   * executing callback keeps its own source refs until return, unlike queued work. */
+  bytes = g_bytes_new_static("\0\0\0\xff", 4);
+  Delivery reentrant = { PIVRA_GPU_PAINTABLE(pivra_gpu_paintable_new()),
+    gdk_memory_texture_new(1,1,GDK_MEMORY_R8G8B8A8,bytes,4) };
+  g_bytes_unref(bytes);
+  texture_finalized=0; paintable_finalized=0;
+  g_object_weak_ref(G_OBJECT(reentrant.texture),retired,&texture_finalized);
+  g_object_weak_ref(G_OBJECT(reentrant.paintable),retired,&paintable_finalized);
+  g_signal_connect(reentrant.paintable,"invalidate-contents",G_CALLBACK(close_in_presentation),&reentrant);
+  thread = g_thread_new("test-reentrant-close",enqueue,&reentrant);
+  g_thread_join(thread);
+  while(g_main_context_pending(ctx)) g_main_context_iteration(ctx,FALSE);
+  g_assert_cmpint(pivra_gpu_pending_presentations(), ==, 0);
+  g_assert_cmpint(g_atomic_int_get(&texture_finalized), ==, 1);
+  g_assert_cmpint(g_atomic_int_get(&paintable_finalized), ==, 1);
+  g_print("PASS stale queued frames discarded, immediate/reentrant close drains refs, queue remains bounded, new epoch works\n");
 }
 
 static void retired(gpointer data, GObject *object) {

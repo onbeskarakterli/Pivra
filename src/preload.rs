@@ -98,11 +98,32 @@ impl State {
         self.invalidate_related(true);
     }
     pub fn invalidate_paths(&mut self, paths: &[PathBuf]) {
+        if paths.is_empty() {
+            // Unknown-path notifications cannot safely preserve cache identity.
+            self.invalidate();
+            return;
+        }
         let related = self
             .current_path
             .as_ref()
             .is_some_and(|p| paths.contains(p));
-        self.invalidate_related(related);
+        if related {
+            self.epoch = Rc::new(());
+        }
+        // Folder notifications identify affected paths. Keep unrelated decoded
+        // textures and their pin/LRU state; fetch still checks full FileKey identity.
+        let mut cache = self.cache.lock().unwrap();
+        for path in paths {
+            cache.invalidate_path(path);
+        }
+        drop(cache);
+        self.failed.retain(|p| !paths.contains(p));
+        self.queue.retain(|p| !paths.contains(p));
+        if let Some(bg) = &self.background {
+            if related || paths.contains(&bg.path) {
+                bg.token.cancel();
+            }
+        }
     }
     fn invalidate_related(&mut self, related: bool) {
         if related {
@@ -342,5 +363,93 @@ pub(super) fn maybe_start(state: &Rc<RefCell<State>>, slot: &Rc<LoadSlot>, has_i
             token,
             consumer,
         });
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    fn populated() -> (tempfile::TempDir, Rc<RefCell<State>>, Vec<PathBuf>) {
+        let dir = tempfile::tempdir().unwrap();
+        let state = State::new();
+        let paths: Vec<_> = (0..3)
+            .map(|n| {
+                let path = dir.path().join(format!("{n}.png"));
+                std::fs::write(&path, [n]).unwrap();
+                path
+            })
+            .collect();
+        let texture: gdk::Texture = gdk::MemoryTexture::new(
+            1,
+            1,
+            gdk::MemoryFormat::R8g8b8a8,
+            &glib::Bytes::from_owned([12, 34, 56, 255]),
+            4,
+        )
+        .upcast();
+        let mut s = state.borrow_mut();
+        s.current_path = Some(paths[0].clone());
+        s.cache
+            .lock()
+            .unwrap()
+            .pin(Some(FileKey::read(&paths[0]).unwrap()));
+        for path in &paths {
+            assert!(s.cache.lock().unwrap().insert(
+                FileKey::read(path).unwrap(),
+                texture.clone(),
+                32,
+                &[]
+            ));
+        }
+        s.queue = paths.clone().into();
+        s.failed = paths.clone().into();
+        drop(s);
+        (dir, state, paths)
+    }
+    #[test]
+    fn unrelated_change_keeps_cached_neighbors_and_active_background() {
+        let (dir, state, paths) = populated();
+        let token = gio::Cancellable::new();
+        let mut s = state.borrow_mut();
+        s.background = Some(Background {
+            path: paths[1].clone(),
+            token: token.clone(),
+            consumer: Rc::new(RefCell::new(None)),
+        });
+        let epoch = s.epoch.clone();
+        s.invalidate_paths(&[dir.path().join("unrelated.png")]);
+        assert!(Rc::ptr_eq(&epoch, &s.epoch));
+        assert!(!token.is_cancelled());
+        assert_eq!(s.cache.lock().unwrap().stats().entries, 3);
+        assert_eq!(s.queue.len(), 3);
+        assert_eq!(s.failed.len(), 3);
+        s.close();
+        assert!(token.is_cancelled());
+        assert_eq!(s.cache.lock().unwrap().stats().entries, 0);
+    }
+    #[test]
+    fn affected_background_cancels_and_current_change_rotates_epoch() {
+        let (_dir, state, paths) = populated();
+        let token = gio::Cancellable::new();
+        let mut s = state.borrow_mut();
+        s.background = Some(Background {
+            path: paths[1].clone(),
+            token: token.clone(),
+            consumer: Rc::new(RefCell::new(None)),
+        });
+        let epoch = s.epoch.clone();
+        s.invalidate_paths(&[paths[1].clone()]);
+        assert!(token.is_cancelled());
+        assert!(Rc::ptr_eq(&epoch, &s.epoch));
+        assert_eq!(s.cache.lock().unwrap().stats().entries, 2);
+        assert!(!s.queue.contains(&paths[1]));
+        assert!(!s.failed.contains(&paths[1]));
+        s.invalidate_paths(&[paths[0].clone()]);
+        assert!(!Rc::ptr_eq(&epoch, &s.epoch));
+        assert_eq!(s.cache.lock().unwrap().stats().entries, 1);
+        assert!(s.cache.lock().unwrap().peek(&paths[2]).is_some());
+        s.invalidate_paths(&[]);
+        assert_eq!(s.cache.lock().unwrap().stats().entries, 0);
+        s.close();
     }
 }

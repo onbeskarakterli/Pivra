@@ -1,4 +1,11 @@
-# Arch packaging — native RC accepted; publication not authorized
+> Current recipe target: **pivra 0.2.6-1**, options=('!debug'). Development
+> candidate only; native AMD lifecycle is BLOCKED. No v0.2.6 immutable source
+> checksum is approved. See [current candidate gates](../../docs/releases/PIVRA_V0.2.6_RC_VALIDATION.md).
+> Older release sections below are historical, including approved v0.2.5 inputs.
+
+# Arch packaging — v0.2.6 development candidate
+
+## Historical v0.1 native RC acceptance record
 
 Only `pivra` 0.1.0-1 / x86_64 is designed here. There is no approved main release
 commit/tag/archive digest recorded in this checkout yet. Clean makepkg,

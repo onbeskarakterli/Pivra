@@ -1,0 +1,430 @@
+{
+  "schema": 1,
+  "date": "2026-11-19",
+  "base_commit": "1e25d0a850c1af174ec1a697e1bda2eb9ac27cab",
+  "provenance": "Before: base plus new probes and behavior-preserving thumbnail helper extraction. After: optimization working tree; no immutable release-source approval.",
+  "environment": {
+    "os": "Debian 13",
+    "gtk": "4.18.6",
+    "gstreamer": "1.26.2",
+    "gpu": "Mesa llvmpipe (software control)",
+    "rust": "1.99.1",
+    "device_vram": "NOT MEASURED"
+  },
+  "thumbnail_before": [
+    {
+      "scenario": "64-packed-rgba-thumbnails",
+      "synthetic_pixels": true,
+      "samples": 11,
+      "median_us": 31,
+      "p95_us": 759,
+      "rss_before_bytes": 14876672,
+      "rss_retained_bytes": 15106048,
+      "rss_delta_bytes": 229376,
+      "source_bytes": 7864320,
+      "vram_measured": false
+    },
+    {
+      "scenario": "64-packed-rgba-thumbnails",
+      "synthetic_pixels": true,
+      "samples": 11,
+      "median_us": 31,
+      "p95_us": 136,
+      "rss_before_bytes": 14860288,
+      "rss_retained_bytes": 15089664,
+      "rss_delta_bytes": 229376,
+      "source_bytes": 7864320,
+      "vram_measured": false
+    },
+    {
+      "scenario": "64-packed-rgba-thumbnails",
+      "synthetic_pixels": true,
+      "samples": 11,
+      "median_us": 30,
+      "p95_us": 108,
+      "rss_before_bytes": 14872576,
+      "rss_retained_bytes": 15101952,
+      "rss_delta_bytes": 229376,
+      "source_bytes": 7864320,
+      "vram_measured": false
+    }
+  ],
+  "thumbnail_after": [
+    {
+      "scenario": "64-packed-rgba-thumbnails",
+      "synthetic_pixels": true,
+      "samples": 11,
+      "median_us": 8,
+      "p95_us": 106,
+      "rss_before_bytes": 14872576,
+      "rss_retained_bytes": 15097856,
+      "rss_delta_bytes": 225280,
+      "source_bytes": 7864320,
+      "vram_measured": false
+    },
+    {
+      "scenario": "64-packed-rgba-thumbnails",
+      "synthetic_pixels": true,
+      "samples": 11,
+      "median_us": 8,
+      "p95_us": 86,
+      "rss_before_bytes": 14864384,
+      "rss_retained_bytes": 15089664,
+      "rss_delta_bytes": 225280,
+      "source_bytes": 7864320,
+      "vram_measured": false
+    },
+    {
+      "scenario": "64-packed-rgba-thumbnails",
+      "synthetic_pixels": true,
+      "samples": 11,
+      "median_us": 8,
+      "p95_us": 95,
+      "rss_before_bytes": 14864384,
+      "rss_retained_bytes": 15089664,
+      "rss_delta_bytes": 225280,
+      "source_bytes": 7864320,
+      "vram_measured": false
+    }
+  ],
+  "cache_before": [
+    {
+      "scenario": "unrelated-folder-churn",
+      "controlled": true,
+      "iterations": 12,
+      "extra_decodes": 48,
+      "elapsed_us": 67161,
+      "cache_entries": 3
+    },
+    {
+      "scenario": "unrelated-folder-churn",
+      "controlled": true,
+      "iterations": 12,
+      "extra_decodes": 47,
+      "elapsed_us": 140850,
+      "cache_entries": 3
+    },
+    {
+      "scenario": "unrelated-folder-churn",
+      "controlled": true,
+      "iterations": 12,
+      "extra_decodes": 48,
+      "elapsed_us": 56365,
+      "cache_entries": 3
+    }
+  ],
+  "cache_after": [
+    {
+      "scenario": "unrelated-folder-churn",
+      "controlled": true,
+      "iterations": 12,
+      "extra_decodes": 0,
+      "elapsed_us": 121456,
+      "cache_entries": 3
+    },
+    {
+      "scenario": "unrelated-folder-churn",
+      "controlled": true,
+      "iterations": 12,
+      "extra_decodes": 0,
+      "elapsed_us": 31728,
+      "cache_entries": 3
+    },
+    {
+      "scenario": "unrelated-folder-churn",
+      "controlled": true,
+      "iterations": 12,
+      "extra_decodes": 0,
+      "elapsed_us": 30834,
+      "cache_entries": 3
+    }
+  ],
+  "queued_presentation_refs_after_reset": {
+    "before": 2,
+    "after": 0,
+    "scope": "Application-held queued references, not physical driver VRAM"
+  },
+  "probe_executable_sha256": {
+    "thumbnail-before": "13045beb5c35c992da83717fad62f8aba8672d5459fb891e8187296e6b3998f0",
+    "thumbnail-after": "268bff65761a644064dfcecb00e519af93d3f912a36c7206ef694531e98f078c",
+    "preload-before": "491e1867cbb61991390f60f89be7742790eab828dfd389c89c197bc15bfdbf54",
+    "preload-after": "0416e37a746a7af397d40d0bbd5b8332a692a9dfebeee8218efa9c14cc59098e"
+  },
+  "validation": {
+    "fmt": "PASS",
+    "check_locked": "PASS",
+    "strict_all_target_clippy": "PASS; zero warnings",
+    "rust_tests": 217,
+    "python_tests": 210,
+    "python_suites": {
+      "root": 67,
+      "thumbnail": 59,
+      "fd05a": 9,
+      "video_color": 13,
+      "video_gpu": 62
+    },
+    "strict_c_lifecycle": "PASS; including reentrant close",
+    "gpu_required_release_build": "PASS",
+    "elf_contract": "PASS",
+    "source_notices_collection": "PASS; 184 locked crates",
+    "destdir_staging": "PASS",
+    "candidate_preflight": "PENDING clean post-commit check"
+  },
+  "native_amd": {
+    "status": "BLOCKED",
+    "new_revision": "NOT RUN",
+    "uploaded_result": "Real inferior exit 101, not a debugger stop",
+    "source_commit": "not established by the two uploaded files",
+    "egl_display": "0x55d875099f70",
+    "termination_call_id": 18,
+    "termination_return": 1,
+    "post_termination_failed_context_creations": 38,
+    "log_sha256": "6683ec6fba6014da4bb18d3af5d8882c2f87a5026bc6881d7a12dfd2fe5b2b8c",
+    "sidecar_sha256": "d3a62ee7be27a7cb04a2fa1b72a7cccf0fb3b2dac0631162f14c0732c27795af"
+  },
+  "limitations": [
+    "Small synthetic decoded-pixel/control workloads, not native secure decoder throughput.",
+    "No meaningful RSS reduction demonstrated; allocator/shared-host noise exceeds the observed 4 KiB difference.",
+    "No actual VRAM, hardware decoding, end-to-end zero-copy or long-running resource plateau measurements.",
+    "Native AMD EGLDisplay ownership remains blocked; stock/HDR routes and shader unchanged.",
+    "Native Arch makepkg/source approval/publication not performed."
+  ],
+  "controlled_gui": [
+    {
+      "session": "x11",
+      "software_control": true,
+      "results": [
+        {
+          "name": "thumbnail-memory",
+          "status": "PASS",
+          "exit": 0
+        },
+        {
+          "name": "cache-churn",
+          "status": "PASS",
+          "exit": 0
+        },
+        {
+          "name": "preload-controlled",
+          "status": "PASS",
+          "exit": 0
+        },
+        {
+          "name": "catalog",
+          "status": "PASS",
+          "exit": 0
+        },
+        {
+          "name": "view-modes",
+          "status": "PASS",
+          "exit": 0
+        },
+        {
+          "name": "async-cancel",
+          "status": "PASS",
+          "exit": 0
+        },
+        {
+          "name": "window-races",
+          "status": "PASS",
+          "exit": 0
+        },
+        {
+          "name": "video-lifecycle-nine-gates",
+          "status": "PASS",
+          "exit": 0
+        }
+      ],
+      "pointer_evidence": {
+        "initial_pointer": [
+          1279,
+          1023
+        ],
+        "after_client_disconnect_pointer": [
+          1279,
+          1023
+        ],
+        "catalog_pointer": [
+          1279,
+          1023
+        ]
+      },
+      "video_gates": [
+        {
+          "name": "ownership-foreign",
+          "status": "PASS",
+          "exit": 0
+        },
+        {
+          "name": "ownership-release",
+          "status": "PASS",
+          "exit": 0
+        },
+        {
+          "name": "ownership-current",
+          "status": "PASS",
+          "exit": 0
+        },
+        {
+          "name": "ownership-presentation",
+          "status": "PASS",
+          "exit": 0
+        },
+        {
+          "name": "ownership-failure",
+          "status": "PASS",
+          "exit": 0
+        },
+        {
+          "name": "mixed-lifecycle",
+          "status": "PASS",
+          "exit": 0
+        },
+        {
+          "name": "error-cleanup",
+          "status": "PASS",
+          "exit": 0
+        },
+        {
+          "name": "limited-presentation-controls",
+          "status": "PASS",
+          "exit": 0
+        },
+        {
+          "name": "full-ramp-shader-controls",
+          "status": "PASS",
+          "exit": 0
+        }
+      ]
+    },
+    {
+      "session": "sway",
+      "software_control": true,
+      "results": [
+        {
+          "name": "thumbnail-memory",
+          "status": "PASS",
+          "exit": 0
+        },
+        {
+          "name": "cache-churn",
+          "status": "PASS",
+          "exit": 0
+        },
+        {
+          "name": "preload-controlled",
+          "status": "PASS",
+          "exit": 0
+        },
+        {
+          "name": "catalog",
+          "status": "PASS",
+          "exit": 0
+        },
+        {
+          "name": "view-modes",
+          "status": "PASS",
+          "exit": 0
+        },
+        {
+          "name": "async-cancel",
+          "status": "PASS",
+          "exit": 0
+        },
+        {
+          "name": "window-races",
+          "status": "PASS",
+          "exit": 0
+        },
+        {
+          "name": "video-lifecycle-nine-gates",
+          "status": "PASS",
+          "exit": 0
+        }
+      ],
+      "pointer_evidence": {},
+      "video_gates": [
+        {
+          "name": "ownership-foreign",
+          "status": "PASS",
+          "exit": 0
+        },
+        {
+          "name": "ownership-release",
+          "status": "PASS",
+          "exit": 0
+        },
+        {
+          "name": "ownership-current",
+          "status": "PASS",
+          "exit": 0
+        },
+        {
+          "name": "ownership-presentation",
+          "status": "PASS",
+          "exit": 0
+        },
+        {
+          "name": "ownership-failure",
+          "status": "PASS",
+          "exit": 0
+        },
+        {
+          "name": "mixed-lifecycle",
+          "status": "PASS",
+          "exit": 0
+        },
+        {
+          "name": "error-cleanup",
+          "status": "PASS",
+          "exit": 0
+        },
+        {
+          "name": "limited-presentation-controls",
+          "status": "PASS",
+          "exit": 0
+        },
+        {
+          "name": "full-ramp-shader-controls",
+          "status": "PASS",
+          "exit": 0
+        }
+      ]
+    }
+  ],
+  "filesystem_regression_only": [
+    {
+      "name": "scan-100-trace0",
+      "first_scan_us": 234,
+      "repeat_scan": {
+        "n": 10,
+        "median_us": 131.0,
+        "p95_us": 186,
+        "max_us": 186
+      },
+      "sampled_parent_rss_bytes": 94208
+    },
+    {
+      "name": "scan-1000-trace0",
+      "first_scan_us": 1840,
+      "repeat_scan": {
+        "n": 10,
+        "median_us": 1509.5,
+        "p95_us": 1893,
+        "max_us": 1893
+      },
+      "sampled_parent_rss_bytes": 94208
+    },
+    {
+      "name": "scan-5000-trace0",
+      "first_scan_us": 8436,
+      "repeat_scan": {
+        "n": 10,
+        "median_us": 10387.0,
+        "p95_us": 11733,
+        "max_us": 11733
+      },
+      "sampled_parent_rss_bytes": 1921024
+    }
+  ]
+}

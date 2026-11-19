@@ -42,6 +42,8 @@ struct _PivraGpuPaintable
   GdkSurface *surface;
   gint pending;
   gint epoch;
+  GMutex presentation_lock;
+  guint presentation_sources[2];
 };
 
 static gint pending_presentations;
@@ -293,16 +295,28 @@ pivra_gpu_paintable_dispose (GObject *object)
 }
 
 static void
+pivra_gpu_paintable_finalize (GObject *object)
+{
+  PivraGpuPaintable *self = PIVRA_GPU_PAINTABLE(object);
+  /* Pending sources each own self; finalization cannot precede their release. */
+  g_assert_cmpint(g_atomic_int_get(&self->pending), ==, 0);
+  g_mutex_clear(&self->presentation_lock);
+  G_OBJECT_CLASS(pivra_gpu_paintable_parent_class)->finalize(object);
+}
+
+static void
 pivra_gpu_paintable_class_init (PivraGpuPaintableClass *klass)
 {
   GObjectClass *object_class = G_OBJECT_CLASS (klass);
 
   object_class->dispose = pivra_gpu_paintable_dispose;
+  object_class->finalize = pivra_gpu_paintable_finalize;
 }
 
 static void
 pivra_gpu_paintable_init (PivraGpuPaintable *self)
 {
+  g_mutex_init(&self->presentation_lock);
 }
 
 GdkPaintable *
@@ -334,10 +348,21 @@ pivra_gpu_paintable_unrealize (PivraGpuPaintable *self,
     self->surface = NULL;
 }
 
-/* Called on GTK's thread after the pipeline has reached NULL. Queued frame
- * callbacks still own/release their buffers but cannot republish a closed frame. */
+/* Called on GTK's thread after the pipeline has reached NULL. Cancel queued
+ * sources now; an executing callback keeps its refs until its normal return. */
 void pivra_gpu_paintable_reset(PivraGpuPaintable *self) {
+  guint sources[2];
+  g_mutex_lock(&self->presentation_lock);
   g_atomic_int_inc(&self->epoch);
+  for (guint i=0; i<G_N_ELEMENTS(sources); i++) {
+    sources[i]=self->presentation_sources[i];
+    self->presentation_sources[i]=0;
+  }
+  g_mutex_unlock(&self->presentation_lock);
+  /* Reset is on GTK's thread after state NULL. Destroy outside the mutex:
+   * notifiers release pending textures/buffers and take this mutex themselves. */
+  for (guint i=0; i<G_N_ELEMENTS(sources); i++)
+    if (sources[i]) g_source_remove(sources[i]);
   g_clear_object(&self->image);
   gdk_paintable_invalidate_size(GDK_PAINTABLE(self));
   gdk_paintable_invalidate_contents(GDK_PAINTABLE(self));
@@ -390,11 +415,22 @@ struct _SetTextureInvocation {
   graphene_rect_t  viewport;
   int              orientation;
   gint             epoch;
+  guint            source_id;
 };
+
+static void
+forget_presentation_source(PivraGpuPaintable *self, guint id)
+{
+  g_mutex_lock(&self->presentation_lock);
+  for (guint i=0; i<G_N_ELEMENTS(self->presentation_sources); i++)
+    if (self->presentation_sources[i] == id) self->presentation_sources[i]=0;
+  g_mutex_unlock(&self->presentation_lock);
+}
 
 static void
 set_texture_invocation_free (SetTextureInvocation *invoke)
 {
+  forget_presentation_source(invoke->paintable, invoke->source_id);
   g_atomic_int_add (&invoke->paintable->pending, -1);
   g_atomic_int_add (&pending_presentations, -1);
   g_object_unref (invoke->paintable);
@@ -408,6 +444,10 @@ pivra_gpu_paintable_set_texture_invoke (gpointer data)
 {
   SetTextureInvocation *invoke = data;
 
+  /* Reset may be invoked reentrantly by an invalidate signal. A currently
+   * dispatching source must retain its references until this callback returns;
+   * only not-yet-dispatched sources can be cancelled immediately. */
+  forget_presentation_source(invoke->paintable, invoke->source_id);
   if (invoke->epoch == g_atomic_int_get(&invoke->paintable->epoch))
     pivra_gpu_paintable_set_paintable (invoke->paintable,
                                    GDK_PAINTABLE (invoke->texture),
@@ -427,7 +467,12 @@ pivra_gpu_paintable_queue_set_texture (PivraGpuPaintable       *self,
 {
   SetTextureInvocation *invoke;
 
-  if (g_atomic_int_add (&self->pending, 1) >= 2) { g_atomic_int_add (&self->pending, -1); return; }
+  g_mutex_lock(&self->presentation_lock);
+  if (g_atomic_int_get(&self->pending) >= 2) {
+    g_mutex_unlock(&self->presentation_lock);
+    return;
+  }
+  g_atomic_int_inc(&self->pending);
   invoke = g_new0 (SetTextureInvocation, 1);
   invoke->paintable = g_object_ref (self);
   invoke->texture = g_object_ref (texture);
@@ -444,7 +489,14 @@ pivra_gpu_paintable_queue_set_texture (PivraGpuPaintable       *self,
   g_source_set_priority(source, G_PRIORITY_DEFAULT);
   g_source_set_callback(source, pivra_gpu_paintable_set_texture_invoke, invoke,
                         (GDestroyNotify)set_texture_invocation_free);
-  g_source_attach(source, g_main_context_default());
+  invoke->source_id=g_source_attach(source, g_main_context_default());
+  for (guint i=0; i<G_N_ELEMENTS(self->presentation_sources); i++) {
+    if (!self->presentation_sources[i]) {
+      self->presentation_sources[i]=invoke->source_id;
+      break;
+    }
+  }
+  g_mutex_unlock(&self->presentation_lock);
   g_source_unref(source);
 }
 

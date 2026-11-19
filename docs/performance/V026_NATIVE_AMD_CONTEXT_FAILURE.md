@@ -1,6 +1,10 @@
 # v0.2.6 Task 01C — native AMD failure and stock EGL ownership
 
 Status: **native acceptance BLOCKED / pending; not declared fixed**.
+2026-11-19: attached matching native logs now establish real inferior exit 101,
+successful shared-display eglTerminate and 38 later failed context creations.
+See [final sprint evidence](V026_FINAL_SPRINT.md). The older exit-255 excerpt
+below remains a separate historical debugger-classification question.
 Latest native GDB follow-up: exit 255 at an observed `eglDestroyContext` stack
 does not identify an inferior failure or prove display termination; see
 [debugger stop classification](V026_GDB_STOP_CLASSIFICATION.md).

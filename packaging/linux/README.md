@@ -1,12 +1,15 @@
+> Current dev target: **0.2.6 development candidate**, native AMD lifecycle BLOCKED.
+> Stable release: **0.2.5**. Use [v0.2.6 gates](../../docs/releases/PIVRA_V0.2.6_RC_VALIDATION.md)
+> for this checkout. No source approval or native package success is inherited.
+
 # Building Pivra from source on Linux (experimental)
 
-The `dev` branch reports **Pivra 0.2.5**, the upcoming release candidate. The latest
-published stable release remains v0.2.4; the version bump does not publish or
-update AUR. Native Arch GPU-enabled staging and physical AMD OpenGL playback
-were accepted by the user before this bump. The new 0.2.5 artifacts require
-candidate staging again. Experimental DNG remains explicit opt-in, not a default
-format-support claim.
-
+The `dev` branch reports **Pivra 0.2.6**, a development candidate with native
+AMD EGLDisplay lifecycle acceptance still BLOCKED. Current stable is **v0.2.5**.
+Earlier user-reported Arch staging/AMD acceptance belongs to the prior version;
+it does not validate the new artifacts. Source approval, native package testing
+and publication remain separate. Experimental DNG remains explicit opt-in,
+not a default format-support claim.
 
 ## Common Makefile interface (development branch)
 
@@ -132,9 +135,9 @@ Run `bash packaging/arch/stage-video-candidate.sh` on clean native Arch for the
 single candidate staging step. It does not run makepkg or install system files.
 After explicit immutable-source approval, use a separate release workspace for
 makepkg source verification, real .SRCINFO generation and package checks.
-`python3 scripts/release_preflight.py --version 0.2.5 --candidate --staging-root
+`python3 scripts/release_preflight.py --version 0.2.6 --candidate --staging-root
 /path/to/stage` validates this candidate. Final preflight omits --candidate and
-requires README/release notes to identify v0.2.5 as current stable; that handoff
+requires README/release notes to identify v0.2.6 as current stable; that handoff
 must be explicitly authorized before final source approval/publication.
 
 ## Known limitations
@@ -150,6 +153,6 @@ must be explicitly authorized before final source approval/publication.
 - The historical accepted `Preload exceeds cache entry budget` observation is not
   claimed fixed; see the existing release/audit records.
 
-See the [v0.2.5 release notes](../../docs/releases/PIVRA_V0.2.5_RELEASE_NOTES.md),
-[candidate report](../../docs/releases/PIVRA_V0.2.5_RC_VALIDATION.md) and
+See the [v0.2.6 release notes](../../docs/releases/PIVRA_V0.2.6_RELEASE_NOTES.md),
+[candidate report](../../docs/releases/PIVRA_V0.2.6_RC_VALIDATION.md) and
 [LGPL rebuild instructions](../../docs/diagnostics/VIDEO_ADAPTER_REBUILD.md).

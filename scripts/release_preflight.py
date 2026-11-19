@@ -18,7 +18,7 @@ def git(*args):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--version", required=True, help="Release version, e.g. 0.2.5")
+    parser.add_argument("--version", required=True, help="Release version, e.g. 0.2.6")
     parser.add_argument("--binary", type=Path, help="Inspect an actual GPU-enabled distribution ELF")
     parser.add_argument("--staging-root", type=Path, help="Inspect an actual PREFIX=/usr DESTDIR staging tree")
     parser.add_argument("--candidate", action="store_true", help="Validate the exact target candidate; publication/source approval remain separate")

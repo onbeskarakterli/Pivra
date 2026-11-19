@@ -4,6 +4,8 @@
 
 **Current stable release: v0.2.5.** Pivra includes automatic GPU-accelerated BT.709 SDR video color correction on stock GTK and is free software under GPL-3.0-only.
 
+**Upcoming release candidate: v0.2.6.** Performance/resource-lifetime work is in development; native AMD EGLDisplay lifecycle acceptance is **BLOCKED**. See the [candidate notes](docs/releases/PIVRA_V0.2.6_RELEASE_NOTES.md) and [validation gates](docs/releases/PIVRA_V0.2.6_RC_VALIDATION.md). This does not change the current stable release.
+
 This is the prepared v0.2.5 stable-release handoff. Source approval, native package validation and publication evidence are tracked separately in the [source review procedure](docs/releases/PIVRA_V0.2.5_SOURCE_APPROVAL.md); this README is not evidence that GitHub/AUR publication has occurred. See the [v0.2.5 release notes](docs/releases/PIVRA_V0.2.5_RELEASE_NOTES.md).
 
 **[Latest published release](https://github.com/onbeskarakterli/Pivra/releases/latest)** · **[Arch Linux AUR](https://aur.archlinux.org/packages/pivra)** · **[Development roadmap](docs/PIVRA_DEVELOPMENT_ROADMAP.md)**
@@ -46,7 +48,7 @@ The AUR package builds Pivra from a pinned source revision. GitHub releases also
 
 ## Features and roadmap
 
-**Available** = implemented in the current `dev` source (v0.2.5 source); publication is tracked separately from implemented functionality. **Partial** = some aspects implemented, with more work planned. **Planned** = not yet delivered. This is a feature-level snapshot, not a declaration that every numbered roadmap milestone is complete.
+**Available** = implemented in the current `dev` source (v0.2.6 development source); publication is tracked separately from implemented functionality. **Partial** = some aspects implemented, with more work planned. **Planned** = not yet delivered. This is a feature-level snapshot, not a declaration that every numbered roadmap milestone is complete.
 
 ### Photo viewing and navigation
 

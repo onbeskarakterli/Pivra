@@ -388,14 +388,44 @@ pub(super) fn run(app: &adw::Application) {
             "stable selection redecoded thumbnails"
         );
         for n in [100, 103, 119] {
-            let bounds = button(&row, n).compute_bounds(&row).unwrap();
+            let cell = button(&row, n);
+            let photo = cell
+                .child()
+                .unwrap()
+                .downcast::<gtk::Overlay>()
+                .unwrap()
+                .child()
+                .unwrap()
+                .downcast::<gtk::Picture>()
+                .unwrap();
+            // 7d7e056c added three-pixel photo margins after the original outer
+            // cell assertion. Check BOTH configured photo size and outer insets;
+            // do not change production layout just to satisfy the older test.
+            assert_eq!(
+                (photo.width(), photo.height()),
+                (
+                    image_view::thumbnail_overlay::CELL_WIDTH,
+                    image_view::thumbnail_overlay::CELL_HEIGHT,
+                ),
+                "thumbnail photo viewport must match configured dimensions"
+            );
+            assert_eq!(
+                (
+                    photo.margin_start(),
+                    photo.margin_end(),
+                    photo.margin_top(),
+                    photo.margin_bottom()
+                ),
+                (3, 3, 3, 3)
+            );
+            let bounds = cell.compute_bounds(&row).unwrap();
             assert_eq!(
                 (bounds.width() as i32, bounds.height() as i32),
                 (
-                    image_view::thumbnail_overlay::CELL_WIDTH,
-                    image_view::thumbnail_overlay::CELL_HEIGHT
+                    photo.width() + photo.margin_start() + photo.margin_end(),
+                    photo.height() + photo.margin_top() + photo.margin_bottom()
                 ),
-                "thumbnail cell geometry must match the configured dimensions"
+                "thumbnail cell must contain exactly the photo viewport and configured insets"
             );
         }
         println!(
@@ -652,7 +682,29 @@ fn production_windows(app: &adw::Application, photos: &[(usize, PathBuf)]) {
     // Reattach it before asking the production visibility state to hide.
     overlay.add_controller(motion.clone());
     motion.emit_by_name::<()>("motion", &[&20f64, &20f64]);
-    until(|| !strip.is_visible());
+    let pin: gtk::ToggleButton = find::<gtk::ToggleButton>(first.upcast_ref(), "thumbnail-toggle")
+        .next_sibling()
+        .unwrap()
+        .downcast()
+        .unwrap();
+    assert!(
+        !pin.is_active(),
+        "production hide requires an unpinned strip"
+    );
+    let hide_deadline = Instant::now() + Duration::from_secs(20);
+    while strip.is_visible() {
+        assert!(
+            Instant::now() < hide_deadline,
+            "production auto-hide deadline: overlay_height={} strip_height={} strip_request={} controller={:?} contains_pointer={} pin_active={}",
+            overlay.height(),
+            strip.height(),
+            strip.height_request(),
+            motion.name(),
+            motion.contains_pointer(),
+            pin.is_active()
+        );
+        pump();
+    }
     overlay.remove_controller(motion);
     gio::prelude::ActionGroupExt::activate_action(first, "next-media", None);
     until(|| {

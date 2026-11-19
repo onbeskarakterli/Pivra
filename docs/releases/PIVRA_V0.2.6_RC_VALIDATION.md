@@ -2,6 +2,14 @@
 
 Status: **PARTIAL / NO-GO for publication**. Version preparation is not native acceptance.
 
+Reviewed implementation: `25d4b9eddd169b2d25385dccbcdde136b465ae5f`.
+Codex: fmt/check/strict Clippy PASS, 217 Rust / 210 Python tests PASS, controlled
+X11 and Sway GUI gates PASS (video 9/9 each, llvmpipe). Mandatory GPU release
+build, ELF contract, private staging, corresponding source/notices, desktop entry
+and clean candidate preflight PASS. These are source/package-consistency controls,
+not Arch makepkg, physical AMD, or publication approval. Final evidence updates
+are documentation-only and do not make the implementation's native gate PASS.
+
 - Cargo.toml, only Pivra's Cargo.lock entry and Arch pkgver: 0.2.6.
 - pkgrel=1 and `options=('!debug')`: preserved; no separate pivra-debug package.
 - Stable README information remains v0.2.5; v0.2.6 is upcoming and blocked.
@@ -35,6 +43,10 @@ sandbox fallback is enabled. Preserve logs and resource-series files.
 2. Follow `packaging/arch/validate-release.py --help` to fetch/check the immutable
    archive and locally prepare the source configuration. A computed digest is
    evidence to review, not authorization. Never reuse an earlier version's hash.
+   After explicit approval, the existing automated entry is:
+   `python3 packaging/arch/validate-release.py --approved-source APPROVED_40_HEX_COMMIT --sha256 APPROVED_64_HEX_DIGEST`.
+   Those are placeholders, not actual approved values. Passing --approved-source
+   attests owner approval; do not use it to obtain approval implicitly.
 3. In a separate private recipe directory, copy PKGBUILD, collect-licenses.py and
    the approved local release-source.conf. Run `makepkg --verifysource --force`,
    `makepkg --printsrcinfo > .SRCINFO`, then `makepkg --cleanbuild --force`.

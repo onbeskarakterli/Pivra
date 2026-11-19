@@ -2701,3 +2701,31 @@ Native birleşik `bash tests/run_preview_pipeline_probe.sh` **exit 0** (Takip 04
   check/build/Clippy PASS; fmt eski kapsam dışı farklar nedeniyle FAIL.
 - Yeni native pool/verify kabulü NOT RUN; FD-06 TESTING, FD-07 başlamadı.
   Ayrıntı/tek komut: [FD06_PROVIDER_MANAGER_INTEGRATION.md](FD06_PROVIDER_MANAGER_INTEGRATION.md).
+
+
+## v0.2.6 final development sprint — 2026-11-19
+
+**PARTIAL / release NO-GO; native AMD lifecycle BLOCKED.** Stable v0.2.5 remains
+current; dev version 0.2.6 is an upcoming development candidate only.
+
+Implementation commit: `25d4b9eddd169b2d25385dccbcdde136b465ae5f` — retain unrelated preload/cache entries,
+avoid redundant packed-thumbnail normalization objects, release queued GPU frame
+references at reset with reentrant-close protection, and correct stale GUI test
+assumptions. BT.1886 math, stock/HDR routing, provider order, source-media safety,
+Glycin/Bwrap and all cache/worker budgets remain unchanged. options=('!debug')
+is preserved. [Measured evidence](performance/V026_FINAL_SPRINT.md).
+
+- Controlled unrelated-notification workload: 47–48 extra decode calls → 0;
+  thumbnail preparation median ~31 → 8 µs. RSS difference 4 KiB is not a proven
+  RAM gain; actual VRAM was not measured. Queued refs after reset: 2 → 0.
+- fmt/check/strict all-target Clippy PASS; 217 Rust / 210 Python PASS; X11 and
+  headless Sway GUI gates PASS, with 9/9 video lifecycle controls each on llvmpipe.
+- Mandatory GPU release build, helper/ELF/desktop checks, corresponding-source /
+  LGPL notices, private DESTDIR staging and clean candidate preflight PASS in
+  Codex. Actual Arch makepkg/install and new physical AMD acceptance: NOT RUN.
+- Attached native evidence is a real exit 101 after stock GTK/GStreamer terminates
+  the shared EGLDisplay. The system GTK is not patched; native acceptance cannot
+  close until nine real AMD gates PASS. The accepted historical preload-budget
+  observation remains OPEN, without a newly asserted fix or v0.2.6 risk approval.
+- No main, tag, release or AUR action. Source/hash approval and immutable package
+  validation remain separate. [Candidate workflow](releases/PIVRA_V0.2.6_RC_VALIDATION.md).

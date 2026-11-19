@@ -1,5 +1,6 @@
 # v0.2.6 final development sprint — measured changes, native blocker open
 
+Implementation commit: `25d4b9eddd169b2d25385dccbcdde136b465ae5f`.
 Recorded 2026-11-19. Base: `1e25d0a850c1af174ec1a697e1bda2eb9ac27cab`, dev.
 **PARTIAL / NO-GO for release.** Version 0.2.6 is a development candidate; stable
 v0.2.5 is not changed. [Machine-readable evidence](V026_FINAL_SPRINT.json).
@@ -163,7 +164,7 @@ PREFIX=/usr DESTDIR=NEW_PRIVATE_STAGE bash packaging/linux/build-install.sh inst
 | Filesystem/model collector, 100/1000/5000, diagnostics off/on | Six PASS; native scenarios explicitly NOT RUN |
 | Mandatory GPU distribution release build, ELF and sibling helper | PASS |
 | Locked crate/adapter/application source and notices; private DESTDIR staging | PASS, 184 crate sources |
-| Clean candidate preflight | PENDING post-commit consistency check |
+| Clean candidate preflight | PASS on the implementation commit; source/package consistency only |
 | Native AMD / new Arch makepkg / immutable source approval | BLOCKED / NOT RUN / NOT APPROVED |
 
 Current diagnostics-off scan repeat medians: 131 / 1,509.5 / 10,387 µs at
@@ -201,3 +202,11 @@ test permission, keeps FAIL/NOT RUN visible and performs no package installation
 Native performance/64 MP collection runs only after the video lifecycle gate
 passes, avoiding another repetition of the known failure. Until the stock EGL
 ownership blocker is corrected and all nine AMD gates pass, publication is NO-GO.
+
+Post-commit staging used the exact implementation commit above: 184 locked crate
+sources / 324 application files collected. The staged archive's changed Rust,
+native video and acceptance-runner files were compared byte-for-byte with the
+reviewed tree. The staged binary reports Pivra 0.2.6; desktop validation, GPU ELF
+contract and clean candidate preflight passed. This evidence follow-up changes
+only documentation; neither the staging snapshot nor its checksum is an approved
+immutable release source. Native makepkg and physical acceptance remain separate.

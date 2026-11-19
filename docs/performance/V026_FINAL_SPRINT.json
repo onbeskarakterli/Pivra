@@ -168,7 +168,8 @@
     "elf_contract": "PASS",
     "source_notices_collection": "PASS; 184 locked crates",
     "destdir_staging": "PASS",
-    "candidate_preflight": "PENDING clean post-commit check"
+    "candidate_preflight": "PASS on clean implementation commit; source/package consistency only",
+    "staged_corresponding_source": "PASS; 184 locked crates and 324 application files; changed code bytes verified against staged archive"
   },
   "native_amd": {
     "status": "BLOCKED",
@@ -426,5 +427,6 @@
       },
       "sampled_parent_rss_bytes": 1921024
     }
-  ]
+  ],
+  "implementation_commit": "25d4b9eddd169b2d25385dccbcdde136b465ae5f"
 }

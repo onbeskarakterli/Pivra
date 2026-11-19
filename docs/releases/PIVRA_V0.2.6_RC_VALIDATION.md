@@ -10,6 +10,24 @@ and clean candidate preflight PASS. These are source/package-consistency control
 not Arch makepkg, physical AMD, or publication approval. Final evidence updates
 are documentation-only and do not make the implementation's native gate PASS.
 
+
+### Native acceptance follow-up — 2026-11-20
+
+The user reports **6 PASS / 2 FAIL**, catalog expected one failed cell but got
+zero, and GPU `no shared GL context` / `No EGL configuration available`.
+This is not a successful native acceptance. At
+`ff9d6fc74a34b65d43c4c06e1c62235ac55cc49a`, the driver now enables the real
+`--native-thumbnails` catalog mode and isolates controlled generation failures.
+Native repair assertions require publication/current identity and another secure
+cache decode, not just failed=0. The stock GTK EGLDisplay defect remains upstream
+and **is not fixed by this harness change**.
+
+Latest Codex follow-up: 217 Rust / 213 Python PASS; fmt/check/strict Clippy/release
+build PASS; targeted catalog and 9/9 video controls PASS on X11 and Sway/llvmpipe.
+The real secure catalog prerequisite returned NOT RUN/77 on its single Codex
+attempt. The six other native gate definitions are preserved, without claiming
+new hardware PASS. [Detailed follow-up](../performance/V026_NATIVE_ACCEPTANCE_FIXES.md).
+
 - Cargo.toml, only Pivra's Cargo.lock entry and Arch pkgver: 0.2.6.
 - pkgrel=1 and `options=('!debug')`: preserved; no separate pivra-debug package.
 - Stable README information remains v0.2.5; v0.2.6 is upcoming and blocked.

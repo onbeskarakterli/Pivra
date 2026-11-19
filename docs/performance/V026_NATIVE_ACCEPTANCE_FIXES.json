@@ -1,0 +1,160 @@
+{
+  "schema": 1,
+  "date": "2026-11-20",
+  "base_commit": "7f99570c263000b0ebb2124af0bc2b4c4c1d82a3",
+  "implementation_commit": "ff9d6fc74a34b65d43c4c06e1c62235ac55cc49a",
+  "native_user_report": {
+    "pass_count": 6,
+    "fail_count": 2,
+    "source_commit": "not supplied",
+    "catalog": "expected one failure, observed zero after hybrid-mode cache repair",
+    "gpu": "PIVRA_GPU_FAIL no shared GL context; No EGL configuration available"
+  },
+  "status": "NO-GO; native AMD lifecycle BLOCKED; updated native catalog NOT RUN in Codex",
+  "validation": {
+    "rustfmt": "PASS",
+    "check_locked": "PASS",
+    "strict_clippy_all_targets": "PASS, zero warnings",
+    "rust": 217,
+    "python": {
+      "total": 213,
+      "root": 69,
+      "thumbnail": 59,
+      "fd05a": 9,
+      "video_color": 13,
+      "video_gpu": 63
+    },
+    "release_build": "PASS (ordinary development release profile, not new native Arch packaging)"
+  },
+  "cases": [
+    {
+      "session": "x11",
+      "gate": "catalog-controlled",
+      "exit": 0,
+      "evidence_kind": "controlled-cache-failures-and-synthetic-decoder",
+      "status": "PASS"
+    },
+    {
+      "session": "x11",
+      "gate": "secure-catalog-prerequisite",
+      "exit": 77,
+      "evidence_kind": "real secure decode, software display; NOT hardware acceptance",
+      "status": "NOT RUN"
+    },
+    {
+      "session": "x11",
+      "gate": "video-nine-gates",
+      "exit": 0,
+      "evidence_kind": "llvmpipe software control",
+      "status": "PASS",
+      "gates": [
+        {
+          "name": "ownership-foreign",
+          "status": "PASS",
+          "exit": 0
+        },
+        {
+          "name": "ownership-release",
+          "status": "PASS",
+          "exit": 0
+        },
+        {
+          "name": "ownership-current",
+          "status": "PASS",
+          "exit": 0
+        },
+        {
+          "name": "ownership-presentation",
+          "status": "PASS",
+          "exit": 0
+        },
+        {
+          "name": "ownership-failure",
+          "status": "PASS",
+          "exit": 0
+        },
+        {
+          "name": "mixed-lifecycle",
+          "status": "PASS",
+          "exit": 0
+        },
+        {
+          "name": "error-cleanup",
+          "status": "PASS",
+          "exit": 0
+        },
+        {
+          "name": "limited-presentation-controls",
+          "status": "PASS",
+          "exit": 0
+        },
+        {
+          "name": "full-ramp-shader-controls",
+          "status": "PASS",
+          "exit": 0
+        }
+      ]
+    },
+    {
+      "session": "sway",
+      "gate": "catalog-controlled",
+      "exit": 0,
+      "evidence_kind": "controlled-cache-failures-and-synthetic-decoder",
+      "status": "PASS"
+    },
+    {
+      "session": "sway",
+      "gate": "video-nine-gates",
+      "exit": 0,
+      "evidence_kind": "llvmpipe software control",
+      "status": "PASS",
+      "gates": [
+        {
+          "name": "ownership-foreign",
+          "status": "PASS",
+          "exit": 0
+        },
+        {
+          "name": "ownership-release",
+          "status": "PASS",
+          "exit": 0
+        },
+        {
+          "name": "ownership-current",
+          "status": "PASS",
+          "exit": 0
+        },
+        {
+          "name": "ownership-presentation",
+          "status": "PASS",
+          "exit": 0
+        },
+        {
+          "name": "ownership-failure",
+          "status": "PASS",
+          "exit": 0
+        },
+        {
+          "name": "mixed-lifecycle",
+          "status": "PASS",
+          "exit": 0
+        },
+        {
+          "name": "error-cleanup",
+          "status": "PASS",
+          "exit": 0
+        },
+        {
+          "name": "limited-presentation-controls",
+          "status": "PASS",
+          "exit": 0
+        },
+        {
+          "name": "full-ramp-shader-controls",
+          "status": "PASS",
+          "exit": 0
+        }
+      ]
+    }
+  ]
+}

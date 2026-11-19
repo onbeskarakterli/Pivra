@@ -2729,3 +2729,25 @@ is preserved. [Measured evidence](performance/V026_FINAL_SPRINT.md).
   observation remains OPEN, without a newly asserted fix or v0.2.6 risk approval.
 - No main, tag, release or AUR action. Source/hash approval and immutable package
   validation remain separate. [Candidate workflow](releases/PIVRA_V0.2.6_RC_VALIDATION.md).
+
+
+## v0.2.6 native acceptance fixes — 2026-11-20
+
+**NO-GO / native AMD BLOCKED.** User-reported native outcome: 6 PASS / 2 FAIL;
+exact tested SHA not supplied. Test fix commit:
+`ff9d6fc74a34b65d43c4c06e1c62235ac55cc49a`.
+
+- Native acceptance now supplies --native-thumbnails. Controlled catalog tests
+  use a private generation-failure fixture, preserving failed=1 / failed=2 checks.
+  Native repair additionally proves a current GNOME cache publication and one
+  real secure decode of the repaired path; no aggregate-zero-only success.
+- No EGL configuration available now fails the GPU gate even with exit 0.
+  Production GPU/math/stock routes, helper limits, providers and application source
+  are unchanged. The private stock GTK wrapper still needs the upstream borrowed
+  EGLDisplay correction; system GTK is not patched and no AMD fix is claimed.
+- Codex: 217 Rust / 213 Python PASS; fmt/check/strict Clippy/release PASS; controlled
+  catalog and video 9/9 PASS on both X11 and Sway/llvmpipe. One real secure catalog
+  prerequisite: NOT RUN/77 under Bwrap. Native repair and AMD acceptance pending.
+- Six earlier native PASS gates are retained as user evidence, not new Codex
+  hardware results. No main/tag/release/AUR/version/package/lockfile change.
+  [Follow-up evidence](performance/V026_NATIVE_ACCEPTANCE_FIXES.md).

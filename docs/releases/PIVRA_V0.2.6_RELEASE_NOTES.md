@@ -23,6 +23,12 @@ thumbnail-provider ordering or secure Glycin/Bwrap policy change is included.
 JPEG/PNG/GIF/video navigation, controls, zoom/pan and the 64 MP foreground policy
 remain in scope; this is not a new feature release.
 
+Native acceptance runner follow-up (2026-11-20) separates real secure-thumbnail
+repair from controlled missing/corrupt-cache failure injection. A successful real
+repair is no longer tested using the synthetic-mode failed-cell expectation.
+This is a test correction, not a production provider or GPU fix; see
+[latest acceptance evidence](../performance/V026_NATIVE_ACCEPTANCE_FIXES.md).
+
 ## Blocking limitations
 
 Native user logs on GTK 4.24.1 / AMD demonstrate stock MediaFile retirement

@@ -33,6 +33,9 @@ pub(super) struct ImageView {
     picture: gtk::Picture,
     video: gtk::Picture,
     video_stream: Rc<RefCell<Option<gtk::MediaFile>>>,
+    video_surface: Rc<RefCell<Option<gtk::gdk::Surface>>>,
+    video_error_handler: Rc<RefCell<Option<glib::SignalHandlerId>>>,
+    video_ready_handler: Rc<RefCell<Option<glib::SignalHandlerId>>>,
     video_transform: Rc<RefCell<Transform>>,
     video_path: Rc<RefCell<Option<PathBuf>>>,
     video_positions: Rc<RefCell<std::collections::HashMap<PathBuf, i64>>>,
@@ -81,25 +84,6 @@ impl ImageView {
         video.set_overflow(gtk::Overflow::Hidden);
         video.set_visible(false);
         let video_stream: Rc<RefCell<Option<gtk::MediaFile>>> = Rc::default();
-        let closing_video = video_stream.clone();
-        let closing_picture = video.downgrade();
-        window.connect_close_request(move |_| {
-            let owned = closing_video
-                .borrow()
-                .as_ref()
-                .is_some_and(gpu_video::is_owned);
-            if owned {
-                if let Some(picture) = closing_picture.upgrade() {
-                    picture.set_paintable(None::<&gtk::gdk::Paintable>);
-                }
-                let media = closing_video.borrow_mut().take();
-                if let Some(media) = media {
-                    media.pause();
-                    media.clear();
-                }
-            }
-            glib::Propagation::Proceed
-        });
         let video_path = Rc::default();
         let video_positions = Rc::default();
         overlay.add_overlay(&video);
@@ -334,13 +318,16 @@ impl ImageView {
             }
         });
         window.add_action(&quality_action);
-        Self {
+        let view = Self {
             animation_controls,
             video_controls,
             animation_generation,
             thumbnail_strip,
             video,
             video_stream,
+            video_surface: Rc::default(),
+            video_error_handler: Rc::default(),
+            video_ready_handler: Rc::default(),
             video_transform,
             video_path,
             video_positions,
@@ -358,7 +345,19 @@ impl ImageView {
             loading_spinner,
             slot,
             window: window.downgrade(),
-        }
+        };
+        // Disconnect callbacks before dropping streams; error recovery holds a
+        // view only until this explicit detach, not past close/unrealize.
+        let closing = view.clone();
+        window.connect_close_request(move |_| {
+            closing.stop_video();
+            glib::Propagation::Proceed
+        });
+        let closing = view.clone();
+        window.connect_unrealize(move |_| closing.stop_video());
+        let closing = view.clone();
+        window.connect_destroy(move |_| closing.stop_video());
+        view
     }
 
     #[allow(dead_code)] // Used by the fullscreen thumbnail probe.
@@ -409,6 +408,10 @@ impl ImageView {
     )]
     pub(super) fn video_widget(&self) -> &gtk::Picture {
         &self.video
+    }
+    #[allow(dead_code)] // Native production-window probes inspect the actual selected stream.
+    pub(super) fn current_video(&self) -> Option<gtk::MediaFile> {
+        self.video_stream.borrow().clone()
     }
 
     /// Bounded queue diagnostics for native/controlled probes; no product UI.
@@ -483,8 +486,51 @@ impl ImageView {
         });
     }
     fn start_video(&self, path: &std::path::Path, backend: gpu_video::Backend) {
-        let media = match gpu_video::open_selected(path, backend) {
+        self.start_video_with_state(path, backend, None);
+    }
+    fn start_video_with_state(
+        &self,
+        path: &std::path::Path,
+        backend: gpu_video::Backend,
+        resume: Option<(bool, bool, f64, bool, i64)>,
+    ) {
+        let Some(window) = self.window.upgrade() else {
+            return;
+        };
+        if !window.is_realized() {
+            // Signal barrier, not an idle/sleep race against window.present().
+            if let Some(handler) = self.video_ready_handler.borrow_mut().take() {
+                window.disconnect(handler);
+            }
+            let this = self.clone();
+            let path = path.to_owned();
+            let expected = self.animation_generation.get();
+            let handler = window.connect_realize(move |window| {
+                if let Some(handler) = this.video_ready_handler.borrow_mut().take() {
+                    window.disconnect(handler);
+                }
+                if this.animation_generation.get() == expected {
+                    this.start_video_with_state(&path, backend, resume);
+                }
+            });
+            self.video_ready_handler.replace(Some(handler));
+            return;
+        }
+        let Some(surface) = window.surface().filter(|s| !s.is_destroyed()) else {
+            self.status
+                .set_text("Video: native window surface unavailable");
+            self.status.set_visible(true);
+            return;
+        };
+        let media = match gpu_video::open_selected_on_surface(path, backend, Some(&surface)) {
             Ok(media) => media,
+            Err(error) if backend == gpu_video::Backend::Gpu => {
+                eprintln!(
+                    "PIVRA_VIDEO_FALLBACK stage=initialization backend=stock reason={error}; BT.1886 correction unavailable"
+                );
+                self.start_video_with_state(path, gpu_video::Backend::Stock, resume);
+                return;
+            }
             Err(error) => {
                 self.status.set_text(&format!("Video: {error}"));
                 self.status.set_visible(true);
@@ -495,12 +541,47 @@ impl ImageView {
         let generation = self.animation_generation.clone();
         let status = self.status.downgrade();
         let picture = self.video.downgrade();
-        media.connect_notify_local(Some("error"), move |media, _| {
+        let this = self.clone();
+        let failed_path = path.to_owned();
+        let recovery_queued = Cell::new(false);
+        // GtkMediaStream::gerror pauses before notifying error. Preserve the
+        // last user intent, ignoring the pause caused by that error itself.
+        let playing = Rc::new(Cell::new(resume.is_none_or(|s| s.0)));
+        let intent = playing.clone();
+        media.connect_notify_local(Some("playing"), move |media, _| {
+            if media.error().is_none() {
+                intent.set(media.is_playing());
+            }
+        });
+        let handler = media.connect_notify_local(Some("error"), move |media, _| {
             if generation.get() != expected {
                 return;
             }
             if let Some(error) = media.error() {
-                eprintln!("Pivra video: {error}; stock override: PIVRA_VIDEO_BACKEND=stock");
+                if gpu_video::is_owned(media) {
+                    if recovery_queued.replace(true) {
+                        return;
+                    }
+                    let this = this.clone();
+                    let path = failed_path.clone();
+                    let failed = media.downgrade();
+                    let resume = (
+                        playing.get(), media.is_muted(), media.volume(), media.is_loop(), media.timestamp(),
+                    );
+                    eprintln!("PIVRA_VIDEO_FALLBACK stage=pipeline backend=stock reason={error}; BT.1886 correction unavailable");
+                    // Leave the error/bus callback before dismantling its stream.
+                    glib::idle_add_local_once(move || {
+                        if this.animation_generation.get() != expected ||
+                            !this.video_stream.borrow().as_ref().is_some_and(|s| Some(s.clone()) == failed.upgrade()) {
+                            return;
+                        }
+                        this.stop_video();
+                        this.status.set_visible(false);
+                        this.start_video_with_state(&path, gpu_video::Backend::Stock, Some(resume));
+                    });
+                    return;
+                }
+                eprintln!("Pivra stock video: {error}");
                 if let Some(status) = status.upgrade() {
                     status.set_text(&format!("Video: {error}"));
                     status.set_visible(true);
@@ -509,24 +590,17 @@ impl ImageView {
                     picture.set_visible(false);
                     picture.set_paintable(None::<&gtk::gdk::Paintable>);
                 }
-                if gpu_video::is_owned(media) {
-                    let weak = media.downgrade();
-                    glib::idle_add_local_once(move || {
-                        if let Some(media) = weak.upgrade() {
-                            media.pause();
-                            media.clear();
-                        }
-                    });
-                }
             }
         });
-        media.set_loop(false);
-        let resume_at = self
-            .video_positions
-            .borrow()
-            .get(path)
-            .copied()
-            .unwrap_or(0);
+        self.video_error_handler.replace(Some(handler));
+        media.set_loop(resume.is_some_and(|s| s.3));
+        let resume_at = resume.map(|s| s.4).unwrap_or_else(|| {
+            self.video_positions
+                .borrow()
+                .get(path)
+                .copied()
+                .unwrap_or(0)
+        });
         if resume_at > 0 {
             // MediaFile prepares asynchronously; a seek before preparation
             // may be ignored. Apply the stored timestamp once prepared.
@@ -546,7 +620,9 @@ impl ImageView {
             }
         }
         self.video_path.replace(Some(path.to_owned()));
-        self.video_transform.borrow_mut().reset();
+        if resume.is_none() {
+            self.video_transform.borrow_mut().reset();
+        }
         let mode = self
             .mode_action
             .state()
@@ -559,14 +635,29 @@ impl ImageView {
                 mode,
             )));
         self.video_stream.replace(Some(media.clone()));
+        self.video_surface.replace(Some(surface));
         self.mode_action.set_enabled(true);
         self.video.set_visible(true);
         self.video_controls
             .attach(Some(media.clone().upcast::<gtk::MediaStream>()));
-        media.play();
+        if let Some((playing, muted, volume, _, _)) = resume {
+            media.set_loop(resume.is_some_and(|s| s.3));
+            media.set_muted(muted);
+            media.set_volume(volume);
+            if playing {
+                media.play();
+            }
+        } else {
+            media.play();
+        }
     }
     fn stop_video(&self) {
         gpu_video::trace_binding(c"video-retire-begin");
+        if let Some(handler) = self.video_ready_handler.borrow_mut().take() {
+            if let Some(window) = self.window.upgrade() {
+                window.disconnect(handler);
+            }
+        }
         self.video_controls.attach(None);
         let path = self.video_path.borrow_mut().take();
         // Detach the render surface before stopping the native decoder.
@@ -575,7 +666,11 @@ impl ImageView {
         self.video.set_visible(false);
         self.video.set_paintable(None::<&gtk::gdk::Paintable>);
         let stream = self.video_stream.borrow_mut().take();
+        let surface = self.video_surface.borrow_mut().take();
         if let Some(stream) = stream {
+            if let Some(handler) = self.video_error_handler.borrow_mut().take() {
+                stream.disconnect(handler);
+            }
             stream.pause();
             if let Some(path) = path {
                 let timestamp = stream.timestamp();
@@ -587,6 +682,9 @@ impl ImageView {
             // stream. Preserve the stock backend's asynchronous drop policy.
             if gpu_video::is_owned(&stream) {
                 stream.clear();
+            }
+            if let Some(surface) = surface {
+                stream.unrealize(&surface);
             }
             // Stock MediaFile owns its pipeline and is released when references
             // are dropped; don't synchronously clear the native backend here.

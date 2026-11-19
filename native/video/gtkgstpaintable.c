@@ -224,7 +224,15 @@ pivra_gpu_paintable_create_sink (PivraGpuPaintable *self)
   else
     display = gdk_display_get_default ();
 
-  context = gdk_display_create_gl_context (display, &error);
+  /* A GtkPicture wrapping a media paintable does not realize the stream like
+   * GtkVideo does. Production must bind the native surface before opening.
+   * Surface creation matches the window's configuration/share group. Keep the
+   * display-only path for standalone/offscreen API users. */
+  context = self->surface ? gdk_surface_create_gl_context(self->surface, &error)
+                          : gdk_display_create_gl_context (display, &error);
+  if (g_getenv("PIVRA_TRACE_VIDEO"))
+    g_printerr("PIVRA_GPU_INITIALIZE source=%s surface=%p\n",
+               self->surface ? "window-surface" : "offscreen-display", (void *)self->surface);
   if (context == NULL)
     {
       GST_INFO ("failed to create GDK GL context: %s", error->message);
@@ -292,6 +300,7 @@ pivra_gpu_paintable_dispose (GObject *object)
   PivraGpuPaintable *self = PIVRA_GPU_PAINTABLE (object);
 
   g_clear_object (&self->image);
+  g_clear_object (&self->surface);
 
   G_OBJECT_CLASS (pivra_gpu_paintable_parent_class)->dispose (object);
 }
@@ -334,7 +343,7 @@ pivra_gpu_paintable_realize (PivraGpuPaintable *self,
   if (self->surface)
     return;
 
-  self->surface = surface;
+  g_set_object (&self->surface, surface);
 }
 
 void
@@ -347,7 +356,7 @@ pivra_gpu_paintable_unrealize (PivraGpuPaintable *self,
    */
 
   if (self->surface == surface)
-    self->surface = NULL;
+    g_clear_object (&self->surface);
 }
 
 /* Called on GTK's thread after the pipeline has reached NULL. Cancel queued

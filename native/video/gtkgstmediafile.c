@@ -126,7 +126,7 @@ static void open_file(GtkMediaFile *file) {
   g_object_weak_ref(G_OBJECT(self->pipeline),pipeline_retired,NULL);
   GstElement *sink=pivra_gpu_paintable_create_sink(PIVRA_GPU_PAINTABLE(self->paintable));
   /* A NULL sink must never select playbin's automatic/CPU/other-window sink. */
-  if(!sink) { close_file(file);gtk_media_stream_error(GTK_MEDIA_STREAM(self),G_IO_ERROR,G_IO_ERROR_FAILED,"GPU sink construction failed; stock override: PIVRA_VIDEO_BACKEND=stock");return; }
+  if(!sink) { close_file(file);gtk_media_stream_error(GTK_MEDIA_STREAM(self),G_IO_ERROR,G_IO_ERROR_FAILED,"GPU sink initialization failed; see preceding context diagnostics");return; }
   gst_object_ref_sink(sink);
   gchar *uri=g_file_get_uri(source);g_object_set(self->pipeline,"uri",uri,"video-sink",sink,NULL);
   g_free(uri);gst_object_unref(sink);

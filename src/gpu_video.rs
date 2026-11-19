@@ -216,9 +216,29 @@ fn stock(path: &Path) -> gtk::MediaFile {
     }
     media
 }
+#[allow(dead_code)] // Standalone GPU probes intentionally have no native window surface.
 pub fn open_selected(path: &Path, backend: Backend) -> Result<gtk::MediaFile, String> {
+    open_selected_on_surface(path, backend, None)
+}
+/// Production supplies its realized native surface before setting the filename:
+/// GtkPicture/ActualPaintable does not forward GtkMediaStream realization.
+pub fn open_selected_on_surface(
+    path: &Path,
+    backend: Backend,
+    surface: Option<&gtk::gdk::Surface>,
+) -> Result<gtk::MediaFile, String> {
     if backend == Backend::Stock {
-        return Ok(stock(path));
+        let media = stock(path);
+        if let Some(surface) = surface {
+            media.realize(surface);
+        }
+        if let Some(error) = media.error() {
+            if let Some(surface) = surface {
+                media.unrealize(surface);
+            }
+            return Err(error.to_string());
+        }
+        return Ok(media);
     }
     let renderer = if gtk::minor_version() < 20 {
         "ngl"
@@ -229,7 +249,7 @@ pub fn open_selected(path: &Path, backend: Backend) -> Result<gtk::MediaFile, St
         eprintln!(
             "Pivra GPU correction unavailable with selected renderer; stock retained (requires {renderer})"
         );
-        return Ok(stock(path));
+        return open_selected_on_surface(path, Backend::Stock, surface);
     }
     #[cfg(pivra_gpu_backend)]
     {
@@ -242,8 +262,15 @@ pub fn open_selected(path: &Path, backend: Backend) -> Result<gtk::MediaFile, St
             .map_err(|_| "GPU construction failed")?;
         debug_assert!(is_owned(&media));
         GPU.fetch_add(1, Ordering::SeqCst);
+        if let Some(surface) = surface {
+            media.realize(surface);
+        }
         media.set_filename(Some(path));
         if let Some(error) = media.error() {
+            if let Some(surface) = surface {
+                media.unrealize(surface);
+            }
+            media.clear();
             return Err(error.to_string());
         }
         eprintln!(

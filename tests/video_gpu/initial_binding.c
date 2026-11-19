@@ -11,6 +11,14 @@
 
 int main(int argc, char **argv) {
   gtk_init(); gst_init(&argc,&argv);
+  GtkWidget *window=NULL;
+  GdkSurface *surface=NULL;
+  for (int i=1; i<argc; i++) if (g_str_equal(argv[i],"--surface")) {
+    window=gtk_window_new();
+    gtk_widget_realize(window);
+    surface=gtk_native_get_surface(GTK_NATIVE(window));
+    g_assert_nonnull(surface);
+  }
   GError *error=NULL;
   GdkGLContext *caller=gdk_display_create_gl_context(gdk_display_get_default(),&error);
   if (!caller || !gdk_gl_context_realize(caller,&error)) {
@@ -29,6 +37,7 @@ int main(int argc, char **argv) {
   g_assert_true(eglGetCurrentContext()==EGL_NO_CONTEXT);
   g_print("INITIAL_BINDING gdk-normalized=true native-binding=none\n");
   PivraGpuPaintable *paintable=PIVRA_GPU_PAINTABLE(pivra_gpu_paintable_new());
+  if (surface) pivra_gpu_paintable_realize(paintable,surface);
   GstElement *bin=pivra_gpu_paintable_create_sink(paintable);
   gboolean succeeded=bin!=NULL;
   if (bin) {
@@ -37,6 +46,7 @@ int main(int argc, char **argv) {
     GValue value=G_VALUE_INIT;
     g_assert_cmpint(gst_iterator_next(iter,&value),==,GST_ITERATOR_OK);
     PivraGpuSink *sink=PIVRA_GPU_SINK(g_value_get_object(&value));
+    if (surface) g_assert_true(gdk_gl_context_get_surface(sink->gdk_context)==surface);
     GstGLDisplayEGL *egl=gst_gl_display_egl_from_gl_display(sink->gst_display);
     g_assert_nonnull(egl);
     g_assert_cmpuint(gst_gl_display_get_handle(GST_GL_DISPLAY(egl)),==,(guintptr)display);
@@ -51,6 +61,7 @@ int main(int argc, char **argv) {
     gst_object_unref(egl);g_value_unset(&value);gst_iterator_free(iter);
     gst_object_unref(bin);
   }
+  if (surface) pivra_gpu_paintable_unrealize(paintable,surface);
   g_object_unref(paintable);
   /* The actual incoming binding was NONE, so leaving GDK TLS and EGL unbound
    * is the correct restoration. A valid caller context can be rebound later. */
@@ -59,6 +70,7 @@ int main(int argc, char **argv) {
   gdk_gl_context_make_current(caller);
   gboolean reusable=eglGetCurrentContext()==native;
   gdk_gl_context_clear_current();g_object_unref(caller);
+  if (window) gtk_window_destroy(GTK_WINDOW(window));
   g_print("INITIAL_BINDING gpu_sink=%s restored_unbound=%s caller_reusable=%s\n",
       succeeded ? "ready":"failed",unbound ? "true":"false",reusable ? "true":"false");
   return succeeded && unbound && reusable ? 0:1;

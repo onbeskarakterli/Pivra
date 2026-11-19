@@ -1,5 +1,10 @@
 # Normal GPU playback restoration candidate — 2026-11-20
 
+Follow-up: the owner subsequently reproduced normal GPU failure in **both**
+installed v0.2.5 and current dev on the updated AMD platform. See
+[production initialization and stock recovery](V026_PRODUCTION_GPU_INITIALIZATION.md).
+The comparison below remains a historical software-GL result, not native recovery proof.
+
 **Native AMD normal playback: PENDING. Mixed native lifecycle: BLOCKED. No release preparation or readiness claim.**
 
 Implementation: `e416839efa094fe1ae9057c61af0c60511e55525`.

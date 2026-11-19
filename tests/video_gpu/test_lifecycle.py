@@ -31,6 +31,12 @@ class LifecycleRunner(unittest.TestCase):
         self.assertEqual(r['status'], 'FAIL')
         self.assertEqual(r['context_errors'], 1)
 
+    def test_missing_egl_configuration_cannot_pass_on_exit_zero(self):
+        r = self.run_child('print("Gsk-WARNING: No EGL configuration available")')
+        self.assertEqual(r['status'],'FAIL')
+        self.assertEqual(r['egl_configuration_errors'],1)
+        self.assertIn('native context/GPU failure logged',r['reasons'])
+
     def test_context_restore_failure_cannot_pass_on_exit_zero(self):
         r = self.run_child('print("PIVRA_GPU_CONTEXT_FAILURE stage=restore-previous")')
         self.assertEqual(r['status'], 'FAIL')

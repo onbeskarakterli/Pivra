@@ -41,6 +41,22 @@ def outside_pointer(env, *, move=True):
         return [x.value,y.value]
     finally: lib.XCloseDisplay(display)
 
+def catalog_case(target, env, out, *, native):
+    """Keep real native repair separate from deterministic controlled failures."""
+    command=[str(target/'thumbnail_overlay_probe'),'--catalog-regression']
+    case_env=dict(env)
+    if native:
+        command.append('--native-thumbnails')
+        return command,case_env,'secure-decoder-and-production-provider'
+    # Trusted private failure injection, not a decoder. Do not let an installed
+    # real GNOME factory heal the missing/corrupt-cache negative controls.
+    helper=out/'config/catalog-no-generation.py'
+    helper.parent.mkdir(mode=0o700,parents=True,exist_ok=True)
+    helper.write_text('#!/usr/bin/env python3\nimport sys\nprint("CONTROLLED catalog: generation deliberately unavailable",file=sys.stderr)\nsys.exit(4)\n')
+    helper.chmod(0o700)
+    case_env.update(XDG_CURRENT_DESKTOP='GNOME',PIVRA_THUMBNAIL_GENERATOR=str(helper))
+    return command,case_env,'controlled-cache-failures-and-synthetic-decoder'
+
 def main():
     p=argparse.ArgumentParser(description=__doc__)
     p.add_argument('--session',choices=['native','x11','sway'],default='native')
@@ -92,7 +108,14 @@ def main():
             example={'thumbnail-memory':'thumbnail_memory_probe','cache-churn':'preload_probe','preload-controlled':'preload_probe',
                      'catalog':'thumbnail_overlay_probe','view-modes':'view_modes_probe','async-cancel':'async_cancel_probe','window-races':'window_failure_race_probe'}[name]
             if a.session=='x11' and name=='catalog': report['catalog_pointer']=outside_pointer(active,move=False)
-            run(name,[str(target/example),*args],active)
+            if name=='catalog':
+                command,case_env,kind=catalog_case(target,active,out,native=a.session=='native')
+                print('CATALOG_MODE',kind,flush=True)
+                run(name,command,case_env)
+                rows[-1]['evidence_kind']=kind
+                rows[-1]['command']=command
+            else:
+                run(name,[str(target/example),*args],active)
         lifecycle=['bash','tests/run_video_context_lifecycle.sh']+(['--software'] if a.software else [])
         run('video-lifecycle-nine-gates',lifecycle,active,240)
         if a.session=='native' and rows[-1]['status']=='PASS':

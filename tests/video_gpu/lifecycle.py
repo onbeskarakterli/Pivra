@@ -91,6 +91,7 @@ def run(name, command, env, out, timeout=90, expected_gpu_errors=0, expected_con
     if debugger_result: status = debugger_result['status']
     diagnostics = sum(line.startswith('{"pivra_perf":1,') for line in log.splitlines())
     context_errors = log.count('gdk_gl_context_make_current() failed')
+    egl_configuration_errors = log.count('No EGL configuration available')
     gpu_errors = log.count('PIVRA_GPU_FAIL') + log.count('PIVRA_GPU_SHADER_FAIL')
     context_failures = log.count('PIVRA_GPU_CONTEXT_FAILURE')
     reasons = []
@@ -98,7 +99,7 @@ def run(name, command, env, out, timeout=90, expected_gpu_errors=0, expected_con
         reasons.append(debugger_result['reason'])
     if timed_out:
         status='FAIL'; reasons.append('test deadline exceeded; inferior completion not established')
-    if context_errors or gpu_errors != expected_gpu_errors or context_failures != expected_context_failures:
+    if context_errors or egl_configuration_errors or gpu_errors != expected_gpu_errors or context_failures != expected_context_failures:
         reasons.append('native context/GPU failure logged')
     if diagnostics >= 4096:
         reasons.append('diagnostic cap reached')
@@ -119,7 +120,7 @@ def run(name, command, env, out, timeout=90, expected_gpu_errors=0, expected_con
     if status in ('FAIL','BLOCKED'):
         print(status+' last transition:', stages[-1] if stages else 'not reached', flush=True)
         print('\n'.join(lines[-12:]), flush=True)
-    return dict(name=name, exit=code, status=status, diagnostic_events=diagnostics, context_errors=context_errors, context_failures=context_failures,gpu_errors=gpu_errors, reasons=reasons,last_stage=stages[-1] if stages else None,last_bindings=bindings[-8:],inferior_signals=signals,libraries_sha256=libraries,
+    return dict(name=name, exit=code, status=status, diagnostic_events=diagnostics, context_errors=context_errors, egl_configuration_errors=egl_configuration_errors, context_failures=context_failures,gpu_errors=gpu_errors, reasons=reasons,last_stage=stages[-1] if stages else None,last_bindings=bindings[-8:],inferior_signals=signals,libraries_sha256=libraries,
                 timed_out=timed_out,exit_scope='debugger' if debugger else 'application',
                 debugger_exit=code if debugger else None,debugger_result=debugger_result,gdb_event_count=len(debugger_records),egl_requests=ownership(debugger_records,log))
 

@@ -7,6 +7,8 @@ mod actual_paintable;
 mod gpu_video;
 #[path = "support/video_backend.rs"]
 mod video_backend;
+#[path = "support/video_preparation.rs"]
+mod video_preparation;
 use gtk::{gdk, glib, prelude::*};
 use pivra::viewing::{Transform, ViewMode};
 use std::{
@@ -158,10 +160,8 @@ fn render(
     })
 }
 
-fn check_controls(media: &gtk::MediaFile) -> Result<(), String> {
-    if !media.is_prepared() || !media.is_seekable() || media.duration() <= 0 {
-        return Err("control gate requires a prepared, seekable finite video".into());
-    }
+fn check_controls(media: &gtk::MediaFile, deadline: Instant) -> Result<(), String> {
+    video_preparation::wait(media, deadline)?;
     media.set_volume(0.375);
     if (media.volume() - 0.375).abs() > f64::EPSILON || !media.is_muted() {
         return Err("volume/mute state did not persist".into());
@@ -321,7 +321,7 @@ fn native(path: &std::path::Path, expected: Option<glib::Type>) -> Result<(), St
     };
     let result = result.and_then(|()| {
         if std::env::args().any(|arg| arg == "--check-controls") {
-            check_controls(&media)
+            check_controls(&media, deadline)
         } else {
             Ok(())
         }

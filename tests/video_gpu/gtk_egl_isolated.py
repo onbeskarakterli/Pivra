@@ -62,7 +62,7 @@ def main():
                 relative = file.relative_to(clean)
                 if str(relative) != 'gdk/gdkdisplay.c' and file.read_bytes() != (patched/relative).read_bytes():
                     raise RuntimeError('unreviewed GTK color/renderer change: '+str(relative))
-    subprocess.run(['cargo', 'build', '--locked', '--bin', 'pivra', '--example', 'video_color_probe', '--example', 'integrated_video_probe'], cwd=ROOT, check=True)
+    subprocess.run(['cargo', 'build', '--locked', '--bin', 'pivra', '--example', 'video_color_probe', '--example', 'integrated_video_probe', '--example', 'video_preparation_probe'], cwd=ROOT, check=True)
     target = Path(json.loads(subprocess.check_output(['cargo', 'metadata', '--locked', '--no-deps', '--format-version', '1'], cwd=ROOT))['target_directory'])/'debug'
     ctest = out/'gtk-context'
     flags = lambda key: shlex.split(subprocess.check_output(['pkg-config', key, 'gtk4', 'epoxy'], text=True))
@@ -106,7 +106,7 @@ def execute(args, variants, out, target, ctest, video, extra):
                     module = folder/label/'gtk-modules/4.0.0/media'; module.mkdir(parents=True)
                     (module/media.name).symlink_to(media)
                     child['GTK_PATH'] = str(folder/label/'gtk-modules')
-                for name, command in [('context', [ctest]), ('gpu-color-controls', [target/'examples/video_color_probe', video, '--check-controls', *extra]),
+                for name, command in [('context', [ctest]), ('preparation-order', [target/'examples/video_preparation_probe']), ('gpu-color-controls', [target/'examples/video_color_probe', video, '--check-controls', *extra]),
                                       ('production-window', [target/'examples/integrated_video_probe', '--normal-only', video])]:
                     test = label+'-'+name
                     (folder/(test+'-ldd.log')).write_text(require_loader(command[0], meta['library'], child))

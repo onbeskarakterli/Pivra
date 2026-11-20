@@ -1,0 +1,537 @@
+{
+  "implementation_commit": "ef55fd0a18b66571bf05bfc39ab57501ac5a7fee",
+  "base": "444de1b108425ee3f27f5170ec9cbbdedb7e3aa8",
+  "tested_tree": "implementation sources before commit; original reports retain base HEAD and dirty state",
+  "native_user_report": {
+    "environment": "Arch/GNOME Wayland, GTK 4.24.1, Mesa 26.3.1, GStreamer 1.28.9, RX 7900 XT",
+    "x11_gpu": "PASS, user-reported hardware/visual/audio acceptance",
+    "wayland_gpu": "FAIL at GTK create-gdk-context / EGL configuration; stock fallback triggered"
+  },
+  "application_fix": "Original GDK GError now propagated through GtkMediaStream into fallback reason",
+  "native_wayland_playback_fix": "BLOCKED, not achieved or claimed",
+  "root_cause": "Proven private GTK configuration boundary; exact native failing attributes/error still PENDING native counts",
+  "environment": {
+    "gtk": "4.18.6",
+    "gstreamer": "1.26.2",
+    "rust": "1.99.1",
+    "gpu": "llvmpipe software"
+  },
+  "checks": {
+    "production_x11": {
+      "status": "PASS",
+      "software_control": true,
+      "report": "/tmp/pivra-production-init-onrw2pxz/report.json",
+      "report_sha256": "d9181f6ace265e891cea83470f72ac6d26d57bb1db1cca28223f707dc4b75a19",
+      "results": [
+        {
+          "name": "native-surface-binding",
+          "status": "PASS",
+          "exit": 0,
+          "context_failures": 0,
+          "gpu_errors": 0,
+          "context_errors": 0,
+          "reasons": []
+        },
+        {
+          "name": "production-normal",
+          "status": "PASS",
+          "exit": 0,
+          "context_failures": 0,
+          "gpu_errors": 0,
+          "context_errors": 0,
+          "reasons": []
+        },
+        {
+          "name": "production-init-failure",
+          "status": "PASS",
+          "exit": 0,
+          "context_failures": 2,
+          "gpu_errors": 2,
+          "context_errors": 0,
+          "reasons": []
+        },
+        {
+          "name": "production-async-recovery",
+          "status": "PASS",
+          "exit": 0,
+          "context_failures": 0,
+          "gpu_errors": 0,
+          "context_errors": 0,
+          "reasons": []
+        },
+        {
+          "name": "production-async-playing",
+          "status": "PASS",
+          "exit": 0,
+          "context_failures": 0,
+          "gpu_errors": 0,
+          "context_errors": 0,
+          "reasons": []
+        },
+        {
+          "name": "production-stale-recovery",
+          "status": "PASS",
+          "exit": 0,
+          "context_failures": 0,
+          "gpu_errors": 0,
+          "context_errors": 0,
+          "reasons": []
+        },
+        {
+          "name": "production-close-pending",
+          "status": "PASS",
+          "exit": 0,
+          "context_failures": 0,
+          "gpu_errors": 0,
+          "context_errors": 0,
+          "reasons": []
+        },
+        {
+          "name": "production-deleted-source",
+          "status": "PASS",
+          "exit": 0,
+          "context_failures": 0,
+          "gpu_errors": 0,
+          "context_errors": 0,
+          "reasons": []
+        },
+        {
+          "name": "full-production-window",
+          "status": "PASS",
+          "exit": 0,
+          "context_failures": 0,
+          "gpu_errors": 0,
+          "context_errors": 0,
+          "reasons": []
+        }
+      ]
+    },
+    "production_sway": {
+      "status": "PASS",
+      "software_control": true,
+      "report": "/tmp/pivra-production-init-dknkqnqi/report.json",
+      "report_sha256": "f8a50c91d6d27876866c308d4781b8c403d111be17983812b587585602748b91",
+      "results": [
+        {
+          "name": "native-surface-binding",
+          "status": "PASS",
+          "exit": 0,
+          "context_failures": 0,
+          "gpu_errors": 0,
+          "context_errors": 0,
+          "reasons": []
+        },
+        {
+          "name": "production-normal",
+          "status": "PASS",
+          "exit": 0,
+          "context_failures": 0,
+          "gpu_errors": 0,
+          "context_errors": 0,
+          "reasons": []
+        },
+        {
+          "name": "production-init-failure",
+          "status": "PASS",
+          "exit": 0,
+          "context_failures": 2,
+          "gpu_errors": 2,
+          "context_errors": 0,
+          "reasons": []
+        },
+        {
+          "name": "production-async-recovery",
+          "status": "PASS",
+          "exit": 0,
+          "context_failures": 0,
+          "gpu_errors": 0,
+          "context_errors": 0,
+          "reasons": []
+        },
+        {
+          "name": "production-async-playing",
+          "status": "PASS",
+          "exit": 0,
+          "context_failures": 0,
+          "gpu_errors": 0,
+          "context_errors": 0,
+          "reasons": []
+        },
+        {
+          "name": "production-stale-recovery",
+          "status": "PASS",
+          "exit": 0,
+          "context_failures": 0,
+          "gpu_errors": 0,
+          "context_errors": 0,
+          "reasons": []
+        },
+        {
+          "name": "production-close-pending",
+          "status": "PASS",
+          "exit": 0,
+          "context_failures": 0,
+          "gpu_errors": 0,
+          "context_errors": 0,
+          "reasons": []
+        },
+        {
+          "name": "production-deleted-source",
+          "status": "PASS",
+          "exit": 0,
+          "context_failures": 0,
+          "gpu_errors": 0,
+          "context_errors": 0,
+          "reasons": []
+        },
+        {
+          "name": "full-production-window",
+          "status": "PASS",
+          "exit": 0,
+          "context_failures": 0,
+          "gpu_errors": 0,
+          "context_errors": 0,
+          "reasons": []
+        }
+      ]
+    },
+    "lifecycle_x11": {
+      "status": "PASS",
+      "software_control": true,
+      "report": "/tmp/pivra-video-context-qgvax0z1/report.json",
+      "report_sha256": "3f13072ee511f87af0d2ea9169e720d9de0d54f52219ed71c0835db78dccfc62",
+      "results": [
+        {
+          "name": "ownership-foreign",
+          "status": "PASS",
+          "exit": 0,
+          "context_failures": 0,
+          "gpu_errors": 0,
+          "context_errors": 0,
+          "reasons": []
+        },
+        {
+          "name": "ownership-release",
+          "status": "PASS",
+          "exit": 0,
+          "context_failures": 0,
+          "gpu_errors": 0,
+          "context_errors": 0,
+          "reasons": []
+        },
+        {
+          "name": "ownership-current",
+          "status": "PASS",
+          "exit": 0,
+          "context_failures": 0,
+          "gpu_errors": 0,
+          "context_errors": 0,
+          "reasons": []
+        },
+        {
+          "name": "ownership-presentation",
+          "status": "PASS",
+          "exit": 0,
+          "context_failures": 0,
+          "gpu_errors": 0,
+          "context_errors": 0,
+          "reasons": []
+        },
+        {
+          "name": "ownership-failure",
+          "status": "PASS",
+          "exit": 0,
+          "context_failures": 8,
+          "gpu_errors": 8,
+          "context_errors": 0,
+          "reasons": []
+        },
+        {
+          "name": "mixed-lifecycle",
+          "status": "PASS",
+          "exit": 0,
+          "context_failures": 0,
+          "gpu_errors": 0,
+          "context_errors": 0,
+          "reasons": []
+        },
+        {
+          "name": "error-cleanup",
+          "status": "PASS",
+          "exit": 0,
+          "context_failures": 0,
+          "gpu_errors": 0,
+          "context_errors": 0,
+          "reasons": []
+        },
+        {
+          "name": "limited-presentation-controls",
+          "status": "PASS",
+          "exit": 0,
+          "context_failures": 0,
+          "gpu_errors": 0,
+          "context_errors": 0,
+          "reasons": []
+        },
+        {
+          "name": "full-ramp-shader-controls",
+          "status": "PASS",
+          "exit": 0,
+          "context_failures": 0,
+          "gpu_errors": 0,
+          "context_errors": 0,
+          "reasons": []
+        }
+      ]
+    },
+    "lifecycle_sway": {
+      "status": "PASS",
+      "software_control": true,
+      "report": "/tmp/pivra-video-context-bc50l0bh/report.json",
+      "report_sha256": "cbdf07377dd8941aeb419b12cea9aa15ca416e7ed1b605ca6bc01ad158986eba",
+      "results": [
+        {
+          "name": "ownership-foreign",
+          "status": "PASS",
+          "exit": 0,
+          "context_failures": 0,
+          "gpu_errors": 0,
+          "context_errors": 0,
+          "reasons": []
+        },
+        {
+          "name": "ownership-release",
+          "status": "PASS",
+          "exit": 0,
+          "context_failures": 0,
+          "gpu_errors": 0,
+          "context_errors": 0,
+          "reasons": []
+        },
+        {
+          "name": "ownership-current",
+          "status": "PASS",
+          "exit": 0,
+          "context_failures": 0,
+          "gpu_errors": 0,
+          "context_errors": 0,
+          "reasons": []
+        },
+        {
+          "name": "ownership-presentation",
+          "status": "PASS",
+          "exit": 0,
+          "context_failures": 0,
+          "gpu_errors": 0,
+          "context_errors": 0,
+          "reasons": []
+        },
+        {
+          "name": "ownership-failure",
+          "status": "PASS",
+          "exit": 0,
+          "context_failures": 8,
+          "gpu_errors": 8,
+          "context_errors": 0,
+          "reasons": []
+        },
+        {
+          "name": "mixed-lifecycle",
+          "status": "PASS",
+          "exit": 0,
+          "context_failures": 0,
+          "gpu_errors": 0,
+          "context_errors": 0,
+          "reasons": []
+        },
+        {
+          "name": "error-cleanup",
+          "status": "PASS",
+          "exit": 0,
+          "context_failures": 0,
+          "gpu_errors": 0,
+          "context_errors": 0,
+          "reasons": []
+        },
+        {
+          "name": "limited-presentation-controls",
+          "status": "PASS",
+          "exit": 0,
+          "context_failures": 0,
+          "gpu_errors": 0,
+          "context_errors": 0,
+          "reasons": []
+        },
+        {
+          "name": "full-ramp-shader-controls",
+          "status": "PASS",
+          "exit": 0,
+          "context_failures": 0,
+          "gpu_errors": 0,
+          "context_errors": 0,
+          "reasons": []
+        }
+      ]
+    }
+  },
+  "quality": {
+    "fmt": {
+      "status": "PASS",
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "check": {
+      "status": "PASS",
+      "log_sha256": "fd096010b1bf4ec330bfd4d9c384d640d38c3aea10e8ea3caea74f1927be23be"
+    },
+    "clippy": {
+      "status": "PASS",
+      "log_sha256": "80f32951ce2b706800b53dda52840a28963a9022497a6db9a4bd36fc10d2f9bd"
+    },
+    "rust": {
+      "status": "PASS",
+      "log_sha256": "b56023368a3e2e280e6bbfd300c4f05c6e684dd18dc38d283a9d8a8350cba844"
+    },
+    "python-root": {
+      "status": "PASS",
+      "log_sha256": "92ec394b44f8181ce8b5ee1181627e2f89a992044bedc86963a65b37812d9554"
+    },
+    "python-thumbnail": {
+      "status": "PASS",
+      "log_sha256": "78c236b3b993d16f4a747660624e9de4d3d802063b280a0f6f59db1965b58de7"
+    },
+    "python-fd05a": {
+      "status": "PASS",
+      "log_sha256": "b1e2df9be5b3e954c2d2d25efcf39cb02fe4e10735e67c33a5bb9488485289d7"
+    },
+    "python-color": {
+      "status": "PASS",
+      "log_sha256": "1b54e7bd3e4f0557cdf06d1076b6ef63ce21d6c17ecec62d2881ac93eafe1fed"
+    },
+    "python-gpu-verified": {
+      "status": "PASS",
+      "log_sha256": "79aa42905061ac874e1d5e0add4bcd376c6f614c37ae38158280106a922322cb"
+    },
+    "release": {
+      "status": "PASS",
+      "log_sha256": "11afcf2c294eb15cedc8d936346f72cb16dc50db271685dac3c77fbaf7d63ff7"
+    }
+  },
+  "rust_tests": 217,
+  "python_tests": 230,
+  "query_control": {
+    "source": "444de1b108425ee3f27f5170ec9cbbdedb7e3aa8",
+    "software_control": true,
+    "classification": "GTK_SDR_CONFIG_FAILURE_NOT_REPRODUCED",
+    "exit": 0,
+    "queries": [
+      {
+        "name": "gtk_sdr_implicit",
+        "ok": true,
+        "count": 10,
+        "error": 12288,
+        "size": -1,
+        "renderable_request": 0,
+        "alpha": 8,
+        "min_rgb": 8
+      },
+      {
+        "name": "gtk_sdr_size_zero",
+        "ok": true,
+        "count": 10,
+        "error": 12288,
+        "size": 0,
+        "renderable_request": 0,
+        "alpha": 8,
+        "min_rgb": 8
+      },
+      {
+        "name": "explicit_es1",
+        "ok": true,
+        "count": 10,
+        "error": 12288,
+        "size": 0,
+        "renderable_request": 1,
+        "alpha": 8,
+        "min_rgb": 8
+      },
+      {
+        "name": "explicit_es2",
+        "ok": true,
+        "count": 10,
+        "error": 12288,
+        "size": 0,
+        "renderable_request": 4,
+        "alpha": 8,
+        "min_rgb": 8
+      },
+      {
+        "name": "explicit_gl",
+        "ok": true,
+        "count": 10,
+        "error": 12288,
+        "size": 0,
+        "renderable_request": 8,
+        "alpha": 8,
+        "min_rgb": 8
+      },
+      {
+        "name": "any_api",
+        "ok": true,
+        "count": 10,
+        "error": 12288,
+        "size": 0,
+        "renderable_request": -1,
+        "alpha": 8,
+        "min_rgb": 8
+      },
+      {
+        "name": "any_api_no_alpha",
+        "ok": true,
+        "count": 40,
+        "error": 12288,
+        "size": 0,
+        "renderable_request": -1,
+        "alpha": 0,
+        "min_rgb": 8
+      }
+    ],
+    "optional_hdr_queries": [
+      {
+        "name": "gtk_hdr_implicit",
+        "ok": true,
+        "count": 0,
+        "error": 12288,
+        "size": -1,
+        "renderable_request": 0,
+        "alpha": 8,
+        "min_rgb": 9
+      },
+      {
+        "name": "hdr_any_api",
+        "ok": true,
+        "count": 0,
+        "error": 12288,
+        "size": 0,
+        "renderable_request": -1,
+        "alpha": 8,
+        "min_rgb": 9
+      }
+    ],
+    "scope": "private Wayland connection: configuration query only, not GPU playback or a native fix",
+    "native_wayland_acceptance": "PENDING; GTK cached-display state is not reproduced by a private connection"
+  },
+  "gtk_review_patch": {
+    "status": "apply --check PASS against exact tag source; compilation/native test NOT RUN; NOT applied to system GTK",
+    "condition": "Only relevant if native evidence establishes implicit GLES1 filter mismatch",
+    "file": "docs/performance/gtk-4.24.1-modern-egl-config-review.patch"
+  },
+  "reviewed_source_sha256": {
+    "gdk_gdkdisplay.c": "1dfc7c6da4cff4883e7835e430501426eae196229eceed6e6a3de0e950f72f67",
+    "gdk_gdksurface.c": "9101ce7f660a03df40d77f1412f98d49226d4b74fd75e340069f8ab53e7a62d4",
+    "gdk_wayland_gdkglcontext-wayland.c": "09ad5bcf85bcbedf4c77e366408b38f377050a11f35171bbb7a1645eaf0473ba",
+    "gdk_x11_gdkdisplay-x11.c": "481e2ded4d2dc6738867fddb4474f92591b0764446bd6c4723fc2fad5425c25b",
+    "mesa263-eglapi.c": "2c246a9f06650c03c6f4a132d4d3df878fd071b66ae0854cc79b4490df66aa6c",
+    "mesa263-eglconfig.c": "5c3c51ca3bfe6eff902fa36c3e86699ed94818025ae47449ddac8f9ac38e1ab7"
+  },
+  "publication": "BLOCKED; no main, release, AUR, version, packaging or system library changes"
+}

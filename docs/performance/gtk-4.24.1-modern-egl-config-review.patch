@@ -1,0 +1,34 @@
+--- a/gdk/gdkdisplay.c
++++ b/gdk/gdkdisplay.c
+@@ -1361,6 +1361,10 @@
+   attrs[i++] = EGL_COLOR_BUFFER_TYPE;
+   attrs[i++] = EGL_RGB_BUFFER;
+ 
++  /* Do not implicitly require GLES 1; GTK uses desktop GL or GLES 3. */
++  attrs[i++] = EGL_RENDERABLE_TYPE;
++  attrs[i++] = EGL_DONT_CARE;
++
+   attrs[i++] = EGL_RED_SIZE;
+   attrs[i++] = (flags & GDK_EGL_CONFIG_HDR) ? 9 : 8;
+   attrs[i++] = EGL_GREEN_SIZE;
+@@ -1380,7 +1384,7 @@
+   attrs[i++] = EGL_NONE;
+   g_assert (i < MAX_EGL_ATTRS);
+ 
+-  if (!eglChooseConfig (priv->egl_display, attrs, NULL, -1, &alloced) || alloced == 0)
++  if (!eglChooseConfig (priv->egl_display, attrs, NULL, 0, &alloced) || alloced == 0)
+     {
+       g_set_error_literal (error, GDK_GL_ERROR, GDK_GL_ERROR_NOT_AVAILABLE,
+                            _("No EGL configuration available"));
+@@ -1401,6 +1405,11 @@
+ 
+   for (i = 0; i < count; i++)
+     {
++      EGLint renderable;
++      if (!eglGetConfigAttrib (priv->egl_display, configs[i], EGL_RENDERABLE_TYPE, &renderable) ||
++          !(renderable & (EGL_OPENGL_BIT | EGL_OPENGL_ES3_BIT_KHR)))
++        continue;
++
+       guint score = GDK_DISPLAY_GET_CLASS (self)->rate_egl_config (self, priv->egl_display, configs[i]);
+ 
+       if (score < best_score)

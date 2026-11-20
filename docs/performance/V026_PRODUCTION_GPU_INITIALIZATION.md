@@ -1,5 +1,10 @@
 # Production GPU initialization and stock recovery — 2026-11-20
 
+Follow-up native evidence: X11/XWayland GPU playback PASS on RX 7900 XT,
+while native Wayland fails inside GTK's EGL configuration query before the
+owned Gst sink. See [the Wayland EGL boundary report](V026_WAYLAND_EGL_CONFIG.md).
+The application surface/fallback work below does not fix that private GTK query.
+
 **v0.2.6 publication: BLOCKED pending actual AMD GPU playback or safe stock
 recovery acceptance.** Implementation: `0923a6f4fc0395f93e97c56749ac7c9dd08ab602`.
 Base: `fc3547e6eef94e2a47c4daf9a5b3780d8f9e530a`.

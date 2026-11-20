@@ -1,5 +1,11 @@
 # Native Wayland EGL configuration boundary — 2026-11-20
 
+Follow-up (2026-11-21): the owner supplied native 0 implicit/ES1 versus 40
+explicit-modern configurations with EGL_SUCCESS. The implicit filter cause is
+now confirmed; the separate GTK correction was built and runtime-tested in
+isolation. See [isolated GTK correction](V026_GTK_EGL_ISOLATED_FIX.md). Physical
+RX 7900 XT Wayland acceptance remains pending; the historical snapshot follows.
+
 **Wayland GPU fix: BLOCKED, not demonstrated. v0.2.6 publication remains NO-GO.**
 Implementation: `ef55fd0a18b66571bf05bfc39ab57501ac5a7fee`.
 Base: `444de1b108425ee3f27f5170ec9cbbdedb7e3aa8`.

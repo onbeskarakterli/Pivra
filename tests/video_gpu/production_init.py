@@ -61,7 +61,7 @@ def main():
                          expected_context_failures=2 if mode == 'init-failure' else 0)
             markers = [f'PASS production-init {mode}', 'PIVRA_GPU_INITIALIZE source=window-surface']
             if mode == 'init-failure':
-                markers += ['CONTROLLED_PIVRA_CONTEXT_FAILURE stock-and-renderer-unchanged', 'PIVRA_VIDEO_FALLBACK stage=initialization backend=stock', 'PIVRA_GPU_STOCK']
+                markers += ['CONTROLLED_PIVRA_CONTEXT_FAILURE stock-and-renderer-unchanged', 'PIVRA_VIDEO_FALLBACK stage=initialization backend=stock reason=controlled Pivra surface-context failure', 'PIVRA_GPU_STOCK']
             else:
                 markers += ['PIVRA_GPU_DRAW BT1886 GLMemory -> GLMemory', 'PIVRA_GPU_PRESENT GLMemory sync-meta retained']
             if mode in ('async-recovery', 'async-playing', 'stale-recovery', 'close-pending'):

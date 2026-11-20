@@ -213,6 +213,12 @@ pivra_gpu_paintable_paintable_init (GdkPaintableInterface *iface)
 GstElement *
 pivra_gpu_paintable_create_sink (PivraGpuPaintable *self)
 {
+  return pivra_gpu_paintable_create_sink_full(self, NULL);
+}
+
+GstElement *
+pivra_gpu_paintable_create_sink_full (PivraGpuPaintable *self, GError **out_error)
+{
   GstElement *sink;
   gboolean uses_gl;
   GdkDisplay *display;
@@ -237,14 +243,18 @@ pivra_gpu_paintable_create_sink (PivraGpuPaintable *self)
     {
       GST_INFO ("failed to create GDK GL context: %s", error->message);
       g_printerr("PIVRA_GPU_CONTEXT_FAILURE stage=create-gdk-context reason=%s\n",error->message);
-      g_error_free (error);
+      g_printerr("PIVRA_GPU_FAIL no shared GL context\n");
+      g_propagate_error(out_error, error);
+      return NULL;
     }
   else if (!gdk_gl_context_realize (context, &error))
     {
       GST_INFO ("failed to realize GDK GL context: %s", error->message);
       g_printerr("PIVRA_GPU_CONTEXT_FAILURE stage=realize-gdk-context reason=%s\n",error->message);
       g_clear_object (&context);
-      g_error_free (error);
+      g_printerr("PIVRA_GPU_FAIL no shared GL context\n");
+      g_propagate_error(out_error, error);
+      return NULL;
     }
 
   sink = g_object_new (PIVRA_TYPE_GPU_SINK,
@@ -257,6 +267,8 @@ pivra_gpu_paintable_create_sink (PivraGpuPaintable *self)
 
   if (!uses_gl) {
       g_printerr ("PIVRA_GPU_FAIL no shared GL context\n");
+      g_set_error_literal(out_error, GDK_GL_ERROR, GDK_GL_ERROR_NOT_AVAILABLE,
+                          "GL context sharing/activation failed; see preceding context diagnostics");
       g_object_unref(sink); g_clear_object(&context); return NULL;
     }
   {
@@ -270,6 +282,8 @@ pivra_gpu_paintable_create_sink (PivraGpuPaintable *self)
     GstPad *pad;
     if (!upload || !convert) {
       g_printerr ("PIVRA_GPU_FAIL missing glupload/glcolorconvert\n");
+      g_set_error_literal(out_error, G_IO_ERROR, G_IO_ERROR_NOT_SUPPORTED,
+                          "Missing GStreamer glupload/glcolorconvert");
       if(upload) gst_object_unref(upload);
       if(convert) gst_object_unref(convert);
       gst_object_unref(normalize); gst_object_unref(transfer); gst_object_unref(sink); gst_object_unref(bin);
@@ -277,6 +291,7 @@ pivra_gpu_paintable_create_sink (PivraGpuPaintable *self)
     }
     gst_bin_add_many(GST_BIN(bin), upload, convert, normalize, transfer, sink, NULL);
     if (!gst_element_link_many(upload, convert, normalize, transfer, sink, NULL)) {
+      g_set_error_literal(out_error, G_IO_ERROR, G_IO_ERROR_FAILED, "GPU filter chain link failed");
       gst_object_unref(bin); g_clear_object(&context); return NULL;
     }
     pad = gst_element_get_static_pad(upload, "sink");

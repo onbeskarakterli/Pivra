@@ -124,9 +124,10 @@ static void open_file(GtkMediaFile *file) {
   if(!self->pipeline) { gtk_media_stream_error(GTK_MEDIA_STREAM(self),G_IO_ERROR,G_IO_ERROR_NOT_SUPPORTED,"Missing GStreamer playbin3");return; }
   gst_object_ref_sink(self->pipeline);
   g_object_weak_ref(G_OBJECT(self->pipeline),pipeline_retired,NULL);
-  GstElement *sink=pivra_gpu_paintable_create_sink(PIVRA_GPU_PAINTABLE(self->paintable));
+  GError *sink_error=NULL;
+  GstElement *sink=pivra_gpu_paintable_create_sink_full(PIVRA_GPU_PAINTABLE(self->paintable), &sink_error);
   /* A NULL sink must never select playbin's automatic/CPU/other-window sink. */
-  if(!sink) { close_file(file);gtk_media_stream_error(GTK_MEDIA_STREAM(self),G_IO_ERROR,G_IO_ERROR_FAILED,"GPU sink initialization failed; see preceding context diagnostics");return; }
+  if(!sink) { close_file(file);gtk_media_stream_gerror(GTK_MEDIA_STREAM(self),sink_error);return; }
   gst_object_ref_sink(sink);
   gchar *uri=g_file_get_uri(source);g_object_set(self->pipeline,"uri",uri,"video-sink",sink,NULL);
   g_free(uri);gst_object_unref(sink);

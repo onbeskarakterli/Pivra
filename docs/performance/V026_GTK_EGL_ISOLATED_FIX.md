@@ -1,5 +1,11 @@
 # GTK 4.24.1 implicit GLES 1 filter — isolated correction, 2026-11-21
 
+Follow-up native user report: corrected GTK context/GLMemory/frame/production
+gates PASS on RX 7900 XT, and real-video raw/wrapper max channel difference is
+0. A control-preparation assertion then failed; see the
+[test barrier follow-up](V026_VIDEO_CONTROL_PREPARATION.md). Native control
+acceptance remains pending; the historical results below are preserved.
+
 **Root cause: CONFIRMED by user-reported native API/config comparison and
 upstream source. GTK correction: source-unit, build and software-runtime
 validated. RX 7900 XT Wayland playback after correction: PENDING. Release BLOCKED.**

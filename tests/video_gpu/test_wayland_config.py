@@ -7,6 +7,13 @@ def rows(**counts):
 
 
 class WaylandConfigEvidence(unittest.TestCase):
+    def test_user_reported_rx7900xt_counts_confirm_default_es1_filter(self):
+        # Unreported size/alpha controls use fixture defaults, not claimed
+        # additional hardware measurements. The reported API counts determine
+        # this branch; a no-alpha result is not needed for the conclusion.
+        native = rows(explicit_es2=40, explicit_gl=40, any_api=40)
+        self.assertEqual(classify(native), 'IMPLICIT_ES1_FILTER_MISMATCH')
+
     def test_missing_or_duplicate_observations_are_incomplete(self):
         self.assertEqual(classify(rows()[:-1]), 'INCOMPLETE')
         self.assertEqual(classify(rows()+[rows()[0]]), 'INCOMPLETE')

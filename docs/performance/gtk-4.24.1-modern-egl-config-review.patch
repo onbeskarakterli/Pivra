@@ -11,15 +11,6 @@
    attrs[i++] = EGL_RED_SIZE;
    attrs[i++] = (flags & GDK_EGL_CONFIG_HDR) ? 9 : 8;
    attrs[i++] = EGL_GREEN_SIZE;
-@@ -1380,7 +1384,7 @@
-   attrs[i++] = EGL_NONE;
-   g_assert (i < MAX_EGL_ATTRS);
-
--  if (!eglChooseConfig (priv->egl_display, attrs, NULL, -1, &alloced) || alloced == 0)
-+  if (!eglChooseConfig (priv->egl_display, attrs, NULL, 0, &alloced) || alloced == 0)
-     {
-       g_set_error_literal (error, GDK_GL_ERROR, GDK_GL_ERROR_NOT_AVAILABLE,
-                            _("No EGL configuration available"));
 @@ -1401,6 +1405,11 @@
 
    for (i = 0; i < count; i++)

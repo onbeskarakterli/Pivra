@@ -1,13 +1,14 @@
-> Current dev target: **0.2.6 development candidate**, native AMD lifecycle BLOCKED.
+> Current dev target: **0.2.6 development candidate**; isolated GTK Wayland and X11 native acceptance PASS, stock GTK mixed lifecycle still limited.
 > Stable release: **0.2.5**. Use [v0.2.6 gates](../../docs/releases/PIVRA_V0.2.6_RC_VALIDATION.md)
 > for this checkout. No source approval or native package success is inherited.
 
 # Building Pivra from source on Linux (experimental)
 
-The `dev` branch reports **Pivra 0.2.6**, a development candidate with native
-AMD EGLDisplay lifecycle acceptance still BLOCKED. Current stable is **v0.2.5**.
-Earlier user-reported Arch staging/AMD acceptance belongs to the prior version;
-it does not validate the new artifacts. Source approval, native package testing
+The `dev` branch reports **Pivra 0.2.6**, a development candidate. Current stable
+is **v0.2.5**. Latest user-reported native RX 7900 XT results are isolated
+ownership-patched GTK Wayland 9/9 and X11 9/9; original stock ownership Wayland
+remains 8/9. These new lifecycle results do not approve fresh package artifacts;
+earlier staging/package records belong to their recorded source versions. Source approval, native package testing
 and publication remain separate. Experimental DNG remains explicit opt-in,
 not a default format-support claim.
 
@@ -141,6 +142,14 @@ requires README/release notes to identify v0.2.6 as current stable; that handoff
 must be explicitly authorized before final source approval/publication.
 
 ## Known limitations
+
+- Stock GTK 4.24.1 Wayland mixed GPU/stock playback can invalidate a shared
+  EGLDisplay; the private ownership fix is not installed by this helper. On a
+  system with XWayland/X11, `GDK_BACKEND=x11 GSK_RENDERER=gl pivra /path/to/video.mp4`
+  is a per-process workaround accepted on the native AMD test system. No global
+  overrides or system GTK patches are applied. A separate software candidate
+  SIGSEGV remains OPEN; [release risk decisions](../../docs/releases/PIVRA_V0.2.6_RC_VALIDATION.md)
+  are pending.
 
 - Intel/NVIDIA GPU paths are untested; Vulkan adapter interop is not implemented.
 - Native HDR visual preservation, hardware decoding and end-to-end zero-copy

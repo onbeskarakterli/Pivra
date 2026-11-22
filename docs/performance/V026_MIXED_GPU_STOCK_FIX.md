@@ -1,7 +1,14 @@
 # Mixed GPU / stock ownership control — 2026-11-23
 
 Base: `2d6a580cdb71e6810014b0fa72b1235634cf28ba`, branch `dev`.
-**Native AMD acceptance BLOCKED / v0.2.6 NO-GO.**
+**Historical Codex control result: native acceptance was pending at this commit.**
+
+Follow-up, 2026-11-23: the owner now reports RX 7900 XT isolated ownership-patched
+Wayland 9/9 and X11 9/9; stock ownership Wayland is still 8/9. This does not close
+the Codex candidate SIGSEGV recorded below. New native raw provenance was not
+provided. [Current release decisions](../releases/PIVRA_V0.2.6_RC_VALIDATION.md)
+and [SIGSEGV investigation](V026_CANDIDATE_SIGSEGV.md). The original measured
+results below remain unchanged; no software failure is relabelled PASS.
 
 ## Native evidence and root-cause boundary
 

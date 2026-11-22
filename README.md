@@ -4,9 +4,9 @@
 
 **Current stable release: v0.2.5.** Pivra includes automatic GPU-accelerated BT.709 SDR video color correction on stock GTK and is free software under GPL-3.0-only.
 
-**Upcoming release candidate: v0.2.6.** Performance/resource-lifetime work is in development; native AMD EGLDisplay lifecycle acceptance is **BLOCKED**. See the [candidate notes](docs/releases/PIVRA_V0.2.6_RELEASE_NOTES.md) and [validation gates](docs/releases/PIVRA_V0.2.6_RC_VALIDATION.md). This does not change the current stable release.
+**Upcoming release candidate: v0.2.6.** Performance/resource-lifetime work is prepared. Native RX 7900 XT acceptance reports ownership-patched GTK Wayland 9/9 and X11 9/9; stock GTK Wayland remains 8/9 with a known mixed-playback limitation. Release approval is pending. See the [candidate notes](docs/releases/PIVRA_V0.2.6_RELEASE_NOTES.md) and [validation gates](docs/releases/PIVRA_V0.2.6_RC_VALIDATION.md). This does not change the current stable release.
 
-This is the prepared v0.2.5 stable-release handoff. Source approval, native package validation and publication evidence are tracked separately in the [source review procedure](docs/releases/PIVRA_V0.2.5_SOURCE_APPROVAL.md); this README is not evidence that GitHub/AUR publication has occurred. See the [v0.2.5 release notes](docs/releases/PIVRA_V0.2.5_RELEASE_NOTES.md).
+v0.2.6 is not published. The [v0.2.5 source review](docs/releases/PIVRA_V0.2.5_SOURCE_APPROVAL.md) and [release notes](docs/releases/PIVRA_V0.2.5_RELEASE_NOTES.md) remain the stable-version record; the [v0.2.6 checklist](docs/releases/PIVRA_V0.2.6_RC_VALIDATION.md) tracks the next release separately.
 
 **[Latest published release](https://github.com/onbeskarakterli/Pivra/releases/latest)** · **[Arch Linux AUR](https://aur.archlinux.org/packages/pivra)** · **[Development roadmap](docs/PIVRA_DEVELOPMENT_ROADMAP.md)**
 
@@ -121,7 +121,7 @@ Editing will live in a separate **Edit** mode so the normal viewer remains simpl
 | Safe Save As, metadata handling, and original-file protection | ⏳ Planned |
 | Background batch conversion with pause/cancel and collision handling | ⏳ Planned |
 
-The [detailed development roadmap](docs/PIVRA_DEVELOPMENT_ROADMAP.md) retains historical PIV milestone and release-gate records; its older status snapshots do not supersede the v0.2.5 source scope above. The [feature specification](docs/PIVRA_FEATURE_SPEC_TR.md) describes the longer-term goals.
+The [detailed development roadmap](docs/PIVRA_DEVELOPMENT_ROADMAP.md) retains historical PIV milestone and release-gate records; its older status snapshots do not supersede the current feature snapshot and version-specific release notes. The [feature specification](docs/PIVRA_FEATURE_SPEC_TR.md) describes the longer-term goals.
 
 ## Current limitations
 
@@ -131,7 +131,11 @@ Still-image loading is bounded to 64 MP (maximum 32,768 pixels per edge) and 64 
 
 The v0.2.5 release scope is described in the [release notes](docs/releases/PIVRA_V0.2.5_RELEASE_NOTES.md). Source/package/publication approval is recorded separately; historical release records remain in docs/releases.
 
-The v0.2.5 GPU adapter currently targets the validated OpenGL path. Intel/NVIDIA are untested; Vulkan interop is not implemented; native HDR visual preservation and end-to-end zero-copy remain unproven. Other color metadata/codecs retain stock playback.
+The GPU adapter targets the validated OpenGL path. Intel/NVIDIA are untested; Vulkan interop is not implemented; native HDR visual preservation and end-to-end zero-copy remain unproven. Other color metadata/codecs retain stock playback.
+
+On the reported GTK 4.24.1 / Mesa 26.3.1 Arch/GNOME Wayland stack, switching between GPU-eligible and stock-routed videos can invalidate the shared EGLDisplay and break later GPU playback or another window. Normal production Wayland playback passed the owner’s tests; the mixed sequence remains a stock GTK limitation. A separate, isolated GTK ownership fix passed native 9/9 and is not bundled with Pivra. An earlier software candidate SIGSEGV remains unclassified. The equivalent ownership fix already exists upstream; fixed distribution-package acceptance is pending. See the [upstream handoff](docs/upstream/GTK_4.24.1_WAYLAND_EGL_OWNERSHIP.md) and [release risk checklist](docs/releases/PIVRA_V0.2.6_RC_VALIDATION.md).
+
+Where XWayland/X11 is available, a per-process workaround is `GDK_BACKEND=x11 GSK_RENDERER=gl pivra /path/to/video.mp4`. Native RX 7900 XT X11 lifecycle acceptance is user-reported 9/9. This does not change the system backend or guarantee other GPUs.
 
 ## License
 

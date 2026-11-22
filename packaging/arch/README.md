@@ -1,9 +1,28 @@
 > Current recipe target: **pivra 0.2.6-1**, options=('!debug'). Development
-> candidate only; native AMD lifecycle is BLOCKED. No v0.2.6 immutable source
-> checksum is approved. See [current candidate gates](../../docs/releases/PIVRA_V0.2.6_RC_VALIDATION.md).
+> candidate only. Native ownership-patched Wayland and X11 are user-reported 9/9;
+> stock GTK Wayland remains 8/9. Risk decisions and v0.2.6 immutable source/checksum approval are pending. See [current candidate gates](../../docs/releases/PIVRA_V0.2.6_RC_VALIDATION.md).
 > Older release sections below are historical, including approved v0.2.5 inputs.
 
 # Arch packaging — v0.2.6 development candidate
+
+## Current v0.2.6 release boundary
+
+Cargo.toml, Cargo.lock's Pivra entry, pkgver, source validator and staging
+preflight agree on **0.2.6**, pkgrel=1, one pkgname=pivra,
+`options=('!debug')`. The recipe installs v0.2.6 notes and validation report.
+No new immutable source/hash, generated .SRCINFO, actual v0.2.6 makepkg result or
+package installation is approved by the new native lifecycle results.
+
+System GTK remains the runtime dependency. Neither review patch is installed by
+the recipe. Shipping an automatically patched/bundled GTK is outside this plan.
+The stock GTK mixed-lifecycle limitation must be disclosed and explicitly
+accepted or fixed in a native-validated distribution stack before publication.
+The ownership fix is already present in inspected upstream GTK refs; a source
+commit labelled 4.24.2 is not an approved/released Arch package. The separate EGL
+config issue still needs verification. X11/XWayland is an optional,
+per-process workaround on the tested AMD system, not a newly required package
+or globally forced environment setting. The candidate SIGSEGV is still open.
+[Release checklist and exact source/makepkg workflow](../../docs/releases/PIVRA_V0.2.6_RC_VALIDATION.md).
 
 ## Historical v0.1 native RC acceptance record
 
@@ -268,6 +287,9 @@ Bash syntax and missing-source-approval negative checks PASS. Actual updated
 Arch release package bytes and installed-helper generation remain NOT RUN here.
 
 ## v0.2.5 GPU distribution preparation
+
+> Historical v0.2.5 record; the recipe/scripts in the current checkout target
+> v0.2.6. Follow the current candidate gates linked above for new package work.
 
 The current development release candidate is 0.2.5. Version preparation is
 authorized; immutable source approval and actual makepkg validation remain separate. GPU distribution builds are mandatory and check native GStreamer

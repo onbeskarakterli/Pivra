@@ -2776,3 +2776,37 @@ exact tested SHA not supplied. Test fix commit:
   not clear the ordinary SIGSEGV. Native candidate 9/9 remains NOT RUN.
 - Upstream/distribution ownership correction and the additional Sway crash are
   open boundaries. No main/tag/release/AUR/version/package/lockfile change.
+
+## v0.2.6 upstream ownership fix / release preparation — 2026-11-23
+
+Reviewed diagnostic source: `c4ca4d85a05fa81efeddc6f5229d28040c56d787`.
+**Isolated native acceptance PASS; unrestricted publication remains NO-GO.**
+
+- Latest owner-reported RX 7900 XT results: original stock ownership Wayland 8/9,
+  isolated ownership-patched Wayland 9/9, X11 9/9, normal production Wayland
+  GPU/video/audio/color/seek PASS. New raw native logs, checkout and library
+  hashes were not supplied; no Codex hardware execution is implied.
+- Both existing GTK patches and validation tools are byte-for-byte preserved.
+  [Upstream report draft](upstream/GTK_4.24.1_WAYLAND_EGL_OWNERSHIP.md) includes
+  versions, source contract, exact patch digests, standalone reproducer and A/B
+  commands. The common EGL patch in both controls is disclosed. Read-only source
+  review found existing upstream commit `95b7ec19b01c460c46d58ec52cd0c4eb2d730395`
+  (issue #8456 / MR !10582) in main/gtk-4-24. No new submission is posted. Fixed
+  package availability/native validation remain pending; the separate EGL config
+  change is absent from inspected gtk-4-24 gdkdisplay.c.
+- [SIGSEGV investigation](performance/V026_CANDIDATE_SIGSEGV.md) retains the
+  ordinary software -11 failure and five earlier successful GDB runs, narrows
+  the last logged interval and records hashes. The later native 9/9 result
+  does not close this OPEN / UNCLASSIFIED observation.
+- README/notes/current Arch/Linux documentation and the
+  [v0.2.6 release checklist](releases/PIVRA_V0.2.6_RC_VALIDATION.md) now distinguish
+  accepted patched tests from stock compatibility. v0.2.5 history remains.
+  The owner must decide the stock GTK, SIGSEGV and preload risk policies; no
+  acceptance is inferred. X11 is a tested per-process AMD workaround.
+- New documentation-task checks: 69 root + 92 GPU-tool Python tests PASS (161,
+  zero skips), fmt PASS, version/license/!debug/script-reference audit PASS,
+  Bash syntax PASS and both pinned GTK patches apply-check PASS. Prior 217 Rust /
+  242 Python / Clippy/release results remain attributed to diagnostic source,
+  not relabelled as newly run. Actual Arch makepkg/install: NOT RUN here.
+- No production/test/script/PKGBUILD/Cargo/lockfile change; no system GTK,
+  main/tag/release/AUR action. Immutable source/checksum approval remains separate.

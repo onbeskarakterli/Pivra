@@ -156,7 +156,7 @@ def main():
         extra_libs = shlex.split(subprocess.check_output(['pkg-config','--libs','epoxy'],text=True))
         subprocess.run([*shlex.split(env.get('CC','cc')),'-O2','-Wall','-Wextra','-Werror','-DGST_USE_UNSTABLE_API',*shlex.split(env.get('CPPFLAGS','')),*flags('--cflags'),*extra_cflags,'tests/video_gpu/stock_egl_retirement.c','-o',str(ctest),*shlex.split(env.get('LDFLAGS','')),*flags('--libs'),*extra_libs],cwd=ROOT,check=True)
         with session(args.session,env,out) as active:
-            rows=[run('retirement-'+mode,[ctest,mode],active,out) for mode in ['legacy','borrowed']]
+            rows=[run('retirement-'+mode,[ctest,mode],active,out) for mode in ['legacy','borrowed','borrowed-native']]
         for row in rows:
             if row['name']=='retirement-legacy' and row['status']=='PASS': row['status']='MECHANISM REPRODUCED'
         (out/'retirement-report.json').write_text(json.dumps(dict(native_acceptance=False,results=rows),indent=2)+'\n')

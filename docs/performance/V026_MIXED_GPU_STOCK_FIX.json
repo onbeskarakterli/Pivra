@@ -1,0 +1,220 @@
+{
+  "schema": 1,
+  "date": "2026-11-23",
+  "base_commit": "2d6a580cdb71e6810014b0fa72b1235634cf28ba",
+  "scope": "working-tree diagnostic/upstream-review changes, not a release source approval",
+  "status": "PARTIAL; native AMD BLOCKED; release NO-GO",
+  "environment": {
+    "os": "Debian 13",
+    "gpu": "Mesa 25.0.7 llvmpipe (software control)",
+    "gtk": "4.24.1, two private builds, real built-in GStreamer media enabled",
+    "gstreamer_core_base_gl_play": "1.28.9, private prefix",
+    "plugin_limitation": "existing SDK/system plugin directories supply libav, MP4 and parser plugins; not a clean Arch package set",
+    "actual_vram": "NOT MEASURED"
+  },
+  "source": {
+    "gtk_archive_sha256": "6b03cc3eac17e6d7b252c7ac96559e58aa7c990874ca47da696d81d0add7521d",
+    "gstreamer_monorepo_archive_sha256": "0fdecabb02f170b78251f7b9f1b5092073f52e70ba06c92df53fe36745041db6",
+    "original_gtk_stock_sink_sha256": "5a5591e2e72b2b93f49174cd25e3e975a9022d73e9e84990af93eb47ea6a9f04",
+    "candidate_gtk_stock_sink_sha256": "5aaf601a1dd892ba08f34832ff9751eecc4ca5c0304efd14f025f61c11fa1f3c",
+    "unchanged_egl_config_source_sha256": "bad9c80634ab2112c9d361708a78747f01058c6e7c6cf96a6ad966353b0fba10",
+    "unchanged_egl_patch_sha256": "61c36ea800954e2728c3414f0f126bc0c4025fb7d231ce9f2560c517bc2773f9",
+    "stock_patch_sha256": "e4b4e994853636c91be489a58782eba3e55b2361dbe314115b5949290d728811",
+    "gtk_options": [
+      "--wrap-mode=nofallback",
+      "-Dwayland-backend=true",
+      "-Dx11-backend=true",
+      "-Dvulkan=disabled",
+      "-Daccesskit=disabled",
+      "-Dprint-cups=disabled",
+      "-Dintrospection=disabled",
+      "-Ddocumentation=false",
+      "-Dbuild-tests=false",
+      "-Dbuild-testsuite=false",
+      "-Dbuild-examples=false",
+      "-Dbuild-demos=false",
+      "-Dmedia-gstreamer=enabled"
+    ]
+  },
+  "controls": {
+    "sway": {
+      "control": {
+        "status": "FAIL",
+        "passed": 8,
+        "failed": 1,
+        "exit": 1,
+        "same_application_binary": true,
+        "application_sha256": "60a635260fb915ac7ee0e2a15dd84a39e24d7e3db01d90ab5be923479f49535f",
+        "runtime_GTK_verified": true,
+        "GTK_library_sha256": "1d298be3027c24c8b2a164236349e6ae6274709ca5b652fd14bcfbffd3788d43",
+        "mixed": {
+          "exit": 101,
+          "status": "FAIL",
+          "last_stage": "LIFECYCLE_STAGE full-range GPU begin",
+          "context_errors": 4,
+          "egl_configuration_errors": 0,
+          "context_failures": 1,
+          "gpu_errors": 1,
+          "diagnostic_events": 192
+        },
+        "pass_cases": [
+          "ownership-foreign",
+          "ownership-release",
+          "ownership-current",
+          "ownership-presentation",
+          "ownership-failure",
+          "error-cleanup",
+          "limited-presentation-controls",
+          "full-ramp-shader-controls"
+        ]
+      },
+      "candidate": {
+        "status": "FAIL",
+        "passed": 8,
+        "failed": 1,
+        "exit": 1,
+        "same_application_binary": true,
+        "application_sha256": "60a635260fb915ac7ee0e2a15dd84a39e24d7e3db01d90ab5be923479f49535f",
+        "runtime_GTK_verified": true,
+        "GTK_library_sha256": "bbe2ae07f7a9bd8db0f622592a9109bf5194ac6fcef80606115a71c23d037444",
+        "mixed": {
+          "exit": -11,
+          "status": "FAIL",
+          "last_stage": "LIFECYCLE_STAGE unknown stock route ready contexts=1 frames=1 presentations=0",
+          "context_errors": 0,
+          "egl_configuration_errors": 0,
+          "context_failures": 0,
+          "gpu_errors": 0,
+          "diagnostic_events": 139
+        },
+        "pass_cases": [
+          "ownership-foreign",
+          "ownership-release",
+          "ownership-current",
+          "ownership-presentation",
+          "ownership-failure",
+          "error-cleanup",
+          "limited-presentation-controls",
+          "full-ramp-shader-controls"
+        ]
+      }
+    },
+    "x11": {
+      "control": {
+        "status": "PASS",
+        "passed": 9,
+        "failed": 0,
+        "exit": 0,
+        "same_application_binary": true,
+        "application_sha256": "60a635260fb915ac7ee0e2a15dd84a39e24d7e3db01d90ab5be923479f49535f",
+        "runtime_GTK_verified": true,
+        "GTK_library_sha256": "1d298be3027c24c8b2a164236349e6ae6274709ca5b652fd14bcfbffd3788d43",
+        "mixed": {
+          "exit": 0,
+          "status": "PASS",
+          "last_stage": "LIFECYCLE_STAGE delete and close cleanup ready contexts=0 frames=0 presentations=0",
+          "context_errors": 0,
+          "egl_configuration_errors": 0,
+          "context_failures": 0,
+          "gpu_errors": 0,
+          "diagnostic_events": 629
+        },
+        "pass_cases": [
+          "ownership-foreign",
+          "ownership-release",
+          "ownership-current",
+          "ownership-presentation",
+          "ownership-failure",
+          "mixed-lifecycle",
+          "error-cleanup",
+          "limited-presentation-controls",
+          "full-ramp-shader-controls"
+        ]
+      },
+      "candidate": {
+        "status": "PASS",
+        "passed": 9,
+        "failed": 0,
+        "exit": 0,
+        "same_application_binary": true,
+        "application_sha256": "60a635260fb915ac7ee0e2a15dd84a39e24d7e3db01d90ab5be923479f49535f",
+        "runtime_GTK_verified": true,
+        "GTK_library_sha256": "bbe2ae07f7a9bd8db0f622592a9109bf5194ac6fcef80606115a71c23d037444",
+        "mixed": {
+          "exit": 0,
+          "status": "PASS",
+          "last_stage": "LIFECYCLE_STAGE delete and close cleanup ready contexts=0 frames=0 presentations=0",
+          "context_errors": 0,
+          "egl_configuration_errors": 0,
+          "context_failures": 0,
+          "gpu_errors": 0,
+          "diagnostic_events": 639
+        },
+        "pass_cases": [
+          "ownership-foreign",
+          "ownership-release",
+          "ownership-current",
+          "ownership-presentation",
+          "ownership-failure",
+          "mixed-lifecycle",
+          "error-cleanup",
+          "limited-presentation-controls",
+          "full-ramp-shader-controls"
+        ]
+      }
+    }
+  },
+  "checks": {
+    "fmt": "PASS exit 0",
+    "cargo_check_locked": "PASS exit 0",
+    "strict_all_target_clippy": "PASS exit 0, zero warnings",
+    "cargo_test_locked": {
+      "status": "PASS",
+      "passed": 217,
+      "failed": 0
+    },
+    "release_build": "PASS exit 0",
+    "python": {
+      "status": "PASS",
+      "root": 69,
+      "thumbnail": 59,
+      "fd05a": 9,
+      "video_color": 13,
+      "video_gpu": 92,
+      "total": 242,
+      "skipped": 0
+    },
+    "retirement_mechanism": {
+      "legacy": "MECHANISM REPRODUCED: both GTK contexts invalidated",
+      "direct_borrowed": "PASS both GTK contexts/current bindings survive",
+      "native_wayland_foreign": "PASS both GTK contexts/current bindings survive",
+      "native_acceptance": false
+    }
+  },
+  "native_user_report": {
+    "hardware": "RX 7900 XT / GNOME Wayland / GTK 4.24.1 / Mesa 26.3.1-arch1.2",
+    "latest_summary": "seven nonvideo gates PASS; video 8/9 PASS; mixed-lifecycle FAIL; normal video/audio/colors/seek PASS",
+    "new_native_candidate_test": "NOT RUN",
+    "latest_test_source_sha": "not supplied"
+  },
+  "retained_native_trace": {
+    "log_sha256": "6683ec6fba6014da4bb18d3af5d8882c2f87a5026bc6881d7a12dfd2fe5b2b8c",
+    "sidecar_sha256": "d3a62ee7be27a7cb04a2fa1b72a7cccf0fb3b2dac0631162f14c0732c27795af",
+    "events": 117,
+    "inferior_exit": 101,
+    "egl_terminate_call": 18,
+    "shared_display": "0x55d875099f70",
+    "return": 1,
+    "source_sha": "not recoverable"
+  },
+  "additional_candidate_signal": {
+    "status": "OPEN",
+    "observed_exit": -11,
+    "stage": "unknown stock route ready; retirement before full-range GPU",
+    "make_current_warnings": 0,
+    "GPU_context_failure_markers": 0,
+    "stack": "NOT CAPTURED; five bounded GDB mixed runs exited normally, including one with perf/private XDG homes; this does not clear the original crash",
+    "root_cause": "UNCLASSIFIED; no claim of patch independence or native hardware reproduction"
+  },
+  "native_command": "GDK_BACKEND=wayland bash tests/run_gtk_egl_isolated.sh --stock-lifecycle --workspace \"$HOME/.cache/pivra-gtk-stock-ownership\""
+}

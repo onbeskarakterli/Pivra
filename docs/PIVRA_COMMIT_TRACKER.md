@@ -2751,3 +2751,28 @@ exact tested SHA not supplied. Test fix commit:
 - Six earlier native PASS gates are retained as user evidence, not new Codex
   hardware results. No main/tag/release/AUR/version/package/lockfile change.
   [Follow-up evidence](performance/V026_NATIVE_ACCEPTANCE_FIXES.md).
+
+## v0.2.6 mixed GPU / stock ownership control — 2026-11-23
+
+**PARTIAL / NO-GO; native AMD remains BLOCKED.** Base:
+`2d6a580cdb71e6810014b0fa72b1235634cf28ba`.
+[Evidence and focused native command](performance/V026_MIXED_GPU_STOCK_FIX.md).
+
+- Retained native 117-event trace revalidated: stock retirement terminates the
+  same EGLDisplay used by another GPU window. Latest seven nonvideo PASS and
+  video 8/9 are user-reported, not new Codex hardware results.
+- Refine the separate GTK upstream-review patch: retain native Wayland display,
+  validate the cached EGL handle and mark it foreign through the public setter
+  before creating contexts. Accepted EGL config patch and production Pivra,
+  shaders, normal playback, optimizations and v0.2.5 records are unchanged.
+- New isolated A/B mode requires the real built-in GTK 4.24 GStreamer backend,
+  identical application binary and verified loaded library hashes. It preserves
+  all nine assertions and never installs GTK. Two-context destructive/borrowed
+  controls and six new runner guards cover the ownership policy/provenance.
+- Codex: 217 Rust / 242 Python PASS; fmt/check/strict Clippy/release PASS.
+  Real GTK 4.24.1 + private GStreamer 1.28.9, llvmpipe: X11 control/candidate 9/9;
+  Sway control 8/9 (original context failure reproduced), candidate 8/9 (new
+  unclassified SIGSEGV). Five GDB mixed candidate runs exited normally; this does
+  not clear the ordinary SIGSEGV. Native candidate 9/9 remains NOT RUN.
+- Upstream/distribution ownership correction and the additional Sway crash are
+  open boundaries. No main/tag/release/AUR/version/package/lockfile change.

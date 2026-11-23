@@ -1,9 +1,9 @@
-> Current dev target: **0.2.7 release candidate**. Current published stable remains **0.2.5**.
-> Use [v0.2.7 validation gates](../../docs/releases/PIVRA_V0.2.7_RC_VALIDATION.md); earlier release evidence does not authorize publication.
+> Current release target: **0.2.7**. Native Arch staging, package build and owner acceptance passed.
+> See [v0.2.7 validation evidence](../../docs/releases/PIVRA_V0.2.7_RC_VALIDATION.md); immutable source hash and publication are separate checks.
 
 # Building Pivra from source on Linux (experimental)
 
-The `dev` branch reports **Pivra 0.2.7**. Fullscreen slideshow, persistent toolbar preferences and in-window Open are implemented; XWayland is the temporary default where available due to the GTK Wayland EGL lifecycle issue. The source still requires complete release validation and immutable-source approval. Non-Arch distribution acceptance remains unverified.
+Pivra **0.2.7** includes fullscreen slideshow, persistent toolbar preferences and in-window Open. XWayland is the temporary default where available due to the GTK Wayland EGL lifecycle issue. Native Arch build, staging, package installation and owner GNOME acceptance passed; immutable publication source hashes remain a separate verification. Non-Arch distribution acceptance remains unverified.
 
 ## Common Makefile interface (development branch)
 
@@ -132,7 +132,7 @@ makepkg source verification, real .SRCINFO generation and package checks.
 `python3 scripts/release_preflight.py --version 0.2.7 --candidate --staging-root
 /path/to/stage` validates this candidate. Final preflight omits --candidate and
 requires README/release notes to identify v0.2.7 as current stable; that handoff
-must be explicitly authorized before final source approval/publication.
+is authorized by the project owner, but final source archive and publication still require verification.
 
 ## Known limitations
 

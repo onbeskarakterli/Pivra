@@ -2,9 +2,9 @@
 
 **Pivra** is a native image viewer for Linux, built with **Rust, GTK4, and libadwaita**. It is designed to feel at home on GNOME: open a photo, move through the folder, zoom in on details, and browse thumbnails without getting in the way.
 
-**Current stable release: v0.2.5.** The published release remains unchanged until explicit approval.
+**Current stable release: v0.2.7.** Pivra includes fullscreen slideshow, updated toolbar controls, and in-window Open, alongside native photo/video playback.
 
-**Upcoming release candidate: v0.2.7.** The `dev` branch includes fullscreen slideshow (photo intervals, video completion, pause/skip, fade), revised toolbar controls, persistent preferences, in-window Open and last-folder recall. XWayland is the temporary default where available due to the known stock GTK Wayland EGL lifecycle problem. The release is not published. See [v0.2.7 release notes](docs/releases/PIVRA_V0.2.7_RELEASE_NOTES.md) and [validation](docs/releases/PIVRA_V0.2.7_RC_VALIDATION.md).
+Release notes: [v0.2.7](docs/releases/PIVRA_V0.2.7_RELEASE_NOTES.md). On affected GTK Wayland stacks, Pivra selects XWayland by default when available to avoid a known EGL lifecycle crash. The native Wayland issue remains open.
 
 v0.2.6 was an unreleased development candidate. Its [release notes](docs/releases/PIVRA_V0.2.6_RELEASE_NOTES.md) and [validation](docs/releases/PIVRA_V0.2.6_RC_VALIDATION.md) remain historical records. Published v0.2.5 records remain unchanged.
 

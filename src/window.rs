@@ -17,6 +17,8 @@ use std::{
 
 #[path = "fullscreen.rs"]
 pub(super) mod fullscreen;
+#[path = "slideshow_window.rs"]
+pub(super) mod slideshow;
 
 // Replace the previous deletion notification instead of queuing stale toasts.
 fn show_latest_toast(
@@ -105,6 +107,7 @@ fn update_title(window: &adw::ApplicationWindow, title: &adw::WindowTitle, conte
 // Keep the on-image arrow buttons in sync with the same catalog actions as
 // the Left/Right keyboard shortcuts, including asynchronous folder updates.
 fn update_navigation_actions(window: &adw::ApplicationWindow, context: &FileContext) {
+    let slideshow = slideshow::active(window) && !context.collection.items().is_empty();
     for (name, enabled) in [
         (
             "previous-media",
@@ -127,7 +130,7 @@ fn update_navigation_actions(window: &adw::ApplicationWindow, context: &FileCont
             .lookup_action(name)
             .and_then(|action| action.downcast::<gio::SimpleAction>().ok())
         {
-            action.set_enabled(enabled);
+            action.set_enabled(enabled || slideshow);
         }
     }
 }
@@ -522,6 +525,18 @@ pub(super) fn build(app: &adw::Application, settings: &Settings, file: Option<Op
                 let Some(window) = weak_window.upgrade() else {
                     return;
                 };
+                if slideshow::active(&window) {
+                    gio::prelude::ActionGroupExt::activate_action(
+                        &window,
+                        if forward {
+                            "slideshow-next"
+                        } else {
+                            "slideshow-previous"
+                        },
+                        None,
+                    );
+                    return;
+                }
                 let mut context = context.borrow_mut();
                 let changed = if forward {
                     context.collection.select_next()
@@ -691,11 +706,32 @@ pub(super) fn build(app: &adw::Application, settings: &Settings, file: Option<Op
             }
         });
         window.add_action(&save_frame);
+        let slides = slideshow::install(&window, &title, context.clone(), view.clone(), &menu);
         let keys = gtk::EventControllerKey::new();
         keys.set_propagation_phase(gtk::PropagationPhase::Capture);
         let weak_window = window.downgrade();
         let video_keys = view.clone();
         keys.connect_key_pressed(move |_, key, _, modifiers| {
+            if !modifiers.intersects(
+                gdk::ModifierType::CONTROL_MASK
+                    | gdk::ModifierType::ALT_MASK
+                    | gdk::ModifierType::SUPER_MASK,
+            ) {
+                if key == gdk::Key::F5 {
+                    slides.start();
+                    return glib::Propagation::Stop;
+                }
+                if weak_window.upgrade().is_some_and(|w| slideshow::active(&w)) {
+                    match key {
+                        gdk::Key::space => slides.pause(),
+                        gdk::Key::Escape => slides.stop(),
+                        gdk::Key::Left => slides.navigate(false),
+                        gdk::Key::Right => slides.navigate(true),
+                        _ => return glib::Propagation::Proceed,
+                    }
+                    return glib::Propagation::Stop;
+                }
+            }
             if !modifiers.intersects(gdk::ModifierType::ALT_MASK | gdk::ModifierType::SUPER_MASK)
                 && video_keys.video_key(key, modifiers.contains(gdk::ModifierType::CONTROL_MASK))
             {

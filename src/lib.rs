@@ -25,3 +25,5 @@ pub mod thumbnail_provider;
 pub mod thumbnail_diagnostics;
 
 pub mod performance;
+
+pub mod slideshow;

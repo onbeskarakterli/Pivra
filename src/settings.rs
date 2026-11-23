@@ -236,8 +236,59 @@ pub fn save_video_audio(volume: f64, muted: bool) {
     }
 }
 
+/// Bounded slideshow photo interval; the preference is independent of playback.
+pub fn load_slideshow_interval() -> u32 {
+    use std::io::Read;
+    let mut bytes = String::new();
+    std::fs::File::open(glib::user_config_dir().join("pivra/slideshow-interval.conf"))
+        .and_then(|f| f.take(32).read_to_string(&mut bytes))
+        .ok();
+    parse_slideshow_interval(&bytes)
+}
+fn parse_slideshow_interval(bytes: &str) -> u32 {
+    bytes
+        .trim()
+        .parse()
+        .ok()
+        .filter(|s| crate::slideshow::INTERVALS.contains(s))
+        .unwrap_or(crate::slideshow::DEFAULT_SECONDS)
+}
+pub fn save_slideshow_interval(seconds: u32) {
+    if !crate::slideshow::INTERVALS.contains(&seconds) {
+        return;
+    }
+    let dir = glib::user_config_dir().join("pivra");
+    let result = (|| -> Result<(), Box<dyn std::error::Error>> {
+        std::fs::create_dir_all(&dir)?;
+        gio::File::for_path(dir.join("slideshow-interval.conf")).replace_contents(
+            format!("{seconds}\n").as_bytes(),
+            None,
+            false,
+            gio::FileCreateFlags::PRIVATE | gio::FileCreateFlags::REPLACE_DESTINATION,
+            None::<&gio::Cancellable>,
+        )?;
+        Ok(())
+    })();
+    if let Err(error) = result {
+        eprintln!("Pivra: could not save slideshow interval: {error}");
+    }
+}
+
 #[cfg(test)]
 mod thumbnail_tests {
+    #[test]
+    fn slideshow_interval_rejects_invalid_preferences() {
+        for value in ["", "0", "2", "-5", "3601", "not-a-number", "5\n10"] {
+            assert_eq!(super::parse_slideshow_interval(value), 5);
+        }
+        for value in ["3", "5", "10", "15", "30\n"] {
+            assert_eq!(
+                super::parse_slideshow_interval(value),
+                value.trim().parse::<u32>().unwrap()
+            );
+        }
+    }
+
     use super::*;
     #[test]
     fn default_persist_restart_and_corruption() {

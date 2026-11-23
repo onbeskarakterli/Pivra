@@ -96,9 +96,12 @@ fn load_last_open_folder() -> Option<gio::File> {
 
 fn save_last_open_folder(folder: &std::path::Path) {
     let config = glib::user_config_dir().join("pivra");
-    if let Err(error) = std::fs::create_dir_all(&config)
-        .and_then(|_| std::fs::write(config.join("last-open-dir.conf"), folder.as_os_str().as_encoded_bytes()))
-    {
+    if let Err(error) = std::fs::create_dir_all(&config).and_then(|_| {
+        std::fs::write(
+            config.join("last-open-dir.conf"),
+            folder.as_os_str().as_encoded_bytes(),
+        )
+    }) {
         eprintln!("Pivra: could not save last open folder: {error}");
     }
 }
@@ -965,7 +968,13 @@ pub(super) fn build(app: &adw::Application, settings: &Settings, file: Option<Op
         });
         window.present();
         *folder_watch.borrow_mut() = Some(watch(
-            &window, &title, &placeholder, &banner, view, context, opened,
+            &window,
+            &title,
+            &placeholder,
+            &banner,
+            view,
+            context,
+            opened,
         ));
     } else {
         window.present();

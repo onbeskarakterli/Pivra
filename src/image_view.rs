@@ -241,7 +241,7 @@ impl ImageView {
             destroyed_texture.borrow_mut().take();
         });
         let transform = Rc::new(RefCell::new(Transform::default()));
-        let filter = Rc::new(Cell::new(Resampling::default()));
+        let filter = Rc::new(Cell::new(pivra::settings::load_resampling()));
         let zoom_wheel = Rc::new(Cell::new(false));
         let video_transform = Rc::new(RefCell::new(Transform::default()));
         install_video_interaction(
@@ -296,7 +296,7 @@ impl ImageView {
         let quality_action = gio::SimpleAction::new_stateful(
             "image-resampling",
             Some(glib::VariantTy::STRING),
-            &Resampling::default().id().to_variant(),
+            &filter.get().id().to_variant(),
         );
         let weak_picture = picture.downgrade();
         let current_texture = texture.clone();
@@ -311,6 +311,7 @@ impl ImageView {
                 return;
             };
             chosen.set(value);
+            pivra::settings::save_resampling(value);
             action.set_state(&value.id().to_variant());
             if let Some(picture) = weak_picture.upgrade() {
                 let mode = mode.state();
@@ -825,6 +826,11 @@ impl ImageView {
     }
 
     // Per-window slideshow policy; native GPU renderer is unchanged.
+    #[allow(dead_code, reason = "Standalone image probes omit slideshow settings")]
+    pub(super) fn set_slideshow_effect(&self, effect: pivra::slideshow::Effect) {
+        self.transition
+            .set_fade(effect == pivra::slideshow::Effect::Fade);
+    }
     #[allow(
         dead_code,
         reason = "Standalone image probes omit window slideshow controls"

@@ -19,20 +19,32 @@ use std::{
 pub(super) mod fullscreen;
 #[path = "slideshow_window.rs"]
 pub(super) mod slideshow;
+#[path = "toolbar.rs"]
+mod toolbar;
 
-// Replace the previous deletion notification instead of queuing stale toasts.
+// Keep one current notification, shared by Trash and slideshow status.
 fn show_latest_toast(
     overlay: &adw::ToastOverlay,
     current: &Rc<RefCell<Option<adw::Toast>>>,
     toast: adw::Toast,
 ) {
-    if let Some(previous) = current.borrow_mut().take() {
+    let previous = current.borrow_mut().take();
+    if let Some(previous) = previous {
         previous.dismiss();
     }
     // NORMAL priority can enqueue a new toast behind an outgoing animation.
-    // HIGH displays the newest deletion result immediately instead of waiting.
+    // HIGH displays the newest result immediately instead of waiting.
     toast.set_priority(adw::ToastPriority::High);
     *current.borrow_mut() = Some(toast.clone());
+    let weak = Rc::downgrade(current);
+    toast.connect_dismissed(move |toast| {
+        if let Some(current) = weak.upgrade() {
+            let same = current.borrow().as_ref() == Some(toast);
+            if same {
+                current.borrow_mut().take();
+            }
+        }
+    });
     overlay.add_toast(toast);
 }
 
@@ -41,6 +53,16 @@ struct FileContext {
     suffix: Option<String>,
     warning: bool,
     revision: u64,
+}
+fn editing(window: &adw::ApplicationWindow) -> bool {
+    let mut focus = gtk::prelude::GtkWindowExt::focus(window);
+    while let Some(widget) = focus {
+        if widget.is_mapped() && (widget.is::<gtk::Editable>() || widget.is::<gtk::TextView>()) {
+            return true;
+        }
+        focus = widget.parent();
+    }
+    false
 }
 
 // Identify the exact newly trashed entry rather than restoring an unrelated
@@ -387,7 +409,15 @@ pub(super) fn build(app: &adw::Application, settings: &Settings, file: Option<Op
             .tooltip_text(pivra::viewing::ViewMode::HELP)
             .menu_model(&menu)
             .build();
-        header.pack_end(&mode_button);
+        mode_button.set_widget_name("display-mode-selector");
+        let groups = gtk::Box::new(gtk::Orientation::Horizontal, 8);
+        groups.set_widget_name("viewer-controls");
+        let display_group = gtk::Box::new(gtk::Orientation::Horizontal, 0);
+        display_group.set_widget_name("display-controls");
+        display_group.add_css_class("linked");
+        display_group.append(&mode_button);
+        groups.append(&display_group);
+        header.pack_end(&groups);
         // Wheel mode is per-window; the lens is visibly active only for zoom.
         let zoom_toggle = gtk::ToggleButton::builder()
             .tooltip_text("Wheel zoom (off: wheel changes photos; hold left mouse button to zoom)")
@@ -411,7 +441,7 @@ pub(super) fn build(app: &adw::Application, settings: &Settings, file: Option<Op
             let _ = cr.stroke();
         });
         zoom_toggle.set_child(Some(&lens));
-        zoom_toggle.set_active(false);
+        zoom_toggle.set_widget_name("wheel-zoom-toggle");
         // Use the GNOME accent color only while wheel zoom is enabled.
         zoom_toggle.connect_toggled(|button| {
             if button.is_active() {
@@ -420,11 +450,18 @@ pub(super) fn build(app: &adw::Application, settings: &Settings, file: Option<Op
                 button.remove_css_class("suggested-action");
             }
         });
-        header.pack_end(&zoom_toggle);
+        let zoom_group = gtk::Box::new(gtk::Orientation::Horizontal, 0);
+        zoom_group.set_widget_name("zoom-controls");
+        zoom_group.append(&zoom_toggle);
+        groups.append(&zoom_group);
         let zoom_for_key = zoom_toggle.clone();
+        let zoom_window = window.downgrade();
         let zoom_key = gtk::EventControllerKey::new();
         zoom_key.set_propagation_phase(gtk::PropagationPhase::Capture);
         zoom_key.connect_key_pressed(move |_, key, _, modifiers| {
+            if zoom_window.upgrade().is_some_and(|w| editing(&w)) {
+                return glib::Propagation::Proceed;
+            }
             if !matches!(key, gdk::Key::z | gdk::Key::Z)
                 || modifiers.intersects(
                     gdk::ModifierType::CONTROL_MASK
@@ -442,12 +479,14 @@ pub(super) fn build(app: &adw::Application, settings: &Settings, file: Option<Op
         let zoom_view = view.clone();
         zoom_toggle.connect_toggled(move |button| {
             zoom_view.set_zoom_wheel_enabled(button.is_active());
+            pivra::settings::save_wheel_zoom(button.is_active());
             button.set_tooltip_text(Some(if button.is_active() {
                 "Wheel zoom enabled"
             } else {
                 "Wheel changes photos; hold left mouse button to zoom"
             }));
         });
+        zoom_toggle.set_active(pivra::settings::load_wheel_zoom());
         let weak_button = mode_button.downgrade();
         let action = window
             .lookup_action("image-mode")
@@ -706,12 +745,25 @@ pub(super) fn build(app: &adw::Application, settings: &Settings, file: Option<Op
             }
         });
         window.add_action(&save_frame);
-        let slides = slideshow::install(&window, &title, context.clone(), view.clone(), &menu);
+        let slides = slideshow::install(
+            &window,
+            &title,
+            context.clone(),
+            view.clone(),
+            &toast_overlay,
+            current_delete_toast.clone(),
+        );
+        groups.append(&toolbar::slideshow_group(&window));
         let keys = gtk::EventControllerKey::new();
         keys.set_propagation_phase(gtk::PropagationPhase::Capture);
         let weak_window = window.downgrade();
         let video_keys = view.clone();
         keys.connect_key_pressed(move |_, key, _, modifiers| {
+            if !matches!(key, gdk::Key::F5 | gdk::Key::Escape)
+                && weak_window.upgrade().is_some_and(|w| editing(&w))
+            {
+                return glib::Propagation::Proceed;
+            }
             if !modifiers.intersects(
                 gdk::ModifierType::CONTROL_MASK
                     | gdk::ModifierType::ALT_MASK

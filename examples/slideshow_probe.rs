@@ -71,6 +71,8 @@ use gtk::{gio, glib, prelude::*};
 use std::time::{Duration, Instant};
 #[path = "support/render_frame.rs"]
 mod render_frame;
+#[path = "support/toolbar_ux.rs"]
+mod toolbar_ux;
 fn pump() {
     // Reuse the existing frame barrier; no fixed wait stands in for rendering.
     for _ in 0..100 {
@@ -397,6 +399,14 @@ fn main() {
         other.close();
         eprintln!("NOT RUN native secure slideshow prerequisite; sandbox unchanged");
         std::process::exit(77);
+    }
+    if std::env::args().any(|s| s == "--toolbar-ux" || s == "--toolbar-ux-restore") {
+        toolbar_ux::run(
+            &first,
+            &other,
+            std::env::args().any(|s| s == "--toolbar-ux-restore"),
+        );
+        return;
     }
     first
         .lookup_action("slideshow-interval")

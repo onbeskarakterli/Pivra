@@ -3,6 +3,43 @@ use crate::{catalog::MediaCollection, media::MediaKind};
 use std::{collections::HashSet, path::PathBuf, time::Duration};
 pub const DEFAULT_SECONDS: u32 = 5;
 pub const INTERVALS: [u32; 5] = [3, 5, 10, 15, 30];
+pub fn valid_interval(seconds: u32) -> bool {
+    (1..=3600).contains(&seconds)
+}
+pub fn parse_interval(text: &str) -> Option<u32> {
+    let text = text.trim();
+    if text.is_empty() || text.len() > 4 || !text.bytes().all(|b| b.is_ascii_digit()) {
+        return None;
+    }
+    text.parse().ok().filter(|s| valid_interval(*s))
+}
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum Effect {
+    #[default]
+    Fade,
+    None,
+}
+impl Effect {
+    pub fn id(self) -> &'static str {
+        match self {
+            Self::Fade => "fade",
+            Self::None => "none",
+        }
+    }
+    pub fn from_id(id: &str) -> Option<Self> {
+        match id {
+            "fade" => Some(Self::Fade),
+            "none" => Some(Self::None),
+            _ => None,
+        }
+    }
+    pub fn label(self) -> &'static str {
+        match self {
+            Self::Fade => "Fade",
+            Self::None => "No transition",
+        }
+    }
+}
 #[derive(Debug)]
 pub struct Clock {
     pub paused: bool,
@@ -141,6 +178,28 @@ pub fn target(
 mod tests {
     use super::*;
     use crate::media::MediaItem;
+    #[test]
+    fn custom_interval_validation() {
+        for (text, expected) in [("1", 1), ("7", 7), ("3600", 3600), (" 15 ", 15)] {
+            assert_eq!(parse_interval(text), Some(expected));
+        }
+        for text in [
+            "", "0", "3601", "-1", "+5", "1.5", "5\n10", "hello", "999999", "５",
+        ] {
+            assert_eq!(parse_interval(text), None, "{text:?}");
+        }
+        for seconds in INTERVALS {
+            assert!(valid_interval(seconds));
+        }
+        assert!(!valid_interval(u32::MAX));
+    }
+    #[test]
+    fn only_supported_effects_round_trip() {
+        for effect in [Effect::Fade, Effect::None] {
+            assert_eq!(Effect::from_id(effect.id()), Some(effect));
+        }
+        assert_eq!(Effect::from_id("spin"), None);
+    }
     fn at(s: u64) -> Duration {
         Duration::from_secs(s)
     }

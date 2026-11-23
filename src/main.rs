@@ -15,8 +15,8 @@ use pivra::APP_NAME;
 fn main() {
     // Prefer XWayland until the GTK EGL teardown issue is fixed.
     // An explicit GDK_BACKEND (including "wayland") always takes precedence.
-    let prefer_x11 = std::env::var_os("GDK_BACKEND").is_none()
-        && std::env::var_os("DISPLAY").is_some();
+    let prefer_x11 =
+        std::env::var_os("GDK_BACKEND").is_none() && std::env::var_os("DISPLAY").is_some();
     let select_gl = cfg!(pivra_gpu_backend)
         && std::env::var_os("GSK_RENDERER").is_none()
         && std::env::var("PIVRA_VIDEO_BACKEND").as_deref() != Ok("stock");

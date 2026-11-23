@@ -6,6 +6,7 @@ use std::{
 };
 pub struct Transition {
     enabled: Cell<bool>,
+    fade: Cell<bool>,
     old: gtk::Picture,
     tick: RefCell<Option<gtk::TickCallbackId>>,
 }
@@ -23,6 +24,7 @@ impl Transition {
         overlay.set_measure_overlay(&old, false);
         Rc::new(Self {
             enabled: Cell::new(false),
+            fade: Cell::new(true),
             old,
             tick: RefCell::new(None),
         })
@@ -33,6 +35,10 @@ impl Transition {
             self.clear();
         }
     }
+    pub fn set_fade(&self, fade: bool) {
+        self.fade.set(fade);
+        self.clear();
+    }
     pub fn clear(&self) {
         if let Some(id) = self.tick.borrow_mut().take() {
             id.remove();
@@ -42,7 +48,12 @@ impl Transition {
     }
     pub fn capture(&self, picture: &gtk::Picture, ready: bool) {
         self.clear();
-        if !self.enabled.get() || !ready || picture.width() <= 0 || picture.height() <= 0 {
+        if !self.enabled.get()
+            || !self.fade.get()
+            || !ready
+            || picture.width() <= 0
+            || picture.height() <= 0
+        {
             return;
         }
         if let Some(image) = picture.paintable() {

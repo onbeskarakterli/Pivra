@@ -52,8 +52,32 @@ pub(super) struct Session {
     inhibitor: Cell<u32>,
     inhibitor_app: RefCell<Option<glib::WeakRef<gtk::Application>>>,
     video_end: RefCell<VideoCompletion>,
+    toasts: glib::WeakRef<adw::ToastOverlay>,
+    current_toast: Rc<RefCell<Option<adw::Toast>>>,
+    notice: RefCell<Option<glib::WeakRef<adw::Toast>>>,
 }
 impl Session {
+    fn dismiss_notice(&self) {
+        if let Some(toast) = self.notice.borrow_mut().take().and_then(|w| w.upgrade()) {
+            toast.dismiss();
+        }
+    }
+    fn notify(&self, message: &str) {
+        if let Some(overlay) = self.toasts.upgrade() {
+            let toast = adw::Toast::new(message);
+            toast.set_timeout(2);
+            self.notice.replace(Some(toast.downgrade()));
+            super::show_latest_toast(&overlay, &self.current_toast, toast.clone());
+            // Dismiss after two seconds even when GTK pauses toast timeouts
+            // (for example when the pointer rests over the notification).
+            let weak_toast = toast.downgrade();
+            glib::timeout_add_local_once(Duration::from_secs(2), move || {
+                if let Some(toast) = weak_toast.upgrade() {
+                    toast.dismiss();
+                }
+            });
+        }
+    }
     fn unbind_video(&self) {
         if let Some(watch) = self.stream.borrow_mut().take() {
             if let Some(media) = watch.media.upgrade() {
@@ -188,6 +212,7 @@ impl Session {
             media.play();
         }
         self.arm();
+        self.notify("Slideshow started");
     }
     fn arm(self: &Rc<Self>) {
         if self.timer.borrow().is_some() || !self.running.get() {
@@ -237,6 +262,11 @@ impl Session {
             update_navigation_actions(&window, &self.context.borrow());
         }
         self.trace("stop-complete", None);
+        if self.window.upgrade().is_some_and(|w| w.is_visible()) {
+            self.notify("Slideshow finished");
+        } else {
+            self.dismiss_notice();
+        }
     }
     pub(super) fn pause(&self) {
         if !self.running.get() {
@@ -246,6 +276,11 @@ impl Session {
         let paused = self.clock.borrow().paused;
         self.view.set_slideshow_paused(paused);
         self.state("slideshow-paused", paused);
+        if paused {
+            self.notify("Slideshow paused");
+        } else {
+            self.dismiss_notice();
+        }
         // Inhibitor intentionally survives pause.
     }
     pub(super) fn navigate(self: &Rc<Self>, forward: bool) {
@@ -417,7 +452,8 @@ pub(super) fn install(
     title: &adw::WindowTitle,
     context: Rc<RefCell<FileContext>>,
     view: ImageView,
-    menu: &gio::Menu,
+    toasts: &adw::ToastOverlay,
+    current_toast: Rc<RefCell<Option<adw::Toast>>>,
 ) -> Rc<Session> {
     let seconds = pivra::settings::load_slideshow_interval();
     let this = Rc::new(Session {
@@ -436,6 +472,9 @@ pub(super) fn install(
         inhibitor: Cell::new(0),
         inhibitor_app: RefCell::new(None),
         video_end: RefCell::new(VideoCompletion::default()),
+        toasts: toasts.downgrade(),
+        current_toast,
+        notice: RefCell::new(None),
     });
     let weak = Rc::downgrade(&this);
     this.view.on_video_stream(move |media| {
@@ -483,7 +522,7 @@ pub(super) fn install(
     interval.connect_activate(move |action, value| {
         let Some(seconds) = value
             .and_then(|v| v.get::<u32>())
-            .filter(|s| pivra::slideshow::INTERVALS.contains(s))
+            .filter(|s| pivra::slideshow::valid_interval(*s))
         else {
             return;
         };
@@ -495,23 +534,36 @@ pub(super) fn install(
         pivra::settings::save_slideshow_interval(seconds);
     });
     window.add_action(&interval);
-    let section = gio::Menu::new();
-    section.append(Some("Start slideshow (F5)"), Some("win.slideshow"));
-    for seconds in pivra::slideshow::INTERVALS {
-        let item = gio::MenuItem::new(Some(&format!("Photo interval: {seconds} s")), None);
-        item.set_action_and_target_value(
-            Some("win.slideshow-interval"),
-            Some(&seconds.to_variant()),
-        );
-        section.append_item(&item);
-    }
-    menu.append_section(Some("Slideshow"), &section);
+    let effect = pivra::settings::load_slideshow_effect();
+    this.view.set_slideshow_effect(effect);
+    let transition = gio::SimpleAction::new_stateful(
+        "slideshow-transition",
+        Some(glib::VariantTy::STRING),
+        &effect.id().to_variant(),
+    );
+    let state = this.clone();
+    transition.connect_activate(move |action, value| {
+        let Some(effect) = value
+            .and_then(|v| v.str())
+            .and_then(pivra::slideshow::Effect::from_id)
+        else {
+            return;
+        };
+        state.view.set_slideshow_effect(effect);
+        action.set_state(&effect.id().to_variant());
+        pivra::settings::save_slideshow_effect(effect);
+    });
+    window.add_action(&transition);
     let closing = this.clone();
     window.connect_close_request(move |_| {
         closing.stop();
+        closing.dismiss_notice();
         glib::Propagation::Proceed
     });
     let destroyed = this.clone();
-    window.connect_destroy(move |_| destroyed.stop());
+    window.connect_destroy(move |_| {
+        destroyed.stop();
+        destroyed.dismiss_notice();
+    });
     this
 }

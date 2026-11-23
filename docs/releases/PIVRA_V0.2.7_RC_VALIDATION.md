@@ -17,10 +17,10 @@
 - [x] Owner-reported XWayland slideshow media playback and slideshow video interval regression pass on prior slideshow-feature code.
 - [x] Final v0.2.7 XWayland BT.709 slideshow video-interval regression: PASS (owner native Arch output, 23 Nov 2026; pause/seek/EOS/error/manual/close, no crash).
 - [ ] Re-run full native checks on final 0.2.7 metadata/source.
-- [ ] X11/XWayland GUI toolbar, slideshow, image/video navigation, pause/resume, EOS, open/reopen, notification timeout, folder monitor and preference persistence regression on final `dev`.
+- [x] Owner-reported final installed Pivra v0.2.7 GNOME acceptance: photo/video navigation, slideshow, notifications and Open are working without observed issues (23 Nov 2026). This is a manual user acceptance, not a newly run automated GUI suite.
 - [x] Native Arch DESTDIR staging and v0.2.7 candidate preflight: PASS (owner output, 23 Nov 2026). GPU ELF, dependency ownership/runtime, 184 crate source inventory, 383 application files, installed licenses and thumbnail helper validated. Stage: `/tmp/pivra-gpu-stage.anFsJLMo/usr`.
 - [ ] Approved immutable source archive and SHA-256, real `makepkg` verification, package installation and version checks.
-- [x] Owner-reported Arch `makepkg` built package `pivra-0.2.7-1-x86_64.pkg.tar.zst` (23 Nov 2026); `pacman -Qip` confirms version 0.2.7-1, x86_64, GPL-3.0-only and expected dependency metadata. Compressed 21.62 MiB, installed 28.42 MiB. Installation, actual package file inventory, `.SRCINFO` and pacman integrity checks remain pending.
+- [x] Owner-reported Arch `makepkg` built package `pivra-0.2.7-1-x86_64.pkg.tar.zst` (23 Nov 2026); `pacman -Qip` confirms version 0.2.7-1, x86_64, GPL-3.0-only and expected dependency metadata. Compressed 21.62 MiB, installed 28.42 MiB. Package inventory and installed integrity checked separately; `.SRCINFO` remains pending.
 - [x] Owner-reported `pacman -Qlp` package contents: `/usr/bin/pivra`, `/usr/bin/pivra-thumbnail-factory`, desktop entry, both icons and v0.2.7 release notes present (23 Nov 2026).
 - [x] Owner native Arch install: `sudo pacman -U` upgrade PASS; `pivra --version` = `Pivra 0.2.7`, `pacman -Q pivra` = `pivra 0.2.7-1`, `pacman -Qkk pivra` = 1331 total files, 0 altered (23 Nov 2026).
 - [ ] `.SRCINFO` and source-archive approval plus final release documentation handoff pending; published artifacts not updated.

@@ -1,6 +1,9 @@
 # v0.2.7 slideshow — feature branch validation
 
 Date: 2026-11-23. **TESTING — physical GNOME acceptance pending.**
+Subsequent owner-reported native EOS SIGSEGV: **OPEN; native acceptance BLOCKED**.
+See the [focused investigation and GDB command](V027_SLIDESHOW_EOS_SIGSEGV.md).
+The original results below remain historical controlled-environment evidence.
 Branch: `feature/v0.2.7-slideshow`, based on
 `72405a9fa31b5ff45a98532fbd4008de5ecdc29d`.
 Implementation: `823455ad96844e7ac3d130a5fd119d855cf961ee`.

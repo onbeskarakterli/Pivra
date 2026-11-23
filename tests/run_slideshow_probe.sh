@@ -11,13 +11,38 @@ cleanup() {
 trap cleanup EXIT
 export PIVRA_TRACE_SLIDESHOW=1
 export XDG_CONFIG_HOME="$work/config" XDG_CACHE_HOME="$work/cache" XDG_DATA_HOME="$work/data"
+mode=--native
+cycles=()
+debug=()
+for arg in "$@"; do
+  case "$arg" in
+    --native|--controlled) mode=$arg ;;
+    --eos-regression) cycles=(--eos-regression) ;;
+    --gdb) debug=(--gdb-events "$work/gdb.jsonl") ;;
+    *) echo 'Usage: tests/run_slideshow_probe.sh [--native|--controlled] [--eos-regression] [--gdb]' >&2; exit 2 ;;
+  esac
+done
+if [[ ${#debug[@]} != 0 ]] && ! command -v gdb >/dev/null; then
+  echo 'NOT RUN: gdb required for --gdb' >&2; exit 77
+fi
 ffmpeg -hide_banner -loglevel error -f lavfi -i testsrc2=size=192x96:rate=12 -t 5 -c:v libx264 -pix_fmt yuv420p "$work/video.mp4"
 cargo build --locked --example slideshow_probe
-# Default is real secure decode. --controlled labels photo pixels explicitly.
-case "${1:-}" in
-  ''|--native) mode=--native ;;
-  --controlled) mode=--controlled ;;
-  *) echo 'Usage: tests/run_slideshow_probe.sh [--native|--controlled]' >&2; exit 2 ;;
-esac
-cargo run --locked --example slideshow_probe -- "$mode" "$work/video.mp4" 2>&1 | tee "$work/probe.log"
-grep -q 'PIVRA_SLIDESHOW event=video-ended' "$work/probe.log" || { echo 'FAIL: video EOS was not observed' >&2; exit 1; }
+# Honor Cargo's target directory; never guess which binary GDB launches.
+target=$(cargo metadata --locked --no-deps --format-version 1 | python3 -c 'import json,sys; print(json.load(sys.stdin)["target_directory"])')
+command=("$target/debug/examples/slideshow_probe" "$mode" "${cycles[@]}" "$work/video.mp4")
+sha256sum "$target/debug/examples/slideshow_probe" > "$work/binary.sha256"
+if [[ ${#cycles[@]} != 0 ]]; then export PIVRA_TRACE_VIDEO=1; fi
+if [[ ${#debug[@]} != 0 ]]; then
+  export PIVRA_GDB_EVENTS="$work/gdb.jsonl" PIVRA_TRACE_VIDEO=1
+  command=(gdb -nx --quiet --batch --return-child-result -x tests/video_gpu/context_trace.gdb --args "${command[@]}")
+fi
+set +e
+"${command[@]}" 2>&1 | tee "$work/probe.log"
+pipeline=("${PIPESTATUS[@]}")
+set -e
+[[ ${pipeline[1]} == 0 ]] || { echo 'FAIL: diagnostic log write failed' >&2; exit 1; }
+checks=()
+[[ ${#cycles[@]} == 0 ]] || checks=(--cycles)
+python3 -B tests/slideshow_result.py "$work/probe.log" "${pipeline[0]}" "${checks[@]}" "${debug[@]}"
+# Keep debugger provenance even on success, for clean-versus-native comparison.
+if [[ ${#debug[@]} != 0 ]]; then echo "Debugger artifacts: $work"; trap - EXIT; fi

@@ -2839,3 +2839,26 @@ Implementation commit: `823455ad96844e7ac3d130a5fd119d855cf961ee`
   records unchanged. Cargo/package versions intentionally remain 0.2.6. Stable
   v0.2.5 information and open GTK/SIGSEGV risks remain. Only the feature branch
   is committed/pushed; no dev/main/tag/release/AUR promotion.
+
+## v0.2.7 slideshow native EOS SIGSEGV — 2026-11-23
+
+**OPEN / UNCLASSIFIED; native acceptance BLOCKED, feature TESTING.** Reviewed
+source: `d041378a087a6a129e1acf249421e05b1d2c193b`.
+[Investigation and focused native GDB command](slideshow/V027_SLIDESHOW_EOS_SIGSEGV.md).
+
+- Owner reports corrupt `3.png` rejection, real video EOS, then exit 139. Native
+  log/core directory is not accessible here; no crash cause is inferred.
+- Correct a demonstrated test-barrier gap: selected title alone was not photo
+  readiness. Reuse actual GTK after-paint/render submission; keep the original
+  rapid-navigation assertions. Add three corrupt/video-EOS/photo cycles,
+  two-window/cleanup checks, transition-boundary diagnostics, verified GDB result
+  capture and eleven negative/positive evidence tests. No speculative production
+  lifetime/renderer change or timeout increase.
+- Codex: 226 Rust / 253 Python PASS; fmt/check/strict Clippy PASS. Focused and
+  full controlled slideshow PASS on X11/Sway. Secure native prerequisite under
+  GDB: NOT RUN/77. Private GTK 4.24.1 control/candidate EOS comparison cannot pass
+  due missing playback plug-in: control additionally fails after-paint with GL
+  warning; candidate exit 0 is rejected for missing EOS. This does not classify
+  the owner's SIGSEGV or close the prior GTK/SIGSEGV observations.
+- Only this feature branch is changed; GTK patches, normal video/GPU engine,
+  v0.2.6 release work, versions, dev/main, releases and AUR remain untouched.

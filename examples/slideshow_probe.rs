@@ -69,6 +69,18 @@ mod input;
 mod window;
 use gtk::{gio, glib, prelude::*};
 use std::time::{Duration, Instant};
+#[path = "support/render_frame.rs"]
+mod render_frame;
+fn pump() {
+    // Reuse the existing frame barrier; no fixed wait stands in for rendering.
+    for _ in 0..100 {
+        if !glib::MainContext::default().pending() {
+            break;
+        }
+        glib::MainContext::default().iteration(false);
+    }
+    std::thread::yield_now();
+}
 fn widgets(w: &gtk::Widget) -> Vec<gtk::Widget> {
     let mut result = vec![w.clone()];
     let mut child = w.first_child();
@@ -102,6 +114,121 @@ fn state(w: &adw::ApplicationWindow, name: &str) -> bool {
 fn selected(w: &adw::ApplicationWindow, name: &str) -> bool {
     w.title()
         .is_some_and(|t| t.starts_with(&format!("{name} —")))
+}
+fn runtime_provenance(w: &adw::ApplicationWindow) {
+    eprintln!(
+        "SLIDESHOW_RUNTIME gtk={}.{}.{} display={} renderer={:?}",
+        gtk::major_version(),
+        gtk::minor_version(),
+        gtk::micro_version(),
+        gtk::prelude::WidgetExt::display(w).type_(),
+        w.renderer().map(|r| r.type_())
+    );
+    if let Ok(maps) = std::fs::read_to_string("/proc/self/maps") {
+        let libraries: std::collections::BTreeSet<_> = maps
+            .lines()
+            .filter_map(|line| line.split_whitespace().last())
+            .filter(|path| {
+                [
+                    "libgtk-4.so",
+                    "libgstgl-1.0.so",
+                    "libEGL",
+                    "libgallium",
+                    "libgstgtk",
+                ]
+                .iter()
+                .any(|name| path.contains(name))
+            })
+            .collect();
+        for path in libraries {
+            eprintln!("SLIDESHOW_LIBRARY {path}");
+        }
+    }
+}
+fn photo_presented(w: &adw::ApplicationWindow) {
+    let picture = widgets(w.upcast_ref())
+        .into_iter()
+        .filter_map(|widget| widget.downcast::<gtk::Overlay>().ok())
+        .find_map(|overlay| overlay.child().and_downcast::<gtk::Picture>())
+        .expect("production photo picture");
+    wait("EOS photo content (not only selection title)", || {
+        picture.paintable().is_some()
+            && widgets(w.upcast_ref()).iter().all(|widget| {
+                !((widget.widget_name() == "video-content" && widget.is_visible())
+                    || (widget.widget_name() == "photo-loading-spinner" && widget.is_visible()))
+            })
+    });
+    let node = render_frame::rendered_node(w, &picture);
+    // Exercise real GTK renderer submission, not a fabricated/empty paintable.
+    let texture = w
+        .renderer()
+        .expect("window renderer")
+        .render_texture(&node, None);
+    assert!(texture.width() > 0 && texture.height() > 0);
+}
+fn eos_cycles(first: &adw::ApplicationWindow, other: &adw::ApplicationWindow) {
+    let repeat = widgets(first.upcast_ref())
+        .into_iter()
+        .filter_map(|w| w.downcast::<gtk::ToggleButton>().ok())
+        .find(|b| {
+            b.tooltip_text()
+                .is_some_and(|s| s == "Repeat current video")
+        })
+        .expect("video repeat preference");
+    repeat.set_active(true);
+    for cycle in 1..=3 {
+        eprintln!("SLIDESHOW_STAGE cycle={cycle} corrupt-select");
+        // A fresh session exercises real corrupt-media rejection each cycle;
+        // the normal failed-item set otherwise deliberately skips it thereafter.
+        if state(first, "slideshow") {
+            key(first, gtk::gdk::Key::Escape);
+        }
+        key(first, gtk::gdk::Key::Right);
+        assert!(selected(first, "2.png"));
+        key(first, gtk::gdk::Key::Right);
+        assert!(selected(first, "3.png"));
+        key(first, gtk::gdk::Key::F5);
+        wait("corrupt photo skipped to video", || {
+            selected(first, "4.mp4")
+        });
+        eprintln!("SLIDESHOW_STAGE cycle={cycle} video-selected");
+        if cycle == 1 {
+            runtime_provenance(first);
+        }
+        wait("video EOS returns to first photo", || {
+            selected(first, "1.png")
+        });
+        // Selection changes synchronously; decoding/GTK presentation does not.
+        // Keep the original rapid-navigation test below, but certify this path
+        // independently after an actual photo frame has been submitted.
+        key(first, gtk::gdk::Key::space);
+        photo_presented(first);
+        assert!(state(first, "slideshow-paused"));
+        assert!(selected(first, "1.png") && selected(other, "1.png"));
+        assert!(other.is_visible() && !state(other, "slideshow"));
+        let stats = image_view::gpu_video::stats();
+        wait("EOS owned GPU counters released", || {
+            let s = image_view::gpu_video::stats();
+            s.filters == 0
+                && s.contexts == 0
+                && s.frames == 0
+                && s.presentations == 0
+                && s.workers == 0
+                && s.pending == 0
+        });
+        eprintln!(
+            "SLIDESHOW_STAGE cycle={cycle} photo-presented stock_opened={} gpu_opened={}",
+            stats.stock, stats.gpu
+        );
+    }
+    key(first, gtk::gdk::Key::Escape);
+    assert!(!state(first, "slideshow"));
+    assert!(repeat.is_active() && repeat.is_sensitive());
+    first.close();
+    assert!(other.is_visible());
+    photo_presented(other);
+    other.close();
+    eprintln!("PASS slideshow EOS regression: 3 corrupt/video/photo cycles and independent close");
 }
 fn key(w: &adw::ApplicationWindow, key: gtk::gdk::Key) {
     for controller in w
@@ -172,6 +299,11 @@ fn main() {
         .activate(Some(&3u32.to_variant()));
     assert_eq!(pivra::settings::load_slideshow_interval(), 3);
     first.present();
+    runtime_provenance(&first);
+    if std::env::args().any(|s| s == "--eos-regression") {
+        eos_cycles(&first, &other);
+        return;
+    }
     let repeat = widgets(first.upcast_ref())
         .into_iter()
         .filter_map(|w| w.downcast::<gtk::ToggleButton>().ok())
@@ -243,6 +375,9 @@ fn main() {
     wait("video EOS loops to first photo", || {
         selected(&first, "1.png")
     });
+    eprintln!("SLIDESHOW_STAGE ordinary-probe EOS photo selected");
+    photo_presented(&first);
+    eprintln!("SLIDESHOW_STAGE ordinary-probe EOS photo presented; rapid navigation next");
     assert!(selected(&other, "1.png"));
     key(&first, gtk::gdk::Key::space);
     key(&first, gtk::gdk::Key::Left);

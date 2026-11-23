@@ -41,6 +41,16 @@ pub(super) struct Session {
     ended_seen: Cell<bool>,
 }
 impl Session {
+    // Opt-in transition boundaries only, never per-frame logging or GL calls.
+    fn trace(&self, event: &str, path: Option<&std::path::Path>) {
+        if std::env::var_os("PIVRA_TRACE_SLIDESHOW").is_some_and(|v| v == "1") {
+            eprintln!(
+                "PIVRA_SLIDESHOW event={event} time_us={} path={path:?} phase={:?}",
+                glib::monotonic_time(),
+                self.view.phase()
+            );
+        }
+    }
     fn state(&self, name: &str, value: bool) {
         if let Some(window) = self.window.upgrade() {
             if let Some(action) = window
@@ -134,6 +144,7 @@ impl Session {
         if !self.running.replace(false) {
             return;
         }
+        self.trace("stop-begin", None);
         if let Some(id) = self.timer.borrow_mut().take() {
             id.remove();
         }
@@ -162,6 +173,7 @@ impl Session {
             }
             update_navigation_actions(&window, &self.context.borrow());
         }
+        self.trace("stop-complete", None);
     }
     pub(super) fn pause(&self) {
         if !self.running.get() {
@@ -211,7 +223,10 @@ impl Session {
         context.collection.select(index);
         context.revision = context.revision.wrapping_add(1);
         update_title(&window, &self.title, &context);
+        let path = context.collection.current().map(|i| i.path());
+        self.trace("display-selected-begin", path);
         display_selected(&self.view, &context);
+        self.trace("display-selected-return", path);
     }
     fn poll(&self) {
         if !self.running.get() {
@@ -267,9 +282,22 @@ impl Session {
                     && !self.ended_seen.replace(true)
                 {
                     if std::env::var_os("PIVRA_TRACE_SLIDESHOW").is_some_and(|v| v == "1") {
-                        eprintln!("PIVRA_SLIDESHOW event=video-ended path={:?}", item.path());
+                        eprintln!(
+                            "PIVRA_SLIDESHOW event=video-ended path={:?} time_us={} media={:p} type={} prepared={} seekable={} duration={} timestamp={}",
+                            item.path(),
+                            glib::monotonic_time(),
+                            media.as_ptr(),
+                            media.type_(),
+                            media.is_prepared(),
+                            media.is_seekable(),
+                            media.duration(),
+                            media.timestamp()
+                        );
                     }
+                    // This is the main-context observer, not a GStreamer signal
+                    // handler. Do not retain its stream across stop_video().
                     drop(media);
+                    self.trace("eos-observer-reference-released", Some(item.path()));
                     self.navigate(true);
                     return;
                 }

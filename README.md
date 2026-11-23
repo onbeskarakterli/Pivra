@@ -13,7 +13,9 @@ v0.2.6 is not published. The [v0.2.5 source review](docs/releases/PIVRA_V0.2.5_S
 Left/Right navigate and Escape exits. Photos use a configurable interval and
 photo-only crossfade; videos advance at completion. Ordinary F11 intent is
 preserved. This feature is not part of stable v0.2.5 or the v0.2.6 candidate.
-See [validation and native acceptance instructions](docs/slideshow/V027_SLIDESHOW_VALIDATION.md).
+Native EOS SIGSEGV acceptance is currently blocked; see the
+[investigation](docs/slideshow/V027_SLIDESHOW_EOS_SIGSEGV.md) and
+[validation instructions](docs/slideshow/V027_SLIDESHOW_VALIDATION.md).
 
 **[Latest published release](https://github.com/onbeskarakterli/Pivra/releases/latest)** · **[Arch Linux AUR](https://aur.archlinux.org/packages/pivra)** · **[Development roadmap](docs/PIVRA_DEVELOPMENT_ROADMAP.md)**
 

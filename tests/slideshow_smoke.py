@@ -11,6 +11,7 @@ import sys
 import tempfile
 sys.path.insert(0, str(Path(__file__).parent/'video_gpu'))
 from lifecycle import session, run, ROOT
+from slideshow_result import result
 
 @contextlib.contextmanager
 def window_manager(kind, env, out):
@@ -38,6 +39,7 @@ def window_manager(kind, env, out):
 def main():
     p=argparse.ArgumentParser(description=__doc__)
     p.add_argument('--session',choices=['x11','sway'],required=True)
+    p.add_argument('--eos-regression',action='store_true')
     args=p.parse_args()
     required=['cargo','ffmpeg','dbus-run-session',*(['Xvfb','xfwm4','xprop'] if args.session=='x11' else ['sway'])]
     missing=[name for name in required if not shutil.which(name)]
@@ -57,9 +59,14 @@ def main():
     env=dict(os.environ,XDG_CONFIG_HOME=str(out/'config'),XDG_CACHE_HOME=str(out/'cache'),XDG_DATA_HOME=str(out/'data'),GTK_A11Y='none',PIVRA_TRACE_SLIDESHOW='1')
     with session(args.session,env,out,floating=True) as active:
         with window_manager(args.session,active,out):
-            row=run('slideshow',['target/debug/examples/slideshow_probe','--controlled',video],active,out,timeout=60)
-    if row['status']=='PASS' and 'PIVRA_SLIDESHOW event=video-ended' not in (out/'slideshow.log').read_text():
-        print('FAIL: video did not actually reach EOS (error skip is not completion)',flush=True)
+            extra=['--eos-regression'] if args.eos_regression else []
+            row=run('slideshow',['target/debug/examples/slideshow_probe','--controlled',*extra,video],active,out,timeout=60)
+    report=result(row['exit'],(out/'slideshow.log').read_text(),cycles=args.eos_regression)
+    if report['status']!='PASS':
+        print(f'{report["status"]}: {report["reason"]}',flush=True)
+        return 77 if report['status']=='NOT RUN' else 1
+    if row['status']!='PASS':
+        print('FAIL: existing lifecycle log gate rejected this run',flush=True)
         return 1
     print('Physical GNOME inhibition, secure photo decode and AMD GPU: NOT RUN',flush=True)
     return row['exit'] if row['exit']>=0 else 1

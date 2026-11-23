@@ -1,6 +1,6 @@
 # Pivra v0.2.7 release candidate validation
 
-**Status: IN PROGRESS — no publication approval.** Branch: `dev`. Target: `0.2.7`. Stable release remains v0.2.5.
+**Status: Owner approved v0.2.7 release on 23 Nov 2026; source/tag/GitHub/AUR publication verification pending.** Target: `0.2.7`. Historical stable before this handoff: v0.2.5.
 
 ## Version / documentation consistency
 
@@ -24,7 +24,7 @@
 - [x] Owner-reported `pacman -Qlp` package contents: `/usr/bin/pivra`, `/usr/bin/pivra-thumbnail-factory`, desktop entry, both icons and v0.2.7 release notes present (23 Nov 2026).
 - [x] Owner native Arch install: `sudo pacman -U` upgrade PASS; `pivra --version` = `Pivra 0.2.7`, `pacman -Q pivra` = `pivra 0.2.7-1`, `pacman -Qkk pivra` = 1331 total files, 0 altered (23 Nov 2026).
 - [ ] `.SRCINFO` and source-archive approval plus final release documentation handoff pending; published artifacts not updated.
-- [ ] Explicit owner approval for `dev` → `main`, version tag, GitHub Release and AUR update.
+- [x] Explicit owner approval (23 Nov 2026) for `dev` → `main`, version tag, GitHub Release and AUR update; execution and verification tracked separately.
 
 ## Open risks
 

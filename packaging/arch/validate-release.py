@@ -18,7 +18,7 @@ import tempfile
 import tomllib
 import urllib.request
 
-VERSION = '0.2.5'
+VERSION = '0.2.6'
 
 def source_url(commit):
     if not re.fullmatch(r'[0-9a-f]{40}', commit):

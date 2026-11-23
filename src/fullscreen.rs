@@ -19,22 +19,49 @@ pub(crate) fn install(
     chrome: &[gtk::Widget],
 ) {
     let pending = Rc::new(Cell::new(None));
+    let ordinary = Rc::new(Cell::new(window.is_fullscreen()));
+    let slideshow = Rc::new(Cell::new(false));
     let action =
         gio::SimpleAction::new_stateful("fullscreen", None, &window.is_fullscreen().to_variant());
     let weak = window.downgrade();
     let intent = pending.clone();
-    action.connect_activate(move |_, _| {
+    let normal = ordinary.clone();
+    let slide = slideshow.clone();
+    action.connect_activate(move |action, _| {
         if let Some(window) = weak.upgrade() {
-            let target = !intent.get().unwrap_or_else(|| window.is_fullscreen());
-            request(&window, &intent, target);
+            let target = !normal.get();
+            normal.set(target);
+            action.set_state(&target.to_variant());
+            request(&window, &intent, target || slide.get());
         }
     });
     window.add_action(&action);
+    let forced = gio::SimpleAction::new_stateful("slideshow-fullscreen", None, &false.to_variant());
+    let weak = window.downgrade();
+    let normal = ordinary.clone();
+    let slide = slideshow.clone();
+    let intent = pending.clone();
+    forced.connect_change_state(move |action, value| {
+        let Some(target) = value.and_then(|v| v.get::<bool>()) else {
+            return;
+        };
+        slide.set(target);
+        action.set_state(&target.to_variant());
+        if let Some(window) = weak.upgrade() {
+            request(&window, &intent, target || normal.get());
+        }
+    });
+    window.add_action(&forced);
     let controls: Vec<_> = chrome.iter().map(|w| w.downgrade()).collect();
     let intent = pending.clone();
+    let normal = ordinary.clone();
+    let slide = slideshow.clone();
     window.connect_fullscreened_notify(move |window| {
         let actual = window.is_fullscreen();
-        action.set_state(&actual.to_variant());
+        if !slide.get() && intent.get().is_none() {
+            normal.set(actual);
+        }
+        action.set_state(&normal.get().to_variant());
         for control in &controls {
             if let Some(control) = control.upgrade() {
                 control.set_visible(!actual);
@@ -64,6 +91,22 @@ pub(crate) fn install(
         };
         match key {
             gdk::Key::Escape => {
+                if window
+                    .lookup_action("slideshow")
+                    .and_then(|a| a.state())
+                    .and_then(|v| v.get::<bool>())
+                    == Some(true)
+                {
+                    gio::prelude::ActionGroupExt::activate_action(&window, "slideshow-stop", None);
+                    return glib::Propagation::Stop;
+                }
+                ordinary.set(false);
+                if let Some(action) = window
+                    .lookup_action("fullscreen")
+                    .and_downcast::<gio::SimpleAction>()
+                {
+                    action.set_state(&false.to_variant());
+                }
                 // A second Escape closes even if the compositor has not yet
                 // acknowledged the first request to leave fullscreen.
                 if pending.get() == Some(false)

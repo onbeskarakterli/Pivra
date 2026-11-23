@@ -97,6 +97,8 @@ async fn load_limited(
     budget: Option<usize>,
     admit: Option<&dyn Fn(u32, u32) -> Result<(), String>>,
 ) -> Result<LoadedFrame, String> {
+    let mut measurement = pivra::performance::Span::new("secure_image_load");
+    measurement.status("error_or_cancel");
     if cancellable.is_cancelled() {
         return Err("Image loading cancelled".into());
     }
@@ -146,10 +148,14 @@ async fn load_limited(
             return Err("Preload exceeds cache entry budget".into());
         }
     }
+    let mut decode_measurement = pivra::performance::Span::new("secure_next_frame");
+    decode_measurement.status("error_or_cancel");
     let frame = image
         .next_frame()
         .await
         .map_err(|e| format!("Image decode failed: {e}"))?;
+    decode_measurement.status("decoded");
+    drop(decode_measurement);
     dimensions_for(frame.width(), frame.height(), admit.is_some())?;
     if frame.buf_slice().len() > MAX_FRAME_BYTES {
         return Err("Decoded frame exceeds the 512 MiB buffer limit".into());
@@ -157,6 +163,7 @@ async fn load_limited(
     if cancellable.is_cancelled() {
         return Err("Image loading cancelled".into());
     }
+    measurement.status("decoded");
     Ok(frame)
 }
 

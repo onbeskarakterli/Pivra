@@ -2,9 +2,11 @@
 
 **Pivra** is a native image viewer for Linux, built with **Rust, GTK4, and libadwaita**. It is designed to feel at home on GNOME: open a photo, move through the folder, zoom in on details, and browse thumbnails without getting in the way.
 
-**Current stable release: v0.2.5.** Pivra includes automatic GPU-accelerated BT.709 SDR video color correction on stock GTK and is free software under GPL-3.0-only.
+**Current stable release: v0.2.7.** Pivra includes fullscreen slideshow, updated toolbar controls, and in-window Open, alongside native photo/video playback.
 
-This is the prepared v0.2.5 stable-release handoff. Source approval, native package validation and publication evidence are tracked separately in the [source review procedure](docs/releases/PIVRA_V0.2.5_SOURCE_APPROVAL.md); this README is not evidence that GitHub/AUR publication has occurred. See the [v0.2.5 release notes](docs/releases/PIVRA_V0.2.5_RELEASE_NOTES.md).
+Release notes: [v0.2.7](docs/releases/PIVRA_V0.2.7_RELEASE_NOTES.md). On affected GTK Wayland stacks, Pivra selects XWayland by default when available to avoid a known EGL lifecycle crash. The native Wayland issue remains open.
+
+v0.2.6 was an unreleased development candidate. Its [release notes](docs/releases/PIVRA_V0.2.6_RELEASE_NOTES.md) and [validation](docs/releases/PIVRA_V0.2.6_RC_VALIDATION.md) remain historical records. Published v0.2.5 records remain unchanged.
 
 **[Latest published release](https://github.com/onbeskarakterli/Pivra/releases/latest)** · **[Arch Linux AUR](https://aur.archlinux.org/packages/pivra)** · **[Development roadmap](docs/PIVRA_DEVELOPMENT_ROADMAP.md)**
 
@@ -12,7 +14,7 @@ This is the prepared v0.2.5 stable-release handoff. Source approval, native pack
 
 ### Linux — build from source
 
-Use the approved v0.2.5 source archive for release builds; the workflow below describes a development checkout, not an immutable release input. You will need a compatible Linux desktop, Rust 1.85 or newer, GTK 4.16+, libadwaita 1.2+, GStreamer GL 1.24+ development/runtime components, and the necessary native libraries.
+Use an explicitly approved immutable source archive for release builds; the workflow below describes a development checkout, not an immutable release input. You will need a compatible Linux desktop, Rust 1.85 or newer, GTK 4.16+, libadwaita 1.2+, GStreamer GL 1.24+ development/runtime components, and the necessary native libraries.
 
 ```bash
 git clone --branch dev https://github.com/onbeskarakterli/Pivra.git
@@ -46,7 +48,7 @@ The AUR package builds Pivra from a pinned source revision. GitHub releases also
 
 ## Features and roadmap
 
-**Available** = implemented in the current `dev` source (v0.2.5 source); publication is tracked separately from implemented functionality. **Partial** = some aspects implemented, with more work planned. **Planned** = not yet delivered. This is a feature-level snapshot, not a declaration that every numbered roadmap milestone is complete.
+**Available** = implemented in the current `dev` source (v0.2.7 release candidate); publication is tracked separately from implemented functionality. **Partial** = some aspects implemented, with more work planned. **Planned** = not yet delivered. This is a feature-level snapshot, not a declaration that every numbered roadmap milestone is complete.
 
 ### Photo viewing and navigation
 
@@ -69,7 +71,7 @@ The AUR package builds Pivra from a pinned source revision. GitHub releases also
 | Image minimap when zoomed beyond the viewport | ⏳ Planned |
 | Optional EXIF/metadata information panel | ⏳ Planned |
 | Photo/video/all filters and multi-selection | ⏳ Planned |
-| Slideshow with configurable timing, looping, and transitions | ⏳ Planned |
+| Slideshow with configurable timing, looping, and transitions | ✅ Available in dev (v0.2.7; release validation pending) |
 | Customizable keyboard shortcuts and touchpad gestures | ⏳ Planned |
 | Move media to Trash with Undo | ✅ Available |
 | Wallpaper setting and side-by-side comparison | ⏳ Planned |
@@ -119,17 +121,21 @@ Editing will live in a separate **Edit** mode so the normal viewer remains simpl
 | Safe Save As, metadata handling, and original-file protection | ⏳ Planned |
 | Background batch conversion with pause/cancel and collision handling | ⏳ Planned |
 
-The [detailed development roadmap](docs/PIVRA_DEVELOPMENT_ROADMAP.md) retains historical PIV milestone and release-gate records; its older status snapshots do not supersede the v0.2.5 source scope above. The [feature specification](docs/PIVRA_FEATURE_SPEC_TR.md) describes the longer-term goals.
+The [detailed development roadmap](docs/PIVRA_DEVELOPMENT_ROADMAP.md) retains historical PIV milestone and release-gate records; its older status snapshots do not supersede the current feature snapshot and version-specific release notes. The [feature specification](docs/PIVRA_FEATURE_SPEC_TR.md) describes the longer-term goals.
 
 ## Current limitations
 
-Pivra is a Linux/GNOME-focused viewer, not an image editor. Slideshow, HDR/ICC workflows, and batch conversion are not yet available. Image decoding depends on installed Glycin format loaders and their supported codecs. Video playback depends on the system GTK/GStreamer media backend and available codecs. Individual formats and files may fail.
+Pivra is a Linux/GNOME-focused viewer, not an image editor. Slideshow is implemented on dev for the v0.2.7 release candidate; HDR/ICC workflows and batch conversion are not yet available. Image decoding depends on installed Glycin format loaders and their supported codecs. Video playback depends on the system GTK/GStreamer media backend and available codecs. Individual formats and files may fail.
 
 Still-image loading is bounded to 64 MP (maximum 32,768 pixels per edge) and 64 MiB input size. Animated frames have additional bounds. The automated tests and video-navigation stress test were exercised on the development build; compatibility across other Linux environments remains to be verified.
 
 The v0.2.5 release scope is described in the [release notes](docs/releases/PIVRA_V0.2.5_RELEASE_NOTES.md). Source/package/publication approval is recorded separately; historical release records remain in docs/releases.
 
-The v0.2.5 GPU adapter currently targets the validated OpenGL path. Intel/NVIDIA are untested; Vulkan interop is not implemented; native HDR visual preservation and end-to-end zero-copy remain unproven. Other color metadata/codecs retain stock playback.
+The GPU adapter targets the validated OpenGL path. Intel/NVIDIA are untested; Vulkan interop is not implemented; native HDR visual preservation and end-to-end zero-copy remain unproven. Other color metadata/codecs retain stock playback.
+
+On the reported GTK 4.24.1 / Mesa 26.3.1 Arch/GNOME Wayland stack, switching between GPU-eligible and stock-routed videos can invalidate the shared EGLDisplay and break later GPU playback or another window. Normal production Wayland playback passed the owner’s tests; the mixed sequence remains a stock GTK limitation. A separate, isolated GTK ownership fix passed native 9/9 and is not bundled with Pivra. An earlier software candidate SIGSEGV remains unclassified. The equivalent ownership fix already exists upstream; fixed distribution-package acceptance is pending. See the [upstream handoff](docs/upstream/GTK_4.24.1_WAYLAND_EGL_OWNERSHIP.md) and [release risk checklist](docs/releases/PIVRA_V0.2.6_RC_VALIDATION.md).
+
+Where XWayland/X11 is available, a per-process workaround is `GDK_BACKEND=x11 GSK_RENDERER=gl pivra /path/to/video.mp4`. Native RX 7900 XT X11 lifecycle acceptance is user-reported 9/9. This does not change the system backend or guarantee other GPUs.
 
 ## License
 

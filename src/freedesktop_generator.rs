@@ -64,6 +64,7 @@ pub(crate) fn generate_admitted(
     class: SizeClass,
     permit: &crate::thumbnail_manager::Permit,
 ) -> Result<GeneratedThumbnail, Error> {
+    let _measurement = crate::performance::Span::new("freedesktop_thumbnail_generate");
     if !permit.covers(&request.source.path) {
         return Err(Error::SourceChanged);
     }

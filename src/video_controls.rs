@@ -15,6 +15,7 @@ pub(super) struct Controls {
     volume: gtk::Scale,
     mute: gtk::ToggleButton,
     loop_button: gtk::ToggleButton,
+    slideshow: Rc<Cell<bool>>,
     stream: Rc<std::cell::RefCell<Option<gtk::MediaStream>>>,
     updating: Rc<Cell<bool>>,
     scrubbing: Rc<Cell<bool>>,
@@ -28,6 +29,11 @@ fn clock(us: i64) -> String {
 }
 
 impl Controls {
+    pub fn set_slideshow(&self, active: bool) {
+        self.slideshow.set(active);
+        self.loop_button.set_sensitive(!active);
+    }
+
     pub fn new(window: &adw::ApplicationWindow) -> Self {
         let stream: Rc<std::cell::RefCell<Option<gtk::MediaStream>>> = Rc::default();
         let updating = Rc::new(Cell::new(false));
@@ -225,6 +231,7 @@ impl Controls {
             bar.append(child);
         }
         let result = Self {
+            slideshow: Rc::new(Cell::new(false)),
             bar,
             play,
             position,
@@ -374,13 +381,18 @@ impl Controls {
             media.set_muted(self.mute.is_active());
             // Handle EOS explicitly to work across GTK media backends.
             media.set_loop(false);
+            let slideshow = self.slideshow.clone();
             let repeat = self.loop_button.downgrade();
             let current = Rc::downgrade(&self.stream);
             media.connect_notify_local(Some("ended"), move |ended, _| {
                 let (Some(repeat), Some(current)) = (repeat.upgrade(), current.upgrade()) else {
                     return;
                 };
-                if !ended.is_ended() || !repeat.is_active() || !ended.is_seekable() {
+                if slideshow.get()
+                    || !ended.is_ended()
+                    || !repeat.is_active()
+                    || !ended.is_seekable()
+                {
                     return;
                 }
                 // Weak references prevent retired streams from retaining the

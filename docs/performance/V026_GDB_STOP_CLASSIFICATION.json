@@ -1,0 +1,475 @@
+{
+  "schema": 1,
+  "base_commit": "f1cc9da7cca657005716c9c36804c321d16df5a0",
+  "tested_tree": "base plus debugger follow-up changes before commit",
+  "native_amd_acceptance": "BLOCKED; no new physical AMD run",
+  "user_report": {
+    "pass": 8,
+    "fail": 1,
+    "raw_debugger_exit": 255,
+    "last_stage": "sRGB stock route begin",
+    "inferior_outcome": "not established by supplied excerpt"
+  },
+  "validation": {
+    "rust_tests": 212,
+    "python_tests": 207,
+    "python_suites": {
+      "root": 64,
+      "thumbnail": 59,
+      "fd05a": 9,
+      "video_color": 13,
+      "video_gpu": 62
+    },
+    "fmt": "PASS",
+    "check_locked": "PASS",
+    "strict_clippy": "PASS, zero warnings",
+    "real_gdb_controls": 7,
+    "gdb_report_controls": 10,
+    "gdb_version": "16.3 (official Debian user-directory extraction)",
+    "release_build_locked": "PASS"
+  },
+  "controlled": [
+    {
+      "session": "x11",
+      "software_control": true,
+      "all_gates_pass": true,
+      "results": [
+        {
+          "name": "ownership-foreign",
+          "status": "PASS",
+          "exit": 0,
+          "exit_scope": "application"
+        },
+        {
+          "name": "ownership-release",
+          "status": "PASS",
+          "exit": 0,
+          "exit_scope": "application"
+        },
+        {
+          "name": "ownership-current",
+          "status": "PASS",
+          "exit": 0,
+          "exit_scope": "application"
+        },
+        {
+          "name": "ownership-presentation",
+          "status": "PASS",
+          "exit": 0,
+          "exit_scope": "application"
+        },
+        {
+          "name": "ownership-failure",
+          "status": "PASS",
+          "exit": 0,
+          "exit_scope": "application"
+        },
+        {
+          "name": "mixed-lifecycle",
+          "status": "PASS",
+          "exit": 0,
+          "exit_scope": "debugger"
+        },
+        {
+          "name": "error-cleanup",
+          "status": "PASS",
+          "exit": 0,
+          "exit_scope": "application"
+        },
+        {
+          "name": "limited-presentation-controls",
+          "status": "PASS",
+          "exit": 0,
+          "exit_scope": "application"
+        },
+        {
+          "name": "full-ramp-shader-controls",
+          "status": "PASS",
+          "exit": 0,
+          "exit_scope": "application"
+        }
+      ],
+      "mixed_debugger_result": {
+        "status": "PASS",
+        "application_status": "PASS",
+        "debugger_status": "COMPLETE",
+        "inferior_result": {
+          "schema": 1,
+          "seq": 115,
+          "kind": "inferior_result",
+          "time_us": 5950289200,
+          "pid": 0,
+          "thread": null,
+          "ptid": null,
+          "state": "exited",
+          "exit_code": 0
+        },
+        "debugger_version": "16.3",
+        "reason": "inferior exit confirmed"
+      },
+      "event_count": 115,
+      "destruction_requests": 21,
+      "associated_requests": 14,
+      "terminate_requests_observed": 0,
+      "drain_checkpoints": [
+        "LIFECYCLE_STAGE all filters retired ready contexts=0 frames=0 presentations=0",
+        "LIFECYCLE_STAGE reopen cleanup ready contexts=0 frames=0 presentations=0",
+        "LIFECYCLE_STAGE reopen cleanup ready contexts=0 frames=0 presentations=0",
+        "LIFECYCLE_STAGE reopen cleanup ready contexts=0 frames=0 presentations=0",
+        "LIFECYCLE_STAGE delete and close cleanup ready contexts=0 frames=0 presentations=0"
+      ],
+      "example_worker_destruction": {
+        "symbol": "eglDestroyContext",
+        "call_id": 11,
+        "time_us": 5947792971,
+        "display": "0x56000754a2b0",
+        "context": "0x7f7a10045520",
+        "pid": 35340,
+        "ptid": [
+          35340,
+          35372,
+          0
+        ],
+        "request_return": 1,
+        "generation_start_us": 5946985409,
+        "owner_candidates": [
+          {
+            "role": "pivra-worker",
+            "object": "0x56000ea1d570",
+            "sink": "0x56000de43930",
+            "registered_us": 5946987325,
+            "retirement_observed_before_request": true,
+            "last_reference_snapshot": {
+              "context": "glcontextegl0",
+              "object": "0x56000ea1d570",
+              "owner": "0x56000de43930",
+              "refs": "30",
+              "native_context": "140162231457056",
+              "native_display": "94558122975920",
+              "time_us": "5947788976",
+              "pid": "35340",
+              "tid": "35340"
+            }
+          }
+        ],
+        "display_last_successful_transition": {
+          "schema": 1,
+          "seq": 19,
+          "kind": "egl_return",
+          "time_us": 5947091803,
+          "pid": 35340,
+          "thread": 38,
+          "ptid": [
+            35340,
+            35379,
+            0
+          ],
+          "symbol": "eglInitialize",
+          "call_id": 9,
+          "return_value": 1,
+          "return_source": "linux-ABI-register:rax",
+          "display": "0x56000754a2b0",
+          "display_source": "linux-ABI-register:rdi"
+        },
+        "display_last_request": {
+          "schema": 1,
+          "seq": 18,
+          "kind": "observer_breakpoint",
+          "time_us": 5947091290,
+          "pid": 35340,
+          "thread": 38,
+          "ptid": [
+            35340,
+            35379,
+            0
+          ],
+          "symbol": "eglInitialize",
+          "call_id": 9,
+          "auto_continue": true,
+          "display": "0x56000754a2b0",
+          "display_source": "linux-ABI-register:rdi",
+          "stack": [
+            {
+              "function": "eglInitialize",
+              "pc": "0x7f7aa77f7320",
+              "module": "/workspace/pivra-environment/native/usr/lib/x86_64-linux-gnu/libEGL.so.1"
+            },
+            {
+              "function": null,
+              "pc": "0x7f7aa8cfb5e9",
+              "module": "/lib/x86_64-linux-gnu/libgstgl-1.0.so.0"
+            },
+            {
+              "function": null,
+              "pc": "0x7f7aa8cd1a14",
+              "module": "/lib/x86_64-linux-gnu/libgstgl-1.0.so.0"
+            },
+            {
+              "function": null,
+              "pc": "0x7f7aa8df1b83",
+              "module": "/workspace/pivra-environment/native/usr/lib/x86_64-linux-gnu/libglib-2.0.so.0"
+            },
+            {
+              "function": null,
+              "pc": "0x7f7aa86ab8bb",
+              "module": "/lib/x86_64-linux-gnu/libc.so.6"
+            },
+            {
+              "function": null,
+              "pc": "0x7f7aa8729538",
+              "module": "/lib/x86_64-linux-gnu/libc.so.6"
+            }
+          ]
+        },
+        "caveat": "request/association only; EGL may defer destruction; absent retirement trace does not prove a live reference"
+      },
+      "example_stack": [
+        {
+          "function": "eglDestroyContext",
+          "module": "libEGL.so.1"
+        },
+        {
+          "function": null,
+          "module": "libgstgl-1.0.so.0"
+        },
+        {
+          "function": null,
+          "module": "libgstgl-1.0.so.0"
+        },
+        {
+          "function": null,
+          "module": "libglib-2.0.so.0"
+        },
+        {
+          "function": null,
+          "module": "libc.so.6"
+        },
+        {
+          "function": null,
+          "module": "libc.so.6"
+        }
+      ]
+    },
+    {
+      "session": "sway",
+      "software_control": true,
+      "all_gates_pass": true,
+      "results": [
+        {
+          "name": "ownership-foreign",
+          "status": "PASS",
+          "exit": 0,
+          "exit_scope": "application"
+        },
+        {
+          "name": "ownership-release",
+          "status": "PASS",
+          "exit": 0,
+          "exit_scope": "application"
+        },
+        {
+          "name": "ownership-current",
+          "status": "PASS",
+          "exit": 0,
+          "exit_scope": "application"
+        },
+        {
+          "name": "ownership-presentation",
+          "status": "PASS",
+          "exit": 0,
+          "exit_scope": "application"
+        },
+        {
+          "name": "ownership-failure",
+          "status": "PASS",
+          "exit": 0,
+          "exit_scope": "application"
+        },
+        {
+          "name": "mixed-lifecycle",
+          "status": "PASS",
+          "exit": 0,
+          "exit_scope": "debugger"
+        },
+        {
+          "name": "error-cleanup",
+          "status": "PASS",
+          "exit": 0,
+          "exit_scope": "application"
+        },
+        {
+          "name": "limited-presentation-controls",
+          "status": "PASS",
+          "exit": 0,
+          "exit_scope": "application"
+        },
+        {
+          "name": "full-ramp-shader-controls",
+          "status": "PASS",
+          "exit": 0,
+          "exit_scope": "application"
+        }
+      ],
+      "mixed_debugger_result": {
+        "status": "PASS",
+        "application_status": "PASS",
+        "debugger_status": "COMPLETE",
+        "inferior_result": {
+          "schema": 1,
+          "seq": 117,
+          "kind": "inferior_result",
+          "time_us": 5959767831,
+          "pid": 0,
+          "thread": null,
+          "ptid": null,
+          "state": "exited",
+          "exit_code": 0
+        },
+        "debugger_version": "16.3",
+        "reason": "inferior exit confirmed"
+      },
+      "event_count": 117,
+      "destruction_requests": 21,
+      "associated_requests": 14,
+      "terminate_requests_observed": 0,
+      "drain_checkpoints": [
+        "LIFECYCLE_STAGE all filters retired ready contexts=0 frames=0 presentations=0",
+        "LIFECYCLE_STAGE reopen cleanup ready contexts=0 frames=0 presentations=0",
+        "LIFECYCLE_STAGE reopen cleanup ready contexts=0 frames=0 presentations=0",
+        "LIFECYCLE_STAGE reopen cleanup ready contexts=0 frames=0 presentations=0",
+        "LIFECYCLE_STAGE delete and close cleanup ready contexts=0 frames=0 presentations=0"
+      ],
+      "example_worker_destruction": {
+        "symbol": "eglDestroyContext",
+        "call_id": 11,
+        "time_us": 5957187744,
+        "display": "0x564475ee01c0",
+        "context": "0x7f931800aec0",
+        "pid": 35865,
+        "ptid": [
+          35865,
+          35897,
+          0
+        ],
+        "request_return": 1,
+        "generation_start_us": 5956745806,
+        "owner_candidates": [
+          {
+            "role": "pivra-worker",
+            "object": "0x56447dbcc7b0",
+            "sink": "0x56447cdd4680",
+            "registered_us": 5956746266,
+            "retirement_observed_before_request": true,
+            "last_reference_snapshot": {
+              "context": "glcontextegl0",
+              "object": "0x56447dbcc7b0",
+              "owner": "0x56447cdd4680",
+              "refs": "24",
+              "native_context": "140269739617984",
+              "native_display": "94852036297152",
+              "time_us": "5957184164",
+              "pid": "35865",
+              "tid": "35865"
+            }
+          }
+        ],
+        "display_last_successful_transition": {
+          "schema": 1,
+          "seq": 19,
+          "kind": "egl_return",
+          "time_us": 5956822883,
+          "pid": 35865,
+          "thread": 33,
+          "ptid": [
+            35865,
+            35899,
+            0
+          ],
+          "symbol": "eglInitialize",
+          "call_id": 9,
+          "return_value": 1,
+          "return_source": "linux-ABI-register:rax",
+          "display": "0x564475ee01c0",
+          "display_source": "linux-ABI-register:rdi"
+        },
+        "display_last_request": {
+          "schema": 1,
+          "seq": 18,
+          "kind": "observer_breakpoint",
+          "time_us": 5956822165,
+          "pid": 35865,
+          "thread": 33,
+          "ptid": [
+            35865,
+            35899,
+            0
+          ],
+          "symbol": "eglInitialize",
+          "call_id": 9,
+          "auto_continue": true,
+          "display": "0x564475ee01c0",
+          "display_source": "linux-ABI-register:rdi",
+          "stack": [
+            {
+              "function": "eglInitialize",
+              "pc": "0x7f93af5da320",
+              "module": "/workspace/pivra-environment/native/usr/lib/x86_64-linux-gnu/libEGL.so.1"
+            },
+            {
+              "function": null,
+              "pc": "0x7f93b0ade5e9",
+              "module": "/lib/x86_64-linux-gnu/libgstgl-1.0.so.0"
+            },
+            {
+              "function": null,
+              "pc": "0x7f93b0ab4a14",
+              "module": "/lib/x86_64-linux-gnu/libgstgl-1.0.so.0"
+            },
+            {
+              "function": null,
+              "pc": "0x7f93b0bd4b83",
+              "module": "/workspace/pivra-environment/native/usr/lib/x86_64-linux-gnu/libglib-2.0.so.0"
+            },
+            {
+              "function": null,
+              "pc": "0x7f93b048e8bb",
+              "module": "/lib/x86_64-linux-gnu/libc.so.6"
+            },
+            {
+              "function": null,
+              "pc": "0x7f93b050c538",
+              "module": "/lib/x86_64-linux-gnu/libc.so.6"
+            }
+          ]
+        },
+        "caveat": "request/association only; EGL may defer destruction; absent retirement trace does not prove a live reference"
+      },
+      "example_stack": [
+        {
+          "function": "eglDestroyContext",
+          "module": "libEGL.so.1"
+        },
+        {
+          "function": null,
+          "module": "libgstgl-1.0.so.0"
+        },
+        {
+          "function": null,
+          "module": "libgstgl-1.0.so.0"
+        },
+        {
+          "function": null,
+          "module": "libglib-2.0.so.0"
+        },
+        {
+          "function": null,
+          "module": "libc.so.6"
+        },
+        {
+          "function": null,
+          "module": "libc.so.6"
+        }
+      ]
+    }
+  ]
+}

@@ -1462,15 +1462,13 @@ fn memory_work(
     if FileKey::read(&generated.source.path).ok().as_ref() != Some(&generated.source) {
         return Work::Failed("Source changed".into());
     }
-    let texture = gdk::MemoryTexture::new(
+    match thumbnail_pixels::from_rgba(
+        &generated.pixels,
         generated.width as i32,
         generated.height as i32,
-        gdk::MemoryFormat::R8g8b8a8,
-        &generated.pixels,
         generated.stride,
-    )
-    .upcast();
-    match display_texture(&texture, scale) {
+        display_size(generated.width as i32, generated.height as i32, scale),
+    ) {
         Ok(texture)
             if !worker_token.is_cancelled()
                 && std::time::Instant::now() < deadline
@@ -1509,36 +1507,15 @@ fn reconsider_evicted(
 // Normalize to RGBA8 and at most 2x cell density. Charge 8 bytes/pixel:
 // owned RGBA8 pixels + a renderer upload. 64 * 192*160*8 < 16 MiB.
 // The main photo's conservative 32-byte estimate remains unchanged.
+#[path = "thumbnail_pixels.rs"]
+mod thumbnail_pixels;
 fn display_texture(texture: &gdk::Texture, scale: i32) -> Result<gdk::Texture, String> {
-    let (width, height) = display_size(texture.width(), texture.height(), scale);
-    let mut download = gdk::TextureDownloader::new(texture);
-    download.set_format(gdk::MemoryFormat::R8g8b8a8);
-    let (bytes, stride) = download.download_bytes();
-    if (width, height) == (texture.width(), texture.height()) {
-        return Ok(gdk::MemoryTexture::new(
-            width,
-            height,
-            gdk::MemoryFormat::R8g8b8a8,
-            &bytes,
-            stride,
-        )
-        .upcast());
-    }
-    let stride = i32::try_from(stride).map_err(|_| "Thumbnail stride exceeds limit")?;
-    let pixels = gdk::gdk_pixbuf::Pixbuf::from_bytes(
-        &bytes,
-        gdk::gdk_pixbuf::Colorspace::Rgb,
-        true,
-        8,
-        texture.width(),
-        texture.height(),
-        stride,
-    );
-    let small = pixels
-        .scale_simple(width, height, gdk::gdk_pixbuf::InterpType::Bilinear)
-        .ok_or("Cannot scale decoded thumbnail pixels")?;
-    Ok(gdk::Texture::for_pixbuf(&small))
+    thumbnail_pixels::prepare(
+        texture,
+        display_size(texture.width(), texture.height(), scale),
+    )
 }
+
 fn display_cost(width: i32, height: i32) -> Option<usize> {
     usize::try_from(width)
         .ok()?

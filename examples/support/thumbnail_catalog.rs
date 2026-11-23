@@ -82,7 +82,7 @@ fn button(row: &gtk::Box, index: usize) -> gtk::Button {
     panic!("missing thumbnail {index}");
 }
 
-fn real_pixels(row: &gtk::Box, index: usize, dimensions: Option<(i32, i32)>, check_red: bool) {
+fn cell_texture(row: &gtk::Box, index: usize) -> gdk::Texture {
     let content = button(row, index).child().unwrap();
     let mut child = content.first_child();
     let picture = loop {
@@ -92,11 +92,15 @@ fn real_pixels(row: &gtk::Box, index: usize, dimensions: Option<(i32, i32)>, che
         }
         child = w.next_sibling();
     };
-    let texture = picture
+    picture
         .paintable()
         .unwrap()
         .downcast::<gdk::Texture>()
-        .unwrap();
+        .unwrap()
+}
+
+fn real_pixels(row: &gtk::Box, index: usize, dimensions: Option<(i32, i32)>, check_red: bool) {
+    let texture = cell_texture(row, index);
     if let Some(size) = dimensions {
         assert_eq!((texture.width(), texture.height()), size);
     } else {
@@ -125,6 +129,44 @@ fn real_pixels(row: &gtk::Box, index: usize, dimensions: Option<(i32, i32)>, che
         );
     }
 }
+// Native success must prove repair/publication and another real secure cache
+// decode, rather than merely observing that the aggregate failed count is zero.
+fn native_repair(row: &gtk::Box, index: usize, path: &Path, attempts_before: usize) {
+    let texture = cell_texture(row, index);
+    assert!(texture.width() > 0 && texture.height() > 0);
+    if pivra::thumbnail_manager::Manager::session().id()
+        == pivra::thumbnail_provider::ProviderId::Gnome
+    {
+        let expected = cache_path(path);
+        let outcome =
+            pivra::thumbnail::Provider::new(true, None).query(path, &gio::Cancellable::new());
+        match outcome {
+            pivra::thumbnail::Outcome::Hit(candidate) => {
+                assert_eq!(candidate.thumbnail.path, expected);
+                assert!(candidate.still_current(&gio::Cancellable::new()));
+            }
+            other => panic!("native GNOME repair did not publish a valid current cache: {other:?}"),
+        }
+        let attempts = THUMB_ATTEMPTS.lock().unwrap();
+        let matching: Vec<_> = attempts[attempts_before..]
+            .iter()
+            .filter(|a| a.path == expected && !a.token.is_cancelled())
+            .collect();
+        assert_eq!(
+            matching.len(),
+            1,
+            "repaired cache must be securely decoded once"
+        );
+        assert_eq!(matching[0].completed, Some(true));
+    }
+    println!(
+        "PASS native repair index={index}: real texture={}x{} provider={:?}",
+        texture.width(),
+        texture.height(),
+        pivra::thumbnail_manager::Manager::session().id()
+    );
+}
+
 // Exercises production ImageView/overlay key admission without any decoder.
 // TEST cells and main pixels are synthetic; this is not generation evidence.
 pub(super) fn overlay_shortcut(app: &adw::Application) {
@@ -171,6 +213,15 @@ pub(super) fn overlay_shortcut(app: &adw::Application) {
 pub(super) fn run(app: &adw::Application) {
     let native = std::env::args().any(|s| s == "--native-thumbnails");
     println!("STAGE catalog: automated checks; windows are test-driven until MANUAL instructions");
+    println!(
+        "CATALOG decoder={} provider={:?}",
+        if native {
+            "secure-native"
+        } else {
+            "SYNTHETIC; generation failure must be controlled by the runner"
+        },
+        pivra::thumbnail_manager::Manager::session().id()
+    );
     if native {
         println!("STAGE secure decoder prerequisite (one attempt)");
         // One secure prerequisite; failure is NOT RUN, not 120 failed retries.
@@ -388,14 +439,44 @@ pub(super) fn run(app: &adw::Application) {
             "stable selection redecoded thumbnails"
         );
         for n in [100, 103, 119] {
-            let bounds = button(&row, n).compute_bounds(&row).unwrap();
+            let cell = button(&row, n);
+            let photo = cell
+                .child()
+                .unwrap()
+                .downcast::<gtk::Overlay>()
+                .unwrap()
+                .child()
+                .unwrap()
+                .downcast::<gtk::Picture>()
+                .unwrap();
+            // 7d7e056c added three-pixel photo margins after the original outer
+            // cell assertion. Check BOTH configured photo size and outer insets;
+            // do not change production layout just to satisfy the older test.
+            assert_eq!(
+                (photo.width(), photo.height()),
+                (
+                    image_view::thumbnail_overlay::CELL_WIDTH,
+                    image_view::thumbnail_overlay::CELL_HEIGHT,
+                ),
+                "thumbnail photo viewport must match configured dimensions"
+            );
+            assert_eq!(
+                (
+                    photo.margin_start(),
+                    photo.margin_end(),
+                    photo.margin_top(),
+                    photo.margin_bottom()
+                ),
+                (3, 3, 3, 3)
+            );
+            let bounds = cell.compute_bounds(&row).unwrap();
             assert_eq!(
                 (bounds.width() as i32, bounds.height() as i32),
                 (
-                    image_view::thumbnail_overlay::CELL_WIDTH,
-                    image_view::thumbnail_overlay::CELL_HEIGHT
+                    photo.width() + photo.margin_start() + photo.margin_end(),
+                    photo.height() + photo.margin_top() + photo.margin_bottom()
                 ),
-                "thumbnail cell geometry must match the configured dimensions"
+                "thumbnail cell must contain exactly the photo viewport and configured insets"
             );
         }
         println!(
@@ -404,6 +485,7 @@ pub(super) fn run(app: &adw::Application) {
         // Delete one cached image: GNOME generation must repair it in native mode;
         // cache-only environments expose a controlled placeholder, never fake success.
         let generation_path = &photos[103].1;
+        let missing_attempts = THUMB_ATTEMPTS.lock().unwrap().len();
         std::fs::remove_file(cache_path(generation_path)).unwrap();
         view.invalidate_thumbnails();
         until(|| view.thumbnail_stats().completed == 120 && !view.thumbnail_stats().running);
@@ -413,6 +495,7 @@ pub(super) fn run(app: &adw::Application) {
                 0,
                 "native GNOME generation failed"
             );
+            native_repair(&row, 103, generation_path, missing_attempts);
         } else {
             assert_eq!(
                 view.thumbnail_stats().failed,
@@ -420,6 +503,7 @@ pub(super) fn run(app: &adw::Application) {
                 "missing cache must be explicit"
             );
         }
+        let corrupt_attempts = THUMB_ATTEMPTS.lock().unwrap().len();
         std::fs::write(cache_path(&photos[104].1), b"invalid PNG thumbnail cache").unwrap();
         view.invalidate_thumbnails();
         until(|| view.thumbnail_stats().completed == 120 && !view.thumbnail_stats().running);
@@ -429,6 +513,7 @@ pub(super) fn run(app: &adw::Application) {
                 0,
                 "corrupt cache regeneration"
             );
+            native_repair(&row, 104, &photos[104].1, corrupt_attempts);
         } else {
             assert_eq!(
                 view.thumbnail_stats().failed,
@@ -652,7 +737,29 @@ fn production_windows(app: &adw::Application, photos: &[(usize, PathBuf)]) {
     // Reattach it before asking the production visibility state to hide.
     overlay.add_controller(motion.clone());
     motion.emit_by_name::<()>("motion", &[&20f64, &20f64]);
-    until(|| !strip.is_visible());
+    let pin: gtk::ToggleButton = find::<gtk::ToggleButton>(first.upcast_ref(), "thumbnail-toggle")
+        .next_sibling()
+        .unwrap()
+        .downcast()
+        .unwrap();
+    assert!(
+        !pin.is_active(),
+        "production hide requires an unpinned strip"
+    );
+    let hide_deadline = Instant::now() + Duration::from_secs(20);
+    while strip.is_visible() {
+        assert!(
+            Instant::now() < hide_deadline,
+            "production auto-hide deadline: overlay_height={} strip_height={} strip_request={} controller={:?} contains_pointer={} pin_active={}",
+            overlay.height(),
+            strip.height(),
+            strip.height_request(),
+            motion.name(),
+            motion.contains_pointer(),
+            pin.is_active()
+        );
+        pump();
+    }
     overlay.remove_controller(motion);
     gio::prelude::ActionGroupExt::activate_action(first, "next-media", None);
     until(|| {

@@ -316,8 +316,17 @@ fn widget_pixels(
 }
 fn controller<T: IsA<glib::Object> + glib::types::StaticType>(p: &impl IsA<gtk::Widget>) -> T {
     let list = p.observe_controllers();
+    // Several motion controllers now coexist. Target the production thumbnail
+    // controller by identity, and prefer its held instance after test detachment.
     (0..list.n_items())
-        .find_map(|i| list.item(i).unwrap().downcast().ok())
+        .find_map(|i| {
+            let value = list.item(i)?.downcast::<gtk::EventController>().ok()?;
+            if value.name().as_deref() == Some("pivra-thumbnail-visibility") {
+                value.upcast::<glib::Object>().downcast::<T>().ok()
+            } else {
+                None
+            }
+        })
         .or_else(|| {
             TEST_MOTIONS.with(|motions| {
                 motions.borrow().iter().find_map(|(widget, motion)| {
@@ -329,8 +338,10 @@ fn controller<T: IsA<glib::Object> + glib::types::StaticType>(p: &impl IsA<gtk::
                 })
             })
         })
+        .or_else(|| (0..list.n_items()).find_map(|i| list.item(i)?.downcast().ok()))
         .expect("controller")
 }
+
 fn point(v: &image_view::ImageView, bottom: bool) {
     controller::<gtk::EventControllerMotion>(v.widget()).emit_by_name::<()>(
         "motion",

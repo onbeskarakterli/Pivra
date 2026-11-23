@@ -1,0 +1,215 @@
+{
+  "schema": 1,
+  "reference": "9adca85940c09a31d200211ad2ab1314277f510a",
+  "tested_tree": "reference plus Task 01B working-tree changes, before commit",
+  "native_amd_acceptance": "NOT RUN in Codex; user rerun required",
+  "controlled": [
+    {
+      "source": "9adca85940c09a31d200211ad2ab1314277f510a",
+      "dirty": true,
+      "session": "x11",
+      "software_control": true,
+      "api": "opengl3",
+      "results": [
+        {
+          "name": "ownership-foreign",
+          "exit": 0,
+          "status": "PASS",
+          "diagnostic_events": 0,
+          "context_errors": 0,
+          "gpu_errors": 0,
+          "reasons": []
+        },
+        {
+          "name": "ownership-release",
+          "exit": 0,
+          "status": "PASS",
+          "diagnostic_events": 0,
+          "context_errors": 0,
+          "gpu_errors": 0,
+          "reasons": []
+        },
+        {
+          "name": "ownership-current",
+          "exit": 0,
+          "status": "PASS",
+          "diagnostic_events": 0,
+          "context_errors": 0,
+          "gpu_errors": 0,
+          "reasons": []
+        },
+        {
+          "name": "ownership-presentation",
+          "exit": 0,
+          "status": "PASS",
+          "diagnostic_events": 0,
+          "context_errors": 0,
+          "gpu_errors": 0,
+          "reasons": []
+        },
+        {
+          "name": "ownership-failure",
+          "exit": 0,
+          "status": "PASS",
+          "diagnostic_events": 0,
+          "context_errors": 0,
+          "gpu_errors": 8,
+          "reasons": []
+        },
+        {
+          "name": "mixed-lifecycle",
+          "exit": 0,
+          "status": "PASS",
+          "diagnostic_events": 647,
+          "context_errors": 0,
+          "gpu_errors": 0,
+          "reasons": []
+        },
+        {
+          "name": "error-cleanup",
+          "exit": 0,
+          "status": "PASS",
+          "diagnostic_events": 1,
+          "context_errors": 0,
+          "gpu_errors": 0,
+          "reasons": []
+        },
+        {
+          "name": "limited-presentation-controls",
+          "exit": 0,
+          "status": "PASS",
+          "diagnostic_events": 2,
+          "context_errors": 0,
+          "gpu_errors": 0,
+          "reasons": []
+        },
+        {
+          "name": "full-ramp-shader-controls",
+          "exit": 0,
+          "status": "PASS",
+          "diagnostic_events": 2,
+          "context_errors": 0,
+          "gpu_errors": 0,
+          "reasons": []
+        }
+      ],
+      "actual_contexts": [
+        "PIVRA_GPU_CONTEXT renderer=llvmpipe (LLVM 19.1.7, 256 bits) version=4.5 (Core Profile) Mesa 25.0.7-2+deb13u1"
+      ],
+      "drain_evidence": [
+        "LIFECYCLE_STAGE all filters retired ready contexts=0 frames=0 presentations=0",
+        "LIFECYCLE_STAGE reopen cleanup ready contexts=0 frames=0 presentations=0",
+        "LIFECYCLE_STAGE reopen cleanup ready contexts=0 frames=0 presentations=0",
+        "LIFECYCLE_STAGE reopen cleanup ready contexts=0 frames=0 presentations=0",
+        "LIFECYCLE_STAGE delete and close cleanup ready contexts=0 frames=0 presentations=0"
+      ]
+    },
+    {
+      "source": "9adca85940c09a31d200211ad2ab1314277f510a",
+      "dirty": true,
+      "session": "sway",
+      "software_control": true,
+      "api": "gles2",
+      "results": [
+        {
+          "name": "ownership-foreign",
+          "exit": 0,
+          "status": "PASS",
+          "diagnostic_events": 0,
+          "context_errors": 0,
+          "gpu_errors": 0,
+          "reasons": []
+        },
+        {
+          "name": "ownership-release",
+          "exit": 0,
+          "status": "PASS",
+          "diagnostic_events": 0,
+          "context_errors": 0,
+          "gpu_errors": 0,
+          "reasons": []
+        },
+        {
+          "name": "ownership-current",
+          "exit": 0,
+          "status": "PASS",
+          "diagnostic_events": 0,
+          "context_errors": 0,
+          "gpu_errors": 0,
+          "reasons": []
+        },
+        {
+          "name": "ownership-presentation",
+          "exit": 0,
+          "status": "PASS",
+          "diagnostic_events": 0,
+          "context_errors": 0,
+          "gpu_errors": 0,
+          "reasons": []
+        },
+        {
+          "name": "ownership-failure",
+          "exit": 0,
+          "status": "PASS",
+          "diagnostic_events": 0,
+          "context_errors": 0,
+          "gpu_errors": 8,
+          "reasons": []
+        },
+        {
+          "name": "mixed-lifecycle",
+          "exit": 0,
+          "status": "PASS",
+          "diagnostic_events": 612,
+          "context_errors": 0,
+          "gpu_errors": 0,
+          "reasons": []
+        },
+        {
+          "name": "error-cleanup",
+          "exit": 0,
+          "status": "PASS",
+          "diagnostic_events": 1,
+          "context_errors": 0,
+          "gpu_errors": 0,
+          "reasons": []
+        },
+        {
+          "name": "limited-presentation-controls",
+          "exit": 0,
+          "status": "PASS",
+          "diagnostic_events": 2,
+          "context_errors": 0,
+          "gpu_errors": 0,
+          "reasons": []
+        },
+        {
+          "name": "full-ramp-shader-controls",
+          "exit": 0,
+          "status": "PASS",
+          "diagnostic_events": 2,
+          "context_errors": 0,
+          "gpu_errors": 0,
+          "reasons": []
+        }
+      ],
+      "actual_contexts": [
+        "PIVRA_GPU_CONTEXT renderer=llvmpipe (LLVM 19.1.7, 256 bits) version=OpenGL ES 3.2 Mesa 25.0.7-2+deb13u1"
+      ],
+      "drain_evidence": [
+        "LIFECYCLE_STAGE all filters retired ready contexts=0 frames=0 presentations=0",
+        "LIFECYCLE_STAGE reopen cleanup ready contexts=0 frames=0 presentations=0",
+        "LIFECYCLE_STAGE reopen cleanup ready contexts=0 frames=0 presentations=0",
+        "LIFECYCLE_STAGE reopen cleanup ready contexts=0 frames=0 presentations=0",
+        "LIFECYCLE_STAGE delete and close cleanup ready contexts=0 frames=0 presentations=0"
+      ]
+    }
+  ],
+  "before_controls": {
+    "foreign_display": "egl->foreign_display should be TRUE (failed)",
+    "owned_context_retirement": "0 != 1 (failed)",
+    "caller_current_restored": "get_current() == caller should be TRUE (failed)",
+    "inline_dispatch": "pending_presentations 0 != 2 before UI dispatch (failed)",
+    "intermediate_parent_cleanup": "filters=0 workers=0 pending=0 contexts=4 frames=0 presentations=0 (failed before GstGLFilter parent gl_stop chaining)"
+  }
+}

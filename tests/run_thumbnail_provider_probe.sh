@@ -2,7 +2,11 @@
 # TH-01 capability/cache metadata only. Does not generate or display thumbnails.
 set -euo pipefail
 cd "$(dirname "${BASH_SOURCE[0]}")/.."
-test "$(git branch --show-current)" = dev
+# The authorized slideshow branch must retain this provider regression gate.
+case "$(git branch --show-current)" in
+  dev|feature/v0.2.7-slideshow) ;;
+  *) echo 'FAIL: use dev or feature/v0.2.7-slideshow for this probe' >&2; exit 1 ;;
+esac
 build=$(mktemp -d /tmp/pivra-thumbnail-factory.XXXXXX)
 trap 'rm -rf "$build"' EXIT
 unset PIVRA_THUMBNAIL_FACTORY_PROBE

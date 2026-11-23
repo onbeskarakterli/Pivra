@@ -149,15 +149,26 @@ pub(super) fn run(app: &adw::Application) {
     if std::env::args().any(|a| a == "--expect-scale=2") {
         assert_eq!(scale, 2, "real output scaling was not applied");
     }
+    // The established normal-mode Escape contract closes that window. Test it
+    // separately so fullscreen/paintable/decode-count checks keep their window.
+    {
+        let (escape_window, _escape_view, _escape_picture) = open(app);
+        assert!(
+            key_event(&escape_window, gdk::Key::Escape),
+            "normal Esc must close its window"
+        );
+        wait(|| !escape_window.is_visible());
+        assert!(
+            w.is_visible() && other.is_visible(),
+            "normal Escape affected another window"
+        );
+    }
     let normal = (w.width(), w.height());
     let content = w.content();
     let tree = v.widget().clone();
     let loads = LOADS.load(Ordering::SeqCst);
     let preloads = v.preload_stats().started;
-    assert!(
-        !key_event(&w, gdk::Key::Escape),
-        "normal Esc must propagate"
-    );
+
     for name in ["fit", "fill", "actual"] {
         gio::prelude::ActionGroupExt::activate_action(&w, "image-mode", Some(&name.to_variant()));
         image_bytes(&w, &p);
@@ -385,7 +396,16 @@ fn production(app: &adw::Application, native: bool) {
     for _ in 0..30 {
         gio::prelude::ActionGroupExt::activate_action(&w, "next-media", None);
     }
-    let label = p.next_sibling().unwrap().downcast::<gtk::Label>().unwrap();
+    // Overlay children include the video surface and transient photo fade.
+    // Locate the status label by type, retaining the exact error assertion.
+    let label = p
+        .parent()
+        .unwrap()
+        .observe_children()
+        .iter::<glib::Object>()
+        .filter_map(Result::ok)
+        .find_map(|child| child.downcast::<gtk::Label>().ok())
+        .expect("media error status label");
     wait(|| label.is_visible() && label.text().starts_with("Unable to display image."));
     assert!(actual(&w));
     assert!(key_event(&w, gdk::Key::Escape));

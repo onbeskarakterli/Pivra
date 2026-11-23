@@ -203,6 +203,8 @@ impl LoadSlot {
         let mut s = self.stats.get();
         s.running = self.active.borrow().len();
         s.pending = usize::from(self.pending.borrow().is_some());
+        pivra::performance::emit("image_workers_active", "snapshot", 0, s.running as u64);
+        pivra::performance::emit("image_pending_depth", "snapshot", 0, s.pending as u64);
         s
     }
 }

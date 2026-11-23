@@ -1,0 +1,429 @@
+{
+  "schema": 1,
+  "source": "726f6948cb391e620a4733348ab164ad3a7ea295",
+  "dirty": true,
+  "fixtures": {
+    "scan": "64x32 constant RGB PNG and empty MP4 entries, 4:1 ratio; insertion shuffled with seed 2601; enumeration/model timings only",
+    "native": "1600x1200 PNG, 8000x8000=64MP RGB PNG; generated H264 BT709/sRGB/unknown/full-range 192x96 videos"
+  },
+  "environment": {
+    "platform": "Linux-6.18.57-x86_64-with-glibc2.41",
+    "cpu_count": 5,
+    "clk_tck": 100,
+    "software_gl_test_permission": false
+  },
+  "cases": [
+    {
+      "wait4_max_rss_bytes": 13631488,
+      "wait4_cpu_seconds": 0.002668,
+      "timed_out": false,
+      "name": "scan-100-trace0",
+      "command": [
+        "<repo>/target/release/examples/performance_probe",
+        "<private-fixtures>/100"
+      ],
+      "exit": 0,
+      "status": "PASS",
+      "elapsed_s": 0.005880084994714707,
+      "parent_peak_sampled_rss_bytes": 0,
+      "parent_max_sampled_cpu_ticks": 0,
+      "diagnostic_events": 0,
+      "diagnostic_values": {},
+      "scenario_latencies": {},
+      "pipeline_results": [],
+      "diagnostic_latencies": {},
+      "latencies": {
+        "scan": {
+          "n": 11,
+          "median_us": 130,
+          "p95_us": 206,
+          "max_us": 206
+        },
+        "model_navigation_2000": {
+          "n": 11,
+          "median_us": 31,
+          "p95_us": 32,
+          "max_us": 32
+        }
+      },
+      "first_scan_us": 206,
+      "repeat_scan": {
+        "n": 10,
+        "median_us": 129.5,
+        "p95_us": 190,
+        "max_us": 190
+      }
+    },
+    {
+      "wait4_max_rss_bytes": 13762560,
+      "wait4_cpu_seconds": 0.003662,
+      "timed_out": false,
+      "name": "scan-100-trace1",
+      "command": [
+        "<repo>/target/release/examples/performance_probe",
+        "<private-fixtures>/100"
+      ],
+      "exit": 0,
+      "status": "PASS",
+      "elapsed_s": 0.02239038795232773,
+      "parent_peak_sampled_rss_bytes": 1261568,
+      "parent_max_sampled_cpu_ticks": 0,
+      "diagnostic_events": 33,
+      "diagnostic_values": {},
+      "scenario_latencies": {},
+      "pipeline_results": [],
+      "diagnostic_latencies": {
+        "directory_scan_total": {
+          "n": 11,
+          "median_us": 153,
+          "p95_us": 803,
+          "max_us": 803
+        },
+        "natural_sort": {
+          "n": 11,
+          "median_us": 19,
+          "p95_us": 21,
+          "max_us": 21
+        }
+      },
+      "latencies": {
+        "scan": {
+          "n": 11,
+          "median_us": 161,
+          "p95_us": 811,
+          "max_us": 811
+        },
+        "model_navigation_2000": {
+          "n": 11,
+          "median_us": 32,
+          "p95_us": 32,
+          "max_us": 32
+        }
+      },
+      "first_scan_us": 249,
+      "repeat_scan": {
+        "n": 10,
+        "median_us": 159.5,
+        "p95_us": 811,
+        "max_us": 811
+      }
+    },
+    {
+      "wait4_max_rss_bytes": 13762560,
+      "wait4_cpu_seconds": 0.017255,
+      "timed_out": false,
+      "name": "scan-1000-trace0",
+      "command": [
+        "<repo>/target/release/examples/performance_probe",
+        "<private-fixtures>/1000"
+      ],
+      "exit": 0,
+      "status": "PASS",
+      "elapsed_s": 0.02034581295447424,
+      "parent_peak_sampled_rss_bytes": 8192,
+      "parent_max_sampled_cpu_ticks": 0,
+      "diagnostic_events": 0,
+      "diagnostic_values": {},
+      "scenario_latencies": {},
+      "pipeline_results": [],
+      "diagnostic_latencies": {},
+      "latencies": {
+        "scan": {
+          "n": 11,
+          "median_us": 1423,
+          "p95_us": 1698,
+          "max_us": 1698
+        },
+        "model_navigation_2000": {
+          "n": 11,
+          "median_us": 32,
+          "p95_us": 32,
+          "max_us": 32
+        }
+      },
+      "first_scan_us": 1698,
+      "repeat_scan": {
+        "n": 10,
+        "median_us": 1419.5,
+        "p95_us": 1536,
+        "max_us": 1536
+      }
+    },
+    {
+      "wait4_max_rss_bytes": 13762560,
+      "wait4_cpu_seconds": 0.017,
+      "timed_out": false,
+      "name": "scan-1000-trace1",
+      "command": [
+        "<repo>/target/release/examples/performance_probe",
+        "<private-fixtures>/1000"
+      ],
+      "exit": 0,
+      "status": "PASS",
+      "elapsed_s": 0.031010301026981324,
+      "parent_peak_sampled_rss_bytes": 8192,
+      "parent_max_sampled_cpu_ticks": 0,
+      "diagnostic_events": 33,
+      "diagnostic_values": {},
+      "scenario_latencies": {},
+      "pipeline_results": [],
+      "diagnostic_latencies": {
+        "directory_scan_total": {
+          "n": 11,
+          "median_us": 1427,
+          "p95_us": 1511,
+          "max_us": 1511
+        },
+        "natural_sort": {
+          "n": 11,
+          "median_us": 298,
+          "p95_us": 313,
+          "max_us": 313
+        }
+      },
+      "latencies": {
+        "scan": {
+          "n": 11,
+          "median_us": 1435,
+          "p95_us": 1519,
+          "max_us": 1519
+        },
+        "model_navigation_2000": {
+          "n": 11,
+          "median_us": 30,
+          "p95_us": 31,
+          "max_us": 31
+        }
+      },
+      "first_scan_us": 1482,
+      "repeat_scan": {
+        "n": 10,
+        "median_us": 1434.5,
+        "p95_us": 1519,
+        "max_us": 1519
+      }
+    },
+    {
+      "wait4_max_rss_bytes": 14286848,
+      "wait4_cpu_seconds": 0.08836,
+      "timed_out": false,
+      "name": "scan-5000-trace0",
+      "command": [
+        "<repo>/target/release/examples/performance_probe",
+        "<private-fixtures>/5000"
+      ],
+      "exit": 0,
+      "status": "PASS",
+      "elapsed_s": 0.125595343997702,
+      "parent_peak_sampled_rss_bytes": 1929216,
+      "parent_max_sampled_cpu_ticks": 8,
+      "diagnostic_events": 0,
+      "diagnostic_values": {},
+      "scenario_latencies": {},
+      "pipeline_results": [],
+      "diagnostic_latencies": {},
+      "latencies": {
+        "scan": {
+          "n": 11,
+          "median_us": 7770,
+          "p95_us": 28745,
+          "max_us": 28745
+        },
+        "model_navigation_2000": {
+          "n": 11,
+          "median_us": 32,
+          "p95_us": 32,
+          "max_us": 32
+        }
+      },
+      "first_scan_us": 8573,
+      "repeat_scan": {
+        "n": 10,
+        "median_us": 7643.5,
+        "p95_us": 28745,
+        "max_us": 28745
+      }
+    },
+    {
+      "wait4_max_rss_bytes": 14286848,
+      "wait4_cpu_seconds": 0.12201499999999998,
+      "timed_out": false,
+      "name": "scan-5000-trace1",
+      "command": [
+        "<repo>/target/release/examples/performance_probe",
+        "<private-fixtures>/5000"
+      ],
+      "exit": 0,
+      "status": "PASS",
+      "elapsed_s": 0.16288989299209788,
+      "parent_peak_sampled_rss_bytes": 1982464,
+      "parent_max_sampled_cpu_ticks": 9,
+      "diagnostic_events": 33,
+      "diagnostic_values": {},
+      "scenario_latencies": {},
+      "pipeline_results": [],
+      "diagnostic_latencies": {
+        "directory_scan_total": {
+          "n": 11,
+          "median_us": 11938,
+          "p95_us": 28912,
+          "max_us": 28912
+        },
+        "natural_sort": {
+          "n": 11,
+          "median_us": 2927,
+          "p95_us": 3377,
+          "max_us": 3377
+        }
+      },
+      "latencies": {
+        "scan": {
+          "n": 11,
+          "median_us": 11951,
+          "p95_us": 28925,
+          "max_us": 28925
+        },
+        "model_navigation_2000": {
+          "n": 11,
+          "median_us": 50,
+          "p95_us": 54,
+          "max_us": 54
+        }
+      },
+      "first_scan_us": 24677,
+      "repeat_scan": {
+        "n": 10,
+        "median_us": 11855.5,
+        "p95_us": 28925,
+        "max_us": 28925
+      }
+    },
+    {
+      "wait4_max_rss_bytes": 137015296,
+      "wait4_cpu_seconds": 0.325504,
+      "timed_out": false,
+      "name": "secure-image-gui",
+      "command": [
+        "<repo>/target/release/examples/performance_gui_probe",
+        "<private-fixtures>"
+      ],
+      "exit": 1,
+      "status": "FAIL",
+      "elapsed_s": 0.41766607901081443,
+      "parent_peak_sampled_rss_bytes": 137007104,
+      "parent_max_sampled_cpu_ticks": 30,
+      "diagnostic_events": 23,
+      "diagnostic_values": {
+        "image_cache_charge_estimate": 0,
+        "image_cache_hits": 0,
+        "image_cache_misses": 0,
+        "preload_cancelled": 0,
+        "preload_completed": 0,
+        "preload_queue_depth": 0,
+        "preload_started": 0
+      },
+      "scenario_latencies": {},
+      "pipeline_results": [],
+      "diagnostic_latencies": {
+        "image_request_to_ready_callback": {
+          "n": 1,
+          "median_us": 173728,
+          "p95_us": 173728,
+          "max_us": 173728
+        },
+        "secure_image_load": {
+          "n": 1,
+          "median_us": 44500,
+          "p95_us": 44500,
+          "max_us": 44500
+        }
+      }
+    },
+    {
+      "name": "thumbnail-metadata",
+      "status": "NOT RUN",
+      "reason": "secure image gate unavailable"
+    },
+    {
+      "name": "thumbnail-system-generation",
+      "status": "NOT RUN",
+      "reason": "see real_thumbnail_pipeline in secure-image-gui; metadata probe alone is not generation evidence"
+    },
+    {
+      "wait4_max_rss_bytes": 281886720,
+      "wait4_cpu_seconds": 1.652024,
+      "timed_out": false,
+      "name": "video-lifecycle",
+      "command": [
+        "<repo>/target/release/examples/integrated_video_probe",
+        "<private-fixtures>/video/bt709.mp4",
+        "<private-fixtures>/video/srgb.mp4",
+        "<private-fixtures>/video/unknown.mp4",
+        "<private-fixtures>/video/full709.mp4"
+      ],
+      "exit": 101,
+      "status": "NOT RUN",
+      "elapsed_s": 10.158137172984425,
+      "parent_peak_sampled_rss_bytes": 282533888,
+      "parent_max_sampled_cpu_ticks": 141,
+      "reason": "required secure-decoder or hardware GL capability unavailable; inspect stderr, no bypass enabled",
+      "diagnostic_events": 4096,
+      "diagnostic_values": {
+        "image_cache_charge_estimate": 0,
+        "image_cache_hits": 0,
+        "image_cache_misses": 0,
+        "preload_cancelled": 0,
+        "preload_completed": 0,
+        "preload_queue_depth": 0,
+        "preload_started": 0,
+        "video_live_filters": 0
+      },
+      "scenario_latencies": {},
+      "pipeline_results": [],
+      "diagnostic_latencies": {
+        "directory_scan_total": {
+          "n": 4,
+          "median_us": 128.0,
+          "p95_us": 153,
+          "max_us": 153
+        },
+        "freedesktop_thumbnail_generate": {
+          "n": 8,
+          "median_us": 3.0,
+          "p95_us": 57,
+          "max_us": 57
+        },
+        "natural_sort": {
+          "n": 3,
+          "median_us": 1,
+          "p95_us": 11,
+          "max_us": 11
+        },
+        "video_metadata_discovery": {
+          "n": 1,
+          "median_us": 407291,
+          "p95_us": 407291,
+          "max_us": 407291
+        }
+      }
+    },
+    {
+      "name": "video-seek",
+      "status": "NOT RUN",
+      "reason": "video GL prerequisite unavailable"
+    }
+  ],
+  "limitations": [
+    "Warm filesystem caches are not flushed; first scan is not a guaranteed disk-cold read.",
+    "RSS samples exclude decoder child processes and GPU VRAM; shared mappings are not PSS. wait4 max RSS/CPU can include reaped descendants and is not a live process-tree sum.",
+    "20ms sampling can miss peaks/short processes; CPU is process ticks, not utilization percent.",
+    "Diagnostic I/O adds overhead; compare enabled/disabled runs separately.",
+    "p95 of 10-11 samples is exploratory, not a production SLA.",
+    "wait4 high-water RSS can also include launcher pre-exec mappings; it is not steady-state application RSS."
+  ],
+  "measurement_reference": "v0.2.5 726f6948cb391e620a4733348ab164ad3a7ea295 plus uncommitted Task 01 instrumentation; not an uninstrumented stable-binary benchmark",
+  "executable_sha256": {
+    "performance_probe": "e7a0f46cf66d26513b20c982bf0435fae64f8c87b0fa8e88cda70dcac8c2526f",
+    "performance_gui_probe": "e7e479474ee954d40cc1c975c704da045be37528bcf72538583cd27cfea6a96a"
+  }
+}

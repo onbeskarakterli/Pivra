@@ -1,12 +1,9 @@
+> Current release target: **0.2.7**. Native Arch staging, package build and owner acceptance passed.
+> See [v0.2.7 validation evidence](../../docs/releases/PIVRA_V0.2.7_RC_VALIDATION.md); immutable source hash and publication are separate checks.
+
 # Building Pivra from source on Linux (experimental)
 
-The `dev` branch reports **Pivra 0.2.5**, the upcoming release candidate. The latest
-published stable release remains v0.2.4; the version bump does not publish or
-update AUR. Native Arch GPU-enabled staging and physical AMD OpenGL playback
-were accepted by the user before this bump. The new 0.2.5 artifacts require
-candidate staging again. Experimental DNG remains explicit opt-in, not a default
-format-support claim.
-
+Pivra **0.2.7** includes fullscreen slideshow, persistent toolbar preferences and in-window Open. XWayland is the temporary default where available due to the GTK Wayland EGL lifecycle issue. Native Arch build, staging, package installation and owner GNOME acceptance passed; immutable publication source hashes remain a separate verification. Non-Arch distribution acceptance remains unverified.
 
 ## Common Makefile interface (development branch)
 
@@ -132,12 +129,20 @@ Run `bash packaging/arch/stage-video-candidate.sh` on clean native Arch for the
 single candidate staging step. It does not run makepkg or install system files.
 After explicit immutable-source approval, use a separate release workspace for
 makepkg source verification, real .SRCINFO generation and package checks.
-`python3 scripts/release_preflight.py --version 0.2.5 --candidate --staging-root
+`python3 scripts/release_preflight.py --version 0.2.7 --candidate --staging-root
 /path/to/stage` validates this candidate. Final preflight omits --candidate and
-requires README/release notes to identify v0.2.5 as current stable; that handoff
-must be explicitly authorized before final source approval/publication.
+requires README/release notes to identify v0.2.7 as current stable; that handoff
+is authorized by the project owner, but final source archive and publication still require verification.
 
 ## Known limitations
+
+- Stock GTK 4.24.1 Wayland mixed GPU/stock playback can invalidate a shared
+  EGLDisplay; the private ownership fix is not installed by this helper. On a
+  system with XWayland/X11, `GDK_BACKEND=x11 GSK_RENDERER=gl pivra /path/to/video.mp4`
+  is a per-process workaround accepted on the native AMD test system. No global
+  overrides or system GTK patches are applied. A separate software candidate
+  SIGSEGV remains OPEN; [release risk decisions](../../docs/releases/PIVRA_V0.2.7_RC_VALIDATION.md)
+  are pending.
 
 - Intel/NVIDIA GPU paths are untested; Vulkan adapter interop is not implemented.
 - Native HDR visual preservation, hardware decoding and end-to-end zero-copy
@@ -150,6 +155,6 @@ must be explicitly authorized before final source approval/publication.
 - The historical accepted `Preload exceeds cache entry budget` observation is not
   claimed fixed; see the existing release/audit records.
 
-See the [v0.2.5 release notes](../../docs/releases/PIVRA_V0.2.5_RELEASE_NOTES.md),
-[candidate report](../../docs/releases/PIVRA_V0.2.5_RC_VALIDATION.md) and
+See the [v0.2.7 release notes](../../docs/releases/PIVRA_V0.2.7_RELEASE_NOTES.md),
+[candidate report](../../docs/releases/PIVRA_V0.2.7_RC_VALIDATION.md) and
 [LGPL rebuild instructions](../../docs/diagnostics/VIDEO_ADAPTER_REBUILD.md).

@@ -51,13 +51,29 @@ static ACTIVE: AtomicUsize = AtomicUsize::new(0);
 static PROBES: AtomicUsize = AtomicUsize::new(0);
 static STOCK: AtomicUsize = AtomicUsize::new(0);
 static GPU: AtomicUsize = AtomicUsize::new(0);
+static LAST_FILTERS: AtomicUsize = AtomicUsize::new(usize::MAX);
 #[cfg(pivra_gpu_backend)]
 unsafe extern "C" {
     fn pivra_gpu_backend_type() -> glib::ffi::GType;
     fn pivra_gpu_eligible(uri: *const std::ffi::c_char) -> std::ffi::c_int;
     fn pivra_gpu_live_filters() -> std::ffi::c_int;
+    fn pivra_gpu_live_contexts() -> std::ffi::c_int;
+    fn pivra_gpu_held_frames() -> std::ffi::c_int;
+    fn pivra_gpu_pending_presentations() -> std::ffi::c_int;
+    fn pivra_gpu_trace_binding(stage: *const std::ffi::c_char);
+    fn pivra_gpu_watch_stock(stream: *mut glib::gobject_ffi::GObject);
+}
+
+pub fn trace_binding(stage: &std::ffi::CStr) {
+    #[cfg(pivra_gpu_backend)]
+    if std::env::var_os("PIVRA_TRACE_VIDEO").is_some() {
+        unsafe { pivra_gpu_trace_binding(stage.as_ptr()) };
+    }
+    #[cfg(not(pivra_gpu_backend))]
+    let _ = stage;
 }
 fn discover(path: &Path) -> Backend {
+    let _measurement = pivra::performance::Span::new("video_metadata_discovery");
     PROBES.fetch_add(1, Ordering::SeqCst);
     #[cfg(pivra_gpu_backend)]
     {
@@ -123,8 +139,17 @@ pub async fn choose(path: PathBuf, current: impl Fn() -> bool) -> Option<Backend
     if std::env::var_os("PIVRA_TRACE_VIDEO").is_some() {
         let s = stats();
         eprintln!(
-            "PIVRA_VIDEO_SELECTION {result:?} workers={} pending={} cached={} filters={} probes={} stock={} gpu={}",
-            s.workers, s.pending, s.cached, s.filters, s.probes, s.stock, s.gpu
+            "PIVRA_VIDEO_SELECTION {result:?} workers={} pending={} cached={} filters={} contexts={} frames={} presentations={} probes={} stock={} gpu={}",
+            s.workers,
+            s.pending,
+            s.cached,
+            s.filters,
+            s.contexts,
+            s.frames,
+            s.presentations,
+            s.probes,
+            s.stock,
+            s.gpu
         );
     }
     current().then_some(result)
@@ -134,6 +159,9 @@ pub struct Stats {
     pub pending: usize,
     pub cached: usize,
     pub filters: usize,
+    pub contexts: usize,
+    pub frames: usize,
+    pub presentations: usize,
     pub probes: usize,
     pub stock: usize,
     pub gpu: usize,
@@ -141,14 +169,27 @@ pub struct Stats {
 pub fn stats() -> Stats {
     let c = cache().lock().unwrap();
     #[cfg(pivra_gpu_backend)]
-    let filters = unsafe { pivra_gpu_live_filters() }.max(0) as usize;
+    let (filters, contexts, frames, presentations) = unsafe {
+        (
+            pivra_gpu_live_filters().max(0) as usize,
+            pivra_gpu_live_contexts().max(0) as usize,
+            pivra_gpu_held_frames().max(0) as usize,
+            pivra_gpu_pending_presentations().max(0) as usize,
+        )
+    };
     #[cfg(not(pivra_gpu_backend))]
-    let filters = 0;
+    let (filters, contexts, frames, presentations) = (0, 0, 0, 0);
+    if pivra::performance::enabled() && LAST_FILTERS.swap(filters, Ordering::Relaxed) != filters {
+        pivra::performance::emit("video_live_filters", "observed_count", 0, filters as u64);
+    }
     Stats {
         workers: ACTIVE.load(Ordering::SeqCst),
         pending: c.pending.len(),
         cached: c.entries.len(),
         filters,
+        contexts,
+        frames,
+        presentations,
         probes: PROBES.load(Ordering::SeqCst),
         stock: STOCK.load(Ordering::SeqCst),
         gpu: GPU.load(Ordering::SeqCst),
@@ -159,7 +200,13 @@ pub fn is_owned(media: &gtk::MediaFile) -> bool {
 }
 fn stock(path: &Path) -> gtk::MediaFile {
     STOCK.fetch_add(1, Ordering::SeqCst);
+    trace_binding(c"stock-open-begin");
     let media = gtk::MediaFile::for_filename(path);
+    trace_binding(c"stock-open-end");
+    #[cfg(pivra_gpu_backend)]
+    unsafe {
+        pivra_gpu_watch_stock(media.as_ptr().cast());
+    }
     if std::env::var_os("PIVRA_TRACE_VIDEO").is_some() {
         eprintln!(
             "PIVRA_GPU_STOCK type={} file={}",
@@ -169,9 +216,29 @@ fn stock(path: &Path) -> gtk::MediaFile {
     }
     media
 }
+#[allow(dead_code)] // Standalone GPU probes intentionally have no native window surface.
 pub fn open_selected(path: &Path, backend: Backend) -> Result<gtk::MediaFile, String> {
+    open_selected_on_surface(path, backend, None)
+}
+/// Production supplies its realized native surface before setting the filename:
+/// GtkPicture/ActualPaintable does not forward GtkMediaStream realization.
+pub fn open_selected_on_surface(
+    path: &Path,
+    backend: Backend,
+    surface: Option<&gtk::gdk::Surface>,
+) -> Result<gtk::MediaFile, String> {
     if backend == Backend::Stock {
-        return Ok(stock(path));
+        let media = stock(path);
+        if let Some(surface) = surface {
+            media.realize(surface);
+        }
+        if let Some(error) = media.error() {
+            if let Some(surface) = surface {
+                media.unrealize(surface);
+            }
+            return Err(error.to_string());
+        }
+        return Ok(media);
     }
     let renderer = if gtk::minor_version() < 20 {
         "ngl"
@@ -182,7 +249,7 @@ pub fn open_selected(path: &Path, backend: Backend) -> Result<gtk::MediaFile, St
         eprintln!(
             "Pivra GPU correction unavailable with selected renderer; stock retained (requires {renderer})"
         );
-        return Ok(stock(path));
+        return open_selected_on_surface(path, Backend::Stock, surface);
     }
     #[cfg(pivra_gpu_backend)]
     {
@@ -195,8 +262,15 @@ pub fn open_selected(path: &Path, backend: Backend) -> Result<gtk::MediaFile, St
             .map_err(|_| "GPU construction failed")?;
         debug_assert!(is_owned(&media));
         GPU.fetch_add(1, Ordering::SeqCst);
+        if let Some(surface) = surface {
+            media.realize(surface);
+        }
         media.set_filename(Some(path));
         if let Some(error) = media.error() {
+            if let Some(surface) = surface {
+                media.unrealize(surface);
+            }
+            media.clear();
             return Err(error.to_string());
         }
         eprintln!(

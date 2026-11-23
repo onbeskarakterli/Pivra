@@ -1,0 +1,298 @@
+{
+  "implementation_commit": "aeb66c9dfdd872ff432be48afaa45d671ca311d0",
+  "base": "757706bd5227ff2afe9e1ab55b32022f8539347f",
+  "tested_tree": "implementation sources before commit; healthy real-video checks plus final fast-fail state controls",
+  "user_reported_native": {
+    "gpu_context": "PASS",
+    "GLMemory": "PASS",
+    "frame_presentation": "PASS",
+    "production_test": "PASS",
+    "real_video_raw_wrapper_max_channel_difference": 0,
+    "controls_before_fix": "FAIL: control gate requires a prepared, seekable finite video",
+    "prepared_seekable_duration_values": "NOT SUPPLIED; which individual native predicate failed cannot be recovered from old message"
+  },
+  "diagnosis": "Proven harness ordering gap: first rendered frame is not a GTK preparation barrier; exact native offending field still unobserved",
+  "correction": "Probe-only GLib preparation barrier; keep all original finite/seekable/error checks, fail fast for invalid prepared capabilities",
+  "unchanged_deadlines_seconds": {
+    "shared_frame_and_preparation": 15,
+    "seek_completion": 5
+  },
+  "checks": {
+    "sdk_video": {
+      "report": "/tmp/pivra-control-sdk-8591tz7q/report.json",
+      "report_sha256": "793b6197e6746e0321a37d65531c43465795ca03008b3d82962917ab6f82b258",
+      "scope": "SDK GTK 4.18.6 software regression; controlled preparation cases are not decode/GPU evidence",
+      "results": [
+        {
+          "name": "preparation-order",
+          "status": "PASS",
+          "exit": 0,
+          "backend": "x11"
+        },
+        {
+          "name": "real-video-controls",
+          "status": "PASS",
+          "exit": 0,
+          "backend": "x11"
+        },
+        {
+          "name": "production-window",
+          "status": "PASS",
+          "exit": 0,
+          "backend": "x11"
+        },
+        {
+          "name": "preparation-order",
+          "status": "PASS",
+          "exit": 0,
+          "backend": "sway"
+        },
+        {
+          "name": "real-video-controls",
+          "status": "PASS",
+          "exit": 0,
+          "backend": "sway"
+        },
+        {
+          "name": "production-window",
+          "status": "PASS",
+          "exit": 0,
+          "backend": "sway"
+        }
+      ]
+    },
+    "isolated_gtk": {
+      "report": "/tmp/pivra-gtk-egl-isolated-oxekd78o/report.json",
+      "report_sha256": "610b56ed01725814d30268d39a8a5042333b50fbd2a0ce7a7606d3ff016b7895",
+      "scope": "private GTK 4.24.1 software comparison",
+      "results": [
+        {
+          "name": "baseline-context",
+          "status": "PASS",
+          "exit": 0,
+          "backend": "wayland",
+          "variant": "baseline"
+        },
+        {
+          "name": "baseline-preparation-order",
+          "status": "PASS",
+          "exit": 0,
+          "backend": "wayland",
+          "variant": "baseline"
+        },
+        {
+          "name": "baseline-gpu-color-controls",
+          "status": "PASS",
+          "exit": 0,
+          "backend": "wayland",
+          "variant": "baseline"
+        },
+        {
+          "name": "baseline-production-window",
+          "status": "PASS",
+          "exit": 0,
+          "backend": "wayland",
+          "variant": "baseline"
+        },
+        {
+          "name": "patched-context",
+          "status": "PASS",
+          "exit": 0,
+          "backend": "wayland",
+          "variant": "patched"
+        },
+        {
+          "name": "patched-preparation-order",
+          "status": "PASS",
+          "exit": 0,
+          "backend": "wayland",
+          "variant": "patched"
+        },
+        {
+          "name": "patched-gpu-color-controls",
+          "status": "PASS",
+          "exit": 0,
+          "backend": "wayland",
+          "variant": "patched"
+        },
+        {
+          "name": "patched-production-window",
+          "status": "PASS",
+          "exit": 0,
+          "backend": "wayland",
+          "variant": "patched"
+        },
+        {
+          "name": "baseline-context",
+          "status": "PASS",
+          "exit": 0,
+          "backend": "x11",
+          "variant": "baseline"
+        },
+        {
+          "name": "baseline-preparation-order",
+          "status": "PASS",
+          "exit": 0,
+          "backend": "x11",
+          "variant": "baseline"
+        },
+        {
+          "name": "baseline-gpu-color-controls",
+          "status": "PASS",
+          "exit": 0,
+          "backend": "x11",
+          "variant": "baseline"
+        },
+        {
+          "name": "baseline-production-window",
+          "status": "PASS",
+          "exit": 0,
+          "backend": "x11",
+          "variant": "baseline"
+        },
+        {
+          "name": "patched-context",
+          "status": "PASS",
+          "exit": 0,
+          "backend": "x11",
+          "variant": "patched"
+        },
+        {
+          "name": "patched-preparation-order",
+          "status": "PASS",
+          "exit": 0,
+          "backend": "x11",
+          "variant": "patched"
+        },
+        {
+          "name": "patched-gpu-color-controls",
+          "status": "PASS",
+          "exit": 0,
+          "backend": "x11",
+          "variant": "patched"
+        },
+        {
+          "name": "patched-production-window",
+          "status": "PASS",
+          "exit": 0,
+          "backend": "x11",
+          "variant": "patched"
+        }
+      ],
+      "unchanged_libraries": {
+        "baseline": {
+          "source": "/workspace/pivra-environment/egl-isolated/gtk-4.24.1",
+          "build": "/workspace/pivra-environment/egl-isolated/baseline-build",
+          "library": "/workspace/pivra-environment/egl-isolated/baseline-build/gtk/libgtk-4.so.1.2400.1",
+          "sha256": "0a8764ab8fa034d300d60c77a2ade0c1e5e47f0f09fcaef0e4ce6118bc20824e",
+          "stock_module_built": false
+        },
+        "patched": {
+          "source": "/workspace/pivra-environment/egl-isolated/gtk-patched",
+          "build": "/workspace/pivra-environment/egl-isolated/patched-build",
+          "library": "/workspace/pivra-environment/egl-isolated/patched-build/gtk/libgtk-4.so.1.2400.1",
+          "sha256": "b58fa5d49fae32606cbcdc071a18bd17a68599c7b27495ba17e4b33f49663e53",
+          "stock_module_built": false
+        }
+      }
+    },
+    "final_controlled_states": {
+      "report": "/tmp/pivra-preparation-final-ny80g3pg/report.json",
+      "report_sha256": "01b998aac3184cd7fb48740d3694595f4df988e2efbe9f8f883fc8884a8650f6",
+      "scope": "7 controlled GTK preparation state cases per process, not real decode/GPU evidence",
+      "results": [
+        {
+          "name": "sdk",
+          "status": "PASS",
+          "exit": 0,
+          "session": "x11",
+          "gtk": "sdk"
+        },
+        {
+          "name": "baseline",
+          "status": "PASS",
+          "exit": 0,
+          "session": "x11",
+          "gtk": "baseline"
+        },
+        {
+          "name": "patched",
+          "status": "PASS",
+          "exit": 0,
+          "session": "x11",
+          "gtk": "patched"
+        },
+        {
+          "name": "sdk",
+          "status": "PASS",
+          "exit": 0,
+          "session": "sway",
+          "gtk": "sdk"
+        },
+        {
+          "name": "baseline",
+          "status": "PASS",
+          "exit": 0,
+          "session": "sway",
+          "gtk": "baseline"
+        },
+        {
+          "name": "patched",
+          "status": "PASS",
+          "exit": 0,
+          "session": "sway",
+          "gtk": "patched"
+        }
+      ]
+    }
+  },
+  "controlled_state_cases_per_process": 7,
+  "final_controlled_state_checks": 42,
+  "quality": {
+    "fmt-final": {
+      "status": "PASS",
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "check": {
+      "status": "PASS",
+      "log_sha256": "cf81121366258f709d84e82e58a1a1963b14fc32d40f712151c65a638ab924c1"
+    },
+    "clippy-final": {
+      "status": "PASS",
+      "log_sha256": "6dc12f49230f182b22f221a682619aa1989096cd2fd56428a26c2f9abb37a693"
+    },
+    "rust": {
+      "status": "PASS",
+      "log_sha256": "f62756756a289921f427a42c0eaa4fde275a7cdae964a352c1fdbbde4f9cfc6f"
+    },
+    "python-root": {
+      "status": "PASS",
+      "log_sha256": "0d853f0ab7a4cfe0d7b1c49904482ba98da490ccbc24092abb65920200dca699"
+    },
+    "python-thumbnail": {
+      "status": "PASS",
+      "log_sha256": "8eddb28a64ae4875bceb162806e96151b7db4e1b91c22863d81ceb4a7d529069"
+    },
+    "python-fd05a": {
+      "status": "PASS",
+      "log_sha256": "f9fd52ad1ff09651c49285b6e7e5150e81914830dccc08a31e4bc415681bbcbb"
+    },
+    "python-color": {
+      "status": "PASS",
+      "log_sha256": "26e4fc70ea6b6384bf46375bf00ad2ce38024aabcad5482770bd95e72ba6bbc6"
+    },
+    "python-gpu": {
+      "status": "PASS",
+      "log_sha256": "bed95515ffe1ea05b3d6dfa226ff2d19844dd56f967f652c70111ae9c47ca89d"
+    },
+    "release": {
+      "status": "PASS",
+      "log_sha256": "7a7bb64a28cdda9b91e6e27f41be455104d929b5d7ad6dd5beca75fc5a47f1f4"
+    }
+  },
+  "rust_tests": 217,
+  "python_tests": 236,
+  "protected_scope": "No production source, GPU engine, shader, performance policy, GTK EGL patch, dependencies, version or packaging changes",
+  "native_after_fix": "NOT RUN in Codex; targeted control acceptance PENDING",
+  "publication": "BLOCKED; upstream/backport delivery requirement unchanged; no main/tag/release/AUR actions"
+}

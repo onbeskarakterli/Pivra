@@ -288,6 +288,7 @@ pub(crate) fn install(
     resize.set_propagation_phase(gtk::PropagationPhase::Capture);
     overlay.add_controller(resize);
     let motion = gtk::EventControllerMotion::new();
+    motion.set_name(Some("pivra-thumbnail-visibility"));
     motion.set_propagation_phase(gtk::PropagationPhase::Capture);
     let enter = state.clone();
     motion.connect_enter(move |_, _, y| enter.motion(y));

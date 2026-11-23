@@ -129,6 +129,19 @@ impl Provider {
     }
     /// One request, no pending queue; worker-only. Factory probe bounded to one second.
     pub fn query(&self, path: &Path, cancel: &gio::Cancellable) -> Outcome {
+        let mut measurement = crate::performance::Span::new("gnome_thumbnail_query");
+        let result = self.query_measured(path, cancel);
+        measurement.status(match &result {
+            Outcome::Hit(_) => "hit",
+            Outcome::Missing => "miss",
+            Outcome::Stale => "stale",
+            Outcome::Busy => "busy",
+            Outcome::Cancelled => "cancelled",
+            _ => "other",
+        });
+        result
+    }
+    fn query_measured(&self, path: &Path, cancel: &gio::Cancellable) -> Outcome {
         if !self.gnome {
             return Outcome::UnsupportedDesktop;
         }
@@ -323,6 +336,7 @@ pub fn generation_helper() -> Option<PathBuf> {
 /// Worker-only, cache first. A failed attempt is terminal until source/catalog
 /// invalidation; no implicit retries and no persistent failure marker on sandbox errors.
 pub fn query_or_generate(provider: &Provider, path: &Path, cancel: &gio::Cancellable) -> Outcome {
+    let _measurement = crate::performance::Span::new("gnome_thumbnail_request");
     crate::thumbnail_diagnostics::trace("gnome-query", Some(path), "cache lookup");
     let outcome = provider.query(path, cancel);
     match &outcome {

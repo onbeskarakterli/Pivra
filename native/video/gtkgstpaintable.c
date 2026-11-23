@@ -22,6 +22,7 @@
 #include "gtkgstpaintableprivate.h"
 #include "gtkgstsinkprivate.h"
 #include "filter.c"
+#include "lifecycle.h"
 
 #include <gtk/gtk.h>
 
@@ -40,7 +41,13 @@ struct _PivraGpuPaintable
 
   GdkSurface *surface;
   gint pending;
+  gint epoch;
+  GMutex presentation_lock;
+  guint presentation_sources[2];
 };
+
+static gint pending_presentations;
+int pivra_gpu_pending_presentations(void) { return g_atomic_int_get(&pending_presentations); }
 
 struct _PivraGpuPaintableClass
 {
@@ -206,6 +213,12 @@ pivra_gpu_paintable_paintable_init (GdkPaintableInterface *iface)
 GstElement *
 pivra_gpu_paintable_create_sink (PivraGpuPaintable *self)
 {
+  return pivra_gpu_paintable_create_sink_full(self, NULL);
+}
+
+GstElement *
+pivra_gpu_paintable_create_sink_full (PivraGpuPaintable *self, GError **out_error)
+{
   GstElement *sink;
   gboolean uses_gl;
   GdkDisplay *display;
@@ -217,17 +230,31 @@ pivra_gpu_paintable_create_sink (PivraGpuPaintable *self)
   else
     display = gdk_display_get_default ();
 
-  context = gdk_display_create_gl_context (display, &error);
+  /* A GtkPicture wrapping a media paintable does not realize the stream like
+   * GtkVideo does. Production must bind the native surface before opening.
+   * Surface creation matches the window's configuration/share group. Keep the
+   * display-only path for standalone/offscreen API users. */
+  context = self->surface ? gdk_surface_create_gl_context(self->surface, &error)
+                          : gdk_display_create_gl_context (display, &error);
+  if (g_getenv("PIVRA_TRACE_VIDEO"))
+    g_printerr("PIVRA_GPU_INITIALIZE source=%s surface=%p\n",
+               self->surface ? "window-surface" : "offscreen-display", (void *)self->surface);
   if (context == NULL)
     {
       GST_INFO ("failed to create GDK GL context: %s", error->message);
-      g_error_free (error);
+      g_printerr("PIVRA_GPU_CONTEXT_FAILURE stage=create-gdk-context reason=%s\n",error->message);
+      g_printerr("PIVRA_GPU_FAIL no shared GL context\n");
+      g_propagate_error(out_error, error);
+      return NULL;
     }
   else if (!gdk_gl_context_realize (context, &error))
     {
       GST_INFO ("failed to realize GDK GL context: %s", error->message);
+      g_printerr("PIVRA_GPU_CONTEXT_FAILURE stage=realize-gdk-context reason=%s\n",error->message);
       g_clear_object (&context);
-      g_error_free (error);
+      g_printerr("PIVRA_GPU_FAIL no shared GL context\n");
+      g_propagate_error(out_error, error);
+      return NULL;
     }
 
   sink = g_object_new (PIVRA_TYPE_GPU_SINK,
@@ -240,6 +267,8 @@ pivra_gpu_paintable_create_sink (PivraGpuPaintable *self)
 
   if (!uses_gl) {
       g_printerr ("PIVRA_GPU_FAIL no shared GL context\n");
+      g_set_error_literal(out_error, GDK_GL_ERROR, GDK_GL_ERROR_NOT_AVAILABLE,
+                          "GL context sharing/activation failed; see preceding context diagnostics");
       g_object_unref(sink); g_clear_object(&context); return NULL;
     }
   {
@@ -253,6 +282,8 @@ pivra_gpu_paintable_create_sink (PivraGpuPaintable *self)
     GstPad *pad;
     if (!upload || !convert) {
       g_printerr ("PIVRA_GPU_FAIL missing glupload/glcolorconvert\n");
+      g_set_error_literal(out_error, G_IO_ERROR, G_IO_ERROR_NOT_SUPPORTED,
+                          "Missing GStreamer glupload/glcolorconvert");
       if(upload) gst_object_unref(upload);
       if(convert) gst_object_unref(convert);
       gst_object_unref(normalize); gst_object_unref(transfer); gst_object_unref(sink); gst_object_unref(bin);
@@ -260,6 +291,7 @@ pivra_gpu_paintable_create_sink (PivraGpuPaintable *self)
     }
     gst_bin_add_many(GST_BIN(bin), upload, convert, normalize, transfer, sink, NULL);
     if (!gst_element_link_many(upload, convert, normalize, transfer, sink, NULL)) {
+      g_set_error_literal(out_error, G_IO_ERROR, G_IO_ERROR_FAILED, "GPU filter chain link failed");
       gst_object_unref(bin); g_clear_object(&context); return NULL;
     }
     pad = gst_element_get_static_pad(upload, "sink");
@@ -283,8 +315,19 @@ pivra_gpu_paintable_dispose (GObject *object)
   PivraGpuPaintable *self = PIVRA_GPU_PAINTABLE (object);
 
   g_clear_object (&self->image);
+  g_clear_object (&self->surface);
 
   G_OBJECT_CLASS (pivra_gpu_paintable_parent_class)->dispose (object);
+}
+
+static void
+pivra_gpu_paintable_finalize (GObject *object)
+{
+  PivraGpuPaintable *self = PIVRA_GPU_PAINTABLE(object);
+  /* Pending sources each own self; finalization cannot precede their release. */
+  g_assert_cmpint(g_atomic_int_get(&self->pending), ==, 0);
+  g_mutex_clear(&self->presentation_lock);
+  G_OBJECT_CLASS(pivra_gpu_paintable_parent_class)->finalize(object);
 }
 
 static void
@@ -293,11 +336,13 @@ pivra_gpu_paintable_class_init (PivraGpuPaintableClass *klass)
   GObjectClass *object_class = G_OBJECT_CLASS (klass);
 
   object_class->dispose = pivra_gpu_paintable_dispose;
+  object_class->finalize = pivra_gpu_paintable_finalize;
 }
 
 static void
 pivra_gpu_paintable_init (PivraGpuPaintable *self)
 {
+  g_mutex_init(&self->presentation_lock);
 }
 
 GdkPaintable *
@@ -313,7 +358,7 @@ pivra_gpu_paintable_realize (PivraGpuPaintable *self,
   if (self->surface)
     return;
 
-  self->surface = surface;
+  g_set_object (&self->surface, surface);
 }
 
 void
@@ -326,7 +371,28 @@ pivra_gpu_paintable_unrealize (PivraGpuPaintable *self,
    */
 
   if (self->surface == surface)
-    self->surface = NULL;
+    g_clear_object (&self->surface);
+}
+
+/* Called on GTK's thread after the pipeline has reached NULL. Cancel queued
+ * sources now; an executing callback keeps its refs until its normal return. */
+void pivra_gpu_paintable_reset(PivraGpuPaintable *self) {
+  guint sources[2];
+  g_mutex_lock(&self->presentation_lock);
+  g_atomic_int_inc(&self->epoch);
+  for (guint i=0; i<G_N_ELEMENTS(sources); i++) {
+    sources[i]=self->presentation_sources[i];
+    self->presentation_sources[i]=0;
+  }
+  g_mutex_unlock(&self->presentation_lock);
+  /* Reset is on GTK's thread after state NULL. Destroy outside the mutex:
+   * notifiers release pending textures/buffers and take this mutex themselves. */
+  for (guint i=0; i<G_N_ELEMENTS(sources); i++)
+    if (sources[i]) g_source_remove(sources[i]);
+  g_clear_object(&self->image);
+  gdk_paintable_invalidate_size(GDK_PAINTABLE(self));
+  gdk_paintable_invalidate_contents(GDK_PAINTABLE(self));
+  pivra_video_lifecycle("paintable-reset", self);
 }
 
 static void
@@ -374,12 +440,25 @@ struct _SetTextureInvocation {
   double           pixel_aspect_ratio;
   graphene_rect_t  viewport;
   int              orientation;
+  gint             epoch;
+  guint            source_id;
 };
+
+static void
+forget_presentation_source(PivraGpuPaintable *self, guint id)
+{
+  g_mutex_lock(&self->presentation_lock);
+  for (guint i=0; i<G_N_ELEMENTS(self->presentation_sources); i++)
+    if (self->presentation_sources[i] == id) self->presentation_sources[i]=0;
+  g_mutex_unlock(&self->presentation_lock);
+}
 
 static void
 set_texture_invocation_free (SetTextureInvocation *invoke)
 {
+  forget_presentation_source(invoke->paintable, invoke->source_id);
   g_atomic_int_add (&invoke->paintable->pending, -1);
+  g_atomic_int_add (&pending_presentations, -1);
   g_object_unref (invoke->paintable);
   g_object_unref (invoke->texture);
 
@@ -391,7 +470,12 @@ pivra_gpu_paintable_set_texture_invoke (gpointer data)
 {
   SetTextureInvocation *invoke = data;
 
-  pivra_gpu_paintable_set_paintable (invoke->paintable,
+  /* Reset may be invoked reentrantly by an invalidate signal. A currently
+   * dispatching source must retain its references until this callback returns;
+   * only not-yet-dispatched sources can be cancelled immediately. */
+  forget_presentation_source(invoke->paintable, invoke->source_id);
+  if (invoke->epoch == g_atomic_int_get(&invoke->paintable->epoch))
+    pivra_gpu_paintable_set_paintable (invoke->paintable,
                                    GDK_PAINTABLE (invoke->texture),
                                    invoke->pixel_aspect_ratio,
                                    &invoke->viewport,
@@ -409,18 +493,36 @@ pivra_gpu_paintable_queue_set_texture (PivraGpuPaintable       *self,
 {
   SetTextureInvocation *invoke;
 
-  if (g_atomic_int_add (&self->pending, 1) >= 2) { g_atomic_int_add (&self->pending, -1); return; }
+  g_mutex_lock(&self->presentation_lock);
+  if (g_atomic_int_get(&self->pending) >= 2) {
+    g_mutex_unlock(&self->presentation_lock);
+    return;
+  }
+  g_atomic_int_inc(&self->pending);
   invoke = g_new0 (SetTextureInvocation, 1);
   invoke->paintable = g_object_ref (self);
   invoke->texture = g_object_ref (texture);
   invoke->pixel_aspect_ratio = pixel_aspect_ratio;
   invoke->viewport = *viewport;
   invoke->orientation = orientation;
+  invoke->epoch = g_atomic_int_get(&self->epoch);
+  g_atomic_int_inc(&pending_presentations);
 
-  g_main_context_invoke_full (NULL,
-                              G_PRIORITY_DEFAULT,
-                              pivra_gpu_paintable_set_texture_invoke,
-                              invoke,
-                              (GDestroyNotify) set_texture_invocation_free);
+  /* invoke_full can execute inline on the producer when the main context is
+   * unowned (e.g. between probe iterations). GTK invalidation must be dispatched
+   * by the UI thread, never opportunistically run by GStreamer's GL thread. */
+  GSource *source = g_idle_source_new();
+  g_source_set_priority(source, G_PRIORITY_DEFAULT);
+  g_source_set_callback(source, pivra_gpu_paintable_set_texture_invoke, invoke,
+                        (GDestroyNotify)set_texture_invocation_free);
+  invoke->source_id=g_source_attach(source, g_main_context_default());
+  for (guint i=0; i<G_N_ELEMENTS(self->presentation_sources); i++) {
+    if (!self->presentation_sources[i]) {
+      self->presentation_sources[i]=invoke->source_id;
+      break;
+    }
+  }
+  g_mutex_unlock(&self->presentation_lock);
+  g_source_unref(source);
 }
 

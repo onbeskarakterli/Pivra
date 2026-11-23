@@ -236,8 +236,106 @@ pub fn save_video_audio(volume: f64, muted: bool) {
     }
 }
 
+/// Bounded slideshow photo interval; the preference is independent of playback.
+pub fn load_slideshow_interval() -> u32 {
+    use std::io::Read;
+    let mut bytes = String::new();
+    std::fs::File::open(glib::user_config_dir().join("pivra/slideshow-interval.conf"))
+        .and_then(|f| f.take(32).read_to_string(&mut bytes))
+        .ok();
+    parse_slideshow_interval(&bytes)
+}
+fn parse_slideshow_interval(bytes: &str) -> u32 {
+    crate::slideshow::parse_interval(bytes).unwrap_or(crate::slideshow::DEFAULT_SECONDS)
+}
+pub fn save_slideshow_interval(seconds: u32) {
+    if !crate::slideshow::valid_interval(seconds) {
+        return;
+    }
+    let dir = glib::user_config_dir().join("pivra");
+    let result = (|| -> Result<(), Box<dyn std::error::Error>> {
+        std::fs::create_dir_all(&dir)?;
+        gio::File::for_path(dir.join("slideshow-interval.conf")).replace_contents(
+            format!("{seconds}\n").as_bytes(),
+            None,
+            false,
+            gio::FileCreateFlags::PRIVATE | gio::FileCreateFlags::REPLACE_DESTINATION,
+            None::<&gio::Cancellable>,
+        )?;
+        Ok(())
+    })();
+    if let Err(error) = result {
+        eprintln!("Pivra: could not save slideshow interval: {error}");
+    }
+}
+
+fn load_toolbar_preference(name: &str) -> Option<String> {
+    use std::io::Read;
+    let mut text = String::new();
+    std::fs::File::open(glib::user_config_dir().join("pivra").join(name))
+        .ok()?
+        .take(32)
+        .read_to_string(&mut text)
+        .ok()?;
+    Some(text)
+}
+fn save_toolbar_preference(name: &str, value: &str) {
+    let dir = glib::user_config_dir().join("pivra");
+    let result = (|| -> Result<(), Box<dyn std::error::Error>> {
+        std::fs::create_dir_all(&dir)?;
+        gio::File::for_path(dir.join(name)).replace_contents(
+            format!("{value}\n").as_bytes(),
+            None,
+            false,
+            gio::FileCreateFlags::PRIVATE | gio::FileCreateFlags::REPLACE_DESTINATION,
+            None::<&gio::Cancellable>,
+        )?;
+        Ok(())
+    })();
+    if let Err(error) = result {
+        eprintln!("Pivra: could not save {name}: {error}");
+    }
+}
+pub fn load_slideshow_effect() -> crate::slideshow::Effect {
+    load_toolbar_preference("slideshow-transition.conf")
+        .as_deref()
+        .and_then(|s| crate::slideshow::Effect::from_id(s.trim()))
+        .unwrap_or_default()
+}
+pub fn save_slideshow_effect(effect: crate::slideshow::Effect) {
+    save_toolbar_preference("slideshow-transition.conf", effect.id());
+}
+pub fn load_wheel_zoom() -> bool {
+    load_toolbar_preference("wheel-zoom.conf").as_deref() == Some("true\n")
+}
+pub fn save_wheel_zoom(enabled: bool) {
+    save_toolbar_preference("wheel-zoom.conf", if enabled { "true" } else { "false" });
+}
+pub fn load_resampling() -> crate::viewing::Resampling {
+    load_toolbar_preference("resampling.conf")
+        .as_deref()
+        .and_then(|s| crate::viewing::Resampling::from_id(s.trim()))
+        .unwrap_or_default()
+}
+pub fn save_resampling(filter: crate::viewing::Resampling) {
+    save_toolbar_preference("resampling.conf", filter.id());
+}
+
 #[cfg(test)]
 mod thumbnail_tests {
+    #[test]
+    fn slideshow_interval_rejects_invalid_preferences() {
+        for value in ["", "0", "-5", "3601", "not-a-number", "5\n10"] {
+            assert_eq!(super::parse_slideshow_interval(value), 5);
+        }
+        for value in ["1", "2", "3", "5", "7", "10", "15", "30\n", "3600"] {
+            assert_eq!(
+                super::parse_slideshow_interval(value),
+                value.trim().parse::<u32>().unwrap()
+            );
+        }
+    }
+
     use super::*;
     #[test]
     fn default_persist_restart_and_corruption() {

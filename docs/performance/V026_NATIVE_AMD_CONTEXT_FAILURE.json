@@ -1,0 +1,436 @@
+{
+  "schema": 1,
+  "base_commit": "0ec645b69ab92e8426e8e6056f0a49cdda3263bb",
+  "tested_tree": "base plus Task 01C working-tree changes",
+  "native_amd": {
+    "source": "user report at base commit",
+    "pass": 8,
+    "fail": 1,
+    "case": "mixed-lifecycle",
+    "exit": -6,
+    "signal": "SIGABRT",
+    "new_revision_acceptance": "PENDING / BLOCKED; not executed in Codex"
+  },
+  "checks": {
+    "fmt": "PASS",
+    "cargo_check_locked": "PASS",
+    "strict_all_target_clippy": "PASS, zero warnings",
+    "rust_tests": {
+      "status": "PASS",
+      "passed": 212
+    },
+    "python_tests": {
+      "status": "PASS",
+      "passed": 188,
+      "suites": {
+        "root": 64,
+        "thumbnail": 59,
+        "fd05a": 9,
+        "video_color": 13,
+        "video_gpu": 43
+      }
+    },
+    "release_build": "PASS",
+    "c_policy_and_strict_compilation": "PASS",
+    "gdb_native": "NOT RUN: gdb unavailable",
+    "upstream_patch": "dry-run PASS only, not applied/build-tested as GTK"
+  },
+  "controlled": [
+    {
+      "source": "0ec645b69ab92e8426e8e6056f0a49cdda3263bb",
+      "dirty": true,
+      "session": "x11",
+      "software_control": true,
+      "api": "opengl3",
+      "results": [
+        {
+          "name": "ownership-foreign",
+          "exit": 0,
+          "status": "PASS",
+          "diagnostic_events": 0,
+          "context_errors": 0,
+          "context_failures": 0,
+          "gpu_errors": 0,
+          "reasons": [],
+          "last_stage": null,
+          "last_bindings": [],
+          "inferior_signals": [],
+          "libraries_sha256": {}
+        },
+        {
+          "name": "ownership-release",
+          "exit": 0,
+          "status": "PASS",
+          "diagnostic_events": 0,
+          "context_errors": 0,
+          "context_failures": 0,
+          "gpu_errors": 0,
+          "reasons": [],
+          "last_stage": null,
+          "last_bindings": [],
+          "inferior_signals": [],
+          "libraries_sha256": {}
+        },
+        {
+          "name": "ownership-current",
+          "exit": 0,
+          "status": "PASS",
+          "diagnostic_events": 0,
+          "context_errors": 0,
+          "context_failures": 0,
+          "gpu_errors": 0,
+          "reasons": [],
+          "last_stage": null,
+          "last_bindings": [],
+          "inferior_signals": [],
+          "libraries_sha256": {}
+        },
+        {
+          "name": "ownership-presentation",
+          "exit": 0,
+          "status": "PASS",
+          "diagnostic_events": 0,
+          "context_errors": 0,
+          "context_failures": 0,
+          "gpu_errors": 0,
+          "reasons": [],
+          "last_stage": null,
+          "last_bindings": [],
+          "inferior_signals": [],
+          "libraries_sha256": {}
+        },
+        {
+          "name": "ownership-failure",
+          "exit": 0,
+          "status": "PASS",
+          "diagnostic_events": 0,
+          "context_errors": 0,
+          "context_failures": 8,
+          "gpu_errors": 8,
+          "reasons": [],
+          "last_stage": null,
+          "last_bindings": [],
+          "inferior_signals": [],
+          "libraries_sha256": {}
+        },
+        {
+          "name": "mixed-lifecycle",
+          "exit": 0,
+          "status": "PASS",
+          "diagnostic_events": 640,
+          "context_errors": 0,
+          "context_failures": 0,
+          "gpu_errors": 0,
+          "reasons": [],
+          "last_stage": "LIFECYCLE_STAGE delete and close cleanup ready contexts=0 frames=0 presentations=0",
+          "last_bindings": [
+            "PIVRA_GPU_BINDING time_us=3427370031 stage=wait-begin thread=0x559314082b60 gdk=0x559319b6ca00 egl=94090338125712 glx=0",
+            "PIVRA_GPU_BINDING time_us=3427428960 stage=wait-ready thread=0x559314082b60 gdk=0x559319b6ca00 egl=94090338125712 glx=0",
+            "PIVRA_GPU_BINDING time_us=3427433701 stage=wait-begin thread=0x559314082b60 gdk=0x559319b6ca00 egl=94090338125712 glx=0",
+            "PIVRA_GPU_BINDING time_us=3427436368 stage=wait-ready thread=0x559314082b60 gdk=0x559319b6ca00 egl=94090338125712 glx=0",
+            "PIVRA_GPU_BINDING time_us=3427440700 stage=video-retire-begin thread=0x559314082b60 gdk=0x559319b6ca00 egl=94090338125712 glx=0",
+            "PIVRA_GPU_BINDING time_us=3427440707 stage=video-retire-end thread=0x559314082b60 gdk=0x559319b6ca00 egl=94090338125712 glx=0",
+            "PIVRA_GPU_BINDING time_us=3427449583 stage=wait-begin thread=0x559314082b60 gdk=0x55931ed23a20 egl=94090354591264 glx=0",
+            "PIVRA_GPU_BINDING time_us=3427449794 stage=wait-ready thread=0x559314082b60 gdk=0x55931ed23a20 egl=94090354591264 glx=0"
+          ],
+          "inferior_signals": [],
+          "libraries_sha256": {
+            "libEGL.so.1.1.0": "f4b60a4618fbf760f395f64dfd53320446ba1011151a80e411742b3232b194e6",
+            "libEGL_mesa.so.0.0.0": "af1229604d80d73422ff3767f572849dce074a0ecdba8254e93a06a88cfec2e6",
+            "libGLX.so.0.0.0": "6b9525981881bb388b8726c8862d2ac5c2484e81328738d924415692d873018c",
+            "libepoxy.so.0.0.0": "508c6214d08b997e0509e74b568f1e66f574951105cb11e59d12ed74a4239f13",
+            "libgallium-25.0.7-2+deb13u1.so": "5597543f11c2ef62bc95b0237a8a81339aed87e225d82ae2c6570f8973b1cee5",
+            "libgstgl-1.0.so.0.2602.0": "d9d2235fa425fddc3d11861b4a0db819ca2595fcbecd11ccb3600b5c46f73ad9",
+            "libgstreamer-1.0.so.0.2602.0": "dc33ad7829ba8682f2df0c3bdcaeaa2c6b606aadc39a4c0455fec2960b31fb39",
+            "libgtk-4.so.1.1800.6": "36afb4270891fd08e2ff5817541e2729ddd020cd1fc6af58bde53ce0ad769e8e"
+          }
+        },
+        {
+          "name": "error-cleanup",
+          "exit": 0,
+          "status": "PASS",
+          "diagnostic_events": 1,
+          "context_errors": 0,
+          "context_failures": 0,
+          "gpu_errors": 0,
+          "reasons": [],
+          "last_stage": "LIFECYCLE_STAGE error resources retired ready contexts=0 frames=0 presentations=0",
+          "last_bindings": [
+            "PIVRA_GPU_BINDING time_us=3427877145 stage=wait-begin thread=0x5619b156f1d0 gdk=(nil) egl=0 glx=0",
+            "PIVRA_GPU_BINDING time_us=3427883488 stage=wait-ready thread=0x5619b156f1d0 gdk=(nil) egl=0 glx=0",
+            "PIVRA_GPU_BINDING time_us=3427883500 stage=wait-begin thread=0x5619b156f1d0 gdk=(nil) egl=0 glx=0",
+            "PIVRA_GPU_BINDING time_us=3427883504 stage=wait-ready thread=0x5619b156f1d0 gdk=(nil) egl=0 glx=0"
+          ],
+          "inferior_signals": [],
+          "libraries_sha256": {
+            "libEGL.so.1.1.0": "f4b60a4618fbf760f395f64dfd53320446ba1011151a80e411742b3232b194e6",
+            "libEGL_mesa.so.0.0.0": "af1229604d80d73422ff3767f572849dce074a0ecdba8254e93a06a88cfec2e6",
+            "libGLX.so.0.0.0": "6b9525981881bb388b8726c8862d2ac5c2484e81328738d924415692d873018c",
+            "libepoxy.so.0.0.0": "508c6214d08b997e0509e74b568f1e66f574951105cb11e59d12ed74a4239f13",
+            "libgallium-25.0.7-2+deb13u1.so": "5597543f11c2ef62bc95b0237a8a81339aed87e225d82ae2c6570f8973b1cee5",
+            "libgstgl-1.0.so.0.2602.0": "d9d2235fa425fddc3d11861b4a0db819ca2595fcbecd11ccb3600b5c46f73ad9",
+            "libgstreamer-1.0.so.0.2602.0": "dc33ad7829ba8682f2df0c3bdcaeaa2c6b606aadc39a4c0455fec2960b31fb39",
+            "libgtk-4.so.1.1800.6": "36afb4270891fd08e2ff5817541e2729ddd020cd1fc6af58bde53ce0ad769e8e"
+          }
+        },
+        {
+          "name": "limited-presentation-controls",
+          "exit": 0,
+          "status": "PASS",
+          "diagnostic_events": 2,
+          "context_errors": 0,
+          "context_failures": 0,
+          "gpu_errors": 0,
+          "reasons": [],
+          "last_stage": null,
+          "last_bindings": [],
+          "inferior_signals": [],
+          "libraries_sha256": {}
+        },
+        {
+          "name": "full-ramp-shader-controls",
+          "exit": 0,
+          "status": "PASS",
+          "diagnostic_events": 2,
+          "context_errors": 0,
+          "context_failures": 0,
+          "gpu_errors": 0,
+          "reasons": [],
+          "last_stage": null,
+          "last_bindings": [],
+          "inferior_signals": [],
+          "libraries_sha256": {}
+        }
+      ],
+      "actual_contexts": [
+        "PIVRA_GPU_CONTEXT renderer=llvmpipe (LLVM 19.1.7, 256 bits) version=4.5 (Core Profile) Mesa 25.0.7-2+deb13u1"
+      ],
+      "drain_evidence": [
+        "LIFECYCLE_STAGE all filters retired ready contexts=0 frames=0 presentations=0",
+        "LIFECYCLE_STAGE reopen cleanup ready contexts=0 frames=0 presentations=0",
+        "LIFECYCLE_STAGE reopen cleanup ready contexts=0 frames=0 presentations=0",
+        "LIFECYCLE_STAGE reopen cleanup ready contexts=0 frames=0 presentations=0",
+        "LIFECYCLE_STAGE delete and close cleanup ready contexts=0 frames=0 presentations=0"
+      ]
+    },
+    {
+      "source": "0ec645b69ab92e8426e8e6056f0a49cdda3263bb",
+      "dirty": true,
+      "session": "sway",
+      "software_control": true,
+      "api": null,
+      "results": [
+        {
+          "name": "ownership-foreign",
+          "exit": 0,
+          "status": "PASS",
+          "diagnostic_events": 0,
+          "context_errors": 0,
+          "context_failures": 0,
+          "gpu_errors": 0,
+          "reasons": [],
+          "last_stage": null,
+          "last_bindings": [],
+          "inferior_signals": [],
+          "libraries_sha256": {}
+        },
+        {
+          "name": "ownership-release",
+          "exit": 0,
+          "status": "PASS",
+          "diagnostic_events": 0,
+          "context_errors": 0,
+          "context_failures": 0,
+          "gpu_errors": 0,
+          "reasons": [],
+          "last_stage": null,
+          "last_bindings": [],
+          "inferior_signals": [],
+          "libraries_sha256": {}
+        },
+        {
+          "name": "ownership-current",
+          "exit": 0,
+          "status": "PASS",
+          "diagnostic_events": 0,
+          "context_errors": 0,
+          "context_failures": 0,
+          "gpu_errors": 0,
+          "reasons": [],
+          "last_stage": null,
+          "last_bindings": [],
+          "inferior_signals": [],
+          "libraries_sha256": {}
+        },
+        {
+          "name": "ownership-presentation",
+          "exit": 0,
+          "status": "PASS",
+          "diagnostic_events": 0,
+          "context_errors": 0,
+          "context_failures": 0,
+          "gpu_errors": 0,
+          "reasons": [],
+          "last_stage": null,
+          "last_bindings": [],
+          "inferior_signals": [],
+          "libraries_sha256": {}
+        },
+        {
+          "name": "ownership-failure",
+          "exit": 0,
+          "status": "PASS",
+          "diagnostic_events": 0,
+          "context_errors": 0,
+          "context_failures": 8,
+          "gpu_errors": 8,
+          "reasons": [],
+          "last_stage": null,
+          "last_bindings": [],
+          "inferior_signals": [],
+          "libraries_sha256": {}
+        },
+        {
+          "name": "mixed-lifecycle",
+          "exit": 0,
+          "status": "PASS",
+          "diagnostic_events": 612,
+          "context_errors": 0,
+          "context_failures": 0,
+          "gpu_errors": 0,
+          "reasons": [],
+          "last_stage": "LIFECYCLE_STAGE delete and close cleanup ready contexts=0 frames=0 presentations=0",
+          "last_bindings": [
+            "PIVRA_GPU_BINDING time_us=3433115548 stage=wait-begin thread=0x55fc5d1544f0 gdk=0x7f84f401c6f0 egl=94542517031840 glx=0",
+            "PIVRA_GPU_BINDING time_us=3433173759 stage=wait-ready thread=0x55fc5d1544f0 gdk=0x7f84f401c6f0 egl=94542517031840 glx=0",
+            "PIVRA_GPU_BINDING time_us=3433176887 stage=wait-begin thread=0x55fc5d1544f0 gdk=0x7f84f401c6f0 egl=94542517031840 glx=0",
+            "PIVRA_GPU_BINDING time_us=3433179614 stage=wait-ready thread=0x55fc5d1544f0 gdk=0x7f84f401c6f0 egl=94542517031840 glx=0",
+            "PIVRA_GPU_BINDING time_us=3433183272 stage=video-retire-begin thread=0x55fc5d1544f0 gdk=0x7f84f401c6f0 egl=94542517031840 glx=0",
+            "PIVRA_GPU_BINDING time_us=3433183278 stage=video-retire-end thread=0x55fc5d1544f0 gdk=0x7f84f401c6f0 egl=94542517031840 glx=0",
+            "PIVRA_GPU_BINDING time_us=3433190405 stage=wait-begin thread=0x55fc5d1544f0 gdk=0x7f84f401ccb0 egl=94542497345520 glx=0",
+            "PIVRA_GPU_BINDING time_us=3433190514 stage=wait-ready thread=0x55fc5d1544f0 gdk=0x7f84f401ccb0 egl=94542497345520 glx=0"
+          ],
+          "inferior_signals": [],
+          "libraries_sha256": {
+            "libEGL.so.1.1.0": "f4b60a4618fbf760f395f64dfd53320446ba1011151a80e411742b3232b194e6",
+            "libGLX.so.0.0.0": "6b9525981881bb388b8726c8862d2ac5c2484e81328738d924415692d873018c",
+            "libepoxy.so.0.0.0": "508c6214d08b997e0509e74b568f1e66f574951105cb11e59d12ed74a4239f13",
+            "libgstgl-1.0.so.0.2602.0": "d9d2235fa425fddc3d11861b4a0db819ca2595fcbecd11ccb3600b5c46f73ad9",
+            "libgstreamer-1.0.so.0.2602.0": "dc33ad7829ba8682f2df0c3bdcaeaa2c6b606aadc39a4c0455fec2960b31fb39",
+            "libgtk-4.so.1.1800.6": "36afb4270891fd08e2ff5817541e2729ddd020cd1fc6af58bde53ce0ad769e8e",
+            "libEGL_mesa.so.0.0.0": "af1229604d80d73422ff3767f572849dce074a0ecdba8254e93a06a88cfec2e6",
+            "libgallium-25.0.7-2+deb13u1.so": "5597543f11c2ef62bc95b0237a8a81339aed87e225d82ae2c6570f8973b1cee5"
+          }
+        },
+        {
+          "name": "error-cleanup",
+          "exit": 0,
+          "status": "PASS",
+          "diagnostic_events": 1,
+          "context_errors": 0,
+          "context_failures": 0,
+          "gpu_errors": 0,
+          "reasons": [],
+          "last_stage": "LIFECYCLE_STAGE error resources retired ready contexts=0 frames=0 presentations=0",
+          "last_bindings": [
+            "PIVRA_GPU_BINDING time_us=3433429576 stage=wait-begin thread=0x561ef267f4f0 gdk=(nil) egl=0 glx=0",
+            "PIVRA_GPU_BINDING time_us=3433435206 stage=wait-ready thread=0x561ef267f4f0 gdk=(nil) egl=0 glx=0",
+            "PIVRA_GPU_BINDING time_us=3433435220 stage=wait-begin thread=0x561ef267f4f0 gdk=(nil) egl=0 glx=0",
+            "PIVRA_GPU_BINDING time_us=3433435224 stage=wait-ready thread=0x561ef267f4f0 gdk=(nil) egl=0 glx=0"
+          ],
+          "inferior_signals": [],
+          "libraries_sha256": {
+            "libEGL.so.1.1.0": "f4b60a4618fbf760f395f64dfd53320446ba1011151a80e411742b3232b194e6",
+            "libGLX.so.0.0.0": "6b9525981881bb388b8726c8862d2ac5c2484e81328738d924415692d873018c",
+            "libepoxy.so.0.0.0": "508c6214d08b997e0509e74b568f1e66f574951105cb11e59d12ed74a4239f13",
+            "libgstgl-1.0.so.0.2602.0": "d9d2235fa425fddc3d11861b4a0db819ca2595fcbecd11ccb3600b5c46f73ad9",
+            "libgstreamer-1.0.so.0.2602.0": "dc33ad7829ba8682f2df0c3bdcaeaa2c6b606aadc39a4c0455fec2960b31fb39",
+            "libgtk-4.so.1.1800.6": "36afb4270891fd08e2ff5817541e2729ddd020cd1fc6af58bde53ce0ad769e8e"
+          }
+        },
+        {
+          "name": "limited-presentation-controls",
+          "exit": 0,
+          "status": "PASS",
+          "diagnostic_events": 2,
+          "context_errors": 0,
+          "context_failures": 0,
+          "gpu_errors": 0,
+          "reasons": [],
+          "last_stage": null,
+          "last_bindings": [],
+          "inferior_signals": [],
+          "libraries_sha256": {}
+        },
+        {
+          "name": "full-ramp-shader-controls",
+          "exit": 0,
+          "status": "PASS",
+          "diagnostic_events": 2,
+          "context_errors": 0,
+          "context_failures": 0,
+          "gpu_errors": 0,
+          "reasons": [],
+          "last_stage": null,
+          "last_bindings": [],
+          "inferior_signals": [],
+          "libraries_sha256": {}
+        }
+      ],
+      "actual_contexts": [
+        "PIVRA_GPU_CONTEXT renderer=llvmpipe (LLVM 19.1.7, 256 bits) version=OpenGL ES 3.2 Mesa 25.0.7-2+deb13u1"
+      ],
+      "drain_evidence": [
+        "LIFECYCLE_STAGE all filters retired ready contexts=0 frames=0 presentations=0",
+        "LIFECYCLE_STAGE reopen cleanup ready contexts=0 frames=0 presentations=0",
+        "LIFECYCLE_STAGE reopen cleanup ready contexts=0 frames=0 presentations=0",
+        "LIFECYCLE_STAGE reopen cleanup ready contexts=0 frames=0 presentations=0",
+        "LIFECYCLE_STAGE delete and close cleanup ready contexts=0 frames=0 presentations=0"
+      ]
+    }
+  ],
+  "retirement_control": {
+    "native_acceptance": false,
+    "results": [
+      {
+        "name": "retirement-legacy",
+        "exit": 0,
+        "status": "MECHANISM REPRODUCED",
+        "diagnostic_events": 0,
+        "context_errors": 0,
+        "context_failures": 0,
+        "gpu_errors": 0,
+        "reasons": [],
+        "last_stage": null,
+        "last_bindings": [],
+        "inferior_signals": [],
+        "libraries_sha256": {}
+      },
+      {
+        "name": "retirement-borrowed",
+        "exit": 0,
+        "status": "PASS",
+        "diagnostic_events": 0,
+        "context_errors": 0,
+        "context_failures": 0,
+        "gpu_errors": 0,
+        "reasons": [],
+        "last_stage": null,
+        "last_bindings": [],
+        "inferior_signals": [],
+        "libraries_sha256": {}
+      }
+    ],
+    "output": {
+      "retirement-borrowed.log": "RETIREMENT_CONTROL policy=borrowed gtk_context_valid=true egl_error=0x3000\nPASS borrowed wrapper preserves GTK context\n",
+      "retirement-legacy.log": "RETIREMENT_CONTROL policy=gtk424-wl-wrapper gtk_context_valid=false egl_error=0x3001\nMECHANISM_REPRODUCED external wrapper invalidated GTK context; native AMD acceptance NOT established\n"
+    }
+  },
+  "upstream_sources_sha256": {
+    "gtk424-meson.c": "5b873274012a073ba189075862430a6407261368a4164cb992bafa9b37800a28",
+    "gtk424-gtkgstmediafile.c": "2489fd1246473c029f9ddd33a84cc5fec67d3fa7eff5f7be0f01333a373e71cb",
+    "gtk424-gdkglcontext.c": "db0baae9178bc2f904e4cccd98a60a9e52cdb5623240b4a07639b5f656d53a3e",
+    "gtk424-gtkgstsink.c": "5a5591e2e72b2b93f49174cd25e3e975a9022d73e9e84990af93eb47ea6a9f04",
+    "gtk424-gtkgstpaintable.c": "575d7ef59a92010dbd0e55273e527c11d8b29219efd1b418288b97ff3ef5e309"
+  }
+}

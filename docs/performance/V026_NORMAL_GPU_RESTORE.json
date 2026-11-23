@@ -1,0 +1,496 @@
+{
+  "implementation_commit": "e416839efa094fe1ae9057c61af0c60511e55525",
+  "baseline": "726f6948cb391e620a4733348ab164ad3a7ea295",
+  "pre_fix": "d9d2fdadd2cbbe03b9399024202e5f96c75c83ff",
+  "tested_tree": "implementation sources before commit; local reports correctly retain pre-commit HEAD and dirty=true",
+  "environment": {
+    "system": "Debian 13 SDK",
+    "gtk": "4.18.6",
+    "gstreamer": "1.26.2",
+    "rust": "1.99.1",
+    "gl": "llvmpipe software"
+  },
+  "checks": {
+    "normal_x11": {
+      "status": "PASS",
+      "software_control": true,
+      "session": "x11",
+      "rows": [
+        {
+          "name": "baseline-initialization",
+          "status": "PASS",
+          "exit": 0,
+          "context_errors": 0,
+          "egl_configuration_errors": 0,
+          "context_failures": 0,
+          "gpu_errors": 0,
+          "reasons": []
+        },
+        {
+          "name": "pre-fix-initialization",
+          "status": "PASS",
+          "exit": 0,
+          "context_errors": 0,
+          "egl_configuration_errors": 0,
+          "context_failures": 0,
+          "gpu_errors": 0,
+          "reasons": []
+        },
+        {
+          "name": "dev-initialization",
+          "status": "PASS",
+          "exit": 0,
+          "context_errors": 0,
+          "egl_configuration_errors": 0,
+          "context_failures": 0,
+          "gpu_errors": 0,
+          "reasons": []
+        },
+        {
+          "name": "pre126-api-compatibility",
+          "status": "PASS",
+          "exit": 0,
+          "context_errors": 0,
+          "egl_configuration_errors": 0,
+          "context_failures": 0,
+          "gpu_errors": 0,
+          "reasons": []
+        },
+        {
+          "name": "v025-normal-playback",
+          "status": "PASS",
+          "exit": 0,
+          "context_errors": 0,
+          "egl_configuration_errors": 0,
+          "context_failures": 0,
+          "gpu_errors": 0,
+          "reasons": []
+        },
+        {
+          "name": "pre-fix-normal-playback",
+          "status": "PASS",
+          "exit": 0,
+          "context_errors": 0,
+          "egl_configuration_errors": 0,
+          "context_failures": 0,
+          "gpu_errors": 0,
+          "reasons": []
+        },
+        {
+          "name": "dev-normal-playback",
+          "status": "PASS",
+          "exit": 0,
+          "context_errors": 0,
+          "egl_configuration_errors": 0,
+          "context_failures": 0,
+          "gpu_errors": 0,
+          "reasons": []
+        },
+        {
+          "name": "dev-normal-production-window",
+          "status": "PASS",
+          "exit": 0,
+          "context_errors": 0,
+          "egl_configuration_errors": 0,
+          "context_failures": 0,
+          "gpu_errors": 0,
+          "reasons": []
+        }
+      ],
+      "local_report": "/tmp/pivra-normal-video-9jfofsvk/report.json",
+      "report_sha256": "8466e127d19cea049eb2b6801cee7327acc04d2385aff6534e10f645c284fff1",
+      "library_provenance": {
+        "/usr/lib/x86_64-linux-gnu/libEGL.so.1.1.0": "f4b60a4618fbf760f395f64dfd53320446ba1011151a80e411742b3232b194e6",
+        "/usr/lib/x86_64-linux-gnu/libEGL_mesa.so.0.0.0": "af1229604d80d73422ff3767f572849dce074a0ecdba8254e93a06a88cfec2e6",
+        "/usr/lib/x86_64-linux-gnu/libGLX.so.0.0.0": "6b9525981881bb388b8726c8862d2ac5c2484e81328738d924415692d873018c",
+        "/usr/lib/x86_64-linux-gnu/libepoxy.so.0.0.0": "508c6214d08b997e0509e74b568f1e66f574951105cb11e59d12ed74a4239f13",
+        "/usr/lib/x86_64-linux-gnu/libgallium-25.0.7-2+deb13u1.so": "5597543f11c2ef62bc95b0237a8a81339aed87e225d82ae2c6570f8973b1cee5",
+        "/usr/lib/x86_64-linux-gnu/libgstgl-1.0.so.0.2602.0": "d9d2235fa425fddc3d11861b4a0db819ca2595fcbecd11ccb3600b5c46f73ad9",
+        "/usr/lib/x86_64-linux-gnu/libgstreamer-1.0.so.0.2602.0": "dc33ad7829ba8682f2df0c3bdcaeaa2c6b606aadc39a4c0455fec2960b31fb39",
+        "/workspace/pivra-environment/native/usr/lib/x86_64-linux-gnu/libgtk-4.so.1.1800.6": "36afb4270891fd08e2ff5817541e2729ddd020cd1fc6af58bde53ce0ad769e8e"
+      }
+    },
+    "normal_sway": {
+      "status": "PASS",
+      "software_control": true,
+      "session": "sway",
+      "rows": [
+        {
+          "name": "baseline-initialization",
+          "status": "PASS",
+          "exit": 0,
+          "context_errors": 0,
+          "egl_configuration_errors": 0,
+          "context_failures": 0,
+          "gpu_errors": 0,
+          "reasons": []
+        },
+        {
+          "name": "pre-fix-initialization",
+          "status": "PASS",
+          "exit": 0,
+          "context_errors": 0,
+          "egl_configuration_errors": 0,
+          "context_failures": 0,
+          "gpu_errors": 0,
+          "reasons": []
+        },
+        {
+          "name": "dev-initialization",
+          "status": "PASS",
+          "exit": 0,
+          "context_errors": 0,
+          "egl_configuration_errors": 0,
+          "context_failures": 0,
+          "gpu_errors": 0,
+          "reasons": []
+        },
+        {
+          "name": "pre126-api-compatibility",
+          "status": "PASS",
+          "exit": 0,
+          "context_errors": 0,
+          "egl_configuration_errors": 0,
+          "context_failures": 0,
+          "gpu_errors": 0,
+          "reasons": []
+        },
+        {
+          "name": "v025-normal-playback",
+          "status": "PASS",
+          "exit": 0,
+          "context_errors": 0,
+          "egl_configuration_errors": 0,
+          "context_failures": 0,
+          "gpu_errors": 0,
+          "reasons": []
+        },
+        {
+          "name": "pre-fix-normal-playback",
+          "status": "PASS",
+          "exit": 0,
+          "context_errors": 0,
+          "egl_configuration_errors": 0,
+          "context_failures": 0,
+          "gpu_errors": 0,
+          "reasons": []
+        },
+        {
+          "name": "dev-normal-playback",
+          "status": "PASS",
+          "exit": 0,
+          "context_errors": 0,
+          "egl_configuration_errors": 0,
+          "context_failures": 0,
+          "gpu_errors": 0,
+          "reasons": []
+        },
+        {
+          "name": "dev-normal-production-window",
+          "status": "PASS",
+          "exit": 0,
+          "context_errors": 0,
+          "egl_configuration_errors": 0,
+          "context_failures": 0,
+          "gpu_errors": 0,
+          "reasons": []
+        }
+      ],
+      "local_report": "/tmp/pivra-normal-video-twqz7lj8/report.json",
+      "report_sha256": "04303df9e2c1a5f224b1fc8b42178c58749a89bfbdf49f2ced258689ac3184a9",
+      "executable_sha256": {
+        "compat-binding": "12b106e3fb42d5fbceb6ac39bf9cd5f5b20e551158b64139e89a6978bbd0a67b",
+        "dev-binding": "0dfe0624f72dd0948f0516c22bd15fb92843ceef22a436cd2f4058faca91cf7d",
+        "pre-fix-binding": "3d3a6d9067368f28c67ae1eaf89b00b9768a91b89e512924c793b07ae4afb52c",
+        "v025-binding": "81d6230e4817b38deaf90c2bb636dc1cd633c8f3bba6f5dfffe5b9b4bf1b7c30",
+        "dev-integrated_video_probe": "67fd1a5275e9a4a677c23f0f6ecb76a01b2702e1bd739b6899d7d2a7f25f4d51",
+        "dev-video_color_probe": "85b9520691bf4e0990c9204412d5e5c5a38d052dfaa3d68ff3afeb89621b0666",
+        "dev-pivra": "cd97902b1c972bb65c8435493e74c8edf6b92cbfe8943d2b5583a9397625cc24",
+        "pre-fix-video_color_probe": "85b9520691bf4e0990c9204412d5e5c5a38d052dfaa3d68ff3afeb89621b0666",
+        "pre-fix-pivra": "cd97902b1c972bb65c8435493e74c8edf6b92cbfe8943d2b5583a9397625cc24",
+        "v025-video_color_probe": "071b77d2a2a1eff28f68a5cf4fdcef2fa91db5c09a86ca75cdb214c59368af04",
+        "v025-pivra": "ef3f8347c5837a6cda178ff20177db09f7adf94ccb6fb8e92b314ce69193ec43"
+      },
+      "product_versions": {
+        "v025": "Pivra 0.2.5",
+        "pre-fix": "Pivra 0.2.6",
+        "dev": "Pivra 0.2.6"
+      },
+      "library_provenance": {
+        "/usr/lib/x86_64-linux-gnu/libEGL.so.1.1.0": "f4b60a4618fbf760f395f64dfd53320446ba1011151a80e411742b3232b194e6",
+        "/usr/lib/x86_64-linux-gnu/libGLX.so.0.0.0": "6b9525981881bb388b8726c8862d2ac5c2484e81328738d924415692d873018c",
+        "/usr/lib/x86_64-linux-gnu/libepoxy.so.0.0.0": "508c6214d08b997e0509e74b568f1e66f574951105cb11e59d12ed74a4239f13",
+        "/usr/lib/x86_64-linux-gnu/libgstgl-1.0.so.0.2602.0": "d9d2235fa425fddc3d11861b4a0db819ca2595fcbecd11ccb3600b5c46f73ad9",
+        "/usr/lib/x86_64-linux-gnu/libgstreamer-1.0.so.0.2602.0": "dc33ad7829ba8682f2df0c3bdcaeaa2c6b606aadc39a4c0455fec2960b31fb39",
+        "/workspace/pivra-environment/native/usr/lib/x86_64-linux-gnu/libgtk-4.so.1.1800.6": "36afb4270891fd08e2ff5817541e2729ddd020cd1fc6af58bde53ce0ad769e8e"
+      }
+    },
+    "mixed_x11": {
+      "status": "PASS",
+      "software_control": true,
+      "session": "x11",
+      "rows": [
+        {
+          "name": "ownership-foreign",
+          "status": "PASS",
+          "exit": 0,
+          "context_errors": 0,
+          "egl_configuration_errors": 0,
+          "context_failures": 0,
+          "gpu_errors": 0,
+          "reasons": []
+        },
+        {
+          "name": "ownership-release",
+          "status": "PASS",
+          "exit": 0,
+          "context_errors": 0,
+          "egl_configuration_errors": 0,
+          "context_failures": 0,
+          "gpu_errors": 0,
+          "reasons": []
+        },
+        {
+          "name": "ownership-current",
+          "status": "PASS",
+          "exit": 0,
+          "context_errors": 0,
+          "egl_configuration_errors": 0,
+          "context_failures": 0,
+          "gpu_errors": 0,
+          "reasons": []
+        },
+        {
+          "name": "ownership-presentation",
+          "status": "PASS",
+          "exit": 0,
+          "context_errors": 0,
+          "egl_configuration_errors": 0,
+          "context_failures": 0,
+          "gpu_errors": 0,
+          "reasons": []
+        },
+        {
+          "name": "ownership-failure",
+          "status": "PASS",
+          "exit": 0,
+          "context_errors": 0,
+          "egl_configuration_errors": 0,
+          "context_failures": 8,
+          "gpu_errors": 8,
+          "reasons": []
+        },
+        {
+          "name": "mixed-lifecycle",
+          "status": "PASS",
+          "exit": 0,
+          "context_errors": 0,
+          "egl_configuration_errors": 0,
+          "context_failures": 0,
+          "gpu_errors": 0,
+          "reasons": []
+        },
+        {
+          "name": "error-cleanup",
+          "status": "PASS",
+          "exit": 0,
+          "context_errors": 0,
+          "egl_configuration_errors": 0,
+          "context_failures": 0,
+          "gpu_errors": 0,
+          "reasons": []
+        },
+        {
+          "name": "limited-presentation-controls",
+          "status": "PASS",
+          "exit": 0,
+          "context_errors": 0,
+          "egl_configuration_errors": 0,
+          "context_failures": 0,
+          "gpu_errors": 0,
+          "reasons": []
+        },
+        {
+          "name": "full-ramp-shader-controls",
+          "status": "PASS",
+          "exit": 0,
+          "context_errors": 0,
+          "egl_configuration_errors": 0,
+          "context_failures": 0,
+          "gpu_errors": 0,
+          "reasons": []
+        }
+      ],
+      "local_report": "/tmp/pivra-video-context-dga088ai/report.json",
+      "report_sha256": "a02c1e187ba034b3a55c2cdbf88189cdb52c466e8e1af1b6c5fc9434424612b3",
+      "library_provenance": {
+        "/usr/lib/x86_64-linux-gnu/libEGL.so.1.1.0": "f4b60a4618fbf760f395f64dfd53320446ba1011151a80e411742b3232b194e6",
+        "/usr/lib/x86_64-linux-gnu/libEGL_mesa.so.0.0.0": "af1229604d80d73422ff3767f572849dce074a0ecdba8254e93a06a88cfec2e6",
+        "/usr/lib/x86_64-linux-gnu/libGLX.so.0.0.0": "6b9525981881bb388b8726c8862d2ac5c2484e81328738d924415692d873018c",
+        "/usr/lib/x86_64-linux-gnu/libepoxy.so.0.0.0": "508c6214d08b997e0509e74b568f1e66f574951105cb11e59d12ed74a4239f13",
+        "/usr/lib/x86_64-linux-gnu/libgallium-25.0.7-2+deb13u1.so": "5597543f11c2ef62bc95b0237a8a81339aed87e225d82ae2c6570f8973b1cee5",
+        "/usr/lib/x86_64-linux-gnu/libgstgl-1.0.so.0.2602.0": "d9d2235fa425fddc3d11861b4a0db819ca2595fcbecd11ccb3600b5c46f73ad9",
+        "/usr/lib/x86_64-linux-gnu/libgstreamer-1.0.so.0.2602.0": "dc33ad7829ba8682f2df0c3bdcaeaa2c6b606aadc39a4c0455fec2960b31fb39",
+        "/workspace/pivra-environment/native/usr/lib/x86_64-linux-gnu/libgtk-4.so.1.1800.6": "36afb4270891fd08e2ff5817541e2729ddd020cd1fc6af58bde53ce0ad769e8e"
+      }
+    },
+    "mixed_sway": {
+      "status": "PASS",
+      "software_control": true,
+      "session": "sway",
+      "rows": [
+        {
+          "name": "ownership-foreign",
+          "status": "PASS",
+          "exit": 0,
+          "context_errors": 0,
+          "egl_configuration_errors": 0,
+          "context_failures": 0,
+          "gpu_errors": 0,
+          "reasons": []
+        },
+        {
+          "name": "ownership-release",
+          "status": "PASS",
+          "exit": 0,
+          "context_errors": 0,
+          "egl_configuration_errors": 0,
+          "context_failures": 0,
+          "gpu_errors": 0,
+          "reasons": []
+        },
+        {
+          "name": "ownership-current",
+          "status": "PASS",
+          "exit": 0,
+          "context_errors": 0,
+          "egl_configuration_errors": 0,
+          "context_failures": 0,
+          "gpu_errors": 0,
+          "reasons": []
+        },
+        {
+          "name": "ownership-presentation",
+          "status": "PASS",
+          "exit": 0,
+          "context_errors": 0,
+          "egl_configuration_errors": 0,
+          "context_failures": 0,
+          "gpu_errors": 0,
+          "reasons": []
+        },
+        {
+          "name": "ownership-failure",
+          "status": "PASS",
+          "exit": 0,
+          "context_errors": 0,
+          "egl_configuration_errors": 0,
+          "context_failures": 8,
+          "gpu_errors": 8,
+          "reasons": []
+        },
+        {
+          "name": "mixed-lifecycle",
+          "status": "PASS",
+          "exit": 0,
+          "context_errors": 0,
+          "egl_configuration_errors": 0,
+          "context_failures": 0,
+          "gpu_errors": 0,
+          "reasons": []
+        },
+        {
+          "name": "error-cleanup",
+          "status": "PASS",
+          "exit": 0,
+          "context_errors": 0,
+          "egl_configuration_errors": 0,
+          "context_failures": 0,
+          "gpu_errors": 0,
+          "reasons": []
+        },
+        {
+          "name": "limited-presentation-controls",
+          "status": "PASS",
+          "exit": 0,
+          "context_errors": 0,
+          "egl_configuration_errors": 0,
+          "context_failures": 0,
+          "gpu_errors": 0,
+          "reasons": []
+        },
+        {
+          "name": "full-ramp-shader-controls",
+          "status": "PASS",
+          "exit": 0,
+          "context_errors": 0,
+          "egl_configuration_errors": 0,
+          "context_failures": 0,
+          "gpu_errors": 0,
+          "reasons": []
+        }
+      ],
+      "local_report": "/tmp/pivra-video-context-ydit7v_u/report.json",
+      "report_sha256": "687a829fcc3532d535bb85f5fd51ac4102d3455ccdc6f9c774767121a078c9cd",
+      "library_provenance": {
+        "/usr/lib/x86_64-linux-gnu/libEGL.so.1.1.0": "f4b60a4618fbf760f395f64dfd53320446ba1011151a80e411742b3232b194e6",
+        "/usr/lib/x86_64-linux-gnu/libGLX.so.0.0.0": "6b9525981881bb388b8726c8862d2ac5c2484e81328738d924415692d873018c",
+        "/usr/lib/x86_64-linux-gnu/libepoxy.so.0.0.0": "508c6214d08b997e0509e74b568f1e66f574951105cb11e59d12ed74a4239f13",
+        "/usr/lib/x86_64-linux-gnu/libgstgl-1.0.so.0.2602.0": "d9d2235fa425fddc3d11861b4a0db819ca2595fcbecd11ccb3600b5c46f73ad9",
+        "/usr/lib/x86_64-linux-gnu/libgstreamer-1.0.so.0.2602.0": "dc33ad7829ba8682f2df0c3bdcaeaa2c6b606aadc39a4c0455fec2960b31fb39",
+        "/workspace/pivra-environment/native/usr/lib/x86_64-linux-gnu/libgtk-4.so.1.1800.6": "36afb4270891fd08e2ff5817541e2729ddd020cd1fc6af58bde53ce0ad769e8e",
+        "/usr/lib/x86_64-linux-gnu/libEGL_mesa.so.0.0.0": "af1229604d80d73422ff3767f572849dce074a0ecdba8254e93a06a88cfec2e6",
+        "/usr/lib/x86_64-linux-gnu/libgallium-25.0.7-2+deb13u1.so": "5597543f11c2ef62bc95b0237a8a81339aed87e225d82ae2c6570f8973b1cee5"
+      }
+    }
+  },
+  "quality": {
+    "fmt": {
+      "status": "PASS",
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "check": {
+      "status": "PASS",
+      "log_sha256": "4a39b3b5acc4cfe959d8d58c7e9bde32c2fd5a0469c534f35b40eb46b4981b25"
+    },
+    "clippy": {
+      "status": "PASS",
+      "log_sha256": "62048bb58decfedf3e2b4453e08bf4e4b65978a819bce7cfcc156b610ff0f83d"
+    },
+    "rust": {
+      "status": "PASS",
+      "log_sha256": "802c49dfc0934f82a765af4a7b05d69b94e4204a27302c093f04c68150e1e44e"
+    },
+    "release": {
+      "status": "PASS",
+      "log_sha256": "9c19c601de45c364e510fff69b4ec468324643b6aa82e6e3d963a68df4188b57"
+    },
+    "python-tests": {
+      "status": "PASS",
+      "log_sha256": "a851a53672e5b548ccb941b4e66c4a2c44d2ab4db8e8d4736bef60ed72305f97"
+    },
+    "python-thumbnail": {
+      "status": "PASS",
+      "log_sha256": "6de6b5da8a6d53e95751921188816d1a3db8ef673e3648c489182db1c0ffde5f"
+    },
+    "python-fd05a": {
+      "status": "PASS",
+      "log_sha256": "0490208e5a254f2f2e6e0f70f7a5ee55157accf27688d6887c0492cc0a5b37e0"
+    },
+    "python-video_color": {
+      "status": "PASS",
+      "log_sha256": "26e4fc70ea6b6384bf46375bf00ad2ce38024aabcad5482770bd95e72ba6bbc6"
+    },
+    "python-video_gpu-final": {
+      "status": "PASS",
+      "log_sha256": "1140e35baa2366047b638f9909d79edb151f21617c77f32b872a514883856721"
+    }
+  },
+  "rust_tests": 217,
+  "python_tests": 219,
+  "native_amd_normal": "NOT RUN; acceptance PENDING",
+  "native_amd_mixed": "NOT RUN; prior stock GTK EGL ownership failure remains BLOCKED",
+  "native_visual_acceptance": "NOT RUN in Codex",
+  "real_gstreamer_124_runtime": "NOT RUN; missing-1.26-symbol branch tested separately",
+  "release_preparation": "NOT PERFORMED; requires native normal playback confirmation"
+}

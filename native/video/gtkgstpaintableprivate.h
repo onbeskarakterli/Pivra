@@ -42,5 +42,7 @@ void            pivra_gpu_paintable_queue_set_texture     (PivraGpuPaintable    
                                                          int                     orientation);
 
 GstElement *pivra_gpu_paintable_create_sink(PivraGpuPaintable *self);
+GstElement *pivra_gpu_paintable_create_sink_full(PivraGpuPaintable *self, GError **error);
+void pivra_gpu_paintable_reset(PivraGpuPaintable *self);
 
 G_END_DECLS

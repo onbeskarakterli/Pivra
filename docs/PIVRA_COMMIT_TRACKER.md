@@ -1,6 +1,6 @@
 # Pivra — Planlı Commit ve İlerleme Takibi
 
-**Aktif kaynak sürümü: `dev` v0.2.3 (unreleased).** Faz 2/PIV-18 DONE (31.10.2026). Erken önizleme kapsam dışı; 64 MP kabul edildi. `main` ve yayımlanmış AUR v0.2.1 çizgisindedir; eski 0.1.0/0.2.1 test kayıtları ilgili tarihlerinin kanıtıdır, v0.2.3 yayın iddiası değildir. GitHub Release, etiket ve AUR güncellemesi yapılmadı.
+**Aktif kaynak sürümü: `dev` v0.2.7 (release candidate; unpublished).** Faz 2/PIV-18 DONE (31.10.2026). Erken önizleme kapsam dışı; 64 MP kabul edildi. `main` ve yayımlanmış AUR v0.2.1 çizgisindedir; eski 0.1.0/0.2.1 test kayıtları ilgili tarihlerinin kanıtıdır, v0.2.3 yayın iddiası değildir. GitHub Release, etiket ve AUR güncellemesi yapılmadı.
 
 
 ## Faz 2 ve PIV-18 resmî kapanış — 31.10.2026 — DONE
@@ -2701,3 +2701,191 @@ Native birleşik `bash tests/run_preview_pipeline_probe.sh` **exit 0** (Takip 04
   check/build/Clippy PASS; fmt eski kapsam dışı farklar nedeniyle FAIL.
 - Yeni native pool/verify kabulü NOT RUN; FD-06 TESTING, FD-07 başlamadı.
   Ayrıntı/tek komut: [FD06_PROVIDER_MANAGER_INTEGRATION.md](FD06_PROVIDER_MANAGER_INTEGRATION.md).
+
+
+## v0.2.6 final development sprint — 2026-11-19
+
+**PARTIAL / release NO-GO; native AMD lifecycle BLOCKED.** Stable v0.2.5 remains
+current; dev version 0.2.6 is an upcoming development candidate only.
+
+Implementation commit: `25d4b9eddd169b2d25385dccbcdde136b465ae5f` — retain unrelated preload/cache entries,
+avoid redundant packed-thumbnail normalization objects, release queued GPU frame
+references at reset with reentrant-close protection, and correct stale GUI test
+assumptions. BT.1886 math, stock/HDR routing, provider order, source-media safety,
+Glycin/Bwrap and all cache/worker budgets remain unchanged. options=('!debug')
+is preserved. [Measured evidence](performance/V026_FINAL_SPRINT.md).
+
+- Controlled unrelated-notification workload: 47–48 extra decode calls → 0;
+  thumbnail preparation median ~31 → 8 µs. RSS difference 4 KiB is not a proven
+  RAM gain; actual VRAM was not measured. Queued refs after reset: 2 → 0.
+- fmt/check/strict all-target Clippy PASS; 217 Rust / 210 Python PASS; X11 and
+  headless Sway GUI gates PASS, with 9/9 video lifecycle controls each on llvmpipe.
+- Mandatory GPU release build, helper/ELF/desktop checks, corresponding-source /
+  LGPL notices, private DESTDIR staging and clean candidate preflight PASS in
+  Codex. Actual Arch makepkg/install and new physical AMD acceptance: NOT RUN.
+- Attached native evidence is a real exit 101 after stock GTK/GStreamer terminates
+  the shared EGLDisplay. The system GTK is not patched; native acceptance cannot
+  close until nine real AMD gates PASS. The accepted historical preload-budget
+  observation remains OPEN, without a newly asserted fix or v0.2.6 risk approval.
+- No main, tag, release or AUR action. Source/hash approval and immutable package
+  validation remain separate. [Candidate workflow](releases/PIVRA_V0.2.6_RC_VALIDATION.md).
+
+
+## v0.2.6 native acceptance fixes — 2026-11-20
+
+**NO-GO / native AMD BLOCKED.** User-reported native outcome: 6 PASS / 2 FAIL;
+exact tested SHA not supplied. Test fix commit:
+`ff9d6fc74a34b65d43c4c06e1c62235ac55cc49a`.
+
+- Native acceptance now supplies --native-thumbnails. Controlled catalog tests
+  use a private generation-failure fixture, preserving failed=1 / failed=2 checks.
+  Native repair additionally proves a current GNOME cache publication and one
+  real secure decode of the repaired path; no aggregate-zero-only success.
+- No EGL configuration available now fails the GPU gate even with exit 0.
+  Production GPU/math/stock routes, helper limits, providers and application source
+  are unchanged. The private stock GTK wrapper still needs the upstream borrowed
+  EGLDisplay correction; system GTK is not patched and no AMD fix is claimed.
+- Codex: 217 Rust / 213 Python PASS; fmt/check/strict Clippy/release PASS; controlled
+  catalog and video 9/9 PASS on both X11 and Sway/llvmpipe. One real secure catalog
+  prerequisite: NOT RUN/77 under Bwrap. Native repair and AMD acceptance pending.
+- Six earlier native PASS gates are retained as user evidence, not new Codex
+  hardware results. No main/tag/release/AUR/version/package/lockfile change.
+  [Follow-up evidence](performance/V026_NATIVE_ACCEPTANCE_FIXES.md).
+
+## v0.2.6 mixed GPU / stock ownership control — 2026-11-23
+
+**PARTIAL / NO-GO; native AMD remains BLOCKED.** Base:
+`2d6a580cdb71e6810014b0fa72b1235634cf28ba`.
+[Evidence and focused native command](performance/V026_MIXED_GPU_STOCK_FIX.md).
+
+- Retained native 117-event trace revalidated: stock retirement terminates the
+  same EGLDisplay used by another GPU window. Latest seven nonvideo PASS and
+  video 8/9 are user-reported, not new Codex hardware results.
+- Refine the separate GTK upstream-review patch: retain native Wayland display,
+  validate the cached EGL handle and mark it foreign through the public setter
+  before creating contexts. Accepted EGL config patch and production Pivra,
+  shaders, normal playback, optimizations and v0.2.5 records are unchanged.
+- New isolated A/B mode requires the real built-in GTK 4.24 GStreamer backend,
+  identical application binary and verified loaded library hashes. It preserves
+  all nine assertions and never installs GTK. Two-context destructive/borrowed
+  controls and six new runner guards cover the ownership policy/provenance.
+- Codex: 217 Rust / 242 Python PASS; fmt/check/strict Clippy/release PASS.
+  Real GTK 4.24.1 + private GStreamer 1.28.9, llvmpipe: X11 control/candidate 9/9;
+  Sway control 8/9 (original context failure reproduced), candidate 8/9 (new
+  unclassified SIGSEGV). Five GDB mixed candidate runs exited normally; this does
+  not clear the ordinary SIGSEGV. Native candidate 9/9 remains NOT RUN.
+- Upstream/distribution ownership correction and the additional Sway crash are
+  open boundaries. No main/tag/release/AUR/version/package/lockfile change.
+
+## v0.2.6 upstream ownership fix / release preparation — 2026-11-23
+
+Reviewed diagnostic source: `c4ca4d85a05fa81efeddc6f5229d28040c56d787`.
+**Isolated native acceptance PASS; unrestricted publication remains NO-GO.**
+
+- Latest owner-reported RX 7900 XT results: original stock ownership Wayland 8/9,
+  isolated ownership-patched Wayland 9/9, X11 9/9, normal production Wayland
+  GPU/video/audio/color/seek PASS. New raw native logs, checkout and library
+  hashes were not supplied; no Codex hardware execution is implied.
+- Both existing GTK patches and validation tools are byte-for-byte preserved.
+  [Upstream report draft](upstream/GTK_4.24.1_WAYLAND_EGL_OWNERSHIP.md) includes
+  versions, source contract, exact patch digests, standalone reproducer and A/B
+  commands. The common EGL patch in both controls is disclosed. Read-only source
+  review found existing upstream commit `95b7ec19b01c460c46d58ec52cd0c4eb2d730395`
+  (issue #8456 / MR !10582) in main/gtk-4-24. No new submission is posted. Fixed
+  package availability/native validation remain pending; the separate EGL config
+  change is absent from inspected gtk-4-24 gdkdisplay.c.
+- [SIGSEGV investigation](performance/V026_CANDIDATE_SIGSEGV.md) retains the
+  ordinary software -11 failure and five earlier successful GDB runs, narrows
+  the last logged interval and records hashes. The later native 9/9 result
+  does not close this OPEN / UNCLASSIFIED observation.
+- README/notes/current Arch/Linux documentation and the
+  [v0.2.6 release checklist](releases/PIVRA_V0.2.6_RC_VALIDATION.md) now distinguish
+  accepted patched tests from stock compatibility. v0.2.5 history remains.
+  The owner must decide the stock GTK, SIGSEGV and preload risk policies; no
+  acceptance is inferred. X11 is a tested per-process AMD workaround.
+- New documentation-task checks: 69 root + 92 GPU-tool Python tests PASS (161,
+  zero skips), fmt PASS, version/license/!debug/script-reference audit PASS,
+  Bash syntax PASS and both pinned GTK patches apply-check PASS. Prior 217 Rust /
+  242 Python / Clippy/release results remain attributed to diagnostic source,
+  not relabelled as newly run. Actual Arch makepkg/install: NOT RUN here.
+- No production/test/script/PKGBUILD/Cargo/lockfile change; no system GTK,
+  main/tag/release/AUR action. Immutable source/checksum approval remains separate.
+
+## v0.2.7 slideshow — feature branch only — 2026-11-23
+
+**TESTING; native GNOME acceptance pending.** Branch:
+`feature/v0.2.7-slideshow`, from
+`72405a9fa31b5ff45a98532fbd4008de5ecdc29d`.
+Implementation commit: `823455ad96844e7ac3d130a5fd119d855cf961ee`
+(`feat: add independent fullscreen slideshow with photo crossfade`).
+[Behavior, tests, limitations and native command](slideshow/V027_SLIDESHOW_VALIDATION.md).
+
+- Implements feature-spec §3 requirements 42–45: F5, independent F11 intent,
+  configurable photo clock, video EOS, pause/manual navigation, unconditional
+  loop, ~300 ms photo-only crossfade, existing monitored catalog/preload/loading,
+  bounded error skip and stop/close cleanup. Public GtkApplication IDLE
+  inhibition includes pause; physical effectiveness remains NOT RUN.
+- Codex: fmt/check/strict all-target Clippy PASS (zero warnings), 226 Rust and
+  242 Python tests PASS, application build PASS. Controlled slideshow and four
+  existing catalog/zoom/cancellation/window-race GUI gates PASS on X11 and
+  headless Sway; real stock video EOS is required, controlled photo pixels are
+  explicitly not secure decoder evidence. Existing fullscreen gate passed final
+  X11/Sway runs; earlier compositor allocation failures and baseline comparison
+  are retained in the validation record.
+- Native secure photo prerequisite: NOT RUN/77 (loader exited 1 under existing
+  sandbox). Physical GNOME, hardware GPU slideshow and actual display-sleep
+  inhibition remain pending; no sandbox bypass or hardware PASS inferred.
+- GTK patches/GPU renderer/security/dependencies/package metadata/v0.2.6 release
+  records unchanged. Cargo/package versions intentionally remain 0.2.6. Stable
+  v0.2.5 information and open GTK/SIGSEGV risks remain. Only the feature branch
+  is committed/pushed; no dev/main/tag/release/AUR promotion.
+
+## v0.2.7 slideshow native EOS SIGSEGV — 2026-11-23
+
+**OPEN / UNCLASSIFIED; native acceptance BLOCKED, feature TESTING.** Reviewed
+source: `d041378a087a6a129e1acf249421e05b1d2c193b`.
+[Investigation and focused native GDB command](slideshow/V027_SLIDESHOW_EOS_SIGSEGV.md).
+
+- Owner reports corrupt `3.png` rejection, real video EOS, then exit 139. Native
+  log/core directory is not accessible here; no crash cause is inferred.
+- Correct a demonstrated test-barrier gap: selected title alone was not photo
+  readiness. Reuse actual GTK after-paint/render submission; keep the original
+  rapid-navigation assertions. Add three corrupt/video-EOS/photo cycles,
+  two-window/cleanup checks, transition-boundary diagnostics, verified GDB result
+  capture and eleven negative/positive evidence tests. No speculative production
+  lifetime/renderer change or timeout increase.
+- Codex: 226 Rust / 253 Python PASS; fmt/check/strict Clippy PASS. Focused and
+  full controlled slideshow PASS on X11/Sway. Secure native prerequisite under
+  GDB: NOT RUN/77. Private GTK 4.24.1 control/candidate EOS comparison cannot pass
+  due missing playback plug-in: control additionally fails after-paint with GL
+  warning; candidate exit 0 is rejected for missing EOS. This does not classify
+  the owner's SIGSEGV or close the prior GTK/SIGSEGV observations.
+- Only this feature branch is changed; GTK patches, normal video/GPU engine,
+  v0.2.6 release work, versions, dev/main, releases and AUR remain untouched.
+
+## v0.2.7 slideshow premature video skipping — 2026-11-23
+
+**TESTING — physical GNOME acceptance pending.** Reviewed base:
+`918a79e7181e8f4c8dc93912cdab7c1e6c0bc0dc`.
+[Production correction, evidence and native command](slideshow/V027_VIDEO_COMPLETION_GUARD.md).
+
+- Photo deadlines were already image-only; the native trigger is not inferred
+  without a reason trace. Fix two demonstrated weaknesses: bare ended-level
+  acceptance, and treating video errors as automatic successful progression.
+- Bind weak, explicitly disconnected stream-state notifications before play;
+  accept a fresh prepared-playback EOS without seek/error, consume outside the
+  emitter and reject stale/replaced completion. Disarm photo clocks on video;
+  video errors pause visibly with selection/manual arrows preserved.
+- Four new Rust state regressions plus the existing video timing test; GUI uses
+  8-second video / 3-second photos and certifies playing and paused retention,
+  real seek, EOS, error retention and two-window close. Correct x264 fixture VUI;
+  unchanged production metadata routing still refuses unknown transfer/primaries.
+- Codex: 230 Rust / 256 Python PASS, fmt/check/strict Clippy PASS. New interval
+  gate passes stock and owned GPU on both X11 and Sway (software GL explicitly
+  labelled); existing full and three-cycle EOS gates pass both sessions. Initial
+  fixture and private-X11 test failures remain documented, without weakened
+  assertions or changes to v0.2.6 helpers.
+- Native GNOME/AMD and secure slideshow: NOT RUN here. Prior native SIGSEGV and
+  GTK EGL limits remain OPEN. Only the slideshow feature branch is changed;
+  no GPU architecture/shader, GTK patch, version/package, dev/main or publication
+  changes.

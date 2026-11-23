@@ -15,6 +15,6 @@ test -x "$stage/usr/bin/pivra-thumbnail-factory"
 test -s "$stage/usr/share/licenses/pivra/video-adapter/COPYING.LGPL-2.1"
 test -s "$stage/usr/share/doc/pivra/corresponding-source/Pivra-source.tar.gz"
 desktop-file-validate "$stage/usr/share/applications/io.github.onbeskarakterli.Pivra.desktop"
-python3 scripts/release_preflight.py --version 0.2.6 --candidate --staging-root "$stage"
+python3 scripts/release_preflight.py --version 0.2.7 --candidate --staging-root "$stage"
 printf 'PASS native Arch DESTDIR staging: %s\n' "$stage"
-echo 'NOT RUN: makepkg/installation. Version 0.2.6 is a release candidate; source approval and publication remain separate.'
+echo 'NOT RUN: makepkg/installation. Version 0.2.7 is a release candidate; source approval and publication remain separate.'

@@ -1,6 +1,6 @@
 # Pivra — Planlı Commit ve İlerleme Takibi
 
-**Aktif kaynak sürümü: `dev` v0.2.3 (unreleased).** Faz 2/PIV-18 DONE (31.10.2026). Erken önizleme kapsam dışı; 64 MP kabul edildi. `main` ve yayımlanmış AUR v0.2.1 çizgisindedir; eski 0.1.0/0.2.1 test kayıtları ilgili tarihlerinin kanıtıdır, v0.2.3 yayın iddiası değildir. GitHub Release, etiket ve AUR güncellemesi yapılmadı.
+**Aktif kaynak sürümü: `dev` v0.2.7 (release candidate; unpublished).** Faz 2/PIV-18 DONE (31.10.2026). Erken önizleme kapsam dışı; 64 MP kabul edildi. `main` ve yayımlanmış AUR v0.2.1 çizgisindedir; eski 0.1.0/0.2.1 test kayıtları ilgili tarihlerinin kanıtıdır, v0.2.3 yayın iddiası değildir. GitHub Release, etiket ve AUR güncellemesi yapılmadı.
 
 
 ## Faz 2 ve PIV-18 resmî kapanış — 31.10.2026 — DONE

@@ -360,6 +360,25 @@ pub(super) fn build(app: &adw::Application, settings: &Settings, file: Option<Op
         .content(&content)
         .build();
     pivra::settings::window_state::install(&window, settings);
+    // Always keep Open at the far left of the header bar, including empty windows.
+    let open_button = gtk::Button::from_icon_name("document-open-symbolic");
+    open_button.set_tooltip_text(Some("Open media"));
+    open_button.set_accessible_name(Some("Open media"));
+    let open_window = window.downgrade();
+    open_button.connect_clicked(move |_| {
+        let Some(window) = open_window.upgrade() else {
+            return;
+        };
+        let dialog = gtk::FileDialog::new();
+        dialog.set_title("Open media");
+        let app = window.application();
+        dialog.open(Some(&window), None::<&gio::Cancellable>, move |result| {
+            if let (Ok(file), Some(app)) = (result, app.as_ref()) {
+                app.open(&[file], "");
+            }
+        });
+    });
+    header.pack_start(&open_button);
     if let Some(opened) = file {
         let context = Rc::new(RefCell::new(FileContext {
             collection: MediaCollection::new(vec![opened.item.clone()]),

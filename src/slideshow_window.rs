@@ -67,7 +67,15 @@ impl Session {
             let toast = adw::Toast::new(message);
             toast.set_timeout(2);
             self.notice.replace(Some(toast.downgrade()));
-            super::show_latest_toast(&overlay, &self.current_toast, toast);
+            super::show_latest_toast(&overlay, &self.current_toast, toast.clone());
+            // Dismiss after two seconds even when GTK pauses toast timeouts
+            // (for example when the pointer rests over the notification).
+            let weak_toast = toast.downgrade();
+            glib::timeout_add_local_once(Duration::from_secs(2), move || {
+                if let Some(toast) = weak_toast.upgrade() {
+                    toast.dismiss();
+                }
+            });
         }
     }
     fn unbind_video(&self) {

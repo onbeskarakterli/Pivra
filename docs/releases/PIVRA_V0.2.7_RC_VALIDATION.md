@@ -15,6 +15,7 @@
 - [x] Owner-reported source (pre-metadata update): `cargo fmt --all -- --check`, `cargo check --locked --all-targets`, strict `cargo clippy`, `cargo test --locked --all-targets` (40 pass), Python unittest discovery (83, one skip), and release build passed.
 - [x] Owner-reported in-window Open functional acceptance; last-selected folder behavior reported fixed.
 - [x] Owner-reported XWayland slideshow media playback and slideshow video interval regression pass on prior slideshow-feature code.
+- [x] Final v0.2.7 XWayland BT.709 slideshow video-interval regression: PASS (owner native Arch output, 23 Nov 2026; pause/seek/EOS/error/manual/close, no crash).
 - [ ] Re-run full native checks on final 0.2.7 metadata/source.
 - [ ] X11/XWayland GUI toolbar, slideshow, image/video navigation, pause/resume, EOS, open/reopen, notification timeout, folder monitor and preference persistence regression on final `dev`.
 - [ ] `make stage` and native package verification with approved immutable source checksum and dependency/license checks.

@@ -13,6 +13,25 @@ def evidence():
 
 
 class SlideshowResult(unittest.TestCase):
+    def interval_evidence(self):
+        return '\n'.join([
+            'SLIDESHOW_INTERVAL held-playing elapsed_ms=3301 position=0.5 backend=stock',
+            'SLIDESHOW_INTERVAL held-paused',
+            'PIVRA_SLIDESHOW event=video-ended path="4.mp4"',
+            'SLIDESHOW_INTERVAL failed-video-held',
+            'PASS slideshow video interval: held past photo deadline, pause/seek/EOS/error/manual/close'])
+
+    def test_video_survives_interval_then_genuine_eos(self):
+        self.assertEqual(result(0, self.interval_evidence(), interval=True)['status'], 'PASS')
+
+    def test_eos_before_hold_is_not_an_interval_pass(self):
+        lines=self.interval_evidence().splitlines()
+        lines.insert(0,lines.pop(2))
+        self.assertEqual(result(0, '\n'.join(lines), interval=True)['status'], 'FAIL')
+
+    def test_video_error_hold_and_cleanup_are_required(self):
+        self.assertEqual(result(0, self.interval_evidence().replace('failed-video-held','error skipped'), interval=True)['status'], 'FAIL')
+
     def test_three_complete_cycles(self):
         self.assertEqual(result(0, evidence(), cycles=True)['status'], 'PASS')
 

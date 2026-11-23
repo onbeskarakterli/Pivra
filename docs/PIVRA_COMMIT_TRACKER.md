@@ -2862,3 +2862,30 @@ source: `d041378a087a6a129e1acf249421e05b1d2c193b`.
   the owner's SIGSEGV or close the prior GTK/SIGSEGV observations.
 - Only this feature branch is changed; GTK patches, normal video/GPU engine,
   v0.2.6 release work, versions, dev/main, releases and AUR remain untouched.
+
+## v0.2.7 slideshow premature video skipping — 2026-11-23
+
+**TESTING — physical GNOME acceptance pending.** Reviewed base:
+`918a79e7181e8f4c8dc93912cdab7c1e6c0bc0dc`.
+[Production correction, evidence and native command](slideshow/V027_VIDEO_COMPLETION_GUARD.md).
+
+- Photo deadlines were already image-only; the native trigger is not inferred
+  without a reason trace. Fix two demonstrated weaknesses: bare ended-level
+  acceptance, and treating video errors as automatic successful progression.
+- Bind weak, explicitly disconnected stream-state notifications before play;
+  accept a fresh prepared-playback EOS without seek/error, consume outside the
+  emitter and reject stale/replaced completion. Disarm photo clocks on video;
+  video errors pause visibly with selection/manual arrows preserved.
+- Four new Rust state regressions plus the existing video timing test; GUI uses
+  8-second video / 3-second photos and certifies playing and paused retention,
+  real seek, EOS, error retention and two-window close. Correct x264 fixture VUI;
+  unchanged production metadata routing still refuses unknown transfer/primaries.
+- Codex: 230 Rust / 256 Python PASS, fmt/check/strict Clippy PASS. New interval
+  gate passes stock and owned GPU on both X11 and Sway (software GL explicitly
+  labelled); existing full and three-cycle EOS gates pass both sessions. Initial
+  fixture and private-X11 test failures remain documented, without weakened
+  assertions or changes to v0.2.6 helpers.
+- Native GNOME/AMD and secure slideshow: NOT RUN here. Prior native SIGSEGV and
+  GTK EGL limits remain OPEN. Only the slideshow feature branch is changed;
+  no GPU architecture/shader, GTK patch, version/package, dev/main or publication
+  changes.

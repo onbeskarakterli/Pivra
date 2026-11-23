@@ -53,9 +53,6 @@ impl Clock {
             false
         }
     }
-    pub fn video_completed(&self, ended: bool) -> bool {
-        !self.paused && ended
-    }
     pub fn set_interval(&mut self, seconds: u32, now: Duration) {
         let paused = self.paused;
         let ready = self.ready;
@@ -64,6 +61,51 @@ impl Clock {
         if ready {
             self.photo_ready(now);
         }
+    }
+}
+/// GTK's ended property is a level, not proof of a new successful completion.
+/// Observe stream notifications before play (including very short clips), then
+/// consume on the main-context observer, never dismantling a signal's emitter.
+#[derive(Clone, Copy, Default, Debug)]
+pub struct VideoState {
+    pub prepared: bool,
+    pub playing: bool,
+    pub seeking: bool,
+    pub ended: bool,
+    pub failed: bool,
+}
+#[derive(Default, Debug)]
+pub struct VideoCompletion {
+    live: bool,
+    ended: bool,
+    pending: bool,
+}
+impl VideoCompletion {
+    /// Returns whether a validated completion is pending (not yet consumed).
+    pub fn observe(&mut self, state: VideoState) -> bool {
+        let rising = state.ended && !self.ended;
+        self.ended = state.ended;
+        if !state.prepared || state.failed || state.seeking {
+            self.live = false;
+            self.pending = false;
+            return false;
+        }
+        if !state.ended {
+            self.pending = false;
+            if state.playing {
+                self.live = true;
+            }
+        } else if rising && self.live && !state.playing {
+            self.pending = true;
+            self.live = false;
+        }
+        self.pending
+    }
+    pub fn take(&mut self, paused: bool, state: VideoState) -> bool {
+        if state.failed || !state.prepared || state.seeking || !state.ended || state.playing {
+            self.pending = false;
+        }
+        !paused && std::mem::take(&mut self.pending)
     }
 }
 /// Exactly one bounded pass, including wrap and single-item replay. Failed paths
@@ -156,12 +198,113 @@ mod tests {
     #[test]
     fn video_waits_for_eos_and_paused_eos_is_deferred() {
         let mut c = Clock::new(3);
-        assert!(!c.video_completed(false));
+        let mut end = VideoCompletion::default();
+        end.observe(playing());
+        assert!(!end.take(false, playing()));
         assert!(!c.due(at(999)));
-        c.toggle_pause(at(0));
-        assert!(!c.video_completed(true));
-        c.toggle_pause(at(1));
-        assert!(c.video_completed(true));
+        end.observe(ended());
+        assert!(!end.take(true, ended()));
+        assert!(end.take(false, ended()));
+        assert!(!end.take(false, ended()));
+    }
+    fn playing() -> VideoState {
+        VideoState {
+            prepared: true,
+            playing: true,
+            ..VideoState::default()
+        }
+    }
+    fn ended() -> VideoState {
+        VideoState {
+            prepared: true,
+            ended: true,
+            ..VideoState::default()
+        }
+    }
+    #[test]
+    fn initial_or_unprepared_ended_is_not_a_new_eos() {
+        let mut end = VideoCompletion::default();
+        end.observe(ended());
+        assert!(!end.take(false, ended()));
+        end.observe(VideoState {
+            prepared: false,
+            ..ended()
+        });
+        assert!(!end.take(false, ended()));
+    }
+    #[test]
+    fn errors_and_seeks_cannot_complete_a_video() {
+        for state in [
+            VideoState {
+                failed: true,
+                ..ended()
+            },
+            VideoState {
+                seeking: true,
+                ..ended()
+            },
+        ] {
+            let mut end = VideoCompletion::default();
+            end.observe(playing());
+            end.observe(state);
+            assert!(!end.take(false, state));
+            end.observe(ended());
+            assert!(!end.take(false, ended()));
+            end.observe(playing());
+            end.observe(ended());
+            assert!(end.take(false, ended()));
+        }
+    }
+    #[test]
+    fn pause_is_not_eos_and_short_video_notifications_are_not_lost() {
+        let mut end = VideoCompletion::default();
+        end.observe(playing());
+        end.observe(VideoState {
+            playing: false,
+            ..playing()
+        });
+        assert!(!end.take(
+            false,
+            VideoState {
+                playing: false,
+                ..playing()
+            }
+        ));
+        end.observe(playing());
+        end.observe(ended()); // Both notifications can occur before the next poll.
+        assert!(end.take(false, ended()));
+    }
+    #[test]
+    fn replacement_and_seek_after_eos_discard_pending_completion() {
+        let mut old = VideoCompletion::default();
+        old.observe(playing());
+        old.observe(ended());
+        let mut replacement = VideoCompletion::default();
+        assert!(!replacement.take(false, ended()));
+        old.observe(VideoState {
+            seeking: true,
+            ..ended()
+        });
+        assert!(!old.take(false, ended()));
+        // A queued EOS cannot outlive an error/restart before the next poll,
+        // even if no further notification was delivered to this observer.
+        for invalid in [
+            VideoState {
+                failed: true,
+                ..ended()
+            },
+            VideoState {
+                prepared: false,
+                ..ended()
+            },
+            playing(),
+        ] {
+            let mut queued = VideoCompletion::default();
+            queued.observe(playing());
+            queued.observe(ended());
+            assert!(!queued.take(false, invalid));
+            assert!(!queued.take(false, ended()));
+        }
     }
     #[test]
     fn loop_includes_video_and_skips_failed_unsupported_without_mutating_catalog() {

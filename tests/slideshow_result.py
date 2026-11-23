@@ -10,7 +10,7 @@ sys.path.insert(0, str(Path(__file__).parent / 'video_gpu'))
 from gdb_report import outcome, records_from
 
 
-def result(code, log, *, cycles=False, debugger_records=None):
+def result(code, log, *, cycles=False, interval=False, debugger_records=None):
     if debugger_records is not None:
         status = outcome(code, debugger_records)
         if status['status'] != 'PASS':
@@ -24,6 +24,17 @@ def result(code, log, *, cycles=False, debugger_records=None):
     eos = [i for i, line in enumerate(log.splitlines()) if line.startswith('PIVRA_SLIDESHOW event=video-ended ')]
     if not eos:
         return dict(status='FAIL', reason='error-free video EOS was not observed')
+    if interval:
+        lines = log.splitlines()
+        def stage(prefix):
+            return [i for i, line in enumerate(lines) if line.startswith(prefix)]
+        playing = stage('SLIDESHOW_INTERVAL held-playing ')
+        paused = stage('SLIDESHOW_INTERVAL held-paused')
+        failed = stage('SLIDESHOW_INTERVAL failed-video-held')
+        if not (len(eos) == len(playing) == len(paused) == len(failed) == 1
+                and playing[0] < paused[0] < eos[0] < failed[0]
+                and 'PASS slideshow video interval: held past photo deadline, pause/seek/EOS/error/manual/close' in log):
+            return dict(status='FAIL', reason='video hold/pause/EOS/error/close evidence incomplete or out of order')
     if cycles:
         stages = []
         for i, line in enumerate(log.splitlines()):
@@ -48,10 +59,11 @@ def main():
     parser.add_argument('log', type=Path)
     parser.add_argument('exit_code', type=int)
     parser.add_argument('--cycles', action='store_true')
+    parser.add_argument('--video-interval', action='store_true')
     parser.add_argument('--gdb-events', type=Path)
     args = parser.parse_args()
     log = args.log.read_text(errors='replace')
-    report = result(args.exit_code, log, cycles=args.cycles,
+    report = result(args.exit_code, log, cycles=args.cycles, interval=args.video_interval,
                     debugger_records=records_from(log, args.gdb_events) if args.gdb_events else None)
     libraries = {}
     for line in log.splitlines():

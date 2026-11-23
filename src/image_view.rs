@@ -59,7 +59,9 @@ pub(super) struct ImageView {
     animation_controls: animation::Controls,
     transition: Rc<photo_transition::Transition>,
     slideshow_paused: Rc<Cell<bool>>,
+    video_observer: Rc<RefCell<Option<VideoObserver>>>,
 }
+type VideoObserver = Box<dyn Fn(Option<&gtk::MediaFile>)>;
 
 impl ImageView {
     pub(super) fn new(window: &adw::ApplicationWindow) -> Self {
@@ -326,6 +328,7 @@ impl ImageView {
         let view = Self {
             transition,
             slideshow_paused: Rc::new(Cell::new(false)),
+            video_observer: Rc::default(),
             animation_controls,
             video_controls,
             animation_generation,
@@ -650,6 +653,11 @@ impl ImageView {
         self.video.set_visible(true);
         self.video_controls
             .attach(Some(media.clone().upcast::<gtk::MediaStream>()));
+        // Bind slideshow EOS observations before play, not on a later timer.
+        // Outside slideshow the optional observer does not modify the stream.
+        if let Some(observer) = self.video_observer.borrow().as_ref() {
+            observer(Some(&media));
+        }
         if let Some((playing, muted, volume, _, _)) = resume {
             media.set_loop(resume.is_some_and(|s| s.3));
             media.set_muted(muted);
@@ -663,6 +671,11 @@ impl ImageView {
     }
     fn stop_video(&self) {
         gpu_video::trace_binding(c"video-retire-begin");
+        // Disconnect slideshow notifications while we still own the emitter,
+        // including asynchronous GPU -> stock fallback (not just navigation).
+        if let Some(observer) = self.video_observer.borrow().as_ref() {
+            observer(None);
+        }
         if let Some(handler) = self.video_ready_handler.borrow_mut().take() {
             if let Some(window) = self.window.upgrade() {
                 window.disconnect(handler);
@@ -812,6 +825,13 @@ impl ImageView {
     }
 
     // Per-window slideshow policy; native GPU renderer is unchanged.
+    #[allow(
+        dead_code,
+        reason = "Standalone image probes omit window slideshow controls"
+    )]
+    pub(super) fn on_video_stream(&self, observer: impl Fn(Option<&gtk::MediaFile>) + 'static) {
+        self.video_observer.replace(Some(Box::new(observer)));
+    }
     #[allow(
         dead_code,
         reason = "Standalone image probes omit window slideshow controls"

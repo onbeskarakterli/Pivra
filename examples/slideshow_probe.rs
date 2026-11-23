@@ -230,6 +230,111 @@ fn eos_cycles(first: &adw::ApplicationWindow, other: &adw::ApplicationWindow) {
     other.close();
     eprintln!("PASS slideshow EOS regression: 3 corrupt/video/photo cycles and independent close");
 }
+fn video_interval(
+    first: &adw::ApplicationWindow,
+    other: &adw::ApplicationWindow,
+    dir: &std::path::Path,
+) {
+    let position = widgets(first.upcast_ref())
+        .into_iter()
+        .filter_map(|w| w.downcast::<gtk::Button>().ok())
+        .find(|b| b.tooltip_text().is_some_and(|s| s == "Forward 5 seconds"))
+        .expect("video seek control")
+        .parent()
+        .unwrap()
+        .observe_children()
+        .iter::<glib::Object>()
+        .filter_map(Result::ok)
+        .find_map(|o| o.downcast::<gtk::Scale>().ok())
+        .expect("video position scale");
+    key(first, gtk::gdk::Key::F5);
+    key(first, gtk::gdk::Key::Left); // Wrap photo -> video; photo interval is 3 s.
+    assert!(selected(first, "4.mp4"));
+    wait("prepared playing video", || {
+        assert!(selected(first, "4.mp4"), "video skipped before preparation");
+        position.is_sensitive() && position.value() > 0.0
+    });
+    let gpu = std::env::args().any(|s| s == "--bt709");
+    let stats = image_view::gpu_video::stats();
+    if gpu {
+        assert!(
+            stats.gpu > 0 && stats.filters > 0,
+            "GPU route required, stock fallback is not a GPU PASS"
+        );
+    } else {
+        assert!(
+            stats.stock > 0 && stats.gpu == 0,
+            "unknown metadata must use stock"
+        );
+    }
+    let began = Instant::now();
+    wait("playing video retained beyond photo interval", || {
+        assert!(
+            selected(first, "4.mp4") && !state(first, "slideshow-paused"),
+            "playing video advanced or paused before EOS"
+        );
+        began.elapsed() >= Duration::from_millis(3300) && position.value() >= 0.4
+    });
+    eprintln!(
+        "SLIDESHOW_INTERVAL held-playing elapsed_ms={} position={} backend={}",
+        began.elapsed().as_millis(),
+        position.value(),
+        if gpu { "gpu" } else { "stock" }
+    );
+    key(first, gtk::gdk::Key::space);
+    let paused = Instant::now();
+    wait("paused video retained beyond photo interval", || {
+        assert!(selected(first, "4.mp4") && state(first, "slideshow-paused"));
+        paused.elapsed() >= Duration::from_millis(3300)
+    });
+    eprintln!("SLIDESHOW_INTERVAL held-paused");
+    let time = position
+        .parent()
+        .unwrap()
+        .observe_children()
+        .iter::<glib::Object>()
+        .filter_map(Result::ok)
+        .find_map(|o| o.downcast::<gtk::Label>().ok())
+        .expect("video timestamp label");
+    position.set_value(0.125); // Real seek while paused, then continue to genuine EOS.
+    wait("seek applied while paused", || {
+        time.text().starts_with("0:01 /") && position.value() < 0.2
+    });
+    assert!(selected(first, "4.mp4"));
+    key(first, gtk::gdk::Key::space);
+    wait("successful video EOS advances", || selected(first, "1.png"));
+    key(first, gtk::gdk::Key::space);
+    photo_presented(first);
+    assert!(selected(other, "1.png") && other.is_visible());
+    // A decoder error must remain explicit, not masquerade as successful EOS.
+    std::fs::write(dir.join("4.mp4"), b"intentionally invalid video").unwrap();
+    key(first, gtk::gdk::Key::space);
+    key(first, gtk::gdk::Key::Left);
+    wait("failed video pauses slideshow", || {
+        state(first, "slideshow-paused")
+    });
+    assert!(
+        widgets(first.upcast_ref())
+            .iter()
+            .filter_map(|w| w.downcast_ref::<gtk::Label>())
+            .any(|l| l.is_visible() && l.text().starts_with("Video:"))
+    );
+    let failed = Instant::now();
+    wait("failed video stays selected", || {
+        assert!(selected(first, "4.mp4") && state(first, "slideshow-paused"));
+        failed.elapsed() >= Duration::from_millis(3300)
+    });
+    eprintln!("SLIDESHOW_INTERVAL failed-video-held");
+    key(first, gtk::gdk::Key::Right);
+    assert!(selected(first, "1.png") && state(first, "slideshow-paused"));
+    key(first, gtk::gdk::Key::Escape);
+    first.close();
+    assert!(other.is_visible());
+    other.close();
+    eprintln!(
+        "PASS slideshow video interval: held past photo deadline, pause/seek/EOS/error/manual/close"
+    );
+}
 fn key(w: &adw::ApplicationWindow, key: gtk::gdk::Key) {
     for controller in w
         .observe_controllers()
@@ -300,6 +405,10 @@ fn main() {
     assert_eq!(pivra::settings::load_slideshow_interval(), 3);
     first.present();
     runtime_provenance(&first);
+    if std::env::args().any(|s| s == "--video-interval-regression") {
+        video_interval(&first, &other, dir.path());
+        return;
+    }
     if std::env::args().any(|s| s == "--eos-regression") {
         eos_cycles(&first, &other);
         return;

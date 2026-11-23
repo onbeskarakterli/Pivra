@@ -4,6 +4,9 @@ Date: 2026-11-23. **TESTING — physical GNOME acceptance pending.**
 Subsequent owner-reported native EOS SIGSEGV: **OPEN; native acceptance BLOCKED**.
 See the [focused investigation and GDB command](V027_SLIDESHOW_EOS_SIGSEGV.md).
 The original results below remain historical controlled-environment evidence.
+The subsequent [video-completion guard](V027_VIDEO_COMPLETION_GUARD.md) replaces
+level-only EOS sampling and keeps video errors selected/paused; its new native
+acceptance is also pending.
 Branch: `feature/v0.2.7-slideshow`, based on
 `72405a9fa31b5ff45a98532fbd4008de5ecdc29d`.
 Implementation: `823455ad96844e7ac3d130a5fd119d855cf961ee`.
@@ -36,8 +39,10 @@ not a change to the v0.2.6 release candidate: Cargo/package versions remain
   failure, video switching, stop and close clear that paintable/tick callback.
 - Existing selection/catalog monitoring, token-gated loading, cache and preload
   are reused. A changed selected file re-enters the existing reload path. Failed
-  or unsupported items are skipped once per slideshow session; an empty/all-bad
-  catalog stops with an explicit message rather than retrying indefinitely.
+  or unsupported photos are skipped once per slideshow session; an empty/all-bad
+  photo catalog stops with an explicit message rather than retrying indefinitely.
+  Video playback errors pause with their visible error; manual arrows remain
+  available. They do not count as successful EOS or trigger automatic skipping.
   A repaired failed item is eligible again after restarting slideshow.
 - Each window owns its clock, failed-item set, weak stream reference and one
   chained 100 ms GLib one-shot observer while active. Stop/close removes the

@@ -40,7 +40,13 @@ def main():
     p=argparse.ArgumentParser(description=__doc__)
     p.add_argument('--session',choices=['x11','sway'],required=True)
     p.add_argument('--eos-regression',action='store_true')
+    p.add_argument('--video-interval-regression',action='store_true')
+    p.add_argument('--bt709',action='store_true',help='require actual GPU route (software only with existing explicit permission)')
     args=p.parse_args()
+    if args.eos_regression and args.video_interval_regression:
+        p.error('choose one focused regression')
+    if args.bt709 and not args.video_interval_regression:
+        p.error('--bt709 requires --video-interval-regression')
     required=['cargo','ffmpeg','dbus-run-session',*(['Xvfb','xfwm4','xprop'] if args.session=='x11' else ['sway'])]
     missing=[name for name in required if not shutil.which(name)]
     if missing:
@@ -54,14 +60,17 @@ def main():
     out=Path(os.environ['PIVRA_SLIDESHOW_REPORT_DIR'])
     print('Logs:',out,flush=True)
     video=out/'video.mp4'
-    subprocess.run(['ffmpeg','-hide_banner','-loglevel','error','-f','lavfi','-i','testsrc2=size=192x96:rate=12','-t','5','-c:v','libx264','-pix_fmt','yuv420p',str(video)],check=True)
+    color=['-x264-params','colorprim=bt709:transfer=bt709:colormatrix=bt709:fullrange=off'] if args.bt709 else []
+    subprocess.run(['ffmpeg','-hide_banner','-loglevel','error','-f','lavfi','-i','testsrc2=size=192x96:rate=12','-t','8' if args.video_interval_regression else '5','-c:v','libx264','-pix_fmt','yuv420p',*color,str(video)],check=True)
     subprocess.run(['cargo','build','--locked','--example','slideshow_probe'],cwd=ROOT,check=True)
     env=dict(os.environ,XDG_CONFIG_HOME=str(out/'config'),XDG_CACHE_HOME=str(out/'cache'),XDG_DATA_HOME=str(out/'data'),GTK_A11Y='none',PIVRA_TRACE_SLIDESHOW='1')
     with session(args.session,env,out,floating=True) as active:
         with window_manager(args.session,active,out):
             extra=['--eos-regression'] if args.eos_regression else []
+            if args.video_interval_regression:extra=['--video-interval-regression']
+            if args.bt709:extra+=['--bt709']
             row=run('slideshow',['target/debug/examples/slideshow_probe','--controlled',*extra,video],active,out,timeout=60)
-    report=result(row['exit'],(out/'slideshow.log').read_text(),cycles=args.eos_regression)
+    report=result(row['exit'],(out/'slideshow.log').read_text(),cycles=args.eos_regression,interval=args.video_interval_regression)
     if report['status']!='PASS':
         print(f'{report["status"]}: {report["reason"]}',flush=True)
         return 77 if report['status']=='NOT RUN' else 1

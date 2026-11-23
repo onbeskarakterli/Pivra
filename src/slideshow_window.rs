@@ -6,7 +6,7 @@ use gtk::{gio, glib};
 use pivra::{
     image_pipeline::Phase,
     media::MediaKind,
-    slideshow::{Clock, target},
+    slideshow::{Clock, VideoCompletion, VideoState, target},
 };
 use std::{
     cell::{Cell, RefCell},
@@ -23,6 +23,19 @@ pub(super) fn active(window: &adw::ApplicationWindow) -> bool {
         .and_then(|v| v.get::<bool>())
         .unwrap_or(false)
 }
+struct VideoWatch {
+    media: glib::WeakRef<gtk::MediaFile>,
+    handlers: Vec<glib::SignalHandlerId>,
+}
+fn video_state(media: &gtk::MediaFile) -> VideoState {
+    VideoState {
+        prepared: media.is_prepared(),
+        playing: media.is_playing(),
+        seeking: media.is_seeking(),
+        ended: media.is_ended(),
+        failed: media.error().is_some(),
+    }
+}
 pub(super) struct Session {
     window: glib::WeakRef<adw::ApplicationWindow>,
     title: adw::WindowTitle,
@@ -34,13 +47,63 @@ pub(super) struct Session {
     revision: Cell<Option<u64>>,
     last_path: RefCell<Option<PathBuf>>,
     failed: RefCell<HashSet<PathBuf>>,
-    stream: RefCell<Option<glib::WeakRef<gtk::MediaFile>>>,
+    stream: RefCell<Option<VideoWatch>>,
     timer: RefCell<Option<glib::SourceId>>,
     inhibitor: Cell<u32>,
     inhibitor_app: RefCell<Option<glib::WeakRef<gtk::Application>>>,
-    ended_seen: Cell<bool>,
+    video_end: RefCell<VideoCompletion>,
 }
 impl Session {
+    fn unbind_video(&self) {
+        if let Some(watch) = self.stream.borrow_mut().take() {
+            if let Some(media) = watch.media.upgrade() {
+                for handler in watch.handlers {
+                    media.disconnect(handler);
+                }
+            }
+        }
+        *self.video_end.borrow_mut() = VideoCompletion::default();
+    }
+    fn bind_video(self: &Rc<Self>, media: &gtk::MediaFile) {
+        if !self.running.get() {
+            return;
+        }
+        self.unbind_video();
+        let mut handlers = Vec::new();
+        for property in ["prepared", "playing", "seeking", "ended", "error"] {
+            let weak = Rc::downgrade(self);
+            handlers.push(media.connect_notify_local(Some(property), move |media, _| {
+                let Some(this) = weak.upgrade() else {
+                    return;
+                };
+                if this.running.get()
+                    && this.view.current_video().as_ref() == Some(media)
+                    && this
+                        .stream
+                        .borrow()
+                        .as_ref()
+                        .and_then(|w| w.media.upgrade())
+                        .as_ref()
+                        == Some(media)
+                {
+                    // Record only: poll() consumes completion outside this signal.
+                    let state = video_state(media);
+                    let accepted = this.video_end.borrow_mut().observe(state);
+                    if property == "ended" && state.ended
+                        && std::env::var_os("PIVRA_TRACE_SLIDESHOW").is_some_and(|v| v == "1")
+                    {
+                        eprintln!("PIVRA_SLIDESHOW event=video-end-notify time_us={} media={:p} prepared={} playing={} seeking={} failed={} accepted={accepted}",
+                            glib::monotonic_time(), media.as_ptr(), state.prepared, state.playing, state.seeking, state.failed);
+                    }
+                }
+            }));
+        }
+        self.stream.replace(Some(VideoWatch {
+            media: media.downgrade(),
+            handlers,
+        }));
+        self.video_end.borrow_mut().observe(video_state(media));
+    }
     // Opt-in transition boundaries only, never per-frame logging or GL calls.
     fn trace(&self, event: &str, path: Option<&std::path::Path>) {
         if std::env::var_os("PIVRA_TRACE_SLIDESHOW").is_some_and(|v| v == "1") {
@@ -118,6 +181,7 @@ impl Session {
             }
         }
         if let Some(media) = self.view.current_video() {
+            self.bind_video(&media);
             if media.is_ended() && media.is_seekable() {
                 media.seek(0);
             }
@@ -148,10 +212,9 @@ impl Session {
         if let Some(id) = self.timer.borrow_mut().take() {
             id.remove();
         }
-        self.stream.borrow_mut().take();
+        self.unbind_video();
         self.failed.borrow_mut().clear();
         self.last_path.borrow_mut().take();
-        self.ended_seen.set(false);
         self.clock.borrow_mut().reset();
         self.view.set_slideshow(false);
         self.state("slideshow", false);
@@ -185,10 +248,14 @@ impl Session {
         self.state("slideshow-paused", paused);
         // Inhibitor intentionally survives pause.
     }
-    pub(super) fn navigate(&self, forward: bool) {
+    pub(super) fn navigate(self: &Rc<Self>, forward: bool) {
+        self.advance(forward, "manual");
+    }
+    fn advance(self: &Rc<Self>, forward: bool, reason: &str) {
         if !self.running.get() {
             return;
         }
+        self.trace(reason, None);
         let Some(window) = self.window.upgrade() else {
             self.stop();
             return;
@@ -206,8 +273,10 @@ impl Session {
             return;
         };
         self.clock.borrow_mut().reset();
+        self.unbind_video();
         if context.collection.selected_index() == Some(index) {
             if let Some(media) = self.view.current_video() {
+                self.bind_video(&media);
                 if media.is_seekable() {
                     media.seek(0);
                     if !self.clock.borrow().paused {
@@ -219,7 +288,6 @@ impl Session {
             }
             return;
         }
-        self.stream.borrow_mut().take();
         context.collection.select(index);
         context.revision = context.revision.wrapping_add(1);
         update_title(&window, &self.title, &context);
@@ -228,7 +296,7 @@ impl Session {
         display_selected(&self.view, &context);
         self.trace("display-selected-return", path);
     }
-    fn poll(&self) {
+    fn poll(self: &Rc<Self>) {
         if !self.running.get() {
             return;
         }
@@ -242,45 +310,45 @@ impl Session {
         self.last_path.replace(path);
         if old_revision != Some(revision) {
             self.clock.borrow_mut().reset();
-            self.stream.borrow_mut().take();
             // A same-path revision comes from the existing file monitor. A
             // cancelled/changed current request must not leave slideshow waiting
             // forever for readiness. Navigation already starts its own request.
             if old_revision.is_some() && same_path && item.is_some() {
+                self.trace("catalog-revision-reload", item.as_ref().map(|i| i.path()));
                 if let Some(window) = self.window.upgrade() {
                     gio::prelude::ActionGroupExt::activate_action(&window, "reload-media", None);
                 }
             }
         }
         let Some(item) = item else {
-            self.navigate(true);
+            self.advance(true, "catalog-empty-or-removed");
             return;
         };
         let paused = self.clock.borrow().paused;
         if item.kind() == MediaKind::Video {
+            // The photo deadline is never armed or consumed for a video, even
+            // across delayed initialization, interval edits or catalog updates.
+            self.clock.borrow_mut().reset();
             if let Some(media) = self.view.current_video() {
                 let same = self
                     .stream
                     .borrow()
                     .as_ref()
-                    .and_then(|s| s.upgrade())
+                    .and_then(|s| s.media.upgrade())
                     .is_some_and(|s| s == media);
                 if !same {
-                    self.ended_seen.set(false);
-                    self.stream.replace(Some(media.downgrade()));
+                    self.bind_video(&media);
                     if paused {
                         media.pause();
                     } else {
                         media.play();
                     }
                 }
-                if !media.is_ended() {
-                    self.ended_seen.set(false);
-                }
-                if media.error().is_none()
-                    && self.clock.borrow().video_completed(media.is_ended())
-                    && !self.ended_seen.replace(true)
-                {
+                let complete = self
+                    .video_end
+                    .borrow_mut()
+                    .take(paused, video_state(&media));
+                if complete {
                     if std::env::var_os("PIVRA_TRACE_SLIDESHOW").is_some_and(|v| v == "1") {
                         eprintln!(
                             "PIVRA_SLIDESHOW event=video-ended path={:?} time_us={} media={:p} type={} prepared={} seekable={} duration={} timestamp={}",
@@ -298,12 +366,15 @@ impl Session {
                     // handler. Do not retain its stream across stop_video().
                     drop(media);
                     self.trace("eos-observer-reference-released", Some(item.path()));
-                    self.navigate(true);
+                    self.advance(true, "video-eos");
                     return;
                 }
             }
             if !paused && self.view.slideshow_video_failed() {
-                self.fail(item.path().to_owned());
+                // A decoder failure is not successful completion. Keep its
+                // visible error and selection; manual arrows remain available.
+                self.trace("video-error-paused", Some(item.path()));
+                self.pause();
             }
         } else {
             match self.view.phase() {
@@ -311,7 +382,7 @@ impl Session {
                     self.clock.borrow_mut().photo_ready(self.origin.elapsed());
                     let due = self.clock.borrow_mut().due(self.origin.elapsed());
                     if due {
-                        self.navigate(true);
+                        self.advance(true, "photo-deadline");
                     }
                 }
                 Phase::Failed if !paused => self.fail(item.path().to_owned()),
@@ -322,7 +393,7 @@ impl Session {
             }
         }
     }
-    fn fail(&self, path: PathBuf) {
+    fn fail(self: &Rc<Self>, path: PathBuf) {
         {
             let context = self.context.borrow();
             let mut failed = self.failed.borrow_mut();
@@ -337,7 +408,7 @@ impl Session {
                 failed.retain(|path| current.contains(path.as_path()));
             }
         }
-        self.navigate(true);
+        self.advance(true, "photo-error");
     }
 }
 
@@ -364,7 +435,17 @@ pub(super) fn install(
         timer: RefCell::new(None),
         inhibitor: Cell::new(0),
         inhibitor_app: RefCell::new(None),
-        ended_seen: Cell::new(false),
+        video_end: RefCell::new(VideoCompletion::default()),
+    });
+    let weak = Rc::downgrade(&this);
+    this.view.on_video_stream(move |media| {
+        if let Some(this) = weak.upgrade() {
+            if let Some(media) = media {
+                this.bind_video(media);
+            } else {
+                this.unbind_video();
+            }
+        }
     });
     for (name, kind) in [
         ("slideshow", 0),

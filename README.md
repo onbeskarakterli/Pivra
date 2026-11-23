@@ -8,6 +8,15 @@
 
 v0.2.6 is not published. The [v0.2.5 source review](docs/releases/PIVRA_V0.2.5_SOURCE_APPROVAL.md) and [release notes](docs/releases/PIVRA_V0.2.5_RELEASE_NOTES.md) remain the stable-version record; the [v0.2.6 checklist](docs/releases/PIVRA_V0.2.6_RC_VALIDATION.md) tracks the next release separately.
 
+**Feature branch only — v0.2.7 slideshow: TESTING.** On
+`feature/v0.2.7-slideshow`, F5 starts a fullscreen slideshow; Space pauses,
+Left/Right navigate and Escape exits. Photos use a configurable interval and
+photo-only crossfade; videos advance at completion. Ordinary F11 intent is
+preserved. This feature is not part of stable v0.2.5 or the v0.2.6 candidate.
+Native EOS SIGSEGV acceptance is currently blocked; see the
+[investigation](docs/slideshow/V027_SLIDESHOW_EOS_SIGSEGV.md) and
+[validation instructions](docs/slideshow/V027_SLIDESHOW_VALIDATION.md).
+
 **[Latest published release](https://github.com/onbeskarakterli/Pivra/releases/latest)** · **[Arch Linux AUR](https://aur.archlinux.org/packages/pivra)** · **[Development roadmap](docs/PIVRA_DEVELOPMENT_ROADMAP.md)**
 
 ## Installation
@@ -71,7 +80,7 @@ The AUR package builds Pivra from a pinned source revision. GitHub releases also
 | Image minimap when zoomed beyond the viewport | ⏳ Planned |
 | Optional EXIF/metadata information panel | ⏳ Planned |
 | Photo/video/all filters and multi-selection | ⏳ Planned |
-| Slideshow with configurable timing, looping, and transitions | ⏳ Planned |
+| Slideshow with configurable timing, looping, and transitions | 🧪 Feature branch TESTING (v0.2.7; native acceptance pending) |
 | Customizable keyboard shortcuts and touchpad gestures | ⏳ Planned |
 | Move media to Trash with Undo | ✅ Available |
 | Wallpaper setting and side-by-side comparison | ⏳ Planned |
@@ -125,7 +134,7 @@ The [detailed development roadmap](docs/PIVRA_DEVELOPMENT_ROADMAP.md) retains hi
 
 ## Current limitations
 
-Pivra is a Linux/GNOME-focused viewer, not an image editor. Slideshow, HDR/ICC workflows, and batch conversion are not yet available. Image decoding depends on installed Glycin format loaders and their supported codecs. Video playback depends on the system GTK/GStreamer media backend and available codecs. Individual formats and files may fail.
+Pivra is a Linux/GNOME-focused viewer, not an image editor. Slideshow is under test on the v0.2.7 feature branch; HDR/ICC workflows and batch conversion are not yet available. Image decoding depends on installed Glycin format loaders and their supported codecs. Video playback depends on the system GTK/GStreamer media backend and available codecs. Individual formats and files may fail.
 
 Still-image loading is bounded to 64 MP (maximum 32,768 pixels per edge) and 64 MiB input size. Animated frames have additional bounds. The automated tests and video-navigation stress test were exercised on the development build; compatibility across other Linux environments remains to be verified.
 

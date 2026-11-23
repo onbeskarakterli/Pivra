@@ -2810,3 +2810,82 @@ Reviewed diagnostic source: `c4ca4d85a05fa81efeddc6f5229d28040c56d787`.
   not relabelled as newly run. Actual Arch makepkg/install: NOT RUN here.
 - No production/test/script/PKGBUILD/Cargo/lockfile change; no system GTK,
   main/tag/release/AUR action. Immutable source/checksum approval remains separate.
+
+## v0.2.7 slideshow — feature branch only — 2026-11-23
+
+**TESTING; native GNOME acceptance pending.** Branch:
+`feature/v0.2.7-slideshow`, from
+`72405a9fa31b5ff45a98532fbd4008de5ecdc29d`.
+Implementation commit: `823455ad96844e7ac3d130a5fd119d855cf961ee`
+(`feat: add independent fullscreen slideshow with photo crossfade`).
+[Behavior, tests, limitations and native command](slideshow/V027_SLIDESHOW_VALIDATION.md).
+
+- Implements feature-spec §3 requirements 42–45: F5, independent F11 intent,
+  configurable photo clock, video EOS, pause/manual navigation, unconditional
+  loop, ~300 ms photo-only crossfade, existing monitored catalog/preload/loading,
+  bounded error skip and stop/close cleanup. Public GtkApplication IDLE
+  inhibition includes pause; physical effectiveness remains NOT RUN.
+- Codex: fmt/check/strict all-target Clippy PASS (zero warnings), 226 Rust and
+  242 Python tests PASS, application build PASS. Controlled slideshow and four
+  existing catalog/zoom/cancellation/window-race GUI gates PASS on X11 and
+  headless Sway; real stock video EOS is required, controlled photo pixels are
+  explicitly not secure decoder evidence. Existing fullscreen gate passed final
+  X11/Sway runs; earlier compositor allocation failures and baseline comparison
+  are retained in the validation record.
+- Native secure photo prerequisite: NOT RUN/77 (loader exited 1 under existing
+  sandbox). Physical GNOME, hardware GPU slideshow and actual display-sleep
+  inhibition remain pending; no sandbox bypass or hardware PASS inferred.
+- GTK patches/GPU renderer/security/dependencies/package metadata/v0.2.6 release
+  records unchanged. Cargo/package versions intentionally remain 0.2.6. Stable
+  v0.2.5 information and open GTK/SIGSEGV risks remain. Only the feature branch
+  is committed/pushed; no dev/main/tag/release/AUR promotion.
+
+## v0.2.7 slideshow native EOS SIGSEGV — 2026-11-23
+
+**OPEN / UNCLASSIFIED; native acceptance BLOCKED, feature TESTING.** Reviewed
+source: `d041378a087a6a129e1acf249421e05b1d2c193b`.
+[Investigation and focused native GDB command](slideshow/V027_SLIDESHOW_EOS_SIGSEGV.md).
+
+- Owner reports corrupt `3.png` rejection, real video EOS, then exit 139. Native
+  log/core directory is not accessible here; no crash cause is inferred.
+- Correct a demonstrated test-barrier gap: selected title alone was not photo
+  readiness. Reuse actual GTK after-paint/render submission; keep the original
+  rapid-navigation assertions. Add three corrupt/video-EOS/photo cycles,
+  two-window/cleanup checks, transition-boundary diagnostics, verified GDB result
+  capture and eleven negative/positive evidence tests. No speculative production
+  lifetime/renderer change or timeout increase.
+- Codex: 226 Rust / 253 Python PASS; fmt/check/strict Clippy PASS. Focused and
+  full controlled slideshow PASS on X11/Sway. Secure native prerequisite under
+  GDB: NOT RUN/77. Private GTK 4.24.1 control/candidate EOS comparison cannot pass
+  due missing playback plug-in: control additionally fails after-paint with GL
+  warning; candidate exit 0 is rejected for missing EOS. This does not classify
+  the owner's SIGSEGV or close the prior GTK/SIGSEGV observations.
+- Only this feature branch is changed; GTK patches, normal video/GPU engine,
+  v0.2.6 release work, versions, dev/main, releases and AUR remain untouched.
+
+## v0.2.7 slideshow premature video skipping — 2026-11-23
+
+**TESTING — physical GNOME acceptance pending.** Reviewed base:
+`918a79e7181e8f4c8dc93912cdab7c1e6c0bc0dc`.
+[Production correction, evidence and native command](slideshow/V027_VIDEO_COMPLETION_GUARD.md).
+
+- Photo deadlines were already image-only; the native trigger is not inferred
+  without a reason trace. Fix two demonstrated weaknesses: bare ended-level
+  acceptance, and treating video errors as automatic successful progression.
+- Bind weak, explicitly disconnected stream-state notifications before play;
+  accept a fresh prepared-playback EOS without seek/error, consume outside the
+  emitter and reject stale/replaced completion. Disarm photo clocks on video;
+  video errors pause visibly with selection/manual arrows preserved.
+- Four new Rust state regressions plus the existing video timing test; GUI uses
+  8-second video / 3-second photos and certifies playing and paused retention,
+  real seek, EOS, error retention and two-window close. Correct x264 fixture VUI;
+  unchanged production metadata routing still refuses unknown transfer/primaries.
+- Codex: 230 Rust / 256 Python PASS, fmt/check/strict Clippy PASS. New interval
+  gate passes stock and owned GPU on both X11 and Sway (software GL explicitly
+  labelled); existing full and three-cycle EOS gates pass both sessions. Initial
+  fixture and private-X11 test failures remain documented, without weakened
+  assertions or changes to v0.2.6 helpers.
+- Native GNOME/AMD and secure slideshow: NOT RUN here. Prior native SIGSEGV and
+  GTK EGL limits remain OPEN. Only the slideshow feature branch is changed;
+  no GPU architecture/shader, GTK patch, version/package, dev/main or publication
+  changes.

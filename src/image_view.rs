@@ -6,6 +6,8 @@ mod actual_paintable;
 mod animation;
 #[path = "gpu_video.rs"]
 pub(crate) mod gpu_video;
+#[path = "photo_transition.rs"]
+mod photo_transition;
 #[path = "thumbnail_overlay.rs"]
 pub(crate) mod thumbnail_overlay;
 #[path = "video_controls.rs"]
@@ -55,7 +57,11 @@ pub(super) struct ImageView {
     phase: Rc<Cell<Phase>>,
     animation_generation: Rc<Cell<u64>>,
     animation_controls: animation::Controls,
+    transition: Rc<photo_transition::Transition>,
+    slideshow_paused: Rc<Cell<bool>>,
+    video_observer: Rc<RefCell<Option<VideoObserver>>>,
 }
+type VideoObserver = Box<dyn Fn(Option<&gtk::MediaFile>)>;
 
 impl ImageView {
     pub(super) fn new(window: &adw::ApplicationWindow) -> Self {
@@ -73,6 +79,7 @@ impl ImageView {
         overlay.set_hexpand(true);
         overlay.set_vexpand(true);
         overlay.set_child(Some(&picture));
+        let transition = photo_transition::Transition::new(&overlay);
         // Native GTK media playback is an intentionally small first video
         // milestone. The backend depends on installed media codecs.
         let video = gtk::Picture::new();
@@ -319,6 +326,9 @@ impl ImageView {
         });
         window.add_action(&quality_action);
         let view = Self {
+            transition,
+            slideshow_paused: Rc::new(Cell::new(false)),
+            video_observer: Rc::default(),
             animation_controls,
             video_controls,
             animation_generation,
@@ -348,8 +358,11 @@ impl ImageView {
         };
         // Disconnect callbacks before dropping streams; error recovery holds a
         // view only until this explicit detach, not past close/unrealize.
+        let transition = view.transition.clone();
+        window.connect_destroy(move |_| transition.clear());
         let closing = view.clone();
         window.connect_close_request(move |_| {
+            closing.transition.clear();
             closing.stop_video();
             glib::Propagation::Proceed
         });
@@ -640,19 +653,29 @@ impl ImageView {
         self.video.set_visible(true);
         self.video_controls
             .attach(Some(media.clone().upcast::<gtk::MediaStream>()));
+        // Bind slideshow EOS observations before play, not on a later timer.
+        // Outside slideshow the optional observer does not modify the stream.
+        if let Some(observer) = self.video_observer.borrow().as_ref() {
+            observer(Some(&media));
+        }
         if let Some((playing, muted, volume, _, _)) = resume {
             media.set_loop(resume.is_some_and(|s| s.3));
             media.set_muted(muted);
             media.set_volume(volume);
-            if playing {
+            if playing && !self.slideshow_paused.get() {
                 media.play();
             }
-        } else {
+        } else if !self.slideshow_paused.get() {
             media.play();
         }
     }
     fn stop_video(&self) {
         gpu_video::trace_binding(c"video-retire-begin");
+        // Disconnect slideshow notifications while we still own the emitter,
+        // including asynchronous GPU -> stock fallback (not just navigation).
+        if let Some(observer) = self.video_observer.borrow().as_ref() {
+            observer(None);
+        }
         if let Some(handler) = self.video_ready_handler.borrow_mut().take() {
             if let Some(window) = self.window.upgrade() {
                 window.disconnect(handler);
@@ -692,6 +715,7 @@ impl ImageView {
         gpu_video::trace_binding(c"video-retire-end");
     }
     fn prepare(&self, message: &str, cancel: bool) {
+        self.transition.clear();
         self.stop_video();
         self.animation_generation
             .set(self.animation_generation.get().wrapping_add(1));
@@ -800,6 +824,48 @@ impl ImageView {
         self.phase.get()
     }
 
+    // Per-window slideshow policy; native GPU renderer is unchanged.
+    #[allow(
+        dead_code,
+        reason = "Standalone image probes omit window slideshow controls"
+    )]
+    pub(super) fn on_video_stream(&self, observer: impl Fn(Option<&gtk::MediaFile>) + 'static) {
+        self.video_observer.replace(Some(Box::new(observer)));
+    }
+    #[allow(
+        dead_code,
+        reason = "Standalone image probes omit window slideshow controls"
+    )]
+    pub(super) fn set_slideshow(&self, active: bool) {
+        self.transition.enable(active);
+        if !active {
+            self.slideshow_paused.set(false);
+        }
+        self.video_controls.set_slideshow(active);
+    }
+    #[allow(dead_code, reason = "Standalone image probes omit slideshow controls")]
+    pub(super) fn set_slideshow_paused(&self, paused: bool) {
+        self.slideshow_paused.set(paused);
+        if let Some(media) = self.current_video() {
+            if paused {
+                media.pause();
+            } else if !media.is_ended() {
+                media.play();
+            }
+        }
+    }
+    #[allow(
+        dead_code,
+        reason = "Standalone image probes omit slideshow video errors"
+    )]
+    pub(super) fn slideshow_video_failed(&self) -> bool {
+        self.video_stream
+            .borrow()
+            .as_ref()
+            .is_some_and(|s| s.error().is_some() && !gpu_video::is_owned(s))
+            || (self.status.is_visible() && self.status.text().starts_with("Video:"))
+    }
+
     pub(super) fn load(&self, path: PathBuf) {
         if self.requested.borrow().as_ref() == Some(&path) && self.slot.current_in_flight() {
             return;
@@ -830,6 +896,11 @@ impl ImageView {
         on_completion: impl FnOnce() + 'static,
         on_result: impl FnOnce(bool) + 'static,
     ) {
+        self.transition.capture(
+            &self.picture,
+            self.phase.get() == Phase::FullReady && self.video_stream.borrow().is_none(),
+        );
+        let transition = self.transition.clone();
         let mut measurement = pivra::performance::Span::new("image_request_to_ready_callback");
         measurement.status("abandoned");
         let on_result = move |success| {
@@ -1006,6 +1077,7 @@ impl ImageView {
                 }
                 preload::maybe_start(&prefetch, &slot, texture.borrow().is_some());
                 // User observers can reenter/close/start a request. Never mutate GTK after them.
+                transition.present(success);
                 on_result(success);
             }
         }))));

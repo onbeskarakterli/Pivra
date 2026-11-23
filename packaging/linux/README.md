@@ -1,16 +1,9 @@
-> Current dev target: **0.2.6 development candidate**; isolated GTK Wayland and X11 native acceptance PASS, stock GTK mixed lifecycle still limited.
-> Stable release: **0.2.5**. Use [v0.2.6 gates](../../docs/releases/PIVRA_V0.2.6_RC_VALIDATION.md)
-> for this checkout. No source approval or native package success is inherited.
+> Current dev target: **0.2.7 release candidate**. Current published stable remains **0.2.5**.
+> Use [v0.2.7 validation gates](../../docs/releases/PIVRA_V0.2.7_RC_VALIDATION.md); earlier release evidence does not authorize publication.
 
 # Building Pivra from source on Linux (experimental)
 
-The `dev` branch reports **Pivra 0.2.6**, a development candidate. Current stable
-is **v0.2.5**. Latest user-reported native RX 7900 XT results are isolated
-ownership-patched GTK Wayland 9/9 and X11 9/9; original stock ownership Wayland
-remains 8/9. These new lifecycle results do not approve fresh package artifacts;
-earlier staging/package records belong to their recorded source versions. Source approval, native package testing
-and publication remain separate. Experimental DNG remains explicit opt-in,
-not a default format-support claim.
+The `dev` branch reports **Pivra 0.2.7**. Fullscreen slideshow, persistent toolbar preferences and in-window Open are implemented; XWayland is the temporary default where available due to the GTK Wayland EGL lifecycle issue. The source still requires complete release validation and immutable-source approval. Non-Arch distribution acceptance remains unverified.
 
 ## Common Makefile interface (development branch)
 
@@ -136,9 +129,9 @@ Run `bash packaging/arch/stage-video-candidate.sh` on clean native Arch for the
 single candidate staging step. It does not run makepkg or install system files.
 After explicit immutable-source approval, use a separate release workspace for
 makepkg source verification, real .SRCINFO generation and package checks.
-`python3 scripts/release_preflight.py --version 0.2.6 --candidate --staging-root
+`python3 scripts/release_preflight.py --version 0.2.7 --candidate --staging-root
 /path/to/stage` validates this candidate. Final preflight omits --candidate and
-requires README/release notes to identify v0.2.6 as current stable; that handoff
+requires README/release notes to identify v0.2.7 as current stable; that handoff
 must be explicitly authorized before final source approval/publication.
 
 ## Known limitations
@@ -148,7 +141,7 @@ must be explicitly authorized before final source approval/publication.
   system with XWayland/X11, `GDK_BACKEND=x11 GSK_RENDERER=gl pivra /path/to/video.mp4`
   is a per-process workaround accepted on the native AMD test system. No global
   overrides or system GTK patches are applied. A separate software candidate
-  SIGSEGV remains OPEN; [release risk decisions](../../docs/releases/PIVRA_V0.2.6_RC_VALIDATION.md)
+  SIGSEGV remains OPEN; [release risk decisions](../../docs/releases/PIVRA_V0.2.7_RC_VALIDATION.md)
   are pending.
 
 - Intel/NVIDIA GPU paths are untested; Vulkan adapter interop is not implemented.
@@ -162,6 +155,6 @@ must be explicitly authorized before final source approval/publication.
 - The historical accepted `Preload exceeds cache entry budget` observation is not
   claimed fixed; see the existing release/audit records.
 
-See the [v0.2.6 release notes](../../docs/releases/PIVRA_V0.2.6_RELEASE_NOTES.md),
-[candidate report](../../docs/releases/PIVRA_V0.2.6_RC_VALIDATION.md) and
+See the [v0.2.7 release notes](../../docs/releases/PIVRA_V0.2.7_RELEASE_NOTES.md),
+[candidate report](../../docs/releases/PIVRA_V0.2.7_RC_VALIDATION.md) and
 [LGPL rebuild instructions](../../docs/diagnostics/VIDEO_ADAPTER_REBUILD.md).

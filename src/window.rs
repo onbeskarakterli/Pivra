@@ -88,6 +88,21 @@ fn trash_entries(original: &std::path::Path) -> Vec<gio::File> {
     entries
 }
 
+fn load_last_open_folder() -> Option<gio::File> {
+    let path = glib::user_config_dir().join("pivra/last-open-dir.conf");
+    let folder = PathBuf::from(std::fs::read_to_string(path).ok()?.trim());
+    folder.is_dir().then(|| gio::File::for_path(folder))
+}
+
+fn save_last_open_folder(folder: &std::path::Path) {
+    let config = glib::user_config_dir().join("pivra");
+    if let Err(error) = std::fs::create_dir_all(&config)
+        .and_then(|_| std::fs::write(config.join("last-open-dir.conf"), folder.as_os_str().as_encoded_bytes()))
+    {
+        eprintln!("Pivra: could not save last open folder: {error}");
+    }
+}
+
 fn update_title(window: &adw::ApplicationWindow, title: &adw::WindowTitle, context: &FileContext) {
     update_navigation_actions(window, context);
     let Some(selected) = context.collection.current() else {
@@ -363,20 +378,6 @@ pub(super) fn build(app: &adw::Application, settings: &Settings, file: Option<Op
     // Always keep Open at the far left of the header bar, including empty windows.
     let open_button = gtk::Button::from_icon_name("document-open-symbolic");
     open_button.set_tooltip_text(Some("Open media"));
-    let open_window = window.downgrade();
-    open_button.connect_clicked(move |_| {
-        let Some(window) = open_window.upgrade() else {
-            return;
-        };
-        let dialog = gtk::FileDialog::new();
-        dialog.set_title("Open media");
-        let app = window.application();
-        dialog.open(Some(&window), None::<&gio::Cancellable>, move |result| {
-            if let (Ok(file), Some(app)) = (result, app.as_ref()) {
-                app.open(&[file], "");
-            }
-        });
-    });
     header.pack_start(&open_button);
     if let Some(opened) = file {
         let context = Rc::new(RefCell::new(FileContext {
@@ -394,6 +395,7 @@ pub(super) fn build(app: &adw::Application, settings: &Settings, file: Option<Op
         banner.set_child(Some(&notice));
         viewport.prepend(&banner);
         let view = ImageView::new(&window);
+        let folder_watch = Rc::new(RefCell::new(None::<Rc<FolderWatch>>));
         let picture = view
             .widget()
             .child()
@@ -895,16 +897,76 @@ pub(super) fn build(app: &adw::Application, settings: &Settings, file: Option<Op
                 gio::prelude::ActionGroupExt::activate_action(&window, "reload-media", None);
             }
         });
+        // Open changes the media in this window; cancel the prior folder watcher.
+        let open_window = window.downgrade();
+        let open_context = context.clone();
+        let open_view = view.clone();
+        let open_title = title.clone();
+        let open_status = placeholder.clone();
+        let open_banner = banner.clone();
+        let open_watch = folder_watch.clone();
+        open_button.connect_clicked(move |_| {
+            let Some(window) = open_window.upgrade() else {
+                return;
+            };
+            let dialog = gtk::FileDialog::new();
+            dialog.set_title("Open media");
+            if let Some(folder) = load_last_open_folder() {
+                dialog.set_initial_folder(Some(&folder));
+            }
+            let weak = window.downgrade();
+            let context = open_context.clone();
+            let view = open_view.clone();
+            let title = open_title.clone();
+            let status = open_status.clone();
+            let banner = open_banner.clone();
+            let watcher = open_watch.clone();
+            dialog.open(Some(&window), None::<&gio::Cancellable>, move |result| {
+                let Ok(file) = result else { return };
+                let Some(window) = weak.upgrade() else { return };
+                let Ok(opened) = OpenedFile::from_file(&file) else {
+                    eprintln!("Pivra: selected file could not be opened");
+                    return;
+                };
+                if let Some(parent) = file.path().and_then(|p| p.parent().map(|p| p.to_owned())) {
+                    save_last_open_folder(&parent);
+                }
+                gio::prelude::ActionGroupExt::activate_action(&window, "slideshow-stop", None);
+                if let Some(previous) = watcher.borrow_mut().take() {
+                    previous.stop();
+                }
+                {
+                    let mut state = context.borrow_mut();
+                    state.collection = MediaCollection::new(vec![opened.item.clone()]);
+                    state.suffix = None;
+                    state.warning = false;
+                    state.revision = state.revision.wrapping_add(1);
+                    banner.set_reveal_child(false);
+                    update_title(&window, &title, &state);
+                    display_selected(&view, &state);
+                }
+                *watcher.borrow_mut() = Some(watch(
+                    &window, &title, &status, &banner, view, context, opened,
+                ));
+            });
+        });
+        let closing_watch = folder_watch.clone();
+        window.connect_close_request(move |_| {
+            if let Some(watch) = closing_watch.borrow_mut().take() {
+                watch.stop();
+            }
+            glib::Propagation::Proceed
+        });
+        let destroy_watch = folder_watch.clone();
+        window.connect_destroy(move |_| {
+            if let Some(watch) = destroy_watch.borrow_mut().take() {
+                watch.stop();
+            }
+        });
         window.present();
-        watch(
-            &window,
-            &title,
-            &placeholder,
-            &banner,
-            view,
-            context,
-            opened,
-        );
+        *folder_watch.borrow_mut() = Some(watch(
+            &window, &title, &placeholder, &banner, view, context, opened,
+        ));
     } else {
         window.present();
     }
@@ -1132,7 +1194,7 @@ fn watch(
     view: ImageView,
     context: Rc<RefCell<FileContext>>,
     opened: OpenedFile,
-) {
+) -> Rc<FolderWatch> {
     let directory = opened
         .item
         .path()
@@ -1231,13 +1293,6 @@ fn watch(
                 .set_text("Folder monitoring unavailable; reopen the file to update its catalog.");
         }
     }
-    let closing = state.clone();
-    window.connect_close_request(move |_| {
-        closing.stop();
-        glib::Propagation::Proceed
-    });
-    let destroying = state.clone();
-    window.connect_destroy(move |_| destroying.stop());
     // Some backends do not deliver directory notifications reliably.
     // Periodically reconcile the catalog as a fallback while this window lives.
     let weak = Rc::downgrade(&state);
@@ -1255,4 +1310,5 @@ fn watch(
     });
     state.fallback_poll.replace(Some(poll));
     state.scan();
+    state
 }

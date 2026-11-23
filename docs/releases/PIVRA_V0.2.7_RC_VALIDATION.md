@@ -21,6 +21,7 @@
 - [x] Native Arch DESTDIR staging and v0.2.7 candidate preflight: PASS (owner output, 23 Nov 2026). GPU ELF, dependency ownership/runtime, 184 crate source inventory, 383 application files, installed licenses and thumbnail helper validated. Stage: `/tmp/pivra-gpu-stage.anFsJLMo/usr`.
 - [ ] Approved immutable source archive and SHA-256, real `makepkg` verification, package installation and version checks.
 - [x] Owner-reported Arch `makepkg` built package `pivra-0.2.7-1-x86_64.pkg.tar.zst` (23 Nov 2026); `pacman -Qip` confirms version 0.2.7-1, x86_64, GPL-3.0-only and expected dependency metadata. Compressed 21.62 MiB, installed 28.42 MiB. Installation, actual package file inventory, `.SRCINFO` and pacman integrity checks remain pending.
+- [x] Owner-reported `pacman -Qlp` package contents: `/usr/bin/pivra`, `/usr/bin/pivra-thumbnail-factory`, desktop entry, both icons and v0.2.7 release notes present (23 Nov 2026).
 - [ ] Confirm source version, binary `--version`, `.SRCINFO`, package version and release notes agree at 0.2.7.
 - [ ] Explicit owner approval for `dev` → `main`, version tag, GitHub Release and AUR update.
 

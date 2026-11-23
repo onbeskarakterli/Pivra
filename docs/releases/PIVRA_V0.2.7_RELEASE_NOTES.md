@@ -1,8 +1,8 @@
-# Pivra v0.2.7 — development release candidate
+# Pivra v0.2.7 — release notes
 
-**Status: Unpublished release candidate.** Current published stable remains v0.2.5. This document is not publication approval.
+**Status: Stable-release source prepared for approval.** Release publication requires a tag and GitHub/AUR handoff.
 
-## Changes in dev
+## Changes in v0.2.7
 
 - Fullscreen slideshow: F5 start, Space pause/resume, Left/Right manual navigation and Escape exit; photo intervals and completion-based video advancement.
 - User-configurable slideshow intervals (presets and manual 1–3600 seconds) and photo fade/no-transition selection; preferences are persisted.
@@ -16,8 +16,8 @@
 - Owner reported working slideshow playback on XWayland and working in-window Open.
 - Earlier XWayland slideshow video-interval regression passed; native Wayland regression reached video EOS but GTK/EGL teardown failed (exit 134). This is not claimed fixed.
 - Owner reported the first release preparation gate passed: 40 Rust tests, 83 Python tests (one skipped), formatting, check, strict Clippy and release build; this was before the v0.2.7 version/packaging metadata updates.
-- Fresh 0.2.7 package, end-to-end GUI regression and release candidate source/archive hashes are not yet approved or completed.
+- Native Arch staging, package build, local installation and package integrity passed (1,331 files, zero altered); the owner approved final GNOME use. Final tagged source archive/checksum and AUR publication remain separate.
 - Native Wayland video lifecycle remains an upstream GTK issue; Intel/NVIDIA and cross-distribution validation are outstanding.
-- No tag, GitHub Release, main merge, AUR upload or approved immutable release source is implied by this document.
+- Final source tag, GitHub Release and AUR publication must reference the exact approved commit; this document alone is not proof they have been published.
 
 See [v0.2.7 validation gates](PIVRA_V0.2.7_RC_VALIDATION.md).

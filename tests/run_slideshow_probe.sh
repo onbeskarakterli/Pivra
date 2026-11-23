@@ -2,7 +2,7 @@
 # Native GNOME smoke: private fixtures/config only; no package/system changes.
 set -euo pipefail
 cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.."
-[[ $(git branch --show-current) == feature/v0.2.7-slideshow ]]
+[[ $(git branch --show-current) == dev ]]
 work=$(mktemp -d "${TMPDIR:-/tmp}/pivra-slideshow.XXXXXXXX")
 cleanup() {
   local status=$?

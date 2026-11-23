@@ -22,7 +22,8 @@
 - [ ] Approved immutable source archive and SHA-256, real `makepkg` verification, package installation and version checks.
 - [x] Owner-reported Arch `makepkg` built package `pivra-0.2.7-1-x86_64.pkg.tar.zst` (23 Nov 2026); `pacman -Qip` confirms version 0.2.7-1, x86_64, GPL-3.0-only and expected dependency metadata. Compressed 21.62 MiB, installed 28.42 MiB. Installation, actual package file inventory, `.SRCINFO` and pacman integrity checks remain pending.
 - [x] Owner-reported `pacman -Qlp` package contents: `/usr/bin/pivra`, `/usr/bin/pivra-thumbnail-factory`, desktop entry, both icons and v0.2.7 release notes present (23 Nov 2026).
-- [ ] Confirm source version, binary `--version`, `.SRCINFO`, package version and release notes agree at 0.2.7.
+- [x] Owner native Arch install: `sudo pacman -U` upgrade PASS; `pivra --version` = `Pivra 0.2.7`, `pacman -Q pivra` = `pivra 0.2.7-1`, `pacman -Qkk pivra` = 1331 total files, 0 altered (23 Nov 2026).
+- [ ] `.SRCINFO` and source-archive approval plus final release documentation handoff pending; published artifacts not updated.
 - [ ] Explicit owner approval for `dev` → `main`, version tag, GitHub Release and AUR update.
 
 ## Open risks

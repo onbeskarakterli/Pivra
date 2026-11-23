@@ -363,7 +363,6 @@ pub(super) fn build(app: &adw::Application, settings: &Settings, file: Option<Op
     // Always keep Open at the far left of the header bar, including empty windows.
     let open_button = gtk::Button::from_icon_name("document-open-symbolic");
     open_button.set_tooltip_text(Some("Open media"));
-    open_button.set_accessible_name(Some("Open media"));
     let open_window = window.downgrade();
     open_button.connect_clicked(move |_| {
         let Some(window) = open_window.upgrade() else {

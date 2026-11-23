@@ -2810,3 +2810,32 @@ Reviewed diagnostic source: `c4ca4d85a05fa81efeddc6f5229d28040c56d787`.
   not relabelled as newly run. Actual Arch makepkg/install: NOT RUN here.
 - No production/test/script/PKGBUILD/Cargo/lockfile change; no system GTK,
   main/tag/release/AUR action. Immutable source/checksum approval remains separate.
+
+## v0.2.7 slideshow — feature branch only — 2026-11-23
+
+**TESTING; native GNOME acceptance pending.** Branch:
+`feature/v0.2.7-slideshow`, from
+`72405a9fa31b5ff45a98532fbd4008de5ecdc29d`.
+Implementation commit: `823455ad96844e7ac3d130a5fd119d855cf961ee`
+(`feat: add independent fullscreen slideshow with photo crossfade`).
+[Behavior, tests, limitations and native command](slideshow/V027_SLIDESHOW_VALIDATION.md).
+
+- Implements feature-spec §3 requirements 42–45: F5, independent F11 intent,
+  configurable photo clock, video EOS, pause/manual navigation, unconditional
+  loop, ~300 ms photo-only crossfade, existing monitored catalog/preload/loading,
+  bounded error skip and stop/close cleanup. Public GtkApplication IDLE
+  inhibition includes pause; physical effectiveness remains NOT RUN.
+- Codex: fmt/check/strict all-target Clippy PASS (zero warnings), 226 Rust and
+  242 Python tests PASS, application build PASS. Controlled slideshow and four
+  existing catalog/zoom/cancellation/window-race GUI gates PASS on X11 and
+  headless Sway; real stock video EOS is required, controlled photo pixels are
+  explicitly not secure decoder evidence. Existing fullscreen gate passed final
+  X11/Sway runs; earlier compositor allocation failures and baseline comparison
+  are retained in the validation record.
+- Native secure photo prerequisite: NOT RUN/77 (loader exited 1 under existing
+  sandbox). Physical GNOME, hardware GPU slideshow and actual display-sleep
+  inhibition remain pending; no sandbox bypass or hardware PASS inferred.
+- GTK patches/GPU renderer/security/dependencies/package metadata/v0.2.6 release
+  records unchanged. Cargo/package versions intentionally remain 0.2.6. Stable
+  v0.2.5 information and open GTK/SIGSEGV risks remain. Only the feature branch
+  is committed/pushed; no dev/main/tag/release/AUR promotion.

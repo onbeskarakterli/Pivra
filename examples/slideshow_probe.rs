@@ -69,6 +69,8 @@ mod input;
 mod window;
 use gtk::{gio, glib, prelude::*};
 use std::time::{Duration, Instant};
+#[path = "support/development_features.rs"]
+mod development_features;
 #[path = "support/render_frame.rs"]
 mod render_frame;
 #[path = "support/toolbar_ux.rs"]
@@ -360,6 +362,10 @@ fn main() {
         .flags(gio::ApplicationFlags::NON_UNIQUE)
         .build();
     app.register(None::<&gio::Cancellable>).unwrap();
+    if std::env::args().any(|s| s == "--development-open") {
+        development_features::open(&app);
+        return;
+    }
     let dir = tempfile::tempdir().unwrap();
     for (name, source) in [
         ("1.png", "tests/fixtures/images/wide.png"),

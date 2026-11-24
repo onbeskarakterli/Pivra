@@ -13,6 +13,7 @@ from video_gpu.lifecycle import session, run, ROOT
 def main():
     parser=argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--session',choices=['x11','sway'],required=True)
+    parser.add_argument('--development',choices=['open','info','minimap'])
     args=parser.parse_args()
     if os.environ.get('PIVRA_TOOLBAR_PRIVATE_BUS')!='1':
         out=Path(tempfile.mkdtemp(prefix='pivra-toolbar-ux-'))
@@ -27,10 +28,10 @@ def main():
     env=dict(os.environ,GTK_A11Y='none',PIVRA_TRACE_SLIDESHOW='1')
     with session(args.session,env,out,floating=True) as active:
         with window_manager(args.session,active,out):
-            for mode in ['toolbar-ux','toolbar-ux-restore']:
+            for mode in ['development-'+args.development] if args.development else ['toolbar-ux','toolbar-ux-restore']:
                 result=run(mode,['target/debug/examples/slideshow_probe','--controlled','--'+mode,video],active,out,timeout=60)
                 if result['status']!='PASS':return result['exit'] if result['exit']>0 else 1
-    print('PASS controlled toolbar and fresh-process persistence; native GNOME visual acceptance NOT RUN',flush=True)
+    print(('PASS focused development '+args.development+' GTK gate' if args.development else 'PASS controlled toolbar and fresh-process persistence')+'; native GNOME visual acceptance NOT TESTED',flush=True)
     return 0
 
 if __name__=='__main__':raise SystemExit(main())

@@ -381,10 +381,14 @@ pub(super) fn build(app: &adw::Application, settings: &Settings, file: Option<Op
     // Always keep Open at the far left of the header bar, including empty windows.
     let open_button = gtk::Button::from_icon_name("document-open-symbolic");
     open_button.set_tooltip_text(Some("Open media"));
+    open_button.set_widget_name("open-media-button");
+    open_button.set_action_name(Some("win.choose-media"));
     header.pack_start(&open_button);
-    if let Some(opened) = file {
+    {
         let context = Rc::new(RefCell::new(FileContext {
-            collection: MediaCollection::new(vec![opened.item.clone()]),
+            collection: MediaCollection::new(
+                file.iter().map(|opened| opened.item.clone()).collect(),
+            ),
             suffix: None,
             warning: false,
             revision: 0,
@@ -435,6 +439,7 @@ pub(super) fn build(app: &adw::Application, settings: &Settings, file: Option<Op
         mode_button.set_widget_name("display-mode-selector");
         let groups = gtk::Box::new(gtk::Orientation::Horizontal, 8);
         groups.set_widget_name("viewer-controls");
+        groups.set_visible(file.is_some());
         let display_group = gtk::Box::new(gtk::Orientation::Horizontal, 0);
         display_group.set_widget_name("display-controls");
         display_group.add_css_class("linked");
@@ -908,8 +913,57 @@ pub(super) fn build(app: &adw::Application, settings: &Settings, file: Option<Op
         let open_status = placeholder.clone();
         let open_banner = banner.clone();
         let open_watch = folder_watch.clone();
-        open_button.connect_clicked(move |_| {
-            let Some(window) = open_window.upgrade() else {
+        let controls = groups.downgrade();
+        let open_file = gio::SimpleAction::new("open-file", Some(glib::VariantTy::STRING));
+        open_file.connect_activate(move |_, value| {
+            let Some(uri) = value.and_then(|v| v.str()) else {
+                return;
+            };
+            let Some(window) = open_window.upgrade().filter(|w| w.is_visible()) else {
+                return;
+            };
+            let file = gio::File::for_uri(uri);
+            let Ok(opened) = OpenedFile::from_file(&file) else {
+                eprintln!("Pivra: selected file could not be opened");
+                return;
+            };
+            if let Some(parent) = file.path().and_then(|p| p.parent().map(|p| p.to_owned())) {
+                save_last_open_folder(&parent);
+            }
+            gio::prelude::ActionGroupExt::activate_action(&window, "slideshow-stop", None);
+            if let Some(previous) = open_watch.borrow_mut().take() {
+                previous.stop();
+            }
+            {
+                let mut state = open_context.borrow_mut();
+                state.collection = MediaCollection::new(vec![opened.item.clone()]);
+                state.suffix = None;
+                state.warning = false;
+                state.revision = state.revision.wrapping_add(1);
+                open_banner.set_reveal_child(false);
+                update_title(&window, &open_title, &state);
+                display_selected(&open_view, &state);
+            }
+            if let Some(controls) = controls.upgrade() {
+                controls.set_visible(true);
+            }
+            *open_watch.borrow_mut() = Some(watch(
+                &window,
+                &open_title,
+                &open_status,
+                &open_banner,
+                open_view.clone(),
+                open_context.clone(),
+                opened,
+            ));
+        });
+        window.add_action(&open_file);
+        let dialog_token = Rc::new(RefCell::new(None::<gio::Cancellable>));
+        let choose = gio::SimpleAction::new("choose-media", None);
+        let weak_window = window.downgrade();
+        let tokens = dialog_token.clone();
+        choose.connect_activate(move |action, _| {
+            let Some(window) = weak_window.upgrade() else {
                 return;
             };
             let dialog = gtk::FileDialog::new();
@@ -917,41 +971,40 @@ pub(super) fn build(app: &adw::Application, settings: &Settings, file: Option<Op
             if let Some(folder) = load_last_open_folder() {
                 dialog.set_initial_folder(Some(&folder));
             }
+            let token = gio::Cancellable::new();
+            tokens.replace(Some(token.clone()));
+            action.set_enabled(false);
+            let action = action.downgrade();
             let weak = window.downgrade();
-            let context = open_context.clone();
-            let view = open_view.clone();
-            let title = open_title.clone();
-            let status = open_status.clone();
-            let banner = open_banner.clone();
-            let watcher = open_watch.clone();
-            dialog.open(Some(&window), None::<&gio::Cancellable>, move |result| {
-                let Ok(file) = result else { return };
-                let Some(window) = weak.upgrade() else { return };
-                let Ok(opened) = OpenedFile::from_file(&file) else {
-                    eprintln!("Pivra: selected file could not be opened");
-                    return;
-                };
-                if let Some(parent) = file.path().and_then(|p| p.parent().map(|p| p.to_owned())) {
-                    save_last_open_folder(&parent);
+            let tokens = tokens.clone();
+            dialog.open(Some(&window), Some(&token), move |result| {
+                tokens.borrow_mut().take();
+                if let Some(action) = action.upgrade() {
+                    action.set_enabled(true);
                 }
-                gio::prelude::ActionGroupExt::activate_action(&window, "slideshow-stop", None);
-                if let Some(previous) = watcher.borrow_mut().take() {
-                    previous.stop();
-                }
+                if let (Ok(file), Some(window)) =
+                    (result, weak.upgrade().filter(|w| w.is_visible()))
                 {
-                    let mut state = context.borrow_mut();
-                    state.collection = MediaCollection::new(vec![opened.item.clone()]);
-                    state.suffix = None;
-                    state.warning = false;
-                    state.revision = state.revision.wrapping_add(1);
-                    banner.set_reveal_child(false);
-                    update_title(&window, &title, &state);
-                    display_selected(&view, &state);
+                    gio::prelude::ActionGroupExt::activate_action(
+                        &window,
+                        "open-file",
+                        Some(&file.uri().to_variant()),
+                    );
                 }
-                *watcher.borrow_mut() = Some(watch(
-                    &window, &title, &status, &banner, view, context, opened,
-                ));
             });
+        });
+        window.add_action(&choose);
+        let destroy_token = dialog_token.clone();
+        window.connect_destroy(move |_| {
+            if let Some(token) = destroy_token.borrow_mut().take() {
+                token.cancel();
+            }
+        });
+        window.connect_close_request(move |_| {
+            if let Some(token) = dialog_token.borrow_mut().take() {
+                token.cancel();
+            }
+            glib::Propagation::Proceed
         });
         let closing_watch = folder_watch.clone();
         window.connect_close_request(move |_| {
@@ -967,17 +1020,19 @@ pub(super) fn build(app: &adw::Application, settings: &Settings, file: Option<Op
             }
         });
         window.present();
-        *folder_watch.borrow_mut() = Some(watch(
-            &window,
-            &title,
-            &placeholder,
-            &banner,
-            view,
-            context,
-            opened,
-        ));
-    } else {
-        window.present();
+        if let Some(opened) = file {
+            *folder_watch.borrow_mut() = Some(watch(
+                &window,
+                &title,
+                &placeholder,
+                &banner,
+                view,
+                context,
+                opened,
+            ));
+        } else {
+            view.show_message("Open a photo or video to start.");
+        }
     }
 }
 

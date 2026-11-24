@@ -8,6 +8,8 @@ mod animation;
 pub(crate) mod gpu_video;
 #[path = "information_panel.rs"]
 mod information_panel;
+#[path = "minimap.rs"]
+mod minimap;
 #[path = "photo_transition.rs"]
 mod photo_transition;
 #[path = "thumbnail_overlay.rs"]
@@ -63,6 +65,7 @@ pub(super) struct ImageView {
     slideshow_paused: Rc<Cell<bool>>,
     video_observer: Rc<RefCell<Option<VideoObserver>>>,
     information: Rc<information_panel::Panel>,
+    minimap: Rc<minimap::Map>,
 }
 type VideoObserver = Box<dyn Fn(Option<&gtk::MediaFile>)>;
 
@@ -329,7 +332,18 @@ impl ImageView {
             }
         });
         window.add_action(&quality_action);
+        let minimap = minimap::Map::new(
+            &picture,
+            texture.clone(),
+            transform.clone(),
+            &mode_action,
+            filter.clone(),
+            phase.clone(),
+        );
+        overlay.add_overlay(minimap.widget());
+        overlay.set_measure_overlay(minimap.widget(), false);
         let view = Self {
+            minimap,
             information: information_panel::Panel::new(),
             transition,
             slideshow_paused: Rc::new(Cell::new(false)),
@@ -367,6 +381,13 @@ impl ImageView {
         window.connect_destroy(move |_| transition.clear());
         let information = view.information.clone();
         window.connect_destroy(move |_| information.close());
+        let minimap = view.minimap.clone();
+        window.connect_destroy(move |_| minimap.close());
+        let minimap = view.minimap.clone();
+        window.connect_close_request(move |_| {
+            minimap.close();
+            glib::Propagation::Proceed
+        });
         let information = view.information.clone();
         window.connect_close_request(move |_| {
             information.close();
@@ -744,6 +765,7 @@ impl ImageView {
         gpu_video::trace_binding(c"video-retire-end");
     }
     fn prepare(&self, message: &str, cancel: bool) {
+        self.minimap.hide();
         self.information.select(None);
         self.transition.clear();
         self.stop_video();
@@ -872,6 +894,7 @@ impl ImageView {
         reason = "Standalone image probes omit window slideshow controls"
     )]
     pub(super) fn set_slideshow(&self, active: bool) {
+        self.minimap.set_slideshow(active);
         self.transition.enable(active);
         if !active {
             self.slideshow_paused.set(false);
@@ -932,6 +955,7 @@ impl ImageView {
         on_result: impl FnOnce(bool) + 'static,
     ) {
         self.information.select(Some(path.clone()));
+        self.minimap.hide();
         self.transition.capture(
             &self.picture,
             self.phase.get() == Phase::FullReady && self.video_stream.borrow().is_none(),

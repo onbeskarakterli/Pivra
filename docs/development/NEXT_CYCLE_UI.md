@@ -34,3 +34,32 @@ Formatting, locked compilation, metadata identity/bounds test and controlled GTK
 file/image/video/rapid-selection/no-extra-decode/discovery gate: PASS. Physical
 GNOME, actual secure EXIF-to-panel presentation: **NOT TESTED** here. The GPU
 renderer, shaders and XWayland workaround are unchanged.
+
+## Photo minimap
+
+A small top-right overlay appears only when part of the photo is outside the
+viewport. It shares the existing texture and Transform; the outline represents
+the visible source rectangle. Click/drag pans through the existing paintable.
+Zoom, pan, resize and selection update it via the existing frame clock, without
+starting a continuous animation clock, another decoder or a pixel copy.
+Whole-image Fit, videos and slideshow hide it and release the extra texture
+reference. Window unmap/close disconnects the frame observer.
+
+## Final focused validation
+
+- `cargo fmt --all -- --check`: PASS.
+- `cargo check --locked`: PASS, no warnings.
+- `cargo test --locked --lib media_information::tests`: 1 PASS.
+- `cargo test --locked --lib viewing::minimap_tests`: 2 PASS.
+- `python3 -B tests/toolbar_ux_smoke.py --session x11 --development all`:
+  Open, information and minimap gates all PASS in one Xvfb/xfwm4 session.
+  The Open action, watcher, widgets, GIO, rendering and stock test video are real;
+  photo pixels use the explicitly controlled loader. This is not secure Glycin
+  decode or physical GNOME/AMD acceptance. No full regression matrix was run.
+
+Native GNOME manual check: run `cargo run --locked --`, choose a photo using Open
+in the empty window, verify it stays in that window, then reopen a different
+folder. Toggle Information (`I`), navigate photos/videos and check available
+EXIF/duration plus playback controls. Zoom/pan/resize a photo and drag its minimap;
+verify Fit, slideshow and video hide it. Native file-picker interaction, secure
+EXIF presentation and visual layout remain **NOT TESTED** in this environment.

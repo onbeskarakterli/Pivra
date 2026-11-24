@@ -372,6 +372,10 @@ fn main() {
         development_features::info(&app);
         return;
     }
+    if std::env::args().any(|s| s == "--development-minimap") {
+        development_features::minimap(&app);
+        return;
+    }
     let dir = tempfile::tempdir().unwrap();
     for (name, source) in [
         ("1.png", "tests/fixtures/images/wide.png"),

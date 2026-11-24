@@ -131,3 +131,116 @@ pub(super) fn info(app: &adw::Application) {
         "PASS development info: closed default, I toggle, file/dimensions/date, stale suppression, video metadata, no extra decode/discovery"
     );
 }
+fn controller<T: glib::object::IsA<glib::Object> + glib::types::StaticType>(w: &gtk::Widget) -> T {
+    let list = w.observe_controllers();
+    (0..list.n_items())
+        .find_map(|i| list.item(i).unwrap().downcast::<T>().ok())
+        .expect("production controller")
+}
+pub(super) fn minimap(app: &adw::Application) {
+    let dir = tempfile::tempdir().unwrap();
+    let file = dir.path().join("1.png");
+    std::fs::copy("tests/fixtures/images/wide.png", &file).unwrap();
+    window::build(app, &pivra::settings::Settings::default(), None);
+    let window = app
+        .active_window()
+        .unwrap()
+        .downcast::<adw::ApplicationWindow>()
+        .unwrap();
+    open_uri(&window, &file);
+    photo_presented(&window);
+    let map = widget(&window, "image-minimap");
+    let mini = widget(&window, "minimap-image")
+        .downcast::<gtk::Picture>()
+        .unwrap();
+    let picture = widgets(window.upcast_ref())
+        .into_iter()
+        .filter_map(|w| w.downcast::<gtk::Overlay>().ok())
+        .find_map(|o| o.child().and_downcast::<gtk::Picture>())
+        .unwrap();
+    window
+        .lookup_action("image-mode")
+        .unwrap()
+        .activate(Some(&"fit".to_variant()));
+    photo_presented(&window);
+    assert!(!map.is_visible());
+    let loads = CONTROLLED_LOADS.load(std::sync::atomic::Ordering::SeqCst);
+    widget(&window, "wheel-zoom-toggle")
+        .downcast::<gtk::ToggleButton>()
+        .unwrap()
+        .set_active(true);
+    let zoom = || {
+        controller::<gtk::EventControllerMotion>(picture.upcast_ref())
+            .emit_by_name::<()>("enter", &[&200f64, &150f64]);
+        assert!(
+            controller::<gtk::EventControllerScroll>(picture.upcast_ref())
+                .emit_by_name::<bool>("scroll", &[&0f64, &-20f64])
+        );
+        wait("cropped photo minimap", || {
+            map.is_visible() && map.is_mapped()
+        });
+    };
+    zoom();
+    let source = mini
+        .paintable()
+        .unwrap()
+        .downcast::<gtk::gdk::Texture>()
+        .unwrap();
+    assert_eq!((source.width(), source.height()), (64, 32));
+    let invalidated = std::rc::Rc::new(std::cell::Cell::new(0));
+    let count = invalidated.clone();
+    let painted = picture.paintable().unwrap();
+    painted.connect_invalidate_contents(move |_| count.set(count.get() + 1));
+    let drag = controller::<gtk::GestureDrag>(&map);
+    drag.emit_by_name::<()>("drag-begin", &[&10f64, &40f64]);
+    drag.emit_by_name::<()>("drag-update", &[&120f64, &35f64]);
+    drag.emit_by_name::<()>("drag-end", &[&120f64, &35f64]);
+    assert!(
+        invalidated.get() > 0,
+        "minimap must pan the existing paintable"
+    );
+    assert_eq!(picture.paintable().as_ref(), Some(&painted));
+    assert_eq!(
+        mini.paintable()
+            .unwrap()
+            .downcast::<gtk::gdk::Texture>()
+            .unwrap(),
+        source
+    );
+    let old_width = picture.width();
+    window.set_default_size(1000, 700);
+    wait("resized viewport", || picture.width() != old_width);
+    photo_presented(&window);
+    assert!(map.is_visible());
+    assert_eq!(
+        CONTROLLED_LOADS.load(std::sync::atomic::Ordering::SeqCst),
+        loads
+    );
+    key(&window, gtk::gdk::Key::F5);
+    wait("slideshow hides minimap", || !map.is_visible());
+    assert!(
+        mini.paintable().is_none(),
+        "hidden map releases its texture reference"
+    );
+    key(&window, gtk::gdk::Key::Escape);
+    window
+        .lookup_action("image-mode")
+        .unwrap()
+        .activate(Some(&"fit".to_variant()));
+    photo_presented(&window);
+    wait("Fit hides minimap", || !map.is_visible());
+    zoom();
+    let second = dir.path().join("2.png");
+    std::fs::copy("tests/fixtures/images/wide.png", &second).unwrap();
+    open_uri(&window, &second);
+    photo_presented(&window);
+    wait("new photo resets minimap", || !map.is_visible());
+    let video = std::env::args().find(|s| s.ends_with(".mp4")).unwrap();
+    open_uri(&window, std::path::Path::new(&video));
+    assert!(!map.is_visible());
+    assert!(mini.paintable().is_none());
+    window.close();
+    eprintln!(
+        "PASS development minimap: Fit hidden, cropped region, shared texture/paintable, interactive pan, resize, no decode, slideshow/new-photo/video suppression"
+    );
+}

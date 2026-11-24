@@ -577,7 +577,35 @@ pub(super) fn build(app: &adw::Application, settings: &Settings, file: Option<Op
         let toast_overlay = adw::ToastOverlay::new();
         let current_delete_toast = Rc::new(RefCell::new(None::<adw::Toast>));
         toast_overlay.set_child(Some(view.widget()));
-        viewport.prepend(&toast_overlay);
+        let viewer_row = gtk::Box::new(gtk::Orientation::Horizontal, 0);
+        toast_overlay.set_hexpand(true);
+        toast_overlay.set_vexpand(true);
+        viewer_row.set_vexpand(true);
+        viewer_row.append(&toast_overlay);
+        viewer_row.append(view.information_widget());
+        viewport.prepend(&viewer_row);
+        let info_button = gtk::ToggleButton::builder()
+            .icon_name("dialog-information-symbolic")
+            .tooltip_text("Media information (I)")
+            .build();
+        info_button.set_widget_name("media-information-button");
+        info_button.set_action_name(Some("win.media-info"));
+        groups.append(&info_button);
+        let info = gio::SimpleAction::new_stateful("media-info", None, &false.to_variant());
+        let info_view = view.clone();
+        let weak_button = info_button.downgrade();
+        info.connect_activate(move |action, _| {
+            let show = !action
+                .state()
+                .and_then(|v| v.get::<bool>())
+                .unwrap_or(false);
+            action.set_state(&show.to_variant());
+            info_view.show_information(show);
+            if let Some(button) = weak_button.upgrade() {
+                button.set_active(show);
+            }
+        });
+        window.add_action(&info);
         placeholder.set_vexpand(false);
         update_title(&window, &title, &context.borrow());
         display_selected(&view, &context.borrow());
@@ -799,6 +827,12 @@ pub(super) fn build(app: &adw::Application, settings: &Settings, file: Option<Op
             ) {
                 if key == gdk::Key::F5 {
                     slides.start();
+                    return glib::Propagation::Stop;
+                }
+                if matches!(key, gdk::Key::i | gdk::Key::I) {
+                    if let Some(window) = weak_window.upgrade() {
+                        gio::prelude::ActionGroupExt::activate_action(&window, "media-info", None);
+                    }
                     return glib::Propagation::Stop;
                 }
                 if weak_window.upgrade().is_some_and(|w| slideshow::active(&w)) {

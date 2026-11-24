@@ -103,6 +103,7 @@ async fn load_limited(
         return Err("Image loading cancelled".into());
     }
     let metadata = std::fs::metadata(path).map_err(|e| format!("Cannot access image: {e}"))?;
+    let source_key = pivra::image_cache::FileKey::read(path).ok();
     if !metadata.is_file() || metadata.len() > MAX_FILE_BYTES {
         return Err("Image must be a regular file of at most 64 MiB".into());
     }
@@ -164,6 +165,11 @@ async fn load_limited(
         return Err("Image loading cancelled".into());
     }
     measurement.status("decoded");
+    if let Some(key) =
+        source_key.filter(|key| pivra::image_cache::FileKey::read(path).ok().as_ref() == Some(key))
+    {
+        pivra::media_information::remember(key, pivra::media_information::image_fields(&image));
+    }
     Ok(frame)
 }
 

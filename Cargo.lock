@@ -1275,6 +1275,7 @@ name = "pivra"
 version = "0.2.7"
 dependencies = [
  "glycin",
+ "gufo-exif",
  "gtk4",
  "libadwaita",
  "tempfile",

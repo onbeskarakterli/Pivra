@@ -46,6 +46,7 @@ mod image_loader {
         if cancel.is_cancelled() {
             return Err("controlled cancellation".into());
         }
+        super::CONTROLLED_LOADS.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
         if !path.is_file() || path.file_name().is_some_and(|s| s == "3.png") {
             return Err("controlled bad/missing photo, not decoder evidence".into());
         }
@@ -69,6 +70,7 @@ mod input;
 mod window;
 use gtk::{gio, glib, prelude::*};
 use std::time::{Duration, Instant};
+static CONTROLLED_LOADS: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(0);
 #[path = "support/development_features.rs"]
 mod development_features;
 #[path = "support/render_frame.rs"]
@@ -364,6 +366,10 @@ fn main() {
     app.register(None::<&gio::Cancellable>).unwrap();
     if std::env::args().any(|s| s == "--development-open") {
         development_features::open(&app);
+        return;
+    }
+    if std::env::args().any(|s| s == "--development-info") {
+        development_features::info(&app);
         return;
     }
     let dir = tempfile::tempdir().unwrap();

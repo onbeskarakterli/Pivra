@@ -6,6 +6,8 @@ mod actual_paintable;
 mod animation;
 #[path = "gpu_video.rs"]
 pub(crate) mod gpu_video;
+#[path = "information_panel.rs"]
+mod information_panel;
 #[path = "photo_transition.rs"]
 mod photo_transition;
 #[path = "thumbnail_overlay.rs"]
@@ -60,6 +62,7 @@ pub(super) struct ImageView {
     transition: Rc<photo_transition::Transition>,
     slideshow_paused: Rc<Cell<bool>>,
     video_observer: Rc<RefCell<Option<VideoObserver>>>,
+    information: Rc<information_panel::Panel>,
 }
 type VideoObserver = Box<dyn Fn(Option<&gtk::MediaFile>)>;
 
@@ -327,6 +330,7 @@ impl ImageView {
         });
         window.add_action(&quality_action);
         let view = Self {
+            information: information_panel::Panel::new(),
             transition,
             slideshow_paused: Rc::new(Cell::new(false)),
             video_observer: Rc::default(),
@@ -361,6 +365,13 @@ impl ImageView {
         // view only until this explicit detach, not past close/unrealize.
         let transition = view.transition.clone();
         window.connect_destroy(move |_| transition.clear());
+        let information = view.information.clone();
+        window.connect_destroy(move |_| information.close());
+        let information = view.information.clone();
+        window.connect_close_request(move |_| {
+            information.close();
+            glib::Propagation::Proceed
+        });
         let closing = view.clone();
         window.connect_close_request(move |_| {
             closing.transition.clear();
@@ -471,6 +482,20 @@ impl ImageView {
     pub(super) fn widget(&self) -> &gtk::Overlay {
         &self.overlay
     }
+    #[allow(
+        dead_code,
+        reason = "Standalone rendering probes do not install a sidebar"
+    )]
+    pub(super) fn information_widget(&self) -> &gtk::Revealer {
+        self.information.widget()
+    }
+    #[allow(
+        dead_code,
+        reason = "Standalone rendering probes do not install a sidebar"
+    )]
+    pub(super) fn show_information(&self, show: bool) {
+        self.information.show(show);
+    }
 
     #[allow(dead_code)] // Some standalone view probes never display a non-image selection.
     pub(super) fn show_message(&self, message: &str) {
@@ -483,6 +508,7 @@ impl ImageView {
     #[allow(dead_code)] // Standalone image probes do not open videos.
     pub(super) fn load_video(&self, path: &std::path::Path) {
         self.prepare("", true);
+        self.information.select(Some(path.to_owned()));
         self.loading_spinner.set_visible(true);
         let expected = self.animation_generation.get();
         let this = self.clone();
@@ -654,6 +680,7 @@ impl ImageView {
         self.video.set_visible(true);
         self.video_controls
             .attach(Some(media.clone().upcast::<gtk::MediaStream>()));
+        self.information.bind_video(&media);
         // Bind slideshow EOS observations before play, not on a later timer.
         // Outside slideshow the optional observer does not modify the stream.
         if let Some(observer) = self.video_observer.borrow().as_ref() {
@@ -671,6 +698,7 @@ impl ImageView {
         }
     }
     fn stop_video(&self) {
+        self.information.unbind_video();
         gpu_video::trace_binding(c"video-retire-begin");
         // Disconnect slideshow notifications while we still own the emitter,
         // including asynchronous GPU -> stock fallback (not just navigation).
@@ -716,6 +744,7 @@ impl ImageView {
         gpu_video::trace_binding(c"video-retire-end");
     }
     fn prepare(&self, message: &str, cancel: bool) {
+        self.information.select(None);
         self.transition.clear();
         self.stop_video();
         self.animation_generation
@@ -902,11 +931,13 @@ impl ImageView {
         on_completion: impl FnOnce() + 'static,
         on_result: impl FnOnce(bool) + 'static,
     ) {
+        self.information.select(Some(path.clone()));
         self.transition.capture(
             &self.picture,
             self.phase.get() == Phase::FullReady && self.video_stream.borrow().is_none(),
         );
         let transition = self.transition.clone();
+        let information = Rc::downgrade(&self.information);
         let mut measurement = pivra::performance::Span::new("image_request_to_ready_callback");
         measurement.status("abandoned");
         let on_result = move |success| {
@@ -1025,6 +1056,9 @@ impl ImageView {
                             preload::Output::Raw(texture, key) => (texture, key),
                         };
                         let cost = texture_cost(decoded.width() as u32, decoded.height() as u32);
+                        if let Some(information) = information.upgrade() {
+                            information.image_ready(decoded.width(), decoded.height());
+                        }
                         {
                             let mut state = prefetch.borrow_mut();
                             state.active_large =

@@ -465,6 +465,14 @@ impl ImageView {
     pub(super) fn set_zoom_wheel_enabled(&self, enabled: bool) {
         self.zoom_wheel.set(enabled);
     }
+    /// Share the existing input preference with the toolbar, not a second zoom flag.
+    #[allow(
+        dead_code,
+        reason = "Standalone rendering probes omit the production toolbar"
+    )]
+    pub(super) fn zoom_wheel_state(&self) -> Rc<Cell<bool>> {
+        self.zoom_wheel.clone()
+    }
 
     // Lifecycle probes consume this diagnostic; production has no stats UI.
     #[allow(dead_code, reason = "Used by selected standalone lifecycle probes")]

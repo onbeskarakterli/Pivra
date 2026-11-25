@@ -470,7 +470,7 @@ pub(super) fn build(app: &adw::Application, settings: &Settings, file: Option<Op
         });
         zoom_toggle.set_child(Some(&lens));
         zoom_toggle.set_widget_name("wheel-zoom-toggle");
-        // Use the GNOME accent color only while wheel zoom is enabled.
+        // The same GNOME accent represents explicit wheel mode or manual zoom.
         zoom_toggle.connect_toggled(|button| {
             if button.is_active() {
                 button.add_css_class("suggested-action");
@@ -482,7 +482,52 @@ pub(super) fn build(app: &adw::Application, settings: &Settings, file: Option<Op
         zoom_group.set_widget_name("zoom-controls");
         zoom_group.append(&zoom_toggle);
         groups.append(&zoom_group);
-        let zoom_for_key = zoom_toggle.clone();
+        let wheel_zoom = view.zoom_wheel_state();
+        let action = window
+            .lookup_action("image-mode")
+            .expect("view mode action");
+        let input_handler = Rc::new(std::cell::OnceCell::<glib::SignalHandlerId>::new());
+        let sync_zoom = {
+            let button = zoom_toggle.downgrade();
+            let mode = action.downgrade();
+            let wheel = wheel_zoom.clone();
+            let handler = input_handler.clone();
+            Rc::new(move || {
+                let Some(button) = button.upgrade() else {
+                    return;
+                };
+                let manual = mode
+                    .upgrade()
+                    .and_then(|a| a.state())
+                    .is_some_and(|v| v.str() == Some("manual"));
+                // Feedback from the image state must not enable/persist wheel
+                // mode. Ctrl+wheel remains temporary and cannot leak to a photo.
+                let handler = handler.get().expect("zoom input binding");
+                button.block_signal(handler);
+                button.set_active(wheel.get() || manual);
+                button.unblock_signal(handler);
+                button.set_tooltip_text(Some(if wheel.get() {
+                    "Wheel zoom enabled"
+                } else {
+                    "Wheel changes photos; hold Ctrl or left mouse button to zoom"
+                }));
+            })
+        };
+        let choose_zoom = {
+            let wheel = wheel_zoom.clone();
+            let sync = sync_zoom.clone();
+            Rc::new(move |enabled| {
+                wheel.set(enabled);
+                pivra::settings::save_wheel_zoom(enabled);
+                sync();
+            })
+        };
+        let changed = choose_zoom.clone();
+        input_handler
+            .set(zoom_toggle.connect_toggled(move |button| changed(button.is_active())))
+            .expect("single zoom input binding");
+        wheel_zoom.set(pivra::settings::load_wheel_zoom());
+        sync_zoom();
         let zoom_window = window.downgrade();
         let zoom_key = gtk::EventControllerKey::new();
         zoom_key.set_propagation_phase(gtk::PropagationPhase::Capture);
@@ -500,26 +545,13 @@ pub(super) fn build(app: &adw::Application, settings: &Settings, file: Option<Op
             {
                 return glib::Propagation::Proceed;
             }
-            zoom_for_key.set_active(!zoom_for_key.is_active());
+            choose_zoom(!wheel_zoom.get());
             glib::Propagation::Stop
         });
         window.add_controller(zoom_key);
-        let zoom_view = view.clone();
-        zoom_toggle.connect_toggled(move |button| {
-            zoom_view.set_zoom_wheel_enabled(button.is_active());
-            pivra::settings::save_wheel_zoom(button.is_active());
-            button.set_tooltip_text(Some(if button.is_active() {
-                "Wheel zoom enabled"
-            } else {
-                "Wheel changes photos; hold left mouse button to zoom"
-            }));
-        });
-        zoom_toggle.set_active(pivra::settings::load_wheel_zoom());
         let weak_button = mode_button.downgrade();
-        let action = window
-            .lookup_action("image-mode")
-            .expect("view mode action");
         action.connect_notify_local(Some("state"), move |action, _| {
+            sync_zoom();
             if let Some(button) = weak_button.upgrade() {
                 let state = action.state();
                 let id = state.as_ref().and_then(|v| v.str()).unwrap_or("fit");

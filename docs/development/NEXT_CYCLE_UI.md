@@ -180,3 +180,23 @@ selecting a file loads into the original window. The test uses SDK FileChooser
 schemas compiled in a temporary directory with a memory GSettings backend.
 GNOME/portal-specific physical interaction remains pending; controlled photo
 pixels do not claim secure decoder acceptance.
+
+## Temporary manual zoom indicator
+
+The Zoom toggle now reflects the existing `image-mode=manual` state as well as
+the user's explicit wheel-zoom preference. The existing blue suggested-action
+styling is shared. State-to-button feedback blocks only the input/persistence
+handler, so Ctrl+wheel cannot enable persistent wheel zoom or carry it to the
+next photo. Preset/reset, replacement-photo and video transitions clear the
+temporary manual indication; Fill/100% alone do not activate it. An explicitly
+enabled wheel-mode preference still persists as before. `Z` toggles that existing
+input preference, even while temporary manual zoom is indicated. No second zoom
+flag, rendering/transform calculation or minimap behavior was introduced.
+
+Formatting and locked compilation PASS. Focused Xvfb `--development zoom-state`
+PASS with real Ctrl+wheel input: immediate active/blue state, no preference leak,
+ordinary wheel navigation after Ctrl release, photo/video/preset resets and
+explicit button/Z behavior. The final `shortcuts` and `minimap` gates also PASS
+(real chooser interaction/cancel, shared texture/pan and normal suppression).
+Physical GNOME/portal and hardware visual confirmation remain pending; photo
+pixels are controlled. No full regression, release build or packaging was run.

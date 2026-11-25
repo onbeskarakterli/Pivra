@@ -789,3 +789,136 @@ pub(super) fn shortcuts(app: &adw::Application) {
         "PASS Ctrl+O real X11 keys and GTK chooser: empty/active, cancel unchanged, selected file reuses window"
     );
 }
+
+pub(super) fn zoom_state(app: &adw::Application) {
+    let dir = tempfile::tempdir().unwrap();
+    for name in ["1.png", "2.png"] {
+        std::fs::copy("tests/fixtures/images/wide.png", dir.path().join(name)).unwrap();
+    }
+    pivra::settings::save_wheel_zoom(false);
+    window::build(app, &pivra::settings::Settings::default(), None);
+    let window = app
+        .active_window()
+        .unwrap()
+        .downcast::<adw::ApplicationWindow>()
+        .unwrap();
+    open_uri(&window, &dir.path().join("1.png"));
+    photo_presented(&window);
+    wait("two-photo catalog", || {
+        window.title().is_some_and(|t| t.contains("2 candidates"))
+    });
+    let button = widget(&window, "wheel-zoom-toggle")
+        .downcast::<gtk::ToggleButton>()
+        .unwrap();
+    let mode = window.lookup_action("image-mode").unwrap();
+    let picture = widgets(window.upcast_ref())
+        .into_iter()
+        .filter_map(|w| w.downcast::<gtk::Overlay>().ok())
+        .find_map(|o| o.child().and_downcast::<gtk::Picture>())
+        .unwrap();
+    let map = widget(&window, "image-minimap");
+    let preset = |id: &str| {
+        mode.activate(Some(&id.to_variant()));
+        photo_presented(&window);
+        assert!(
+            !button.is_active() && !button.has_css_class("suggested-action"),
+            "preset {id} is not manual zoom"
+        );
+    };
+    preset("fit");
+    let wheel = |ctrl: bool, number: &str| {
+        window.present();
+        wait("wheel keyboard focus", || window.is_active());
+        let b = picture.compute_bounds(&window).unwrap();
+        let native = std::process::Command::new("xdotool")
+            .arg("getactivewindow")
+            .output()
+            .unwrap();
+        let xid = std::str::from_utf8(&native.stdout).unwrap().trim();
+        assert!(
+            std::process::Command::new("xdotool")
+                .args([
+                    "mousemove",
+                    "--window",
+                    xid,
+                    &(b.x() + b.width() * 0.2).round().to_string(),
+                    &(b.y() + b.height() * 0.2).round().to_string()
+                ])
+                .status()
+                .unwrap()
+                .success()
+        );
+        let args = if ctrl {
+            vec![
+                "keydown",
+                "Control_L",
+                "click",
+                number,
+                "keyup",
+                "Control_L",
+            ]
+        } else {
+            vec!["click", number]
+        };
+        assert!(
+            std::process::Command::new("xdotool")
+                .args(args)
+                .status()
+                .unwrap()
+                .success()
+        );
+    };
+    wheel(true, "4");
+    wait("Ctrl wheel synchronizes blue toggle", || {
+        button.is_active() && button.has_css_class("suggested-action")
+    });
+    assert_eq!(mode.state().unwrap().str(), Some("manual"));
+    assert!(
+        !pivra::settings::load_wheel_zoom(),
+        "temporary zoom must not persist wheel mode"
+    );
+    wait("zoomed photo minimap", || map.is_mapped());
+    preset("fit");
+    // Releasing Ctrl retains ordinary wheel navigation, not persistent zoom.
+    wheel(false, "5");
+    wait("unmodified wheel still navigates", || {
+        selected(&window, "2.png")
+    });
+    photo_presented(&window);
+    assert!(!button.is_active());
+    preset("fill");
+    preset("actual");
+    wheel(true, "4");
+    wait("manual zoom from 100 percent is active", || {
+        button.is_active()
+    });
+    key(&window, gtk::gdk::Key::Left);
+    photo_presented(&window);
+    assert!(selected(&window, "1.png") && !button.is_active());
+    assert!(!pivra::settings::load_wheel_zoom());
+    // The explicit wheel-mode preference remains separate and still persists.
+    preset("fit");
+    button.emit_clicked();
+    assert!(button.is_active() && pivra::settings::load_wheel_zoom());
+    wheel(false, "4");
+    wait("explicit wheel zoom", || {
+        mode.state().unwrap().str() == Some("manual")
+    });
+    key(&window, gtk::gdk::Key::z);
+    assert!(!pivra::settings::load_wheel_zoom());
+    assert!(
+        button.is_active(),
+        "actual manual view remains indicated until reset"
+    );
+    preset("fit");
+    wheel(true, "4");
+    wait("temporary zoom before video", || button.is_active());
+    let video = std::env::args().find(|s| s.ends_with(".mp4")).unwrap();
+    open_uri(&window, std::path::Path::new(&video));
+    assert!(!button.is_active() && !button.has_css_class("suggested-action"));
+    assert!(!pivra::settings::load_wheel_zoom());
+    window.close();
+    eprintln!(
+        "PASS real Ctrl+wheel zoom state: blue immediately, no preference leak, ordinary wheel navigation, photo/video/preset resets, explicit button/Z choice retained, minimap unchanged"
+    );
+}

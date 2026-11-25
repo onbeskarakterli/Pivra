@@ -393,6 +393,10 @@ fn main() {
         development_features::shortcuts(&app);
         return;
     }
+    if std::env::args().any(|s| s == "--development-zoom-state") {
+        development_features::zoom_state(&app);
+        return;
+    }
     let dir = tempfile::tempdir().unwrap();
     for (name, source) in [
         ("1.png", "tests/fixtures/images/wide.png"),

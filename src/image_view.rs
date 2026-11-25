@@ -16,6 +16,8 @@ mod photo_transition;
 pub(crate) mod thumbnail_overlay;
 #[path = "video_controls.rs"]
 mod video_controls;
+#[path = "video_inhibit.rs"]
+mod video_inhibit;
 use adw::prelude::*;
 use gtk::{gio, glib};
 use pivra::viewing::{Resampling, Transform, ViewMode};
@@ -66,6 +68,7 @@ pub(super) struct ImageView {
     video_observer: Rc<RefCell<Option<VideoObserver>>>,
     information: Rc<information_panel::Panel>,
     minimap: Rc<minimap::Map>,
+    video_inhibit: Rc<video_inhibit::VideoInhibit>,
 }
 type VideoObserver = Box<dyn Fn(Option<&gtk::MediaFile>)>;
 
@@ -343,6 +346,7 @@ impl ImageView {
         overlay.add_overlay(minimap.widget());
         overlay.set_measure_overlay(minimap.widget(), false);
         let view = Self {
+            video_inhibit: video_inhibit::VideoInhibit::new(window),
             minimap,
             information: information_panel::Panel::new(),
             transition,
@@ -381,6 +385,13 @@ impl ImageView {
         window.connect_destroy(move |_| transition.clear());
         let information = view.information.clone();
         window.connect_destroy(move |_| information.close());
+        let inhibitor = view.video_inhibit.clone();
+        window.connect_destroy(move |_| inhibitor.close());
+        let inhibitor = view.video_inhibit.clone();
+        window.connect_close_request(move |_| {
+            inhibitor.close();
+            glib::Propagation::Proceed
+        });
         let minimap = view.minimap.clone();
         window.connect_destroy(move |_| minimap.close());
         let minimap = view.minimap.clone();
@@ -710,6 +721,7 @@ impl ImageView {
         self.video_controls
             .attach(Some(media.clone().upcast::<gtk::MediaStream>()));
         self.information.bind_video(&media);
+        self.video_inhibit.bind(&media);
         // Bind slideshow EOS observations before play, not on a later timer.
         // Outside slideshow the optional observer does not modify the stream.
         if let Some(observer) = self.video_observer.borrow().as_ref() {
@@ -727,6 +739,7 @@ impl ImageView {
         }
     }
     fn stop_video(&self) {
+        self.video_inhibit.unbind();
         self.information.unbind_video();
         gpu_video::trace_binding(c"video-retire-begin");
         // Disconnect slideshow notifications while we still own the emitter,

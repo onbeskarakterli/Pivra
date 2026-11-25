@@ -200,3 +200,44 @@ explicit button/Z behavior. The final `shortcuts` and `minimap` gates also PASS
 (real chooser interaction/cancel, shared texture/pan and normal suppression).
 Physical GNOME/portal and hardware visual confirmation remain pending; photo
 pixels are controlled. No full regression, release build or packaging was run.
+
+## Media information, F2, type filters and video inhibition
+
+- Information reuses the existing asynchronous panel/metadata cache, now grouped
+  with native libadwaita preferences rows. Available camera/ISO/aperture/shutter/
+  original capture-date fields come from already loaded EXIF; codec/FPS from the
+  existing discoverer; dimensions/duration from the live frame/MediaFile. No new
+  dependency, directory scan or decode is requested for the panel.
+- F2 opens a native rename dialog; the stem is selected, leaving the extension
+  intact by default. Validation rejects empty/path/control-character/oversized
+  names. An anchored same-directory Linux `RENAME_NOREPLACE` rejects collisions
+  atomically without a copy/delete/overwrite fallback. Source identity is checked;
+  UTF-8 regular files are supported (symlinks should be renamed in the file
+  manager). Catalog sorting/selection, title, metadata and thumbnails are updated.
+  Ready photo/video rendering is retained; unfinished image requests reuse the
+  existing retarget path. Filesystem errors use the existing toast mechanism.
+- The thumbnail controls contain All/Photos/Videos. This is a window-local
+  projection: the main media and full keyboard catalog stay unchanged. The
+  selected thumbnail is included even when it does not match, as the predictable
+  current-media exception. Natural order and original catalog indices remain;
+  cells/textures are retained under the existing 64-entry/16 MiB policy. Hidden
+  types do not start new thumbnail jobs. Filter state survives Open, Rename and
+  folder reconciliation without a filter-triggered rescan.
+- Video playback owns a separate GTK Application IDLE-inhibit lease. Only a
+  prepared, playing, non-ended, non-failed video qualifies. Pause, switch, EOS,
+  error and close release the cookie. Late/reentrant acquisition is released if
+  obsolete; an unsupported service is retried only on a new playing session.
+  Slideshow's existing inhibition, including pause, is unchanged.
+
+Validation: formatting/locked compilation PASS after each feature. Small library
+checks: rename safety 2 PASS (names, collisions, replacement identity, symlinks),
+rename catalog state 1 PASS, media filter order/current-selection 1 PASS, inhibit
+cookie lifecycle 2 PASS. No full Rust/Python/GUI matrix, stress/performance loop,
+release build or packaging was run. Version stays 0.2.7.
+
+Physical GNOME acceptance remains **NOT TESTED**: inspect available EXIF/video
+fields and path wrapping; F2 cancel/collision/rename during navigation and video;
+filter All/Photos/Videos across Open/Rename/folder changes; verify real session
+inhibitors on play/pause/EOS/switch/close and that paused slideshow still inhibits.
+GPU rendering, zoom/minimap, Delete/Undo and existing keyboard behavior require
+combined native acceptance; no hardware success is claimed by these unit checks.

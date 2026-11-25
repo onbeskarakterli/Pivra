@@ -385,6 +385,10 @@ fn main() {
         development_features::layout(&app);
         return;
     }
+    if std::env::args().any(|s| s == "--development-navigation") {
+        development_features::navigation(&app);
+        return;
+    }
     let dir = tempfile::tempdir().unwrap();
     for (name, source) in [
         ("1.png", "tests/fixtures/images/wide.png"),

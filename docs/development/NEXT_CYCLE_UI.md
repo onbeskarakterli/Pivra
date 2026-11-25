@@ -130,3 +130,32 @@ texture sharing, Fit/video/slideshow suppression, resize and fullscreen checks
 remain passing. Photo pixels are controlled, not native decoder evidence.
 Physical GNOME acceptance of this larger minimap/clearance change remains pending.
 No full regression matrix, packaging or release work was performed.
+
+## Navigation visibility synchronized with the minimap
+
+The image overlay now temporarily masks the entire thumbnail scroller, its
+integrated controls/resize edge and both complete navigation arrow buttons while
+the minimap is mapped. Its actual map/unmap signals are the single source of
+truth. A container-level `child_visible` mask preserves each control's normal
+`visible` state, hover/auto-hide logic, enabled and pin preferences. Hover callbacks
+cannot override the mask. Unmapping the minimap removes it synchronously, without
+a settings write, new timer, CSS hiding or duplicate zoom/mode calculations.
+
+Navigation is excluded from minimap placement even on its first frame, avoiding
+a placement jump when it is masked. Other allocated scrollbars retain their
+clearance rule. The hidden thumbnail resize gesture cannot claim minimap dragging;
+unmapping the strip releases resize state/cursor. Video/slideshow controls and
+image transforms are unchanged.
+
+Validation: formatting and `cargo check --locked` PASS. Focused Xvfb/xfwm4
+`tests/toolbar_ux_smoke.py --session x11 --development` modes `navigation`,
+`layout` and `minimap` all PASS. The new gate exercises real pinned navigation,
+hover attempts while masked, repeated zoom/Fit, resize, independent widget
+visibility toggling, selection/video/slideshow transitions and disabled/unpinned
+restoration. It compares enabled/pin settings bytes and observes map signals plus
+rendered frames: zero simultaneous navigation/minimap mappings or frames.
+The layout gate now requires navigation suppression rather than the superseded
+visible-strip clearance behavior; independent scrollbar checks remain intact.
+Controlled photo pixels are not secure decoder or physical GNOME acceptance.
+Native GNOME interaction/visual confirmation remains pending. No full regression,
+release build or packaging was performed; version remains 0.2.7.

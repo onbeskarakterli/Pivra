@@ -76,6 +76,19 @@ impl Map {
             closed: Cell::new(false),
             clock: RefCell::new(None),
         });
+        for mapped in [true, false] {
+            let weak = Rc::downgrade(&this);
+            let sync = move |_: &gtk::Overlay| {
+                if let Some(this) = weak.upgrade() {
+                    this.sync_navigation();
+                }
+            };
+            if mapped {
+                this.root.connect_map(sync);
+            } else {
+                this.root.connect_unmap(sync);
+            }
+        }
         let weak = Rc::downgrade(&this);
         this.canvas.set_draw_func(move |_, cr, width, height| {
             let Some(this) = weak.upgrade() else {
@@ -142,6 +155,31 @@ impl Map {
     }
     pub fn widget(&self) -> &gtk::Overlay {
         &self.root
+    }
+    fn is_navigation(widget: &gtk::Widget) -> bool {
+        matches!(
+            widget.widget_name().as_str(),
+            "thumbnail-strip" | "thumbnail-controls" | "thumbnail-resize-edge"
+        ) || widget
+            .downcast_ref::<gtk::Button>()
+            .and_then(|b| b.action_name())
+            .is_some_and(|a| matches!(a.as_str(), "win.previous-media" | "win.next-media"))
+    }
+    fn sync_navigation(&self) {
+        let Some(parent) = self.root.parent() else {
+            return;
+        };
+        // Container-level mask: each control still owns its normal `visible`
+        // flag (hover, pin, enabled, etc.). No preference or timer is changed.
+        // Map/unmap makes the mask effective before either UI can be painted.
+        let show = !self.root.is_mapped();
+        let mut child = parent.first_child();
+        while let Some(widget) = child {
+            child = widget.next_sibling();
+            if Self::is_navigation(&widget) {
+                widget.set_child_visible(show);
+            }
+        }
     }
     fn disconnect(&self) {
         if let Some((weak, id)) = self.clock.borrow_mut().take() {
@@ -223,20 +261,20 @@ impl Map {
             }
         };
         // Inspect siblings/scroller bars, not every thumbnail cell on each frame.
-        // Thumbnail scrolling has no internal bar (External policy), but its
-        // visible floating panel also occupies the bottom of the image viewport.
+        // Navigation is mutually exclusive with the map, so it does not reduce
+        // the map's usable area even on the first frame before masking it.
         let mut child = parent.first_child();
         while let Some(widget) = child {
             child = widget.next_sibling();
+            if Self::is_navigation(&widget) {
+                continue;
+            }
             if let Some(bar) = widget.downcast_ref::<gtk::Scrollbar>() {
                 reserve(&widget, bar.orientation() == gtk::Orientation::Vertical);
             }
             if let Some(scroll) = widget.downcast_ref::<gtk::ScrolledWindow>() {
                 reserve(scroll.hscrollbar().upcast_ref(), false);
                 reserve(scroll.vscrollbar().upcast_ref(), true);
-            }
-            if widget.widget_name() == "thumbnail-strip" {
-                reserve(&widget, false);
             }
         }
         let available = ((right - left).min(280.), (bottom - top).min(220.));

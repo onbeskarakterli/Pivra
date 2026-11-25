@@ -397,31 +397,15 @@ pub(super) fn layout(app: &adw::Application) {
     overlay.remove_overlay(&horizontal);
     overlay.remove_overlay(&vertical);
     let strip = widget(&window, "thumbnail-strip");
-    // Force only visibility/allocation for this layout test, not provider success.
+    // Minimap and navigation are now mutually exclusive. Changing normal strip
+    // visibility/size must not remap it or reduce the map's usable viewport.
     strip.set_visible(true);
-    let above_strip = || {
-        let b = map.compute_bounds(&picture).unwrap();
-        let s = strip.compute_bounds(&picture).unwrap();
-        strip.is_mapped() && b.y() >= 16. && b.y() + b.height() <= s.y() - 16.
-    };
-    wait("thumbnail strip clearance", above_strip);
-    let old_height = strip.compute_bounds(&picture).unwrap().height();
+    assert!(!strip.is_child_visible() && !strip.is_mapped());
     strip.set_height_request(190);
-    wait("resized thumbnail strip clearance", || {
-        // GTK CSS/borders can make allocation differ from height_request.
-        // Require a larger real allocation and the same strict 16 px gap.
-        strip
-            .compute_bounds(&picture)
-            .is_some_and(|b| b.height() > old_height)
-            && above_strip()
-    });
-    eprintln!(
-        "LAYOUT strip clearance: map={:?} strip={:?}",
-        map.compute_bounds(&picture).unwrap(),
-        strip.compute_bounds(&picture).unwrap()
-    );
+    photo_presented(&window);
+    assert!(!strip.is_child_visible() && !strip.is_mapped());
     strip.set_visible(false);
-    wait("hidden obstacles release usable area", || {
+    wait("suppressed navigation leaves usable area", || {
         let b = map.compute_bounds(&picture).unwrap();
         (picture.height() as f32 - b.y() - b.height() - 16.).abs() <= 1.
             && (picture.width() as f32 - b.x() - b.width() - 16.).abs() <= 1.
@@ -475,5 +459,236 @@ pub(super) fn layout(app: &adw::Application) {
     window.close();
     eprintln!(
         "PASS development layout: centered empty/portrait Fit, bounded bottom-right portrait minimap, sidebar open/close, Fill/Actual/resize/fullscreen"
+    );
+}
+
+pub(super) fn navigation(app: &adw::Application) {
+    use std::{cell::Cell, rc::Rc};
+    let dir = tempfile::tempdir().unwrap();
+    for name in ["1.png", "2.png", "4.png"] {
+        std::fs::copy("tests/fixtures/images/wide.png", dir.path().join(name)).unwrap();
+    }
+    window::build(app, &pivra::settings::Settings::default(), None);
+    let window = app
+        .active_window()
+        .unwrap()
+        .downcast::<adw::ApplicationWindow>()
+        .unwrap();
+    open_uri(&window, &dir.path().join("2.png"));
+    photo_presented(&window);
+    wait("middle item navigation", || {
+        ["previous-media", "next-media"]
+            .iter()
+            .all(|name| window.lookup_action(name).unwrap().is_enabled())
+    });
+    let map = widget(&window, "image-minimap");
+    let strip = widget(&window, "thumbnail-strip");
+    let controls = widget(&window, "thumbnail-controls");
+    let edge = widget(&window, "thumbnail-resize-edge");
+    let previous = widgets(window.upcast_ref())
+        .into_iter()
+        .find(|w| {
+            w.downcast_ref::<gtk::Button>()
+                .is_some_and(|b| b.action_name().as_deref() == Some("win.previous-media"))
+        })
+        .unwrap();
+    let next = widgets(window.upcast_ref())
+        .into_iter()
+        .find(|w| {
+            w.downcast_ref::<gtk::Button>()
+                .is_some_and(|b| b.action_name().as_deref() == Some("win.next-media"))
+        })
+        .unwrap();
+    let picture = widgets(window.upcast_ref())
+        .into_iter()
+        .filter_map(|w| w.downcast::<gtk::Overlay>().ok())
+        .find_map(|o| o.child().and_downcast::<gtk::Picture>())
+        .unwrap();
+    let overlay = picture.parent().unwrap();
+    let motion = |x: f64, y: f64| {
+        let list = overlay.observe_controllers();
+        for i in 0..list.n_items() {
+            if let Ok(c) = list
+                .item(i)
+                .unwrap()
+                .downcast::<gtk::EventControllerMotion>()
+            {
+                c.emit_by_name::<()>("motion", &[&x, &y]);
+            }
+        }
+    };
+    pivra::settings::thumbnail_preference().set_enabled(true);
+    let pin = controls
+        .last_child()
+        .unwrap()
+        .downcast::<gtk::ToggleButton>()
+        .unwrap();
+    if !pin.is_active() {
+        pin.emit_clicked();
+    }
+    wait("normal pinned navigation", || {
+        strip.is_mapped() && controls.is_mapped() && edge.is_mapped()
+    });
+    motion(0., 100.);
+    assert!(previous.is_mapped() && !next.is_mapped());
+    motion(overlay.width() as f64 - 1., 100.);
+    assert!(next.is_mapped() && !previous.is_mapped());
+    let preferences = ["thumbnails.conf", "thumbnail-pinned.conf"]
+        .map(|name| glib::user_config_dir().join("pivra").join(name));
+    let saved = preferences
+        .iter()
+        .map(|p| std::fs::read(p).unwrap())
+        .collect::<Vec<_>>();
+    let nav = vec![strip.clone(), controls.clone(), edge, previous, next];
+    let flashes = Rc::new(Cell::new(0));
+    let frames = Rc::new(Cell::new(0));
+    let map_frames = Rc::new(Cell::new(0));
+    let clock = picture.frame_clock().unwrap();
+    let weak_map = map.downgrade();
+    let watched = nav.iter().map(|w| w.downgrade()).collect::<Vec<_>>();
+    let count = flashes.clone();
+    let observed = frames.clone();
+    let effective = map_frames.clone();
+    let handler = clock.connect_after_paint(move |_| {
+        observed.set(observed.get() + 1);
+        if weak_map.upgrade().is_some_and(|m| m.is_mapped()) {
+            effective.set(effective.get() + 1);
+            if watched
+                .iter()
+                .any(|w| w.upgrade().is_some_and(|w| w.is_mapped()))
+            {
+                count.set(count.get() + 1);
+            }
+        }
+    });
+    // Catch transient remapping from hover/pin callbacks, not just final frames.
+    for w in &nav {
+        let weak = map.downgrade();
+        let count = flashes.clone();
+        w.connect_map(move |_| {
+            if weak.upgrade().is_some_and(|m| m.is_mapped()) {
+                count.set(count.get() + 1);
+            }
+        });
+    }
+    widget(&window, "wheel-zoom-toggle")
+        .downcast::<gtk::ToggleButton>()
+        .unwrap()
+        .set_active(true);
+    let zoom = || {
+        controller::<gtk::EventControllerMotion>(picture.upcast_ref())
+            .emit_by_name::<()>("enter", &[&200f64, &150f64]);
+        controller::<gtk::EventControllerScroll>(picture.upcast_ref())
+            .emit_by_name::<bool>("scroll", &[&0f64, &-20f64]);
+        wait("map masks navigation", || map.is_mapped());
+        let mini = widget(&window, "minimap-image")
+            .downcast::<gtk::Picture>()
+            .unwrap();
+        let _ = render_frame::rendered_node(&window, &mini);
+        assert!(nav.iter().all(|w| !w.is_mapped() && !w.is_child_visible()));
+    };
+    for cycle in 0..3 {
+        zoom();
+        motion(0., overlay.height() as f64 - 1.);
+        motion(overlay.width() as f64 - 1., overlay.height() as f64 - 1.);
+        assert!(nav.iter().all(|w| !w.is_mapped()));
+        let height = strip.height_request();
+        let resize = controller::<gtk::GestureDrag>(&overlay);
+        let y = strip.compute_bounds(&overlay).unwrap().y() as f64;
+        resize.emit_by_name::<()>("drag-begin", &[&10f64, &y]);
+        resize.emit_by_name::<()>("drag-update", &[&0f64, &-30f64]);
+        resize.emit_by_name::<()>("drag-end", &[&0f64, &-30f64]);
+        assert_eq!(
+            strip.height_request(),
+            height,
+            "hidden strip resize must not intercept minimap drag"
+        );
+        if cycle == 1 {
+            let old = picture.width();
+            window.set_default_size(1100, 750);
+            wait("resized minimap navigation", || picture.width() != old);
+            let _ = render_frame::rendered_node(&window, &picture);
+            assert!(map.is_mapped() && nav.iter().all(|w| !w.is_mapped()));
+        }
+        // Visibility itself is the source of truth, independently of zoom/mode.
+        map.set_visible(false);
+        assert!(strip.is_mapped() && controls.is_mapped());
+        assert!(nav.iter().all(|w| w.is_child_visible()));
+        map.set_visible(true);
+        assert!(nav.iter().all(|w| !w.is_mapped()));
+        window
+            .lookup_action("image-mode")
+            .unwrap()
+            .activate(Some(&"fit".to_variant()));
+        photo_presented(&window);
+        wait("Fit restores pinned navigation", || {
+            !map.is_mapped() && strip.is_mapped() && controls.is_mapped()
+        });
+    }
+    zoom();
+    key(&window, gtk::gdk::Key::F5);
+    wait("slideshow restores normal navigation", || {
+        !map.is_mapped() && strip.is_mapped()
+    });
+    key(&window, gtk::gdk::Key::Escape);
+    zoom();
+    key(&window, gtk::gdk::Key::Right);
+    photo_presented(&window);
+    wait("selection restores navigation", || {
+        !map.is_mapped() && strip.is_mapped()
+    });
+    let video = std::env::args().find(|s| s.ends_with(".mp4")).unwrap();
+    open_uri(&window, std::path::Path::new(&video));
+    assert!(!map.is_mapped() && nav.iter().all(|w| w.is_child_visible()));
+    assert!(
+        pivra::settings::thumbnail_preference().enabled()
+            && pivra::settings::load_thumbnail_pinned()
+    );
+    assert_eq!(
+        preferences
+            .iter()
+            .map(|p| std::fs::read(p).unwrap())
+            .collect::<Vec<_>>(),
+        saved
+    );
+    // Disabled/unpinned preferences must also survive temporary masking; hiding
+    // the map must not force a disabled strip open.
+    pin.emit_clicked();
+    pivra::settings::thumbnail_preference().set_enabled(false);
+    let disabled = preferences
+        .iter()
+        .map(|p| std::fs::read(p).unwrap())
+        .collect::<Vec<_>>();
+    open_uri(&window, &dir.path().join("2.png"));
+    photo_presented(&window);
+    zoom();
+    window
+        .lookup_action("image-mode")
+        .unwrap()
+        .activate(Some(&"fit".to_variant()));
+    photo_presented(&window);
+    assert!(!map.is_mapped() && !strip.is_mapped() && nav.iter().all(|w| w.is_child_visible()));
+    assert!(
+        !pivra::settings::thumbnail_preference().enabled()
+            && !pivra::settings::load_thumbnail_pinned()
+    );
+    assert_eq!(
+        preferences
+            .iter()
+            .map(|p| std::fs::read(p).unwrap())
+            .collect::<Vec<_>>(),
+        disabled
+    );
+    assert!(frames.get() > 0);
+    assert!(map_frames.get() > 0);
+    assert_eq!(
+        flashes.get(),
+        0,
+        "navigation remapped/painted while minimap effective"
+    );
+    clock.disconnect(handler);
+    window.close();
+    eprintln!(
+        "PASS navigation/minimap: complete strip/edge/controls/arrows masked, hover cannot override, effective visibility restores, pinned/enabled files unchanged, repeated mode/selection/video/slideshow transitions, zero overlapping frames/remaps"
     );
 }

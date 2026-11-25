@@ -636,7 +636,6 @@ pub(super) fn build(app: &adw::Application, settings: &Settings, file: Option<Op
             .build();
         info_button.set_widget_name("media-information-button");
         info_button.set_action_name(Some("win.media-info"));
-        groups.append(&info_button);
         let info = gio::SimpleAction::new_stateful("media-info", None, &false.to_variant());
         let info_view = view.clone();
         let weak_button = info_button.downgrade();
@@ -856,6 +855,7 @@ pub(super) fn build(app: &adw::Application, settings: &Settings, file: Option<Op
             current_delete_toast.clone(),
         );
         groups.append(&toolbar::slideshow_group(&window));
+        groups.append(&info_button);
         let keys = gtk::EventControllerKey::new();
         keys.set_propagation_phase(gtk::PropagationPhase::Capture);
         let weak_window = window.downgrade();

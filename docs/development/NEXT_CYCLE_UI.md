@@ -37,7 +37,7 @@ renderer, shaders and XWayland workaround are unchanged.
 
 ## Photo minimap
 
-A small top-right overlay appears only when part of the photo is outside the
+A small bottom-right overlay appears only when part of the photo is outside the
 viewport. It shares the existing texture and Transform; the outline represents
 the visible source rectangle. Click/drag pans through the existing paintable.
 Zoom, pan, resize and selection update it via the existing frame clock, without
@@ -63,3 +63,41 @@ folder. Toggle Information (`I`), navigate photos/videos and check available
 EXIF/duration plus playback controls. Zoom/pan/resize a photo and drag its minimap;
 verify Fit, slideshow and video hide it. Native file-picker interaction, secure
 EXIF presentation and visual layout remain **NOT TESTED** in this environment.
+
+## Layout regression correction
+
+The closed information Revealer inherited horizontal expansion from its heading.
+GTK therefore gave it spare width even at zero reveal progress. At `51c55e6`,
+the 950 px content row gave 475 px to the empty viewer and 475 px to the closed
+sidebar. The placeholder was displaced by 238 px; portrait Fit was also left
+of the full content center. Explicitly disabling expansion on the sidebar root
+restores the full viewer allocation, without changing image transforms or adding
+position offsets. The existing centered status label and Picture then center
+correctly in the content below the header.
+
+The minimap's main Picture propagated the full texture's natural dimensions;
+`size_request(160,120)` was a minimum, not a maximum. A controlled 640×1280
+portrait texture produced a 609×571 overlay. The texture Picture is now an
+unmeasured overlay child, and only the root sets the aspect-fitted allocation
+within 180×140 logical pixels (or the smaller viewport minus 12 px margins).
+The non-expanding root is bottom/end-aligned with subtle opacity and a thin
+indicator. The same portrait now produces a 70×140 map at `(868,431)` inside a
+950×583 viewport, with 12 px right/bottom margins. Texture sharing and panning
+remain unchanged.
+
+Targeted Xvfb/xfwm4 validation:
+
+- `cargo fmt --all -- --check` and `cargo check --locked`: PASS.
+- `python3 -B tests/toolbar_ux_smoke.py --session x11 --development layout`:
+  PASS. Reproduced the original layout failure before correction; now verifies
+  empty/portrait centering, bounded portrait minimap, sidebar open/close, resize,
+  Fill/100% and fullscreen geometry. Content allocations, not assumed window
+  decoration dimensions, are the resize barrier.
+- `python3 -B tests/toolbar_ux_smoke.py --session x11 --development minimap`:
+  PASS. Existing texture/paintable sharing, drag-to-pan, resize, no additional
+  decode, Fit/new-photo/video/slideshow suppression remain covered.
+
+These are controlled photo textures and real GTK layout/rendering, not native
+Glycin or physical GNOME visual acceptance. Physical GNOME screenshots/interaction
+remain **NOT TESTED**, pending user confirmation. No full regression matrix or
+packaging checks were run. Version 0.2.7, GPU code and XWayland workaround unchanged.

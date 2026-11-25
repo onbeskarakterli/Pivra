@@ -12,15 +12,15 @@ mod image_loader {
     use std::path::Path;
     pub enum LoadedFrame {
         Native(secure_image_loader::LoadedFrame),
-        Controlled(bool),
+        Controlled(bool, (i32, i32)),
     }
     impl LoadedFrame {
         pub fn texture(&self) -> gdk::Texture {
             match self {
                 Self::Native(f) => f.texture(),
-                Self::Controlled(second) => gdk::MemoryTexture::new(
-                    64,
-                    32,
+                Self::Controlled(second, (width, height)) => gdk::MemoryTexture::new(
+                    *width,
+                    *height,
                     gdk::MemoryFormat::R8g8b8a8,
                     &glib::Bytes::from_owned(
                         if *second {
@@ -28,9 +28,9 @@ mod image_loader {
                         } else {
                             [40, 100, 180, 255]
                         }
-                        .repeat(64 * 32),
+                        .repeat((*width * *height) as usize),
                     ),
-                    64 * 4,
+                    *width as usize * 4,
                 )
                 .upcast(),
             }
@@ -52,6 +52,11 @@ mod image_loader {
         }
         Ok(LoadedFrame::Controlled(
             path.file_name().is_some_and(|s| s == "2.png"),
+            if path.file_name().is_some_and(|s| s == "portrait.png") {
+                (640, 1280)
+            } else {
+                (64, 32)
+            },
         ))
     }
     pub async fn preload(
@@ -374,6 +379,10 @@ fn main() {
     }
     if std::env::args().any(|s| s == "--development-minimap") {
         development_features::minimap(&app);
+        return;
+    }
+    if std::env::args().any(|s| s == "--development-layout") {
+        development_features::layout(&app);
         return;
     }
     let dir = tempfile::tempdir().unwrap();

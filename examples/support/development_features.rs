@@ -244,3 +244,158 @@ pub(super) fn minimap(app: &adw::Application) {
         "PASS development minimap: Fit hidden, cropped region, shared texture/paintable, interactive pan, resize, no decode, slideshow/new-photo/video suppression"
     );
 }
+
+pub(super) fn layout(app: &adw::Application) {
+    let dir = tempfile::tempdir().unwrap();
+    let file = dir.path().join("portrait.png");
+    std::fs::copy("tests/fixtures/images/wide.png", &file).unwrap();
+    window::build(app, &pivra::settings::Settings::default(), None);
+    let window = app
+        .active_window()
+        .unwrap()
+        .downcast::<adw::ApplicationWindow>()
+        .unwrap();
+    let panel = widget(&window, "media-information-panel");
+    let row = panel.parent().unwrap();
+    let picture = widgets(window.upcast_ref())
+        .into_iter()
+        .filter_map(|w| w.downcast::<gtk::Overlay>().ok())
+        .find_map(|o| o.child().and_downcast::<gtk::Picture>())
+        .unwrap();
+    wait("empty viewer layout", || {
+        row.is_mapped() && picture.width() > 0
+    });
+    let status = widgets(window.upcast_ref())
+        .into_iter()
+        .find(|w| {
+            w.downcast_ref::<gtk::Label>()
+                .is_some_and(|l| l.text() == "Open a photo or video to start.")
+        })
+        .unwrap();
+    let center_error = |bounds: gtk::graphene::Rect| {
+        (
+            (bounds.x() + bounds.width() / 2. - row.width() as f32 / 2.).abs(),
+            (bounds.y() + bounds.height() / 2. - row.height() as f32 / 2.).abs(),
+        )
+    };
+    let empty_error = center_error(status.compute_bounds(&row).unwrap());
+    eprintln!(
+        "LAYOUT empty: content={}x{} picture={}x{} panel={} hexpand={} center_error={empty_error:?}",
+        row.width(),
+        row.height(),
+        picture.width(),
+        picture.height(),
+        panel.width(),
+        panel.compute_expand(gtk::Orientation::Horizontal)
+    );
+    open_uri(&window, &file);
+    window
+        .lookup_action("image-mode")
+        .unwrap()
+        .activate(Some(&"fit".to_variant()));
+    photo_presented(&window);
+    let node = render_frame::rendered_node(&window, &picture);
+    let bounds = node.bounds();
+    let pos = picture.compute_bounds(&row).unwrap();
+    let photo_error = center_error(gtk::graphene::Rect::new(
+        pos.x() + bounds.x(),
+        pos.y() + bounds.y(),
+        bounds.width(),
+        bounds.height(),
+    ));
+    eprintln!(
+        "LAYOUT portrait Fit: content={}x{} picture={}x{} panel={} rendered={bounds:?} center_error={photo_error:?}",
+        row.width(),
+        row.height(),
+        picture.width(),
+        picture.height(),
+        panel.width()
+    );
+    widget(&window, "wheel-zoom-toggle")
+        .downcast::<gtk::ToggleButton>()
+        .unwrap()
+        .set_active(true);
+    controller::<gtk::EventControllerMotion>(picture.upcast_ref())
+        .emit_by_name::<()>("enter", &[&200f64, &150f64]);
+    controller::<gtk::EventControllerScroll>(picture.upcast_ref())
+        .emit_by_name::<bool>("scroll", &[&0f64, &-8f64]);
+    let map = widget(&window, "image-minimap");
+    wait("minimap layout", || map.is_mapped() && map.width() > 0);
+    let b = map.compute_bounds(&picture).unwrap();
+    eprintln!(
+        "LAYOUT minimap: bounds={b:?} picture={}x{}",
+        picture.width(),
+        picture.height()
+    );
+    assert!(
+        empty_error.0 <= 1. && empty_error.1 <= 1.,
+        "empty placeholder center: {empty_error:?}"
+    );
+    assert!(
+        photo_error.0 <= 1. && photo_error.1 <= 1.,
+        "portrait Fit center: {photo_error:?}"
+    );
+    assert!(
+        map.width() <= 180 && map.height() <= 140,
+        "bounded minimap: {b:?}"
+    );
+    assert!(
+        (b.width() / b.height() - 0.5).abs() < 0.02,
+        "portrait minimap aspect ratio: {b:?}"
+    );
+    assert!(
+        (picture.width() as f32 - b.x() - b.width() - 12.).abs() <= 1.
+            && (picture.height() as f32 - b.y() - b.height() - 12.).abs() <= 1.,
+        "bottom-right minimap margins: {b:?}"
+    );
+    // Closing the sidebar must give all space back, including after resize.
+    key(&window, gtk::gdk::Key::i);
+    let revealer = panel.downcast_ref::<gtk::Revealer>().unwrap();
+    wait("sidebar fully open", || revealer.is_child_revealed());
+    photo_presented(&window);
+    assert_eq!(picture.width() + panel.width(), row.width());
+    key(&window, gtk::gdk::Key::i);
+    wait("closed sidebar occupies no width", || panel.width() == 0);
+    let old_size = (row.width(), row.height());
+    window.set_default_size(1100, 750);
+    // The compositor may subtract decorations from the requested window size.
+    // Observe the actual content allocation, not an assumed client width.
+    wait("resized layout", || {
+        row.width() > old_size.0 && row.height() > old_size.1
+    });
+    eprintln!("LAYOUT resized: content={}x{}", row.width(), row.height());
+    for mode in ["fill", "actual", "fit"] {
+        window
+            .lookup_action("image-mode")
+            .unwrap()
+            .activate(Some(&mode.to_variant()));
+        let node = render_frame::rendered_node(&window, &picture);
+        assert_eq!(picture.width(), row.width());
+        let bounds = node.bounds();
+        assert!(
+            (bounds.x() + bounds.width() / 2. - picture.width() as f32 / 2.).abs() <= 1.,
+            "{mode} centered after resize: {bounds:?}"
+        );
+    }
+    key(&window, gtk::gdk::Key::F11);
+    wait("fullscreen layout", || window.is_fullscreen());
+    let node = render_frame::rendered_node(&window, &picture);
+    assert_eq!(picture.width(), row.width());
+    let b = node.bounds();
+    let error = center_error(gtk::graphene::Rect::new(
+        b.x(),
+        b.y(),
+        b.width(),
+        b.height(),
+    ));
+    assert!(
+        error.0 <= 1. && error.1 <= 1.,
+        "fullscreen Fit center: {error:?}"
+    );
+    key(&window, gtk::gdk::Key::Escape);
+    wait("normal window restored", || !window.is_fullscreen());
+    window.close();
+    eprintln!(
+        "PASS development layout: centered empty/portrait Fit, bounded bottom-right portrait minimap, sidebar open/close, Fill/Actual/resize/fullscreen"
+    );
+}

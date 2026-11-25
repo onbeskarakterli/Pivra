@@ -22,6 +22,9 @@ impl Panel {
     pub fn new() -> Rc<Self> {
         let root = gtk::Revealer::new();
         root.set_widget_name("media-information-panel");
+        // The expanding heading is internal to the sidebar. Do not inherit it:
+        // a closed revealer must not claim the viewer row's spare width.
+        root.set_hexpand(false);
         root.set_transition_type(gtk::RevealerTransitionType::SlideLeft);
         root.set_transition_duration(150);
         let body = gtk::Box::new(gtk::Orientation::Vertical, 12);

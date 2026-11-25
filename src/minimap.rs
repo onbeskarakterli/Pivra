@@ -36,21 +36,25 @@ impl Map {
         let root = gtk::Overlay::new();
         root.set_widget_name("image-minimap");
         root.add_css_class("osd");
+        root.set_hexpand(false);
+        root.set_vexpand(false);
         root.set_halign(gtk::Align::End);
-        root.set_valign(gtk::Align::Start);
-        root.set_margin_top(12);
+        root.set_valign(gtk::Align::End);
+        root.set_margin_bottom(12);
         root.set_margin_end(12);
-        root.set_size_request(160, 120);
+        root.set_opacity(0.88);
         root.set_tooltip_text(Some("Click or drag to pan"));
         root.set_visible(false);
         let mini = gtk::Picture::new();
         mini.set_widget_name("minimap-image");
         mini.set_can_shrink(true);
         mini.set_content_fit(gtk::ContentFit::Contain);
-        mini.set_hexpand(true);
-        mini.set_vexpand(true);
         mini.set_can_target(false);
-        root.set_child(Some(&mini));
+        // Unmeasured overlay children cannot propagate the full texture's
+        // natural dimensions. The root request below controls the floating box.
+        root.add_overlay(&mini);
+        root.set_measure_overlay(&mini, false);
+        root.set_clip_overlay(&mini, true);
         let canvas = gtk::DrawingArea::new();
         canvas.set_hexpand(true);
         canvas.set_vexpand(true);
@@ -92,10 +96,10 @@ impl Map {
             let h = image.height * region.height;
             cr.rectangle(x, y, w, h);
             cr.set_source_rgba(0., 0., 0., 0.8);
-            cr.set_line_width(3.);
+            cr.set_line_width(2.);
             let _ = cr.stroke_preserve();
             cr.set_source_rgba(1., 1., 1., 0.95);
-            cr.set_line_width(1.5);
+            cr.set_line_width(1.);
             let _ = cr.stroke();
         });
         let drag = gtk::GestureDrag::new();
@@ -198,6 +202,16 @@ impl Map {
             .unwrap_or(ViewMode::Actual);
         let viewport = (picture.width() as f64, picture.height() as f64);
         let image = (texture.width() as f64, texture.height() as f64);
+        let available = ((viewport.0 - 24.).min(180.), (viewport.1 - 24.).min(140.));
+        if available.0 < 1. || available.1 < 1. {
+            self.hide();
+            return;
+        }
+        let scale = (available.0 / image.0).min(available.1 / image.1);
+        self.root.set_size_request(
+            (image.0 * scale).round().max(1.) as i32,
+            (image.1 * scale).round().max(1.) as i32,
+        );
         let region = self
             .transform
             .borrow_mut()

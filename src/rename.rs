@@ -21,6 +21,10 @@ unsafe extern "C" {
         flags: u32,
     ) -> i32;
 }
+// Linux descriptor flags: inspect identity without opening a payload/device.
+const O_DIRECTORY: i32 = 0x10000;
+const O_NOFOLLOW: i32 = 0x20000;
+const O_PATH: i32 = 0x200000;
 pub fn validate_name(name: &str) -> Result<(), &'static str> {
     if name.trim().is_empty()
         || matches!(name, "." | "..")
@@ -43,15 +47,19 @@ impl Ticket {
             .parent()
             .ok_or_else(|| io::Error::other("Missing parent folder"))?
             .to_owned();
-        let directory = File::open(&parent)?;
+        let directory = OpenOptions::new()
+            .read(true)
+            .custom_flags(O_PATH | O_DIRECTORY)
+            .open(&parent)?;
         let name = path
             .file_name()
             .ok_or_else(|| io::Error::other("Missing filename"))?
             .to_owned();
-        // O_NOFOLLOW: rename only regular files, never a changed symlink target.
+        // O_PATH cannot block on a FIFO/device substituted for the media file.
+        // O_NOFOLLOW keeps the identity check on the directory entry itself.
         let source = OpenOptions::new()
             .read(true)
-            .custom_flags(0x20000)
+            .custom_flags(O_PATH | O_NOFOLLOW)
             .open(PathBuf::from(format!("/proc/self/fd/{}", directory.as_raw_fd())).join(&name))?;
         if !source.metadata()?.is_file() {
             return Err(io::Error::other("Only regular media files can be renamed"));

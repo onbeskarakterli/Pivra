@@ -655,6 +655,9 @@ impl ImageView {
                             !this.video_stream.borrow().as_ref().is_some_and(|s| Some(s.clone()) == failed.upgrade()) {
                             return;
                         }
+                        // F2 may have renamed this same playing stream since
+                        // its error handler was installed. Keep fallback valid.
+                        let path = this.video_path.borrow().clone().unwrap_or(path);
                         this.stop_video();
                         this.status.set_visible(false);
                         this.start_video_with_state(&path, gpu_video::Backend::Stock, Some(resume));

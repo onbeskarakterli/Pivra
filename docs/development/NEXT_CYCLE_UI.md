@@ -241,3 +241,8 @@ filter All/Photos/Videos across Open/Rename/folder changes; verify real session
 inhibitors on play/pause/EOS/switch/close and that paused slideshow still inhibits.
 GPU rendering, zoom/minimap, Delete/Undo and existing keyboard behavior require
 combined native acceptance; no hardware success is claimed by these unit checks.
+
+Final rename review: O_PATH directory/source handles inspect identity without
+opening an unexpected FIFO/device stream. Deferred GPU→stock recovery uses the
+current video path after an F2 rename, without changing rendering or routing.
+The two filesystem safety tests were repeated for the descriptor change; PASS.

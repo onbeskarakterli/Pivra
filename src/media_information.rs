@@ -47,7 +47,7 @@ pub fn image_fields(image: &glycin::Image) -> Fields {
         // Check the sealed metadata memfd before copying; no JPEG decoder on host.
         let bounded = std::fs::metadata(format!("/proc/self/fd/{}", data.as_raw_fd()))
             .is_ok_and(|m| m.len() <= 1024 * 1024);
-        if let Some(exif) = bounded
+        if let Some(mut exif) = bounded
             .then(|| data.get_full().ok())
             .flatten()
             .and_then(|bytes| gufo_exif::Exif::new(bytes).ok())
@@ -68,7 +68,18 @@ pub fn image_fields(image: &glycin::Image) -> Fields {
                 fields.push(("Focal length".into(), format!("{v:.1} mm")));
             }
             if let Some((a, b)) = exif.exposure_time().filter(|(_, b)| *b != 0) {
-                fields.push(("Exposure".into(), format!("{a}/{b} s")));
+                fields.push(("Shutter speed".into(), format!("{a}/{b} s")));
+            }
+            // DateTimeOriginal, using the already parsed metadata. Do not add
+            // chrono solely to format an optional EXIF wall-clock string.
+            if let Ok(Some(date)) =
+                exif.decoder()
+                    .lookup_datetime(gufo_exif::internal::TagIfd::new(
+                        gufo_exif::internal::Tag(0x9003),
+                        gufo_exif::internal::Ifd::Exif,
+                    ))
+            {
+                fields.push(("Captured".into(), date));
             }
             if let Some(v) = exif.orientation() {
                 fields.push(("EXIF orientation".into(), format!("{v:?}")));

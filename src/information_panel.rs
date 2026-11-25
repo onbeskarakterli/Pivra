@@ -1,5 +1,6 @@
 //! Optional sidebar. One coalesced metadata worker; no decode or pixel readback.
-use gtk::{gio, glib, prelude::*};
+use adw::prelude::*;
+use gtk::{gio, glib};
 use pivra::media_information::Fields;
 use std::{
     cell::{Cell, RefCell},
@@ -99,20 +100,44 @@ impl Panel {
         while let Some(child) = self.rows.first_child() {
             self.rows.remove(&child);
         }
-        for (key, value) in self.file.borrow().iter().chain(self.media.borrow().iter()) {
-            let row = gtk::Box::new(gtk::Orientation::Vertical, 3);
-            let caption = gtk::Label::new(Some(key));
-            caption.add_css_class("dim-label");
-            caption.set_xalign(0.);
-            let label = gtk::Label::new(Some(value));
-            label.set_xalign(0.);
-            label.set_selectable(true);
-            label.set_wrap(true);
-            label.set_wrap_mode(gtk::pango::WrapMode::WordChar);
-            label.set_max_width_chars(28);
-            row.append(&caption);
-            row.append(&label);
-            self.rows.append(&row);
+        for (title, file_group) in [("File", true), ("Media details", false)] {
+            let group = adw::PreferencesGroup::new();
+            group.set_title(title);
+            let mut count = 0;
+            for (key, value) in self.file.borrow().iter().chain(self.media.borrow().iter()) {
+                let is_file = matches!(
+                    key.as_str(),
+                    "Filename" | "Full path" | "File size" | "Modified" | "File unavailable"
+                );
+                if is_file != file_group || value.is_empty() {
+                    continue;
+                }
+                let row = adw::PreferencesRow::new();
+                let content = gtk::Box::new(gtk::Orientation::Vertical, 4);
+                content.set_margin_start(12);
+                content.set_margin_end(12);
+                content.set_margin_top(10);
+                content.set_margin_bottom(10);
+                let caption = gtk::Label::new(Some(key));
+                caption.set_xalign(0.);
+                caption.add_css_class("dim-label");
+                let label = gtk::Label::new(Some(value));
+                label.set_xalign(0.);
+                label.set_selectable(true);
+                label.set_wrap(true);
+                label.set_wrap_mode(gtk::pango::WrapMode::WordChar);
+                label.set_max_width_chars(26);
+                content.append(&caption);
+                content.append(&label);
+                row.set_child(Some(&content));
+                row.set_activatable(false);
+                row.set_selectable(false);
+                group.add(&row);
+                count += 1;
+            }
+            if count > 0 {
+                self.rows.append(&group);
+            }
         }
         if self.path.borrow().is_none() {
             self.rows

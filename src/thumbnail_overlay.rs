@@ -126,6 +126,19 @@ pub(crate) fn install(
     overlay.set_measure_overlay(&resize_edge, false);
     overlay.set_clip_overlay(&resize_edge, true);
     let thumbnails = ThumbnailStrip::new(items, strip.clone());
+    let filter = gtk::DropDown::from_strings(&["All", "Photos", "Videos"]);
+    filter.set_widget_name("thumbnail-media-filter");
+    filter.set_tooltip_text(Some("Thumbnail media filter (current media stays visible)"));
+    filter.set_enable_search(false);
+    controls.prepend(&filter);
+    let filtered = thumbnails.clone();
+    filter.connect_selected_notify(move |filter| {
+        filtered.set_filter(match filter.selected() {
+            1 => pivra::media_filter::MediaFilter::Photos,
+            2 => pivra::media_filter::MediaFilter::Videos,
+            _ => pivra::media_filter::MediaFilter::All,
+        });
+    });
     let saved_height = pivra::settings::load_thumbnail_height();
     strip.set_height_request(saved_height);
     thumbnails.resize_cells(saved_height);

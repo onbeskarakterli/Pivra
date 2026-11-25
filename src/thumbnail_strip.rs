@@ -3,6 +3,7 @@ use super::{CELL_HEIGHT, CELL_WIDTH};
 use gtk::{gdk, gio, glib, prelude::*};
 use pivra::{
     image_cache::{FileKey, texture_cost},
+    media_filter::MediaFilter,
     thumbnail_manager::Manager,
     thumbnail_provider::Error,
 };
@@ -50,6 +51,7 @@ struct Active {
     epoch: u64,
 }
 struct Inner {
+    filter: Cell<MediaFilter>,
     items: gtk::Box,
     scroller: gtk::ScrolledWindow,
     entries: RefCell<Vec<Entry>>,
@@ -93,6 +95,7 @@ pub(crate) struct ThumbnailStrip(Rc<Inner>);
 impl ThumbnailStrip {
     pub(super) fn new(items: gtk::Box, scroller: gtk::ScrolledWindow) -> Self {
         let inner = Rc::new(Inner {
+            filter: Cell::new(MediaFilter::All),
             items,
             scroller,
             entries: RefCell::new(Vec::new()),
@@ -286,6 +289,39 @@ impl ThumbnailStrip {
             self.0.warm_hidden();
         }
     }
+    pub(super) fn set_filter(&self, filter: MediaFilter) {
+        let i = &self.0;
+        if i.filter.replace(filter) == filter {
+            return;
+        }
+        let cancel_active = i.active.borrow().as_ref().is_some_and(|a| {
+            i.entries
+                .borrow()
+                .iter()
+                .find(|e| e.path == a.path)
+                .is_some_and(|e| !i.included(e))
+        });
+        if cancel_active {
+            i.pause();
+        }
+        if let Some(token) = i.warming.borrow().as_ref() {
+            token.cancel();
+        }
+        for entry in i.entries.borrow().iter() {
+            if let Some(w) = &entry.widgets {
+                w.button.set_visible(i.included(entry));
+            }
+        }
+        i.last_visible.set(None);
+        i.initial.set(i.selected.get());
+        i.restore.set(None);
+        if i.scroller.is_mapped() {
+            i.build();
+            i.scroller.queue_draw();
+        } else {
+            i.warm_hidden();
+        }
+    }
     pub(crate) fn resize_cells(&self, panel_height: i32) {
         let height = (panel_height - 34).max(CELL_HEIGHT);
         let width =
@@ -323,8 +359,9 @@ impl ThumbnailStrip {
                     && self.0.scroller.is_mapped()
                     && (self.0.retry.borrow().is_some()
                         || self.0.building.borrow().is_some()
-                        || e.iter()
-                            .any(|e| matches!(e.phase, Phase::Pending | Phase::Loading)))),
+                        || e.iter().any(|e| {
+                            self.0.included(e) && matches!(e.phase, Phase::Pending | Phase::Loading)
+                        }))),
             started: self.0.started.get(),
             decoded_max: self.0.decoded_max.get(),
             largest_texture: e.iter().map(|e| e.cost).max().unwrap_or(0),
@@ -444,6 +481,7 @@ impl ThumbnailStrip {
         }
         for entry in i.entries.borrow().iter() {
             if let Some(w) = &entry.widgets {
+                w.button.set_visible(i.included(entry));
                 w.button
                     .set_widget_name(&format!("thumbnail-cell-{}", entry.index.get()));
                 if Some(entry.index.get()) == selected {
@@ -459,6 +497,7 @@ impl ThumbnailStrip {
         } else if i.initialized.get() && i.scroller.is_mapped() {
             // File restoration creates pending cells during an asynchronous
             // folder reconciliation; kick the visible scheduler immediately.
+            i.build();
             i.drive();
         }
     }
@@ -468,6 +507,12 @@ impl ThumbnailStrip {
     }
 }
 impl Inner {
+    fn included(&self, entry: &Entry) -> bool {
+        self.filter.get().includes(
+            pivra::discovery::candidate_kind(&entry.path),
+            Some(entry.index.get()) == self.selected.get(),
+        )
+    }
     // Prime GNOME/Freedesktop disk caches after folder discovery even when
     // the overlay is hidden. Bound to a small initial batch and one worker;
     // visible-cell decoding remains owned by the normal viewport scheduler.
@@ -518,6 +563,7 @@ impl Inner {
             // delay all visible photo thumbnails. Visible DNG uses the normal
             // priority scheduler below.
             if e.phase == Phase::Pending
+                && self.included(e)
                 && !crate::raw_loader::is_dng(&e.path)
                 && !paths.contains(&e.path)
             {
@@ -832,7 +878,11 @@ impl Inner {
     }
     fn build(self: &Rc<Self>) {
         if self.building.borrow().is_some()
-            || !self.entries.borrow().iter().any(|e| e.widgets.is_none())
+            || !self
+                .entries
+                .borrow()
+                .iter()
+                .any(|e| e.widgets.is_none() && self.included(e))
         {
             return;
         }
@@ -846,7 +896,11 @@ impl Inner {
                 return glib::ControlFlow::Break;
             }
             let mut entries = i.entries.borrow_mut();
-            for entry in entries.iter_mut().filter(|e| e.widgets.is_none()).take(8) {
+            for entry in entries
+                .iter_mut()
+                .filter(|e| e.widgets.is_none() && i.included(e))
+                .take(8)
+            {
                 let button = gtk::Button::new();
                 button.add_css_class("pivra-thumbnail-cell");
                 let (cell_width, cell_height) = i.cell_size.get();
@@ -975,7 +1029,7 @@ impl Inner {
                     icon,
                 });
             }
-            if entries.iter().any(|e| e.widgets.is_none()) {
+            if entries.iter().any(|e| e.widgets.is_none() && i.included(e)) {
                 glib::ControlFlow::Continue
             } else {
                 i.building.borrow_mut().take();
@@ -1005,7 +1059,9 @@ impl Inner {
         // The measured content must include the final cell, not a provisional
         // hidden-strip adjustment range. This is a layout certificate, not a sleep.
         let Some(last) = entries
-            .last()
+            .iter()
+            .rev()
+            .find(|e| self.included(e))
             .and_then(|e| e.widgets.as_ref())
             .and_then(|w| w.button.compute_bounds(&self.items))
         else {
@@ -1047,6 +1103,9 @@ impl Inner {
         // Actual allocations include theme padding and fractional HiDPI layout;
         // a guessed fixed pitch can omit a still-visible edge cell.
         let mut shown = entries.iter().enumerate().filter_map(|(n, e)| {
+            if !self.included(e) {
+                return None;
+            }
             let b = e.widgets.as_ref()?.button.compute_bounds(&self.items)?;
             (f64::from(b.x()) < adj.value() + adj.page_size()
                 && f64::from(b.x() + b.width()) > adj.value())
@@ -1094,11 +1153,14 @@ impl Inner {
         let near = visible.start.saturating_sub(2)..(visible.end + 2).min(entries.len());
         self.clock.set(self.clock.get().wrapping_add(1));
         for (n, e) in entries.iter_mut().enumerate() {
-            if visible.contains(&n) {
+            if visible.contains(&n) && self.included(e) {
                 e.used = self.clock.get();
             }
             if let Some(w) = &e.widgets {
-                if visible.contains(&n) && matches!(e.phase, Phase::Pending | Phase::Loading) {
+                if visible.contains(&n)
+                    && self.included(e)
+                    && matches!(e.phase, Phase::Pending | Phase::Loading)
+                {
                     if pivra::discovery::candidate_kind(&e.path)
                         == Some(pivra::media::MediaKind::Video)
                     {
@@ -1119,6 +1181,7 @@ impl Inner {
         let warming_paths = self.warming_paths.borrow();
         let pending = |n: usize| {
             entries[n].phase == Phase::Pending
+                && self.included(&entries[n])
                 && (!warming || !warming_paths.contains(&entries[n].path))
         };
         let next = selected
@@ -1350,7 +1413,7 @@ impl Inner {
                     .min_by_key(|(n, e)| {
                         (
                             Some(e.index.get()) == i.selected.get(),
-                            visible.contains(n),
+                            visible.contains(n) && i.included(e),
                             e.used,
                         )
                     })

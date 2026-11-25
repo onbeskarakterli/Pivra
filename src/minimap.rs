@@ -277,7 +277,7 @@ impl Map {
                 reserve(scroll.vscrollbar().upcast_ref(), true);
             }
         }
-        let available = ((right - left).min(280.), (bottom - top).min(220.));
+        let available = ((right - left).min(560.), (bottom - top).min(440.));
         if available.0 < 1. || available.1 < 1. {
             return false;
         }

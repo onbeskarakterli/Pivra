@@ -336,7 +336,7 @@ pub(super) fn layout(app: &adw::Application) {
         "portrait Fit center: {photo_error:?}"
     );
     assert!(
-        map.width() == 110 && map.height() == 220,
+        map.width() == 220 && map.height() == 440,
         "bounded minimap: {b:?}"
     );
     assert!(
@@ -372,8 +372,8 @@ pub(super) fn layout(app: &adw::Application) {
             && b.y() >= 16.
             && b.x() + b.width() <= v.x() - 16.
             && b.y() + b.height() <= h.y() - 16.
-            && b.width() <= 280.
-            && b.height() <= 220.
+            && b.width() <= 560.
+            && b.height() <= 440.
     };
     wait("allocated scrollbar clearance", || {
         horizontal.is_mapped() && vertical.is_mapped() && clearance()

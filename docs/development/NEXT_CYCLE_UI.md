@@ -38,7 +38,7 @@ renderer, shaders and XWayland workaround are unchanged.
 ## Photo minimap
 
 A small bottom-right overlay appears only when part of the photo is outside the
-viewport, bounded to 280×220 logical pixels with the source aspect ratio.
+viewport, bounded to 560×440 logical pixels with the source aspect ratio.
 It shares the existing texture and Transform; the outline represents
 the visible source rectangle. Click/drag pans through the existing paintable.
 Zoom, pan, resize and selection update it via the existing frame clock, without
@@ -109,7 +109,7 @@ The user subsequently confirmed empty-window centering, Fit centering and the
 bounded minimap layout on physical GNOME. This is user-reported acceptance;
 the earlier Codex limitations above remain historical test records.
 
-The minimap cap is now 280×220 logical pixels (portrait 1:2: 110×220), reduced
+The first enlarged cap was 280×220 logical pixels (portrait 1:2: 110×220), reduced
 proportionally when space is limited. Placement uses real GTK allocations and
 16 px clearance, not scrollbar thickness assumptions. The current photo viewer
 uses Transform panning, not a ScrolledWindow. Its thumbnail strip is a separate
@@ -159,3 +159,12 @@ visible-strip clearance behavior; independent scrollbar checks remain intact.
 Controlled photo pixels are not secure decoder or physical GNOME acceptance.
 Native GNOME interaction/visual confirmation remains pending. No full regression,
 release build or packaging was performed; version remains 0.2.7.
+
+## Doubled minimap cap
+
+The maximum is now 560×440 logical pixels (portrait 1:2: 220×440). Only the
+existing size caps changed: source aspect ratio, viewport/scrollbar constraints,
+16 px margins, panning and navigation masking are preserved. Formatting, locked
+compilation and focused Xvfb `layout`, `minimap` and `navigation` gates PASS,
+including smaller-viewport fitting. Physical GNOME confirmation of the new size
+is pending. No full regression suite, release build or packaging was run.

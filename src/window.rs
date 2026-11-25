@@ -18,6 +18,9 @@ mod toolbar;
 #[path = "window/folder_watch.rs"]
 mod folder_watch;
 use folder_watch::{FolderWatch, watch};
+#[path = "window/open_folder.rs"]
+mod open_folder;
+use open_folder::{load_last_open_folder, save_last_open_folder};
 
 // Keep one current notification, shared by Trash and slideshow status.
 fn show_latest_toast(
@@ -84,24 +87,6 @@ fn trash_entries(original: &std::path::Path) -> Vec<gio::File> {
         }
     }
     entries
-}
-
-fn load_last_open_folder() -> Option<gio::File> {
-    let path = glib::user_config_dir().join("pivra/last-open-dir.conf");
-    let folder = PathBuf::from(std::fs::read_to_string(path).ok()?.trim());
-    folder.is_dir().then(|| gio::File::for_path(folder))
-}
-
-fn save_last_open_folder(folder: &std::path::Path) {
-    let config = glib::user_config_dir().join("pivra");
-    if let Err(error) = std::fs::create_dir_all(&config).and_then(|_| {
-        std::fs::write(
-            config.join("last-open-dir.conf"),
-            folder.as_os_str().as_encoded_bytes(),
-        )
-    }) {
-        eprintln!("Pivra: could not save last open folder: {error}");
-    }
 }
 
 fn update_title(window: &adw::ApplicationWindow, title: &adw::WindowTitle, context: &FileContext) {

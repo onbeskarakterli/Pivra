@@ -631,7 +631,7 @@ pub(super) fn build(app: &adw::Application, settings: &Settings, file: Option<Op
         viewer_row.append(view.information_widget());
         viewport.prepend(&viewer_row);
         let info_button = gtk::ToggleButton::builder()
-            .icon_name("dialog-information-symbolic")
+            .icon_name("help-about-symbolic")
             .tooltip_text("Media information (I)")
             .build();
         info_button.set_widget_name("media-information-button");

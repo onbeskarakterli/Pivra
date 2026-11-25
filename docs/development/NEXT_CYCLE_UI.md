@@ -38,7 +38,8 @@ renderer, shaders and XWayland workaround are unchanged.
 ## Photo minimap
 
 A small bottom-right overlay appears only when part of the photo is outside the
-viewport. It shares the existing texture and Transform; the outline represents
+viewport, bounded to 280×220 logical pixels with the source aspect ratio.
+It shares the existing texture and Transform; the outline represents
 the visible source rectangle. Click/drag pans through the existing paintable.
 Zoom, pan, resize and selection update it via the existing frame clock, without
 starting a continuous animation clock, another decoder or a pixel copy.
@@ -101,3 +102,31 @@ These are controlled photo textures and real GTK layout/rendering, not native
 Glycin or physical GNOME visual acceptance. Physical GNOME screenshots/interaction
 remain **NOT TESTED**, pending user confirmation. No full regression matrix or
 packaging checks were run. Version 0.2.7, GPU code and XWayland workaround unchanged.
+
+## Larger minimap and usable viewport
+
+The user subsequently confirmed empty-window centering, Fit centering and the
+bounded minimap layout on physical GNOME. This is user-reported acceptance;
+the earlier Codex limitations above remain historical test records.
+
+The minimap cap is now 280×220 logical pixels (portrait 1:2: 110×220), reduced
+proportionally when space is limited. Placement uses real GTK allocations and
+16 px clearance, not scrollbar thickness assumptions. The current photo viewer
+uses Transform panning, not a ScrolledWindow. Its thumbnail strip is a separate
+bottom overlay with External scrollbar policy. Visible strip bounds and visible,
+mapped scrollbar bounds in the image overlay are excluded from usable space;
+hidden obstacles release that space. Only overlay siblings/scroller bars are
+inspected, without walking thumbnail cells or starting a new frame clock.
+The image transform, viewport indicator coordinates, shared texture, opacity,
+thin outline and click/drag behavior are unchanged.
+
+Validation: `cargo fmt --all -- --check`, `cargo check --locked` and both focused
+Xvfb/xfwm4 modes (`--development layout`, `--development minimap`) PASS. The layout
+gate uses real GTK horizontal/vertical scrollbars of changing thickness, a smaller
+window and the visible/resized/hidden thumbnail strip, requiring at least 16 px
+clearance from actual bounds. For example, after resize: horizontal bar y=409,
+vertical bar x=648, map `(522,173,110,220)` gives 16 px to both. Existing pan,
+texture sharing, Fit/video/slideshow suppression, resize and fullscreen checks
+remain passing. Photo pixels are controlled, not native decoder evidence.
+Physical GNOME acceptance of this larger minimap/clearance change remains pending.
+No full regression matrix, packaging or release work was performed.

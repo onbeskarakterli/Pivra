@@ -336,7 +336,7 @@ pub(super) fn layout(app: &adw::Application) {
         "portrait Fit center: {photo_error:?}"
     );
     assert!(
-        map.width() <= 180 && map.height() <= 140,
+        map.width() == 110 && map.height() == 220,
         "bounded minimap: {b:?}"
     );
     assert!(
@@ -344,10 +344,88 @@ pub(super) fn layout(app: &adw::Application) {
         "portrait minimap aspect ratio: {b:?}"
     );
     assert!(
-        (picture.width() as f32 - b.x() - b.width() - 12.).abs() <= 1.
-            && (picture.height() as f32 - b.y() - b.height() - 12.).abs() <= 1.,
+        (picture.width() as f32 - b.x() - b.width() - 16.).abs() <= 1.
+            && (picture.height() as f32 - b.y() - b.height() - 16.).abs() <= 1.,
         "bottom-right minimap margins: {b:?}"
     );
+    // Controlled UI obstacles, using real GTK scrollbar allocations. These are
+    // not claims that production photo panning creates ScrolledWindow bars.
+    let overlay = picture
+        .parent()
+        .unwrap()
+        .downcast::<gtk::Overlay>()
+        .unwrap();
+    let adjustment = gtk::Adjustment::new(0., 0., 1000., 1., 50., 100.);
+    let horizontal = gtk::Scrollbar::new(gtk::Orientation::Horizontal, Some(&adjustment));
+    horizontal.set_valign(gtk::Align::End);
+    let vertical = gtk::Scrollbar::new(gtk::Orientation::Vertical, Some(&adjustment));
+    vertical.set_halign(gtk::Align::End);
+    for bar in [&horizontal, &vertical] {
+        overlay.add_overlay(bar);
+        overlay.set_measure_overlay(bar, false);
+    }
+    let clearance = || {
+        let b = map.compute_bounds(&picture).unwrap();
+        let h = horizontal.compute_bounds(&picture).unwrap();
+        let v = vertical.compute_bounds(&picture).unwrap();
+        b.x() >= 16.
+            && b.y() >= 16.
+            && b.x() + b.width() <= v.x() - 16.
+            && b.y() + b.height() <= h.y() - 16.
+            && b.width() <= 280.
+            && b.height() <= 220.
+    };
+    wait("allocated scrollbar clearance", || {
+        horizontal.is_mapped() && vertical.is_mapped() && clearance()
+    });
+    horizontal.set_height_request(34);
+    vertical.set_width_request(42);
+    wait("changed scrollbar thickness clearance", || {
+        horizontal.height() >= 34 && vertical.width() >= 42 && clearance()
+    });
+    let old_size = (picture.width(), picture.height());
+    window.set_default_size(700, 500);
+    wait("smaller viewport scrollbar clearance", || {
+        picture.width() < old_size.0 && picture.height() < old_size.1 && clearance()
+    });
+    eprintln!(
+        "LAYOUT scrollbar clearance: map={:?} horizontal={:?} vertical={:?}",
+        map.compute_bounds(&picture).unwrap(),
+        horizontal.compute_bounds(&picture).unwrap(),
+        vertical.compute_bounds(&picture).unwrap()
+    );
+    overlay.remove_overlay(&horizontal);
+    overlay.remove_overlay(&vertical);
+    let strip = widget(&window, "thumbnail-strip");
+    // Force only visibility/allocation for this layout test, not provider success.
+    strip.set_visible(true);
+    let above_strip = || {
+        let b = map.compute_bounds(&picture).unwrap();
+        let s = strip.compute_bounds(&picture).unwrap();
+        strip.is_mapped() && b.y() >= 16. && b.y() + b.height() <= s.y() - 16.
+    };
+    wait("thumbnail strip clearance", above_strip);
+    let old_height = strip.compute_bounds(&picture).unwrap().height();
+    strip.set_height_request(190);
+    wait("resized thumbnail strip clearance", || {
+        // GTK CSS/borders can make allocation differ from height_request.
+        // Require a larger real allocation and the same strict 16 px gap.
+        strip
+            .compute_bounds(&picture)
+            .is_some_and(|b| b.height() > old_height)
+            && above_strip()
+    });
+    eprintln!(
+        "LAYOUT strip clearance: map={:?} strip={:?}",
+        map.compute_bounds(&picture).unwrap(),
+        strip.compute_bounds(&picture).unwrap()
+    );
+    strip.set_visible(false);
+    wait("hidden obstacles release usable area", || {
+        let b = map.compute_bounds(&picture).unwrap();
+        (picture.height() as f32 - b.y() - b.height() - 16.).abs() <= 1.
+            && (picture.width() as f32 - b.x() - b.width() - 16.).abs() <= 1.
+    });
     // Closing the sidebar must give all space back, including after resize.
     key(&window, gtk::gdk::Key::i);
     let revealer = panel.downcast_ref::<gtk::Revealer>().unwrap();

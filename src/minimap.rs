@@ -40,8 +40,8 @@ impl Map {
         root.set_vexpand(false);
         root.set_halign(gtk::Align::End);
         root.set_valign(gtk::Align::End);
-        root.set_margin_bottom(12);
-        root.set_margin_end(12);
+        root.set_margin_bottom(16);
+        root.set_margin_end(16);
         root.set_opacity(0.88);
         root.set_tooltip_text(Some("Click or drag to pan"));
         root.set_visible(false);
@@ -182,6 +182,82 @@ impl Map {
         self.disconnect();
         self.hide();
     }
+    /// Placement uses allocated UI bounds only; image transforms still use the
+    /// full Picture viewport for both the indicator and interactive panning.
+    fn place(&self, picture: &gtk::Picture, image: (f64, f64)) -> bool {
+        let Some(parent) = picture.parent() else {
+            return false;
+        };
+        let Some(photo) = picture.compute_bounds(&parent) else {
+            return false;
+        };
+        let (width, height) = (picture.width() as f64, picture.height() as f64);
+        let (mut left, mut top, mut right, mut bottom) =
+            (16_f64, 16_f64, width - 16., height - 16.);
+        let mut reserve = |widget: &gtk::Widget, vertical: bool| {
+            if !widget.is_visible() || !widget.is_mapped() {
+                return;
+            }
+            let Some(b) = widget.compute_bounds(picture) else {
+                return;
+            };
+            let (x, y, w, h) = (
+                b.x() as f64,
+                b.y() as f64,
+                b.width() as f64,
+                b.height() as f64,
+            );
+            if w <= 0. || h <= 0. || x >= width || y >= height || x + w <= 0. || y + h <= 0. {
+                return;
+            }
+            if vertical {
+                if x + w / 2. < width / 2. {
+                    left = left.max(x + w + 16.);
+                } else {
+                    right = right.min(x - 16.);
+                }
+            } else if y + h / 2. < height / 2. {
+                top = top.max(y + h + 16.);
+            } else {
+                bottom = bottom.min(y - 16.);
+            }
+        };
+        // Inspect siblings/scroller bars, not every thumbnail cell on each frame.
+        // Thumbnail scrolling has no internal bar (External policy), but its
+        // visible floating panel also occupies the bottom of the image viewport.
+        let mut child = parent.first_child();
+        while let Some(widget) = child {
+            child = widget.next_sibling();
+            if let Some(bar) = widget.downcast_ref::<gtk::Scrollbar>() {
+                reserve(&widget, bar.orientation() == gtk::Orientation::Vertical);
+            }
+            if let Some(scroll) = widget.downcast_ref::<gtk::ScrolledWindow>() {
+                reserve(scroll.hscrollbar().upcast_ref(), false);
+                reserve(scroll.vscrollbar().upcast_ref(), true);
+            }
+            if widget.widget_name() == "thumbnail-strip" {
+                reserve(&widget, false);
+            }
+        }
+        let available = ((right - left).min(280.), (bottom - top).min(220.));
+        if available.0 < 1. || available.1 < 1. {
+            return false;
+        }
+        let scale = (available.0 / image.0).min(available.1 / image.1);
+        self.root.set_size_request(
+            (image.0 * scale).floor().max(1.) as i32,
+            (image.1 * scale).floor().max(1.) as i32,
+        );
+        self.root
+            .set_margin_start((photo.x() as f64 + left).ceil() as i32);
+        self.root
+            .set_margin_top((photo.y() as f64 + top).ceil() as i32);
+        self.root
+            .set_margin_end((parent.width() as f64 - photo.x() as f64 - right).ceil() as i32);
+        self.root
+            .set_margin_bottom((parent.height() as f64 - photo.y() as f64 - bottom).ceil() as i32);
+        true
+    }
     fn refresh(&self) {
         if self.closed.get() || self.slideshow.get() || self.phase.get() != Phase::FullReady {
             self.hide();
@@ -202,16 +278,6 @@ impl Map {
             .unwrap_or(ViewMode::Actual);
         let viewport = (picture.width() as f64, picture.height() as f64);
         let image = (texture.width() as f64, texture.height() as f64);
-        let available = ((viewport.0 - 24.).min(180.), (viewport.1 - 24.).min(140.));
-        if available.0 < 1. || available.1 < 1. {
-            self.hide();
-            return;
-        }
-        let scale = (available.0 / image.0).min(available.1 / image.1);
-        self.root.set_size_request(
-            (image.0 * scale).round().max(1.) as i32,
-            (image.1 * scale).round().max(1.) as i32,
-        );
         let region = self
             .transform
             .borrow_mut()
@@ -221,6 +287,10 @@ impl Map {
             self.hide();
             return;
         };
+        if !self.place(&picture, image) {
+            self.hide();
+            return;
+        }
         let changed = self.region.replace(Some(region)) != Some(region);
         self.size.set((texture.width(), texture.height()));
         let paintable = texture.upcast_ref::<gdk::Paintable>();

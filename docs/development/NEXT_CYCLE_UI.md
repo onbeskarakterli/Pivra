@@ -218,8 +218,9 @@ pixels are controlled. No full regression, release build or packaging was run.
   existing retarget path. Filesystem errors use the existing toast mechanism.
 - The thumbnail controls contain All/Photos/Videos. This is a window-local
   projection: the main media and full keyboard catalog stay unchanged. The
-  selected thumbnail is included even when it does not match, as the predictable
-  current-media exception. Natural order and original catalog indices remain;
+  active thumbnail follows the same type filter as every other thumbnail; an
+  excluded active item leaves no visible selection. Natural order and original
+  catalog indices remain;
   cells/textures are retained under the existing 64-entry/16 MiB policy. Hidden
   types do not start new thumbnail jobs. Filter state survives Open, Rename and
   folder reconciliation without a filter-triggered rescan.
@@ -246,3 +247,12 @@ Final rename review: O_PATH directory/source handles inspect identity without
 opening an unexpected FIFO/device stream. Deferred GPU→stock recovery uses the
 current video path after an F2 rename, without changing rendering or routing.
 The two filesystem safety tests were repeated for the descriptor change; PASS.
+
+Thumbnail filter correction: removed the former `selected || type_matches`
+exception. The viewport/catalog selection stays intact, but an excluded current
+thumbnail is hidden like all other non-matching cells. Hidden selected entries
+also cannot anchor strip alignment or receive selected-item hidden warming.
+Formatting, locked compilation and the single focused
+`media_filter::tests::filtering_active_photo_or_video_never_changes_viewer_selection`
+regression PASS (both photo→Videos and video→Photos, All restore/natural order).
+Physical GNOME visual confirmation remains pending.

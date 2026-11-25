@@ -128,7 +128,7 @@ pub(crate) fn install(
     let thumbnails = ThumbnailStrip::new(items, strip.clone());
     let filter = gtk::DropDown::from_strings(&["All", "Photos", "Videos"]);
     filter.set_widget_name("thumbnail-media-filter");
-    filter.set_tooltip_text(Some("Thumbnail media filter (current media stays visible)"));
+    filter.set_tooltip_text(Some("Thumbnail media filter"));
     filter.set_enable_search(false);
     controls.prepend(&filter);
     let filtered = thumbnails.clone();

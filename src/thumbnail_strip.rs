@@ -508,10 +508,9 @@ impl ThumbnailStrip {
 }
 impl Inner {
     fn included(&self, entry: &Entry) -> bool {
-        self.filter.get().includes(
-            pivra::discovery::candidate_kind(&entry.path),
-            Some(entry.index.get()) == self.selected.get(),
-        )
+        self.filter
+            .get()
+            .includes(pivra::discovery::candidate_kind(&entry.path))
     }
     // Prime GNOME/Freedesktop disk caches after folder discovery even when
     // the overlay is hidden. Bound to a small initial batch and one worker;
@@ -553,7 +552,10 @@ impl Inner {
         // Prioritize the selected image, then the neighbors actually expected
         // in the initial viewport, not unrelated images at the folder start.
         if let Some(n) = selected {
-            if entries[n].phase == Phase::Pending && !crate::raw_loader::is_dng(&entries[n].path) {
+            if self.included(&entries[n])
+                && entries[n].phase == Phase::Pending
+                && !crate::raw_loader::is_dng(&entries[n].path)
+            {
                 paths.push(entries[n].path.clone());
             }
         }
@@ -1074,7 +1076,7 @@ impl Inner {
         if let Some(index) = self.initial.get() {
             if let Some(bounds) = entries
                 .iter()
-                .find(|e| e.index.get() == index)
+                .find(|e| e.index.get() == index && self.included(e))
                 .and_then(|e| e.widgets.as_ref())
                 .and_then(|w| w.button.compute_bounds(&self.items))
             {

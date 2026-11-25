@@ -168,3 +168,15 @@ existing size caps changed: source aspect ratio, viewport/scrollbar constraints,
 compilation and focused Xvfb `layout`, `minimap` and `navigation` gates PASS,
 including smaller-viewport fitting. Physical GNOME confirmation of the new size
 is pending. No full regression suite, release build or packaging was run.
+
+## Ctrl+O
+
+The application accelerator `<Control>o` activates the existing window-local
+`win.choose-media` action, sharing the Open button's chooser/cancel/completion
+path in empty and active windows. No new loading state or viewer is created.
+Formatting, locked compilation and focused Xvfb `--development shortcuts` PASS:
+real keys open GTK's local chooser, Escape preserves empty/active state, and
+selecting a file loads into the original window. The test uses SDK FileChooser
+schemas compiled in a temporary directory with a memory GSettings backend.
+GNOME/portal-specific physical interaction remains pending; controlled photo
+pixels do not claim secure decoder acceptance.

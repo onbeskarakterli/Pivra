@@ -380,7 +380,7 @@ pub(super) fn build(app: &adw::Application, settings: &Settings, file: Option<Op
     pivra::settings::window_state::install(&window, settings);
     // Always keep Open at the far left of the header bar, including empty windows.
     let open_button = gtk::Button::from_icon_name("document-open-symbolic");
-    open_button.set_tooltip_text(Some("Open media"));
+    open_button.set_tooltip_text(Some("Open media (Ctrl+O)"));
     open_button.set_widget_name("open-media-button");
     open_button.set_action_name(Some("win.choose-media"));
     header.pack_start(&open_button);
@@ -1028,6 +1028,7 @@ pub(super) fn build(app: &adw::Application, settings: &Settings, file: Option<Op
             });
         });
         window.add_action(&choose);
+        app.set_accels_for_action("win.choose-media", &["<Control>o"]);
         let destroy_token = dialog_token.clone();
         window.connect_destroy(move |_| {
             if let Some(token) = destroy_token.borrow_mut().take() {

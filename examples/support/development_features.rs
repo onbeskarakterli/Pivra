@@ -692,3 +692,100 @@ pub(super) fn navigation(app: &adw::Application) {
         "PASS navigation/minimap: complete strip/edge/controls/arrows masked, hover cannot override, effective visibility restores, pinned/enabled files unchanged, repeated mode/selection/video/slideshow transitions, zero overlapping frames/remaps"
     );
 }
+
+fn native_key(keys: &str) {
+    assert!(
+        std::process::Command::new("xdotool")
+            .args(["key", "--clearmodifiers", keys])
+            .status()
+            .unwrap()
+            .success()
+    );
+}
+fn chooser(window: &adw::ApplicationWindow) -> Option<gtk::Window> {
+    gtk::Window::list_toplevels()
+        .into_iter()
+        .filter_map(|w| w.downcast::<gtk::Window>().ok())
+        .find(|w| w.is_visible() && w.transient_for().as_ref() == Some(window.upcast_ref()))
+}
+pub(super) fn shortcuts(app: &adw::Application) {
+    let dir = tempfile::tempdir().unwrap();
+    let file = dir.path().join("1.png");
+    std::fs::copy("tests/fixtures/images/wide.png", &file).unwrap();
+    window::build(app, &pivra::settings::Settings::default(), None);
+    let window = app
+        .active_window()
+        .unwrap()
+        .downcast::<adw::ApplicationWindow>()
+        .unwrap();
+    let choose = window.lookup_action("choose-media").unwrap();
+    wait("empty window keyboard focus", || window.is_active());
+    native_key("ctrl+o");
+    wait("Ctrl+O opens existing chooser from empty window", || {
+        !choose.is_enabled() && chooser(&window).is_some()
+    });
+    wait("chooser keyboard focus", || {
+        chooser(&window).unwrap().is_active()
+    });
+    native_key("Escape");
+    wait("empty chooser cancel", || choose.is_enabled());
+    assert_eq!(app.windows().len(), 1);
+    assert!(has_text(&window, "Open a photo or video to start."));
+    window.present();
+    wait("keyboard focus after cancel", || window.is_active());
+    native_key("ctrl+o");
+    wait("empty chooser reopened", || chooser(&window).is_some());
+    let dialog = chooser(&window).unwrap();
+    wait("chooser input focus", || dialog.is_active());
+    native_key("ctrl+l");
+    wait("chooser location entry", || {
+        gtk::prelude::GtkWindowExt::focus(&dialog).is_some_and(|w| w.is::<gtk::Editable>())
+    });
+    assert!(
+        std::process::Command::new("xdotool")
+            .args([
+                "type",
+                "--clearmodifiers",
+                "--delay",
+                "0",
+                "--",
+                file.to_str().unwrap()
+            ])
+            .status()
+            .unwrap()
+            .success()
+    );
+    native_key("Return");
+    wait("chooser accepted in original window", || {
+        choose.is_enabled() && selected(&window, "1.png")
+    });
+    photo_presented(&window);
+    assert_eq!(app.windows().len(), 1);
+    let picture = widgets(window.upcast_ref())
+        .into_iter()
+        .filter_map(|w| w.downcast::<gtk::Overlay>().ok())
+        .find_map(|o| o.child().and_downcast::<gtk::Picture>())
+        .unwrap();
+    let painted = picture.paintable();
+    let mode = window.lookup_action("image-mode").unwrap().state();
+    let title = window.title();
+    window.present();
+    wait("active viewer keyboard focus", || window.is_active());
+    native_key("ctrl+o");
+    wait("Ctrl+O opens chooser from active viewer", || {
+        !choose.is_enabled() && chooser(&window).is_some()
+    });
+    wait("active chooser keyboard focus", || {
+        chooser(&window).unwrap().is_active()
+    });
+    native_key("Escape");
+    wait("viewer chooser cancel", || choose.is_enabled());
+    assert_eq!(picture.paintable(), painted);
+    assert_eq!(window.lookup_action("image-mode").unwrap().state(), mode);
+    assert_eq!(window.title(), title);
+    assert_eq!(app.windows().len(), 1);
+    window.close();
+    eprintln!(
+        "PASS Ctrl+O real X11 keys and GTK chooser: empty/active, cancel unchanged, selected file reuses window"
+    );
+}

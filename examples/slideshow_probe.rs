@@ -389,6 +389,10 @@ fn main() {
         development_features::navigation(&app);
         return;
     }
+    if std::env::args().any(|s| s == "--development-shortcuts") {
+        development_features::shortcuts(&app);
+        return;
+    }
     let dir = tempfile::tempdir().unwrap();
     for (name, source) in [
         ("1.png", "tests/fixtures/images/wide.png"),

@@ -12,6 +12,8 @@ mod information_panel;
 mod minimap;
 #[path = "photo_transition.rs"]
 mod photo_transition;
+#[path = "image_view/presentation.rs"]
+mod presentation;
 #[path = "thumbnail_overlay.rs"]
 pub(crate) mod thumbnail_overlay;
 #[path = "video_controls.rs"]
@@ -21,6 +23,8 @@ mod video_inhibit;
 use adw::prelude::*;
 use gtk::{gio, glib};
 use pivra::viewing::{Resampling, Transform, ViewMode};
+use presentation::manual;
+pub(super) use presentation::{present_animation_frame, present_filtered};
 use std::{
     cell::{Cell, RefCell},
     path::PathBuf,
@@ -1513,87 +1517,6 @@ pub(super) fn install_interaction(
     drag.connect_cancel(move |_, _| last.set(None));
     picture.add_controller(drag);
 }
-fn manual(
-    picture: &gtk::Picture,
-    texture: &gtk::gdk::Texture,
-    transform: Rc<RefCell<Transform>>,
-    mode: ViewMode,
-    action: &gio::SimpleAction,
-    filter: Rc<Cell<Resampling>>,
-) {
-    picture.set_overflow(gtk::Overflow::Hidden);
-    picture.set_content_fit(gtk::ContentFit::Fill);
-    if let Some(current) = picture
-        .paintable()
-        .and_then(|p| p.downcast::<actual_paintable::ActualPaintable>().ok())
-        .filter(|p| p.has_transform(&transform) && p.has_texture(texture))
-    {
-        current.invalidate_contents();
-    } else {
-        picture.set_paintable(Some(&actual_paintable::ActualPaintable::transformed(
-            texture, transform, mode, filter,
-        )));
-    }
-    action.set_state(&"manual".to_variant());
-}
-
-/// Keep a single transformed paintable for all frames of one animation.
-pub(super) fn present_animation_frame(
-    picture: &gtk::Picture,
-    texture: &gtk::gdk::Texture,
-    id: &str,
-    transform: Rc<RefCell<Transform>>,
-    filter: Rc<Cell<Resampling>>,
-) {
-    let mode = ViewMode::from_id(id).unwrap_or(ViewMode::Actual);
-    if let Some(current) = picture
-        .paintable()
-        .and_then(|p| p.downcast::<actual_paintable::ActualPaintable>().ok())
-        .filter(|p| p.has_transform(&transform))
-    {
-        // Manual zoom lives in Transform, not in the incoming frame texture.
-        current.set_mode(mode);
-        current.update_texture(texture);
-        return;
-    }
-    picture.set_overflow(gtk::Overflow::Hidden);
-    picture.set_content_fit(gtk::ContentFit::Fill);
-    picture.set_paintable(Some(&actual_paintable::ActualPaintable::transformed(
-        texture, transform, mode, filter,
-    )));
-}
-
-pub(super) fn present_filtered(
-    picture: &gtk::Picture,
-    texture: Option<&gtk::gdk::Texture>,
-    id: &str,
-    transform: Rc<RefCell<Transform>>,
-    filter: Rc<Cell<Resampling>>,
-) {
-    let mode = ViewMode::from_id(id).unwrap_or(ViewMode::Actual);
-    if id != "manual" && filter.get() == Resampling::Smooth && mode != ViewMode::Actual {
-        present(picture, texture, mode);
-        return;
-    }
-    let Some(texture) = texture else {
-        return;
-    };
-    if let Some(current) = picture
-        .paintable()
-        .and_then(|p| p.downcast::<actual_paintable::ActualPaintable>().ok())
-        .filter(|p| p.has_transform(&transform) && p.has_texture(texture))
-    {
-        current.set_mode(mode);
-        current.invalidate_contents();
-        return;
-    }
-    picture.set_overflow(gtk::Overflow::Hidden);
-    picture.set_content_fit(gtk::ContentFit::Fill);
-    picture.set_paintable(Some(&actual_paintable::ActualPaintable::transformed(
-        texture, transform, mode, filter,
-    )));
-}
-
 pub(super) fn present(picture: &gtk::Picture, texture: Option<&gtk::gdk::Texture>, mode: ViewMode) {
     picture.set_overflow(gtk::Overflow::Hidden);
     match mode {
@@ -1611,7 +1534,6 @@ pub(super) fn present(picture: &gtk::Picture, texture: Option<&gtk::gdk::Texture
         }
     }
 }
-
 // Compatibility entry points used by standalone PIV-09 regression examples.
 #[allow(dead_code)]
 pub(super) fn build(window: &adw::ApplicationWindow, path: PathBuf) -> gtk::Overlay {

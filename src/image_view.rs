@@ -878,6 +878,21 @@ impl ImageView {
             self.mode_action.activate(Some(&mode));
         }
     }
+    #[allow(dead_code, reason = "Standalone view probes omit rename actions")]
+    pub(super) fn media_renamed(&self, old: &std::path::Path, new: &std::path::Path) {
+        self.information.renamed(old, new);
+        self.retarget_pending(old, new);
+        if self.video_path.borrow().as_deref() == Some(old) {
+            self.video_path.replace(Some(new.to_owned()));
+        }
+        if self.requested.borrow().as_deref() == Some(old) {
+            self.requested.replace(Some(new.to_owned()));
+        }
+        let mut state = self.prefetch.borrow_mut();
+        if state.current_path.as_deref() == Some(old) {
+            state.current_path = Some(new.to_owned());
+        }
+    }
 
     #[allow(dead_code)] // Probe diagnostics, not a user-visible debug indicator.
     pub(super) fn phase(&self) -> Phase {

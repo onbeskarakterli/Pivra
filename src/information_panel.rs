@@ -93,6 +93,14 @@ impl Panel {
         ]);
         self.refresh();
     }
+    pub fn renamed(self: &Rc<Self>, old: &std::path::Path, new: &std::path::Path) {
+        if self.path.borrow().as_deref() == Some(old) {
+            self.epoch.set(self.epoch.get().wrapping_add(1));
+            self.path.replace(Some(new.to_owned()));
+            self.file.borrow_mut().clear();
+            self.refresh();
+        }
+    }
     fn render(&self) {
         if !self.root.reveals_child() || self.closed.get() {
             return;

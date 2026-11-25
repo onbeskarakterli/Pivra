@@ -38,6 +38,24 @@ impl MediaCollection {
             self.items[index] = MediaItem::new(new, self.items[index].kind());
         }
     }
+    /// Reconcile an explicit rename immediately; preserve selection and natural order.
+    pub fn renamed(&mut self, old: &std::path::Path, new: &std::path::Path) {
+        let selected = self.current().map(|i| {
+            if i.path() == old {
+                new.to_owned()
+            } else {
+                i.path().to_owned()
+            }
+        });
+        for item in &mut self.items {
+            if item.path() == old {
+                *item = MediaItem::new(new, item.kind());
+            }
+        }
+        self.items
+            .sort_by(|a, b| crate::natural::compare_paths(a.path(), b.path()));
+        self.selected = selected.and_then(|p| self.items.iter().position(|i| i.path() == p));
+    }
 
     /// Next, then previous supported JPEG/PNG; video/unsupported candidates are skipped.
     pub fn photo_neighbors(&self) -> Vec<std::path::PathBuf> {
@@ -130,6 +148,15 @@ mod tests {
 
     fn item(path: &str) -> MediaItem {
         MediaItem::new(path, MediaKind::Image)
+    }
+    #[test]
+    fn explicit_rename_resorts_without_losing_selection() {
+        let mut c = MediaCollection::new(vec![item("1.png"), item("2.png"), item("10.png")]);
+        c.select(1);
+        c.renamed("2.png".as_ref(), "20.png".as_ref());
+        assert_eq!(c.selected_index(), Some(2));
+        assert_eq!(c.current().unwrap().path(), std::path::Path::new("20.png"));
+        assert_eq!(c.items()[1].path(), std::path::Path::new("10.png"));
     }
 
     #[test]

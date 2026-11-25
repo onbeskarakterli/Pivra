@@ -17,6 +17,8 @@ use std::{
 
 #[path = "fullscreen.rs"]
 pub(super) mod fullscreen;
+#[path = "rename_dialog.rs"]
+mod rename_dialog;
 #[path = "slideshow_window.rs"]
 pub(super) mod slideshow;
 #[path = "toolbar.rs"]
@@ -49,6 +51,7 @@ fn show_latest_toast(
 }
 
 struct FileContext {
+    own_rename: Option<(PathBuf, PathBuf)>,
     collection: MediaCollection,
     suffix: Option<String>,
     warning: bool,
@@ -386,6 +389,7 @@ pub(super) fn build(app: &adw::Application, settings: &Settings, file: Option<Op
     header.pack_start(&open_button);
     {
         let context = Rc::new(RefCell::new(FileContext {
+            own_rename: None,
             collection: MediaCollection::new(
                 file.iter().map(|opened| opened.item.clone()).collect(),
             ),
@@ -608,6 +612,16 @@ pub(super) fn build(app: &adw::Application, settings: &Settings, file: Option<Op
         install_navigation_arrows(view.widget());
         let toast_overlay = adw::ToastOverlay::new();
         let current_delete_toast = Rc::new(RefCell::new(None::<adw::Toast>));
+        rename_dialog::install(
+            &window,
+            &title,
+            context.clone(),
+            view.clone(),
+            &banner,
+            folder_watch.clone(),
+            &toast_overlay,
+            current_delete_toast.clone(),
+        );
         toast_overlay.set_child(Some(view.widget()));
         let viewer_row = gtk::Box::new(gtk::Orientation::Horizontal, 0);
         toast_overlay.set_hexpand(true);
@@ -903,6 +917,12 @@ pub(super) fn build(app: &adw::Application, settings: &Settings, file: Option<Op
             if key == gdk::Key::Delete {
                 if let Some(window) = weak_window.upgrade() {
                     gio::prelude::ActionGroupExt::activate_action(&window, "trash-selected", None);
+                }
+                return glib::Propagation::Stop;
+            }
+            if key == gdk::Key::F2 {
+                if let Some(window) = weak_window.upgrade() {
+                    gio::prelude::ActionGroupExt::activate_action(&window, "rename-media", None);
                 }
                 return glib::Propagation::Stop;
             }
@@ -1258,6 +1278,7 @@ impl FolderWatch {
             let mut context = state.context.borrow_mut();
             match result {
                 Ok((report, links)) => {
+                    context.own_rename = None;
                     state.watch_links(links);
                     let warnings = report.issues.len() + usize::from(state.monitor.borrow().is_none());
                     for issue in &report.issues {
@@ -1372,6 +1393,12 @@ fn watch(
                 state.view.invalidate_cache_paths(&affected);
                 let mut retarget = None;
                 let mut context = state.context.borrow_mut();
+                let own_rename = context.own_rename.as_ref().is_some_and(|(old, new)| {
+                    path.as_ref() == Some(old) && other.and_then(|f| f.path()).as_ref() == Some(new)
+                });
+                if own_rename {
+                    context.own_rename = None;
+                }
                 let selected = context
                     .collection
                     .current()
@@ -1400,6 +1427,7 @@ fn watch(
                         | gio::FileMonitorEvent::Moved
                 );
                 if changed
+                    && !own_rename
                     && selected.as_ref().is_some_and(|selected| {
                         path.as_ref() == Some(selected)
                             || other.and_then(|file| file.path()).as_ref() == Some(selected)

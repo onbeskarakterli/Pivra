@@ -13,6 +13,10 @@ use std::{
     path::PathBuf,
     rc::Rc,
 };
+#[path = "thumbnail_strip/sizing.rs"]
+mod sizing;
+use sizing::{display_cost, display_size};
+
 const BUDGET: usize = 16 * 1024 * 1024;
 const LIMIT: usize = 64;
 #[cfg(test)]
@@ -1578,24 +1582,6 @@ fn display_texture(texture: &gdk::Texture, scale: i32) -> Result<gdk::Texture, S
     thumbnail_pixels::prepare(
         texture,
         display_size(texture.width(), texture.height(), scale),
-    )
-}
-
-fn display_cost(width: i32, height: i32) -> Option<usize> {
-    usize::try_from(width)
-        .ok()?
-        .checked_mul(usize::try_from(height).ok()?)?
-        .checked_mul(8)
-}
-
-fn display_size(width: i32, height: i32, scale: i32) -> (i32, i32) {
-    let scale = scale.clamp(1, 2);
-    let ratio = (f64::from(CELL_WIDTH * scale) / f64::from(width))
-        .min(f64::from(CELL_HEIGHT * scale) / f64::from(height))
-        .min(1.);
-    (
-        (f64::from(width) * ratio).floor().max(1.) as i32,
-        (f64::from(height) * ratio).floor().max(1.) as i32,
     )
 }
 

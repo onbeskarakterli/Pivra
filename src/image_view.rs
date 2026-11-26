@@ -16,6 +16,8 @@ mod minimap;
 mod photo_transition;
 #[path = "image_view/presentation.rs"]
 mod presentation;
+#[path = "image_view/presentation_trace.rs"]
+mod presentation_trace;
 #[path = "thumbnail_overlay.rs"]
 pub(crate) mod thumbnail_overlay;
 #[path = "video_controls.rs"]
@@ -47,6 +49,7 @@ pub(super) struct ImageView {
     overlay: gtk::Overlay,
     thumbnail_strip: thumbnail_overlay::ThumbnailStrip,
     picture: gtk::Picture,
+    frame_trace: Option<Rc<presentation_trace::Observer>>,
     video: gtk::Picture,
     video_stream: Rc<RefCell<Option<gtk::MediaFile>>>,
     video_surface: Rc<RefCell<Option<gtk::gdk::Surface>>>,
@@ -354,6 +357,7 @@ impl ImageView {
         overlay.add_overlay(minimap.widget());
         overlay.set_measure_overlay(minimap.widget(), false);
         let view = Self {
+            frame_trace: presentation_trace::Observer::new(&picture, window),
             video_inhibit: video_inhibit::VideoInhibit::new(window),
             minimap,
             information: information_panel::Panel::new(),
@@ -1000,6 +1004,8 @@ impl ImageView {
         on_completion: impl FnOnce() + 'static,
         on_result: impl FnOnce(bool) + 'static,
     ) {
+        pivra::performance::media_event("image_requested", "foreground", &path);
+        let _dispatch = pivra::performance::Span::new("image_request_ui");
         self.information.select(Some(path.clone()));
         self.minimap.hide();
         self.transition.capture(
@@ -1021,6 +1027,8 @@ impl ImageView {
         let generation = self.animation_generation.clone();
         let expected = generation.get().wrapping_add(1);
         generation.set(expected);
+        let frame_trace = self.frame_trace.clone();
+        let ready_path = path.clone();
         let animation_path = path.clone();
         let animation_picture = self.picture.downgrade();
         let animation_texture = self.texture.clone();
@@ -1158,6 +1166,14 @@ impl ImageView {
                             transform.clone(),
                             filter.clone(),
                         );
+                        pivra::performance::media_event(
+                            "image_paintable_ready",
+                            "ready",
+                            &ready_path,
+                        );
+                        if let Some(trace) = &frame_trace {
+                            trace.ready(&ready_path);
+                        }
                         status.set_visible(false);
                         animation::start(
                             animation_path,
@@ -1209,7 +1225,9 @@ impl ImageView {
             move || {
                 prefetch.borrow_mut().admission(requested);
                 let loading = token.clone();
+                let waiting = pivra::performance::Span::new("image_worker_queue_wait");
                 let job = gio::spawn_blocking(move || {
+                    drop(waiting);
                     preload::fetch(&path, &loading, &cache, allow_cache, None)
                 });
                 glib::MainContext::default().spawn_local(async move {

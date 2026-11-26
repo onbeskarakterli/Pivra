@@ -7,6 +7,11 @@ use std::{
     time::Instant,
 };
 static ENABLED: OnceLock<bool> = OnceLock::new();
+/// A common process-local monotonic origin for correlating sparse diagnostics.
+pub fn monotonic_us() -> u128 {
+    static START: OnceLock<Instant> = OnceLock::new();
+    START.get_or_init(Instant::now).elapsed().as_micros()
+}
 static EVENTS: AtomicUsize = AtomicUsize::new(0);
 const LIMIT: usize = 4096;
 pub fn enabled() -> bool {
@@ -58,11 +63,25 @@ pub fn emit(event: &str, status: &'static str, elapsed_us: u128, value: u64) {
         .ok()
         .and_then(|s| cpu_ticks(&s));
     eprintln!(
-        "{{\"pivra_perf\":1,\"pid\":{},\"event\":\"{event}\",\"status\":\"{status}\",\"elapsed_us\":{elapsed_us},\"value\":{value},\"rss_bytes\":{},\"cpu_ticks\":{}}}",
+        "{{\"pivra_perf\":1,\"pid\":{},\"monotonic_us\":{},\"event\":\"{event}\",\"status\":\"{status}\",\"elapsed_us\":{elapsed_us},\"value\":{value},\"rss_bytes\":{},\"cpu_ticks\":{}}}",
         std::process::id(),
+        monotonic_us(),
         rss.map_or("null".into(), |v| v.to_string()),
         cpu.map_or("null".into(), |v| v.to_string())
     );
+}
+/// Path identity for correlating requests without logging filenames or URIs.
+pub fn media_event(event: &str, status: &'static str, path: &std::path::Path) {
+    if !enabled() {
+        return;
+    }
+    emit(event, status, 0, media_id(path));
+}
+pub fn media_id(path: &std::path::Path) -> u64 {
+    use std::hash::{Hash, Hasher};
+    let mut hash = std::hash::DefaultHasher::new();
+    path.hash(&mut hash);
+    hash.finish()
 }
 pub struct Span {
     start: Option<Instant>,

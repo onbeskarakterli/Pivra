@@ -71,6 +71,7 @@ impl FolderWatch {
                 Ok(monitor) => {
                     let weak = Rc::downgrade(self);
                     monitor.connect_changed(move |_, _, _, event| {
+                        pivra::performance::emit("folder_monitor_event", "symlink", 0, 0);
                         let Some(state) = weak.upgrade() else {
                             return;
                         };
@@ -133,7 +134,11 @@ impl FolderWatch {
         self.dirty.set(false);
         let directory = self.directory.clone();
         let cancelled = self.cancelled.clone();
+        pivra::performance::emit("folder_scan_submitted", "queued", 0, 0);
+        let waiting = pivra::performance::Span::new("folder_scan_queue_wait");
         let job = gio::spawn_blocking(move || {
+            drop(waiting);
+            let _timing = pivra::performance::Span::new("folder_scan_worker");
             discovery::scan_directory(&directory, &cancelled).map(|report| {
                 let mut links: Vec<_> = std::fs::read_dir(&directory)
                     .into_iter()
@@ -164,9 +169,13 @@ impl FolderWatch {
             let result = job.await.unwrap_or_else(|_| Err(std::io::Error::other("folder worker failed")));
             state.running.set(false);
             if state.cancelled.load(Ordering::Relaxed) { return; }
-            if state.dirty.get() { state.schedule(); return; }
+            if state.dirty.get() {
+                pivra::performance::emit("folder_scan_superseded", "dirty", 0, 0);
+                state.schedule(); return;
+            }
             let (Some(window), Some(title), Some(status)) =
                 (state.window.upgrade(), state.title.upgrade(), state.status.upgrade()) else { return; };
+            let _timing = pivra::performance::Span::new("folder_catalog_apply_ui");
             let mut context = state.context.borrow_mut();
             match result {
                 Ok((report, links)) => {
@@ -190,6 +199,7 @@ impl FolderWatch {
                         state.view.show_message("Selected media was removed or is inaccessible. Use arrow keys to continue.");
                         if let Some(banner) = state.banner.upgrade() { banner.set_reveal_child(false); }
                     }
+                    pivra::performance::emit("folder_catalog_populated", "ready", 0, context.collection.items().len() as u64);
                     state.view.set_neighbors(context.collection.photo_neighbors());
                     if catalog_changed {
                         update_thumbnail_catalog(&state.view, &context);
@@ -270,6 +280,7 @@ pub(super) fn watch(
         Ok(monitor) => {
             let weak = Rc::downgrade(&state);
             monitor.connect_changed(move |_, file, other, event| {
+                pivra::performance::emit("folder_monitor_event", "directory", 0, 0);
                 let Some(state) = weak.upgrade() else {
                     return;
                 };
@@ -355,6 +366,7 @@ pub(super) fn watch(
             return glib::ControlFlow::Break;
         }
         if !state.running.get() {
+            pivra::performance::emit("folder_periodic_reconcile", "existing_poll", 0, 0);
             state.schedule();
         }
         glib::ControlFlow::Continue

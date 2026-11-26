@@ -78,6 +78,8 @@ use std::time::{Duration, Instant};
 static CONTROLLED_LOADS: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(0);
 #[path = "support/development_features.rs"]
 mod development_features;
+#[path = "support/open_latency.rs"]
+mod open_latency;
 #[path = "support/opening.rs"]
 mod opening;
 #[path = "support/render_frame.rs"]
@@ -385,6 +387,15 @@ fn main() {
     }
     if std::env::args().any(|s| s == "--development-slideshow-click") {
         slideshow_click::run(&app);
+        return;
+    }
+    if std::env::args()
+        .any(|s| s == "--development-open-direct" || s == "--development-open-chooser")
+    {
+        open_latency::run(
+            &app,
+            std::env::args().any(|s| s == "--development-open-direct"),
+        );
         return;
     }
     if std::env::args().any(|s| s == "--development-reveal") {

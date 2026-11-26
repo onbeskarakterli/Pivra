@@ -6,6 +6,9 @@ use std::{
     rc::Rc,
 };
 
+#[path = "file_chooser/trace.rs"]
+mod trace;
+
 pub(super) fn set_dialogs_enabled(window: &adw::ApplicationWindow, enabled: bool) {
     for name in ["choose-media", "open-with"] {
         if let Some(action) = window
@@ -17,6 +20,7 @@ pub(super) fn set_dialogs_enabled(window: &adw::ApplicationWindow, enabled: bool
     }
 }
 pub(super) fn install(window: &adw::ApplicationWindow, app: &adw::Application) {
+    trace::observe_bus(app);
     let cached = Rc::new(RefCell::new(None::<gio::File>));
     let revision = Rc::new(Cell::new(0u64));
     let warm = gio::Cancellable::new();
@@ -49,6 +53,7 @@ pub(super) fn install(window: &adw::ApplicationWindow, app: &adw::Application) {
     }
     let dialog = gtk::FileDialog::new();
     dialog.set_title("Open media");
+    trace::created();
     let pending = Rc::new(RefCell::new(None::<gio::Cancellable>));
     let choose = gio::SimpleAction::new("choose-media", None);
     let weak = window.downgrade();
@@ -60,8 +65,12 @@ pub(super) fn install(window: &adw::ApplicationWindow, app: &adw::Application) {
         if tokens.borrow().is_some() {
             return;
         }
+        let trace = trace::Trace::begin(&window, dialog.is_modal());
+        trace::mark(&trace, "popup-dismiss-request");
         super::context_menu::dismiss(&window);
+        trace::mark(&trace, "popup-dismiss-returned");
         set_dialogs_enabled(&window, false);
+        trace::mark(&trace, "file-dialog-descriptor-reused");
         dialog.set_initial_folder(cached.borrow().as_ref());
         let cancel = gio::Cancellable::new();
         tokens.replace(Some(cancel.clone()));
@@ -69,7 +78,20 @@ pub(super) fn install(window: &adw::ApplicationWindow, app: &adw::Application) {
         let weak = window.downgrade();
         let token = cancel.clone();
         let _timing = pivra::performance::Span::new("open_file_gtk_call_ui");
+        trace::mark(&trace, "gtk-presentation-request");
+        let callback_trace = trace.clone();
         dialog.open(Some(&window), Some(&cancel), move |result| {
+            trace::mark(
+                &callback_trace,
+                if result.is_ok() {
+                    "selection-completed"
+                } else {
+                    "cancel-or-error-completed"
+                },
+            );
+            if let Some(trace) = &callback_trace {
+                trace.finish();
+            }
             if tokens.borrow().as_ref() != Some(&token) {
                 return;
             }
@@ -77,11 +99,15 @@ pub(super) fn install(window: &adw::ApplicationWindow, app: &adw::Application) {
             if let Some(window) = weak.upgrade().filter(|w| w.is_visible()) {
                 set_dialogs_enabled(&window, true);
                 match result {
-                    Ok(file) => gio::prelude::ActionGroupExt::activate_action(
-                        &window,
-                        "open-file",
-                        Some(&file.uri().to_variant()),
-                    ),
+                    Ok(file) => {
+                        trace::mark(&callback_trace, "open-file-action-request");
+                        gio::prelude::ActionGroupExt::activate_action(
+                            &window,
+                            "open-file",
+                            Some(&file.uri().to_variant()),
+                        );
+                        trace::mark(&callback_trace, "open-file-action-returned");
+                    }
                     Err(error)
                         if error.matches(gtk::DialogError::Dismissed)
                             || error.matches(gtk::DialogError::Cancelled) => {}
@@ -89,6 +115,7 @@ pub(super) fn install(window: &adw::ApplicationWindow, app: &adw::Application) {
                 }
             }
         });
+        trace::mark(&trace, "gtk-presentation-returned");
     });
     window.add_action(&choose);
     app.set_accels_for_action("win.choose-media", &["<Control>o"]);

@@ -730,7 +730,7 @@ pub(super) fn navigation(app: &adw::Application) {
     );
 }
 
-fn native_key(keys: &str) {
+pub(super) fn native_key(keys: &str) {
     assert!(
         std::process::Command::new("xdotool")
             .args(["key", "--clearmodifiers", keys])

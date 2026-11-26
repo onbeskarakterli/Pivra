@@ -544,3 +544,14 @@ viewed file (including Unicode/spaces) while Pivra remains interactive. Verify
 native popup focus/hover and portal/file-manager cold startup. These physical
 checks remain pending. No GPU, decoder, packaging, version or published-release
 changes are part of these five development commits.
+
+## Native Open latency follow-up (unreleased)
+
+The user still reports ~2 seconds before the first GNOME chooser and slow Next
+following empty-window Open. These reports remain OPEN; the earlier controlled
+responsiveness checks did not reproduce them. Event-driven opt-in traces and a
+same-folder direct/Open/warm navigation probe now distinguish application setup,
+GTK, portal round trips, user interaction, queue/decode and GTK frame timing.
+See [measured results and native capture command](../diagnostics/OPEN_FILE_LATENCY.md).
+No speculative scheduling, cache, decoder or portal-routing changes are claimed
+as a fix for the physical reports.

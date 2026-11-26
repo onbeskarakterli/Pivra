@@ -327,6 +327,10 @@ fn update_thumbnail_catalog(view: &ImageView, context: &FileContext) {
 }
 
 fn display_selected(view: &ImageView, context: &FileContext) {
+    let _timing = pivra::performance::Span::new("display_selected_ui");
+    if let Some(item) = context.collection.current() {
+        pivra::performance::media_event("media_selected", "request", item.path());
+    }
     update_thumbnail_catalog(view, context);
     let Some(item) = context.collection.current() else {
         view.set_neighbors(vec![]);
@@ -651,6 +655,11 @@ pub(super) fn build(app: &adw::Application, settings: &Settings, file: Option<Op
             let view = view.clone();
             let banner = banner.clone();
             action.connect_activate(move |_, _| {
+                let _timing = pivra::performance::Span::new(if forward {
+                    "next_media_ui"
+                } else {
+                    "previous_media_ui"
+                });
                 let Some(window) = weak_window.upgrade() else {
                     return;
                 };
@@ -999,6 +1008,7 @@ pub(super) fn build(app: &adw::Application, settings: &Settings, file: Option<Op
         let controls = groups.downgrade();
         let open_file = gio::SimpleAction::new("open-file", Some(glib::VariantTy::STRING));
         open_file.connect_activate(move |_, value| {
+            let _timing = pivra::performance::Span::new("open_file_apply_ui");
             let Some(uri) = value.and_then(|v| v.str()) else {
                 return;
             };
@@ -1006,11 +1016,16 @@ pub(super) fn build(app: &adw::Application, settings: &Settings, file: Option<Op
                 return;
             };
             let file = gio::File::for_uri(uri);
-            let Ok(opened) = OpenedFile::from_file(&file) else {
-                eprintln!("Pivra: selected file could not be opened");
-                return;
+            let opened = {
+                let _timing = pivra::performance::Span::new("open_file_validate_ui");
+                let Ok(opened) = OpenedFile::from_file(&file) else {
+                    eprintln!("Pivra: selected file could not be opened");
+                    return;
+                };
+                opened
             };
             if let Some(parent) = file.path().and_then(|p| p.parent().map(|p| p.to_owned())) {
+                let _timing = pivra::performance::Span::new("open_file_save_folder_ui");
                 save_last_open_folder(&parent);
             }
             gio::prelude::ActionGroupExt::activate_action(&window, "slideshow-stop", None);

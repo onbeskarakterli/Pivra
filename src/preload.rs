@@ -201,6 +201,20 @@ pub(super) fn fetch(
     allow_cache: bool,
     budget: Option<usize>,
 ) -> (Result<Output, String>, bool) {
+    let _timing = pivra::performance::Span::new(if budget.is_some() {
+        "preload_fetch_worker"
+    } else {
+        "foreground_fetch_worker"
+    });
+    pivra::performance::media_event(
+        "image_worker_started",
+        if budget.is_some() {
+            "preload"
+        } else {
+            "foreground"
+        },
+        path,
+    );
     let before = FileKey::read(path).ok();
     if before.is_none() {
         cache.lock().unwrap().invalidate_path(path);
@@ -209,6 +223,7 @@ pub(super) fn fetch(
         if let Some(key) = &before {
             let cached = { cache.lock().unwrap().lookup(key) };
             if let Some(texture) = cached {
+                pivra::performance::media_event("image_memory_cache", "hit", path);
                 return (
                     if FileKey::read(path).ok().as_ref() == Some(key) {
                         Ok(Output::Cached(texture, key.clone()))
@@ -220,6 +235,7 @@ pub(super) fn fetch(
             }
         }
     }
+    pivra::performance::media_event("image_memory_cache", "miss", path);
     let result = if crate::raw_loader::is_dng(path) {
         if budget.is_some() {
             return (Err("DNG preloading is not enabled".into()), true);
@@ -285,7 +301,11 @@ pub(super) fn maybe_start(state: &Rc<RefCell<State>>, slot: &Rc<LoadSlot>, has_i
     // Reserve before starting: one background job, never a foreground pending slot.
     let admitted = slot.try_background(&token, move || {
         let cancel = target.clone();
-        let job = gio::spawn_blocking(move || fetch(&name, &cancel, &cache, true, Some(budget)));
+        let waiting = pivra::performance::Span::new("preload_worker_queue_wait");
+        let job = gio::spawn_blocking(move || {
+            drop(waiting);
+            fetch(&name, &cancel, &cache, true, Some(budget))
+        });
         glib::MainContext::default().spawn_local(async move {
             let (result, decoded) = job
                 .await

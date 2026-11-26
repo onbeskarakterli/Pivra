@@ -28,6 +28,8 @@ mod application_chooser;
 mod file_chooser;
 #[path = "window/open_folder.rs"]
 mod open_folder;
+#[path = "window/reveal.rs"]
+mod reveal;
 #[path = "window/slideshow_interaction.rs"]
 mod slideshow_interaction;
 use open_folder::save_last_open_folder;

@@ -491,3 +491,32 @@ Cancel preserved selection, Ctrl+O worked empty/active in the same window, and
 GTK heartbeat callbacks progressed. Native GNOME chooser/portal behavior,
 external-application focus/startup and user-reported delay acceptance remain
 NOT TESTED. No full suite, release build or packaging was run.
+
+## Asynchronous Show in Files (unreleased)
+
+GTK 4.24.1 gtkfilelauncher.c's containing-folder path initializes OpenURI portal
+availability and its legacy show_item uses g_bus_get_sync. An async launcher
+entry point therefore did not guarantee that its initial desktop setup could
+never block Pivra's UI. The shared GtkButton RUN_FIRST/popup-grab handoff also
+applied here. External file-manager cold startup was not reproduced/measured on
+physical GNOME and is not claimed to be fixed inside Nautilus.
+
+A separate window/reveal module now dismisses the existing context-menu chain,
+gets the session bus asynchronously and calls the public FileManager1.ShowItems
+method asynchronously with the exact selected file URI. There is no parent-folder
+fallback. One cancellable request per window is admitted; the D-Bus method has
+a bounded 25-second service timeout, and close/destroy cancels pending callbacks.
+Errors produce a concise toast and diagnostic; no subprocess/thread is created.
+Optional PIVRA_PERF events separate UI dispatch from desktop service wait.
+
+Validation: fmt/check PASS; focused X11 reveal gate PASS with real GIO/D-Bus and
+a private delayed FileManager1 fixture. It verifies Unicode/current-file identity,
+popup dismissal before activation, duplicate admission, working media-info action
+and GTK heartbeat while waiting, service rejection and close with pending reply.
+Measured first action (including row activation) returned in 276 us; instrumented
+async dispatch was 61 us while the deliberately delayed service completed after
+381.340 ms, with seven heartbeat callbacks. The initial test's assumption of
+five callbacks within the first 250 ms was replaced with waiting for actual main
+context progress, retaining all URI/admission/error assertions. This is a
+controlled responsiveness observation, not a native Nautilus startup benchmark.
+GNOME selection/focus and cold file-manager startup remain NOT TESTED.

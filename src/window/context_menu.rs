@@ -1,8 +1,8 @@
 //! Native viewport menu; existing window actions remain the operation owners.
-use super::{FileContext, show_latest_toast, slideshow};
+use super::{FileContext, slideshow};
 use crate::image_view::ImageView;
 use adw::prelude::*;
-use gtk::{gdk, gio, glib};
+use gtk::{gdk, gio};
 use pivra::media::MediaKind;
 use std::{cell::RefCell, path::Path, rc::Rc};
 
@@ -108,74 +108,7 @@ pub(super) fn install(
     let dismiss = gio::SimpleAction::new("dismiss-context-menu", None);
     window.add_action(&dismiss);
     super::application_chooser::install(window, context.clone(), toasts, current_toast.clone());
-    // The file-manager path is independent of application selection.
-    {
-        let name = "show-in-files";
-        let action = gio::SimpleAction::new(name, None);
-        let weak = window.downgrade();
-        let selected = context.clone();
-        let toasts = toasts.downgrade();
-        let current = current_toast.clone();
-        let pending = Rc::new(RefCell::new(None::<gio::Cancellable>));
-        let tokens = pending.clone();
-        action.connect_activate(move |action, _| {
-            let Some(window) = weak.upgrade().filter(|w| w.is_visible()) else {
-                return;
-            };
-            let Some(path) = selected
-                .borrow()
-                .collection
-                .current()
-                .map(|i| i.path().to_owned())
-            else {
-                return;
-            };
-            let launcher = gtk::FileLauncher::new(Some(&gio::File::for_path(path)));
-            launcher.set_always_ask(false);
-            let cancel = gio::Cancellable::new();
-            tokens.replace(Some(cancel.clone()));
-            action.set_enabled(false);
-            let action = action.downgrade();
-            let tokens = tokens.clone();
-            let toasts = toasts.clone();
-            let current = current.clone();
-            let done = move |result: Result<(), glib::Error>| {
-                tokens.borrow_mut().take();
-                if let Some(action) = action.upgrade() {
-                    action.set_enabled(true);
-                }
-                if let Err(error) = result {
-                    if error.matches(gtk::DialogError::Dismissed)
-                        || error.matches(gtk::DialogError::Cancelled)
-                        || error.matches(gio::IOErrorEnum::Cancelled)
-                    {
-                        return;
-                    }
-                    if let Some(toasts) = toasts.upgrade().filter(|w| w.is_mapped()) {
-                        show_latest_toast(
-                            &toasts,
-                            &current,
-                            adw::Toast::new(&format!("Could not {}: {error}", "show in Files")),
-                        );
-                    }
-                }
-            };
-            launcher.open_containing_folder(Some(&window), Some(&cancel), done);
-        });
-        window.add_action(&action);
-        let closing = pending.clone();
-        window.connect_close_request(move |_| {
-            if let Some(cancel) = closing.borrow_mut().take() {
-                cancel.cancel();
-            }
-            glib::Propagation::Proceed
-        });
-        window.connect_destroy(move |_| {
-            if let Some(cancel) = pending.borrow_mut().take() {
-                cancel.cancel();
-            }
-        });
-    }
+    super::reveal::install(window, context.clone(), toasts, current_toast.clone());
     let zoom_action =
         gio::SimpleAction::new_stateful("context-zoom", None, &zoom.is_active().to_variant());
     let button = zoom.downgrade();

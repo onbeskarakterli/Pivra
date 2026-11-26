@@ -387,6 +387,10 @@ fn main() {
         slideshow_click::run(&app);
         return;
     }
+    if std::env::args().any(|s| s == "--development-reveal") {
+        opening::reveal(&app);
+        return;
+    }
     if std::env::args().any(|s| s == "--development-opening") {
         opening::run(&app);
         return;

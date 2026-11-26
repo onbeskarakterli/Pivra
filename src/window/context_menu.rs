@@ -38,6 +38,7 @@ fn populate(
     let add =
         |label, action| content.append(&rows::action(window, menus, label, action, None, true));
     for (label, action) in [
+        ("Open...", "choose-media"),
         ("Open With…", "open-with"),
         ("Show in Files", "show-in-files"),
         ("Rename", "rename-media"),

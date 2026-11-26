@@ -1056,6 +1056,7 @@ pub(super) fn context_menu(app: &adw::Application) {
     assert_eq!(
         labels(&menu),
         [
+            "Open...",
             "Open With…",
             "Show in Files",
             "Rename",
@@ -1088,7 +1089,7 @@ pub(super) fn context_menu(app: &adw::Application) {
         assert_eq!(button.height(), first_height, "row height: {}", text.text());
         assert!(first_x < 24., "unnecessary leading indicator space");
     }
-    let thumbnail = buttons[7].clone();
+    let thumbnail = buttons[8].clone();
     let indicator = thumbnail.child().unwrap().last_child().unwrap();
     let saved = pivra::settings::thumbnail_preference().enabled();
     let dimensions = thumbnail.measure(gtk::Orientation::Horizontal, -1);
@@ -1111,7 +1112,7 @@ pub(super) fn context_menu(app: &adw::Application) {
         "unchanged selection/title refresh dismissed context menu"
     );
     let original_content = menu.child();
-    let modes = buttons[4].clone();
+    let modes = buttons[5].clone();
     let child = widget(&window, "display-mode-submenu")
         .downcast::<gtk::Popover>()
         .unwrap();
@@ -1163,7 +1164,7 @@ pub(super) fn context_menu(app: &adw::Application) {
         child.is_visible(),
         "returning to submenu parent closed child"
     );
-    motion(&buttons[2]).emit_by_name::<()>("enter", &[&5f64, &5f64]);
+    motion(&buttons[3]).emit_by_name::<()>("enter", &[&5f64, &5f64]);
     assert!(
         !child.is_visible() && menu.is_visible(),
         "unrelated root row must close only child"
@@ -1274,6 +1275,40 @@ pub(super) fn context_menu(app: &adw::Application) {
     assert!(!menu.is_visible());
     window.present();
     wait("owner remapped", || window.is_active());
+    let title = window.title();
+    let picture = widgets(window.upcast_ref())
+        .into_iter()
+        .filter_map(|w| w.downcast::<gtk::Overlay>().ok())
+        .find_map(|o| o.child().and_downcast::<gtk::Picture>())
+        .unwrap();
+    let painted = picture.paintable();
+    let mode = window.lookup_action("image-mode").unwrap().state();
+    let menu = popup(&window, false);
+    wait("context Open row allocated", || menu.is_mapped());
+    let open = rows(&menu)[0].clone();
+    assert_eq!(label(&open).text(), "Open...");
+    assert_eq!(open.action_name().as_deref(), Some("win.choose-media"));
+    open.emit_clicked();
+    let choose = window.lookup_action("choose-media").unwrap();
+    wait("context Open uses existing chooser", || {
+        !choose.is_enabled() && chooser(&window).is_some()
+    });
+    assert!(!menu.is_visible(), "menu grab survived chooser dispatch");
+    wait("context chooser keyboard focus", || {
+        chooser(&window).unwrap().is_active()
+    });
+    native_key("Escape");
+    wait("context chooser cancel", || choose.is_enabled());
+    assert_eq!(window.title(), title);
+    assert_eq!(picture.paintable(), painted);
+    assert_eq!(window.lookup_action("image-mode").unwrap().state(), mode);
+    assert_eq!(
+        app.windows().len(),
+        1,
+        "context Open created another viewer"
+    );
+    window.present();
+    wait("owner after chooser cancel", || window.is_active());
     let video = std::env::args().find(|s| s.ends_with(".mp4")).unwrap();
     open_uri(&window, std::path::Path::new(&video));
     assert!(
@@ -1286,6 +1321,6 @@ pub(super) fn context_menu(app: &adw::Application) {
     menu.popdown();
     window.close();
     eprintln!(
-        "PASS context menu: uniform rows/check geometry, title/reopen stability, cancelled 200ms hover, sibling/gap lifecycle, owned popup surfaces, native keyboard/action routing, real window focus transfer/hide cleanup, photo/video actions; native GNOME pointer/edge behavior NOT TESTED"
+        "PASS context menu: uniform rows/check geometry, title/reopen stability, cancelled 200ms hover, sibling/gap lifecycle, owned popup surfaces, native keyboard/action routing, real window focus transfer/hide cleanup, photo/video actions, shared Open chooser/cancel/same viewer; native GNOME pointer/edge behavior NOT TESTED"
     );
 }

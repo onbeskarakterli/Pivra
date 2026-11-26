@@ -520,3 +520,27 @@ five callbacks within the first 250 ms was replaced with waiting for actual main
 context progress, retaining all URI/admission/error assertions. This is a
 controlled responsiveness observation, not a native Nautilus startup benchmark.
 GNOME selection/focus and cold file-manager startup remain NOT TESTED.
+
+## Shared Open entry in the context menu (unreleased)
+
+The first root row is now `Open...`, bound directly to `win.choose-media`.
+It precedes Open With, Show in Files and Rename without altering the remaining
+groups, row renderer or submenu controller. Empty-state Open File, Ctrl+O and
+this row all reuse the same chooser and same-window open-file action.
+
+Validation: fmt/check PASS; focused X11 context-menu gate PASS, including existing
+row geometry, submenu/keyboard/focus-lifecycle assertions and new top-row action
+identity, chooser popup handoff, Cancel preserving title/paintable/display mode,
+and no additional viewer window. The separate shortcuts gate verified accepting
+a selected file into the original empty window. Controlled photo pixels do not
+prove secure decoder or physical GNOME behavior.
+
+For combined native GNOME acceptance, run `cargo run --locked -- /path/to/photo.jpg`:
+check slideshow photo click versus drag, interval reset/pause/loop, all eight
+effects on wide/portrait Fit/Fill photos and ordinary/video isolation. Check Open
+from empty/active windows, Ctrl+O, context Open and Cancel; choose an installed
+external app through Open With; confirm Show in Files selects the currently
+viewed file (including Unicode/spaces) while Pivra remains interactive. Verify
+native popup focus/hover and portal/file-manager cold startup. These physical
+checks remain pending. No GPU, decoder, packaging, version or published-release
+changes are part of these five development commits.

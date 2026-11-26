@@ -450,3 +450,44 @@ a real GTK frame and cleans its layer; alternating Fit/Fill and wide/portrait
 photos, persistence and ordinary-navigation isolation are covered with controlled
 pixels. Physical GNOME visual polish, native media and GPU acceptance are not
 claimed. No full regression or packaging was run.
+
+## Responsive Open and Open With (unreleased)
+
+The existing choose-media action still serves the empty-state button and Ctrl+O,
+using the same open-file action/URI to replace media in the same window. Its
+last-folder read and directory validation previously ran synchronously before
+showing the chooser. A bounded (16 KiB) preference read now runs once on GIO's
+shared worker pool, caches the folder and cannot overwrite a newer selection.
+The GtkFileDialog is reused; opening actions are mutually gated until completion
+or cancellation and all pending work is cancelled with the window.
+
+GTK 4.24.1 source inspection found synchronous g_bus_get_sync and
+GtkXdpOpenURI proxy initialization in gtkopenuriportal.c, reached by the old
+GtkFileLauncher Open With path. Open With now immediately shows a native
+libadwaita application selector; installed applications are enumerated/cached
+and launched using supported GIO APIs on the shared worker pool. Only strings
+cross threads, and a worker-local MainContext drives cancellable async launch.
+No defaults or file associations change. The installed-app list is searchable,
+invalidates on GAppInfoMonitor change and excludes Pivra itself.
+
+GtkButton's RUN_FIRST clicked default activates its action before ordinary
+clicked handlers. The old action could open a launcher while its context menu
+still held the popup grab. Both opening actions now explicitly dismiss the
+existing menu controller before showing a dialog; other popup focus fixes remain.
+
+Optional PIVRA_PERF=1 events separate UI dispatch, folder/app enumeration and
+application launch. Controlled Xvfb/SDK observations (single cold + two warm
+Open invocations, not a benchmark): before GTK dispatch 45.100/21.091/18.489 ms,
+after 29.930/19.446/20.851 ms. Before folder reads were 25/21/55 us on the UI;
+after the single 15 us read ran on a worker. Open With's first dialog returned
+in 11.657 ms; its app list took 3.199 ms and actual private GIO launch 6.351 ms
+on workers. These samples prove routing/main-loop progress, not a general native
+speedup or elimination of external desktop startup latency.
+
+Validation: fmt/check PASS; focused X11 opening and shortcuts gates PASS using
+real GTK/GIO and controlled photos. A private installed .desktop/script fixture
+received the correct Unicode/spaced file, overlapping requests were ignored,
+Cancel preserved selection, Ctrl+O worked empty/active in the same window, and
+GTK heartbeat callbacks progressed. Native GNOME chooser/portal behavior,
+external-application focus/startup and user-reported delay acceptance remain
+NOT TESTED. No full suite, release build or packaging was run.

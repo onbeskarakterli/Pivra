@@ -93,6 +93,10 @@ fn populate(
     root.set_child(Some(&content));
 }
 
+pub(super) fn dismiss(window: &adw::ApplicationWindow) {
+    gio::prelude::ActionGroupExt::activate_action(window, "dismiss-context-menu", None);
+}
+
 pub(super) fn install(
     window: &adw::ApplicationWindow,
     context: Rc<RefCell<FileContext>>,
@@ -101,9 +105,12 @@ pub(super) fn install(
     toasts: &adw::ToastOverlay,
     current_toast: Rc<RefCell<Option<adw::Toast>>>,
 ) {
-    // FileLauncher uses the platform's GIO/portal application chooser and
-    // FileManager integration. It never changes the default association.
-    for (name, open_with) in [("open-with", true), ("show-in-files", false)] {
+    let dismiss = gio::SimpleAction::new("dismiss-context-menu", None);
+    window.add_action(&dismiss);
+    super::application_chooser::install(window, context.clone(), toasts, current_toast.clone());
+    // The file-manager path is independent of application selection.
+    {
+        let name = "show-in-files";
         let action = gio::SimpleAction::new(name, None);
         let weak = window.downgrade();
         let selected = context.clone();
@@ -124,7 +131,7 @@ pub(super) fn install(
                 return;
             };
             let launcher = gtk::FileLauncher::new(Some(&gio::File::for_path(path)));
-            launcher.set_always_ask(open_with);
+            launcher.set_always_ask(false);
             let cancel = gio::Cancellable::new();
             tokens.replace(Some(cancel.clone()));
             action.set_enabled(false);
@@ -148,23 +155,12 @@ pub(super) fn install(
                         show_latest_toast(
                             &toasts,
                             &current,
-                            adw::Toast::new(&format!(
-                                "Could not {}: {error}",
-                                if open_with {
-                                    "open with another application"
-                                } else {
-                                    "show in Files"
-                                }
-                            )),
+                            adw::Toast::new(&format!("Could not {}: {error}", "show in Files")),
                         );
                     }
                 }
             };
-            if open_with {
-                launcher.launch(Some(&window), Some(&cancel), done);
-            } else {
-                launcher.open_containing_folder(Some(&window), Some(&cancel), done);
-            }
+            launcher.open_containing_folder(Some(&window), Some(&cancel), done);
         });
         window.add_action(&action);
         let closing = pending.clone();
@@ -274,6 +270,12 @@ pub(super) fn install(
         popover.add_css_class("menu");
         popover.set_parent(&widget);
         let menus = submenu::Menus::new(&popover, window);
+        let closing = Rc::downgrade(&menus);
+        dismiss.connect_activate(move |_, _| {
+            if let Some(menus) = closing.upgrade() {
+                menus.close();
+            }
+        });
         let click = gtk::GestureClick::new();
         click.set_button(3);
         click.set_propagation_phase(gtk::PropagationPhase::Capture);

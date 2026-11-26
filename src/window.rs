@@ -22,11 +22,15 @@ mod empty_state;
 #[path = "window/folder_watch.rs"]
 mod folder_watch;
 use folder_watch::{FolderWatch, watch};
+#[path = "window/application_chooser.rs"]
+mod application_chooser;
+#[path = "window/file_chooser.rs"]
+mod file_chooser;
 #[path = "window/open_folder.rs"]
 mod open_folder;
 #[path = "window/slideshow_interaction.rs"]
 mod slideshow_interaction;
-use open_folder::{load_last_open_folder, save_last_open_folder};
+use open_folder::save_last_open_folder;
 
 // Keep one current notification, shared by Trash and slideshow status.
 fn show_latest_toast(
@@ -1035,55 +1039,7 @@ pub(super) fn build(app: &adw::Application, settings: &Settings, file: Option<Op
             ));
         });
         window.add_action(&open_file);
-        let dialog_token = Rc::new(RefCell::new(None::<gio::Cancellable>));
-        let choose = gio::SimpleAction::new("choose-media", None);
-        let weak_window = window.downgrade();
-        let tokens = dialog_token.clone();
-        choose.connect_activate(move |action, _| {
-            let Some(window) = weak_window.upgrade() else {
-                return;
-            };
-            let dialog = gtk::FileDialog::new();
-            dialog.set_title("Open media");
-            if let Some(folder) = load_last_open_folder() {
-                dialog.set_initial_folder(Some(&folder));
-            }
-            let token = gio::Cancellable::new();
-            tokens.replace(Some(token.clone()));
-            action.set_enabled(false);
-            let action = action.downgrade();
-            let weak = window.downgrade();
-            let tokens = tokens.clone();
-            dialog.open(Some(&window), Some(&token), move |result| {
-                tokens.borrow_mut().take();
-                if let Some(action) = action.upgrade() {
-                    action.set_enabled(true);
-                }
-                if let (Ok(file), Some(window)) =
-                    (result, weak.upgrade().filter(|w| w.is_visible()))
-                {
-                    gio::prelude::ActionGroupExt::activate_action(
-                        &window,
-                        "open-file",
-                        Some(&file.uri().to_variant()),
-                    );
-                }
-            });
-        });
-        window.add_action(&choose);
-        app.set_accels_for_action("win.choose-media", &["<Control>o"]);
-        let destroy_token = dialog_token.clone();
-        window.connect_destroy(move |_| {
-            if let Some(token) = destroy_token.borrow_mut().take() {
-                token.cancel();
-            }
-        });
-        window.connect_close_request(move |_| {
-            if let Some(token) = dialog_token.borrow_mut().take() {
-                token.cancel();
-            }
-            glib::Propagation::Proceed
-        });
+        file_chooser::install(&window, app);
         let closing_watch = folder_watch.clone();
         window.connect_close_request(move |_| {
             if let Some(watch) = closing_watch.borrow_mut().take() {

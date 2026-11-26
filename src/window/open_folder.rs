@@ -1,11 +1,18 @@
 //! Existing last-open-folder persistence, shared by the Open action.
-use gtk::{gio, glib};
+use gtk::glib;
 use std::path::PathBuf;
 
-pub(super) fn load_last_open_folder() -> Option<gio::File> {
+pub(super) fn read_last_open_folder() -> Option<PathBuf> {
     let path = glib::user_config_dir().join("pivra/last-open-dir.conf");
-    let folder = PathBuf::from(std::fs::read_to_string(path).ok()?.trim());
-    folder.is_dir().then(|| gio::File::for_path(folder))
+    use std::io::Read;
+    let mut text = String::new();
+    std::fs::File::open(path)
+        .ok()?
+        .take(16 * 1024)
+        .read_to_string(&mut text)
+        .ok()?;
+    let folder = PathBuf::from(text.trim());
+    folder.is_dir().then_some(folder)
 }
 
 pub(super) fn save_last_open_folder(folder: &std::path::Path) {

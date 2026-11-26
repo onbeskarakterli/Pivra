@@ -1,11 +1,13 @@
 # Pivra v0.2.6 release checklist and validation
 
+> Historical unreleased development candidate record for v0.2.6. The statuses and checks below describe that preparation period, not the current release. **Current stable: v0.2.7**, published on GitHub and AUR; see the [v0.2.7 release notes](PIVRA_V0.2.7_RELEASE_NOTES.md).
+
 Updated 2026-11-23. Reviewed dev source:
 `c4ca4d85a05fa81efeddc6f5229d28040c56d787`.
 **Preparation PARTIAL / unrestricted publication NO-GO.** The isolated native
 ownership-fix gate has passed; stock GTK compatibility, independent risk decisions
 and immutable-source/package approval are still open. This is not publication
-authorization. Stable README information remains v0.2.5 until an approved handoff.
+authorization. At that time, stable README information remained v0.2.5 pending an approved handoff.
 
 ## Current acceptance, with evidence provenance
 

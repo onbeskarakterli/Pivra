@@ -1,5 +1,7 @@
 # Pivra v0.2.5 — Stable-release source
 
+> Historical preparation record for published v0.2.5. The statuses and checks below describe that preparation period, not the current release. **Current stable: v0.2.7**, published on GitHub and AUR; see the [v0.2.7 release notes](PIVRA_V0.2.7_RELEASE_NOTES.md).
+
 **Status: Stable-release source prepared for approval.**
 Linux/GNOME, GPL-3.0-only. No release date, tag, immutable source archive/hash or
 AUR publication is approved by this source preparation.

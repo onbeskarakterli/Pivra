@@ -220,7 +220,7 @@ pub(super) fn install(
         let player = Rc::downgrade(&player);
         let playback = playback.downgrade();
         click.connect_pressed(move |gesture, _, x, y| {
-            let Some(window) = weak.upgrade().filter(|w| submenu::Menus::owner_active(w)) else {
+            let Some(window) = weak.upgrade().filter(submenu::Menus::owner_active) else {
                 return;
             };
             let Some(video) = selected

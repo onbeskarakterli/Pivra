@@ -1,5 +1,10 @@
 //! One current-file rename dialog, reusing the live viewer and folder monitor.
 use super::*;
+pub(super) struct Toasts<'a> {
+    pub overlay: &'a adw::ToastOverlay,
+    pub current: Rc<RefCell<Option<adw::Toast>>>,
+}
+
 pub(super) fn install(
     window: &adw::ApplicationWindow,
     title: &adw::WindowTitle,
@@ -7,14 +12,14 @@ pub(super) fn install(
     view: ImageView,
     banner: &gtk::Revealer,
     watches: Rc<RefCell<Option<Rc<FolderWatch>>>>,
-    toasts: &adw::ToastOverlay,
-    current_toast: Rc<RefCell<Option<adw::Toast>>>,
+    notifications: Toasts<'_>,
 ) {
     let action = gio::SimpleAction::new("rename-media", None);
     let weak_window = window.downgrade();
     let title = title.downgrade();
     let banner = banner.downgrade();
-    let toasts = toasts.downgrade();
+    let toasts = notifications.overlay.downgrade();
+    let current_toast = notifications.current;
     action.connect_activate(move |action, _| {
         let Some(path) = context
             .borrow()

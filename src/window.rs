@@ -611,8 +611,10 @@ pub(super) fn build(app: &adw::Application, settings: &Settings, file: Option<Op
             view.clone(),
             &banner,
             folder_watch.clone(),
-            &toast_overlay,
-            current_delete_toast.clone(),
+            rename_dialog::Toasts {
+                overlay: &toast_overlay,
+                current: current_delete_toast.clone(),
+            },
         );
         toast_overlay.set_child(Some(view.widget()));
         let viewer_row = gtk::Box::new(gtk::Orientation::Horizontal, 0);

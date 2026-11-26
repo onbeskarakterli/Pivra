@@ -409,3 +409,18 @@ Physical GNOME pointer paths, native Wayland window switching/minimization,
 screen-edge placement, outside clicks and assistive-technology presentation
 remain for user acceptance. GTK/GDK/compositor popup constraints still determine
 edge placement. No full regression suite, release build or packaging was run.
+
+## Slideshow photo click (unreleased)
+
+A dedicated window/slideshow_interaction helper groups a left-click gesture with
+the existing photo pan gesture. Release without a drag, outside-control click,
+or intervening paintable replacement activates the existing slideshow-next
+action only while slideshow is running. That manual path resets the existing
+clock and retains pause/loop behavior; no new slideshow timer is created.
+Ordinary photo clicks/panning and right-click/minimap surfaces remain separate.
+Photo double-click fullscreen is left to ordinary viewing, not active slideshow.
+
+Validation: fmt/check PASS; focused X11 slideshow-click gate PASS with controlled
+photos: ordinary-click isolation, immediate advance, no old deadline firing,
+drag exclusion, paused advancement and last-to-first wrap. Physical GNOME mouse
+and secure media acceptance remain pending; no full regression matrix was run.

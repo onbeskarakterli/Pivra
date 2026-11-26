@@ -150,6 +150,14 @@ pub(crate) fn install(
     photo_click.connect_pressed(move |gesture, count, _, _| {
         if count == 2 {
             if let Some(window) = weak.upgrade() {
+                if window
+                    .lookup_action("slideshow")
+                    .and_then(|a| a.state())
+                    .and_then(|v| v.get::<bool>())
+                    == Some(true)
+                {
+                    return;
+                }
                 gesture.set_state(gtk::EventSequenceState::Claimed);
                 if let Some(drag) = &photo_drag {
                     drag.reset();

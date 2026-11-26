@@ -13,7 +13,7 @@ from video_gpu.lifecycle import session, run, ROOT
 def main():
     parser=argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--session',choices=['x11','sway'],required=True)
-    parser.add_argument('--development',choices=['open','info','minimap','layout','navigation','shortcuts','zoom-state','context-menu','all'])
+    parser.add_argument('--development',choices=['open','info','minimap','layout','navigation','shortcuts','zoom-state','context-menu','slideshow-click','all'])
     args=parser.parse_args()
     if os.environ.get('PIVRA_TOOLBAR_PRIVATE_BUS')!='1':
         out=Path(tempfile.mkdtemp(prefix='pivra-toolbar-ux-'))

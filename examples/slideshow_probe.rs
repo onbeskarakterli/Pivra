@@ -80,6 +80,8 @@ static CONTROLLED_LOADS: std::sync::atomic::AtomicUsize = std::sync::atomic::Ato
 mod development_features;
 #[path = "support/render_frame.rs"]
 mod render_frame;
+#[path = "support/slideshow_click.rs"]
+mod slideshow_click;
 #[path = "support/toolbar_ux.rs"]
 mod toolbar_ux;
 fn pump() {
@@ -371,6 +373,10 @@ fn main() {
     app.register(None::<&gio::Cancellable>).unwrap();
     if std::env::args().any(|s| s == "--development-context-menu") {
         development_features::context_menu(&app);
+        return;
+    }
+    if std::env::args().any(|s| s == "--development-slideshow-click") {
+        slideshow_click::run(&app);
         return;
     }
     if std::env::args().any(|s| s == "--development-open") {

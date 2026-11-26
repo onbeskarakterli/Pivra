@@ -24,6 +24,8 @@ mod folder_watch;
 use folder_watch::{FolderWatch, watch};
 #[path = "window/open_folder.rs"]
 mod open_folder;
+#[path = "window/slideshow_interaction.rs"]
+mod slideshow_interaction;
 use open_folder::{load_last_open_folder, save_last_open_folder};
 
 // Keep one current notification, shared by Trash and slideshow status.

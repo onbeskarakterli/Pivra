@@ -455,6 +455,9 @@ pub(super) fn install(
     toasts: &adw::ToastOverlay,
     current_toast: Rc<RefCell<Option<adw::Toast>>>,
 ) -> Rc<Session> {
+    if let Some(picture) = view.widget().child().and_downcast::<gtk::Picture>() {
+        super::slideshow_interaction::install(window, &picture);
+    }
     let seconds = pivra::settings::load_slideshow_interval();
     let this = Rc::new(Session {
         window: window.downgrade(),

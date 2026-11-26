@@ -1324,3 +1324,102 @@ pub(super) fn context_menu(app: &adw::Application) {
         "PASS context menu: uniform rows/check geometry, title/reopen stability, cancelled 200ms hover, sibling/gap lifecycle, owned popup surfaces, native keyboard/action routing, real window focus transfer/hide cleanup, photo/video actions, shared Open chooser/cancel/same viewer; native GNOME pointer/edge behavior NOT TESTED"
     );
 }
+
+pub(super) fn media_file_actions(app: &adw::Application) {
+    use adw::prelude::MessageDialogExt;
+
+    let folder = tempfile::tempdir().unwrap();
+    let original = folder.path().join("1.png");
+    let renamed = folder.path().join("20.png");
+    let neighbor = folder.path().join("10.png");
+    let video = std::env::args().find(|s| s.ends_with(".mp4")).unwrap();
+    let pixels = std::fs::read("tests/fixtures/images/wide.png").unwrap();
+    for file in [&original, &neighbor] {
+        std::fs::write(file, &pixels).unwrap();
+    }
+    std::fs::copy(video, folder.path().join("2.mp4")).unwrap();
+    window::build(app, &pivra::settings::Settings::default(), None);
+    let window = app
+        .active_window()
+        .and_downcast::<adw::ApplicationWindow>()
+        .unwrap();
+    open_uri(&window, &original);
+    photo_presented(&window);
+    wait("rename/filter catalog settled", || {
+        window
+            .title()
+            .is_some_and(|title| title.contains("3 candidates"))
+    });
+
+    pivra::settings::thumbnail_preference().set_enabled(true);
+    let pin = widget(&window, "thumbnail-controls")
+        .last_child()
+        .and_downcast::<gtk::ToggleButton>()
+        .unwrap();
+    if !pin.is_active() {
+        pin.emit_clicked();
+    }
+    let filter = widget(&window, "thumbnail-media-filter")
+        .downcast::<gtk::DropDown>()
+        .unwrap();
+    let items = widget(&window, "thumbnail-items");
+    let visible = || {
+        widgets(&items)
+            .into_iter()
+            .filter(|w| w.is_visible() && w.widget_name().starts_with("thumbnail-cell-"))
+            .map(|w| w.widget_name().to_string())
+            .collect::<Vec<_>>()
+    };
+    wait("all three thumbnail cells allocated", || {
+        visible().len() == 3
+    });
+    filter.set_selected(2);
+    assert_eq!(visible(), ["thumbnail-cell-1"]);
+    assert!(selected(&window, "1.png"));
+    window.lookup_action("next-media").unwrap().activate(None);
+    assert!(selected(&window, "2.mp4"));
+    filter.set_selected(1);
+    assert_eq!(visible(), ["thumbnail-cell-0", "thumbnail-cell-2"]);
+    assert!(selected(&window, "2.mp4"));
+    filter.set_selected(0);
+    assert_eq!(visible().len(), 3);
+    window
+        .lookup_action("previous-media")
+        .unwrap()
+        .activate(None);
+    photo_presented(&window);
+
+    wait("F2 viewer focused", || window.is_active());
+    native_key("F2");
+    wait("rename dialog shown", || chooser(&window).is_some());
+    let dialog = chooser(&window)
+        .unwrap()
+        .downcast::<adw::MessageDialog>()
+        .unwrap();
+    let entry = widgets(dialog.upcast_ref())
+        .into_iter()
+        .find(|w| w.widget_name() == "rename-filename")
+        .and_downcast::<gtk::Entry>()
+        .unwrap();
+    assert_eq!(entry.text(), "1.png");
+    assert_eq!(entry.selection_bounds(), Some((0, 1)));
+    entry.set_text("20.png");
+    dialog.response("rename");
+    wait("renamed file catalog and title updated", || {
+        renamed.is_file() && !original.exists() && selected(&window, "20.png")
+    });
+    assert_eq!(std::fs::read(&renamed).unwrap(), pixels);
+    assert_eq!(std::fs::read(&neighbor).unwrap(), pixels);
+    window
+        .lookup_action("previous-media")
+        .unwrap()
+        .activate(None);
+    assert!(
+        selected(&window, "10.png"),
+        "natural order stale after rename"
+    );
+    window.close();
+    eprintln!(
+        "PASS GTK media filters and F2 rename: both active-media exclusions, preserved content and selected path, reordered catalog"
+    );
+}

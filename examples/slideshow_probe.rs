@@ -410,6 +410,10 @@ fn main() {
         development_features::open(&app);
         return;
     }
+    if std::env::args().any(|s| s == "--development-file-actions") {
+        development_features::media_file_actions(&app);
+        return;
+    }
     if std::env::args().any(|s| s == "--development-info") {
         development_features::info(&app);
         return;

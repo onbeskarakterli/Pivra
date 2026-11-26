@@ -17,6 +17,8 @@ mod toolbar;
 
 #[path = "window/context_menu.rs"]
 mod context_menu;
+#[path = "window/empty_state.rs"]
+mod empty_state;
 #[path = "window/folder_watch.rs"]
 mod folder_watch;
 use folder_watch::{FolderWatch, watch};
@@ -92,6 +94,7 @@ fn trash_entries(original: &std::path::Path) -> Vec<gio::File> {
 }
 
 fn update_title(window: &adw::ApplicationWindow, title: &adw::WindowTitle, context: &FileContext) {
+    empty_state::update(window, context.collection.current().is_some());
     update_navigation_actions(window, context);
     let Some(selected) = context.collection.current() else {
         window.set_title(Some("No media selected — Pivra"));
@@ -363,12 +366,6 @@ pub(super) fn build(app: &adw::Application, settings: &Settings, file: Option<Op
         .content(&content)
         .build();
     pivra::settings::window_state::install(&window, settings);
-    // Always keep Open at the far left of the header bar, including empty windows.
-    let open_button = gtk::Button::from_icon_name("document-open-symbolic");
-    open_button.set_tooltip_text(Some("Open media (Ctrl+O)"));
-    open_button.set_widget_name("open-media-button");
-    open_button.set_action_name(Some("win.choose-media"));
-    header.pack_start(&open_button);
     {
         let context = Rc::new(RefCell::new(FileContext {
             own_rename: None,
@@ -612,6 +609,7 @@ pub(super) fn build(app: &adw::Application, settings: &Settings, file: Option<Op
         viewer_row.append(&toast_overlay);
         viewer_row.append(view.information_widget());
         viewport.prepend(&viewer_row);
+        empty_state::install(&window, &viewport, &viewer_row);
         let info_button = gtk::ToggleButton::builder()
             .icon_name("help-about-symbolic")
             .tooltip_text("Media information (I)")
@@ -1107,8 +1105,6 @@ pub(super) fn build(app: &adw::Application, settings: &Settings, file: Option<Op
                 context,
                 opened,
             ));
-        } else {
-            view.show_message("Open a photo or video to start.");
         }
     }
 }

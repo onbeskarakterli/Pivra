@@ -284,3 +284,28 @@ Photo pixels are controlled; no native decoder/GPU acceptance is claimed.
 Physical GNOME remains NOT TESTED: application chooser/cancel and launching an
 installed application, file-manager reveal/selection, menu pointer placement,
 checkmarks, slideshow, minimap/pan, rename and Trash/Undo integration.
+
+## Centered Open File entry point (unreleased)
+
+The far-left header Open button is removed. An AdwStatusPage in the content area
+below the header provides a folder icon, “Open a photo or video to get started”
+and a suggested Open File button. The small window/empty_state module observes
+a read-only presentation action updated by the existing selected-catalog/title
+path; it switches between the empty page and the original viewer row. It does
+not create a second viewer or replace folder monitoring, admission or rendering.
+The page disappears on selection and returns when the catalog has no selection.
+
+Open File activates the existing win.choose-media action. Ctrl+O still uses that
+same chooser in both empty and active windows; Open With remains a separate
+current-file/application-launch operation in the context menu.
+
+Validation: formatting and locked compilation PASS. Focused Xvfb Open gate PASS
+(button opens chooser, cancel preserves empty state, accepted file/URI uses the
+same viewer/window, replacement folder monitoring/navigation). Existing shortcuts
+gate PASS with real Ctrl+O, cancel in empty/active states and local chooser file
+selection. The updated layout gate PASS: the native empty-state content is
+centered at (0,0) error in a 950×583 content viewport; portrait Fit, minimap,
+scrollbar clearance, sidebar, resize and fullscreen checks remain passing.
+These are controlled photo pixels and SDK GTK/file chooser tests; physical
+GNOME/portal presentation, secure decode and GPU acceptance were not rerun.
+No full regression suite, release build, packaging or version change was done.

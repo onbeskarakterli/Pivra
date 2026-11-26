@@ -27,11 +27,29 @@ pub(super) fn open(app: &adw::Application) {
         .downcast::<adw::ApplicationWindow>()
         .unwrap();
     assert_eq!(app.windows().len(), 1);
-    let button = widget(&window, "open-media-button")
+    let button = widget(&window, "open-file-button")
         .downcast::<gtk::Button>()
         .unwrap();
     assert_eq!(button.action_name().as_deref(), Some("win.choose-media"));
-    assert!(window.lookup_action("choose-media").unwrap().is_enabled());
+    let choose = window.lookup_action("choose-media").unwrap();
+    assert!(choose.is_enabled());
+    let empty = widget(&window, "empty-media-state");
+    assert!(empty.is_visible());
+    assert!(
+        !widgets(widget(&window, "pivra-header").as_ref())
+            .iter()
+            .any(
+                |w| w.widget_name() == "open-media-button" || w.widget_name() == "open-file-button"
+            )
+    );
+    button.emit_clicked();
+    wait("empty Open File opens existing chooser", || {
+        chooser(&window).is_some() && !choose.is_enabled()
+    });
+    chooser(&window).unwrap().close();
+    wait("empty Open File cancel", || choose.is_enabled());
+    assert!(empty.is_visible());
+    assert!(!state(&window, "media-present"));
     let controls = widget(&window, "viewer-controls");
     assert!(!controls.is_visible());
     open_uri(&window, &a.join("1.png"));
@@ -42,6 +60,8 @@ pub(super) fn open(app: &adw::Application) {
     });
     photo_presented(&window);
     assert!(controls.is_visible());
+    assert!(!empty.is_visible());
+    assert!(state(&window, "media-present"));
     open_uri(&window, &b.join("2.png"));
     wait("existing Open reuses same window", || {
         window
@@ -262,32 +282,49 @@ pub(super) fn layout(app: &adw::Application) {
         .filter_map(|w| w.downcast::<gtk::Overlay>().ok())
         .find_map(|o| o.child().and_downcast::<gtk::Picture>())
         .unwrap();
-    wait("empty viewer layout", || {
-        row.is_mapped() && picture.width() > 0
+    let empty = widget(&window, "empty-media-state");
+    wait("empty page layout", || {
+        empty.is_mapped() && empty.width() > 0
     });
-    let status = widgets(window.upcast_ref())
+    let viewport = empty.parent().unwrap();
+    let page_bounds = empty.compute_bounds(&viewport).unwrap();
+    assert!(!row.is_visible());
+    assert!((page_bounds.width() - viewport.width() as f32).abs() <= 1.);
+    assert!((page_bounds.height() - viewport.height() as f32).abs() <= 1.);
+    let button = widget(&window, "open-file-button");
+    let status = widgets(empty.upcast_ref())
         .into_iter()
         .find(|w| {
             w.downcast_ref::<gtk::Label>()
-                .is_some_and(|l| l.text() == "Open a photo or video to start.")
+                .is_some_and(|l| l.text() == "Open a photo or video to get started")
         })
         .unwrap();
+    let button_bounds = button.compute_bounds(&empty).unwrap();
+    let title_bounds = status.compute_bounds(&empty).unwrap();
+    assert!(button_bounds.y() >= title_bounds.y() + title_bounds.height());
+    assert!(
+        (button_bounds.x() + button_bounds.width() / 2. - empty.width() as f32 / 2.).abs() <= 2.
+    );
+    let mut group = status.clone();
+    while !button.is_ancestor(&group) {
+        group = group.parent().expect("shared empty-state content");
+    }
+    let group_bounds = group.compute_bounds(&empty).unwrap();
+    let empty_error = (
+        (group_bounds.x() + group_bounds.width() / 2. - empty.width() as f32 / 2.).abs(),
+        (group_bounds.y() + group_bounds.height() / 2. - empty.height() as f32 / 2.).abs(),
+    );
+    eprintln!(
+        "LAYOUT empty page: {}x{} content={group_bounds:?} center_error={empty_error:?}",
+        empty.width(),
+        empty.height()
+    );
     let center_error = |bounds: gtk::graphene::Rect| {
         (
             (bounds.x() + bounds.width() / 2. - row.width() as f32 / 2.).abs(),
             (bounds.y() + bounds.height() / 2. - row.height() as f32 / 2.).abs(),
         )
     };
-    let empty_error = center_error(status.compute_bounds(&row).unwrap());
-    eprintln!(
-        "LAYOUT empty: content={}x{} picture={}x{} panel={} hexpand={} center_error={empty_error:?}",
-        row.width(),
-        row.height(),
-        picture.width(),
-        picture.height(),
-        panel.width(),
-        panel.compute_expand(gtk::Orientation::Horizontal)
-    );
     open_uri(&window, &file);
     window
         .lookup_action("image-mode")
@@ -329,7 +366,7 @@ pub(super) fn layout(app: &adw::Application) {
     );
     assert!(
         empty_error.0 <= 1. && empty_error.1 <= 1.,
-        "empty placeholder center: {empty_error:?}"
+        "empty-state content center: {empty_error:?}"
     );
     assert!(
         photo_error.0 <= 1. && photo_error.1 <= 1.,
@@ -730,7 +767,7 @@ pub(super) fn shortcuts(app: &adw::Application) {
     native_key("Escape");
     wait("empty chooser cancel", || choose.is_enabled());
     assert_eq!(app.windows().len(), 1);
-    assert!(has_text(&window, "Open a photo or video to start."));
+    assert!(has_text(&window, "Open a photo or video to get started"));
     window.present();
     wait("keyboard focus after cancel", || window.is_active());
     native_key("ctrl+o");

@@ -369,6 +369,10 @@ fn main() {
         .flags(gio::ApplicationFlags::NON_UNIQUE)
         .build();
     app.register(None::<&gio::Cancellable>).unwrap();
+    if std::env::args().any(|s| s == "--development-context-menu") {
+        development_features::context_menu(&app);
+        return;
+    }
     if std::env::args().any(|s| s == "--development-open") {
         development_features::open(&app);
         return;

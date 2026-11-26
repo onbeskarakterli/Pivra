@@ -922,3 +922,114 @@ pub(super) fn zoom_state(app: &adw::Application) {
         "PASS real Ctrl+wheel zoom state: blue immediately, no preference leak, ordinary wheel navigation, photo/video/preset resets, explicit button/Z choice retained, minimap unchanged"
     );
 }
+
+pub(super) fn context_menu(app: &adw::Application) {
+    fn labels(model: &gio::MenuModel) -> Vec<String> {
+        let mut found = Vec::new();
+        for i in 0..model.n_items() {
+            if let Some(label) = model
+                .item_attribute_value(i, "label", None)
+                .and_then(|v| v.get::<String>())
+            {
+                found.push(label);
+            }
+            for link in ["section", "submenu"] {
+                if let Some(child) = model.item_link(i, link) {
+                    found.extend(labels(&child));
+                }
+            }
+        }
+        found
+    }
+    fn popup(window: &adw::ApplicationWindow, video: bool) -> gtk::PopoverMenu {
+        let picture = widgets(window.upcast_ref())
+            .into_iter()
+            .filter_map(|w| w.downcast::<gtk::Picture>().ok())
+            .find(|p| (p.widget_name() == "video-content") == video)
+            .unwrap();
+        let click = picture
+            .observe_controllers()
+            .iter::<glib::Object>()
+            .filter_map(Result::ok)
+            .filter_map(|c| c.downcast::<gtk::GestureClick>().ok())
+            .find(|c| c.button() == 3)
+            .unwrap();
+        click.emit_by_name::<()>("pressed", &[&1i32, &30f64, &30f64]);
+        let menu = widgets(picture.upcast_ref())
+            .into_iter()
+            .find_map(|w| w.downcast::<gtk::PopoverMenu>().ok())
+            .unwrap();
+        menu
+    }
+    let dir = tempfile::tempdir().unwrap();
+    let path = dir.path().join("1.png");
+    std::fs::copy("tests/fixtures/images/wide.png", &path).unwrap();
+    window::build(app, &pivra::settings::Settings::default(), None);
+    let window = app
+        .active_window()
+        .unwrap()
+        .downcast::<adw::ApplicationWindow>()
+        .unwrap();
+    let menu = popup(&window, false);
+    assert!(
+        !menu.is_visible(),
+        "empty window must not offer media actions"
+    );
+    open_uri(&window, &path);
+    photo_presented(&window);
+    let menu = popup(&window, false);
+    wait("context menu mapped", || menu.is_mapped());
+    let items = labels(&menu.menu_model().unwrap());
+    assert_eq!(
+        items,
+        [
+            "Open With…",
+            "Show in Files",
+            "Rename",
+            "Zoom",
+            "Display Mode",
+            "Fit",
+            "Fill",
+            "100%",
+            "Fullscreen",
+            "Start Slideshow",
+            "Thumbnail Strip",
+            "Media Info",
+            "Move to Trash"
+        ]
+    );
+    let zoom = widget(&window, "wheel-zoom-toggle")
+        .downcast::<gtk::ToggleButton>()
+        .unwrap();
+    zoom.emit_clicked();
+    assert_eq!(state(&window, "context-zoom"), zoom.is_active());
+    window.lookup_action("context-zoom").unwrap().activate(None);
+    assert_eq!(state(&window, "context-zoom"), zoom.is_active());
+    let saved = pivra::settings::thumbnail_preference().enabled();
+    window
+        .lookup_action("context-thumbnails")
+        .unwrap()
+        .activate(None);
+    assert_eq!(state(&window, "context-thumbnails"), !saved);
+    pivra::settings::thumbnail_preference().set_enabled(saved);
+    assert_eq!(state(&window, "context-thumbnails"), saved);
+    native_key("Escape");
+    wait("Escape dismisses context menu", || !menu.is_visible());
+    assert!(window.is_visible(), "menu Escape must not close the viewer");
+    window.lookup_action("media-info").unwrap().activate(None);
+    assert!(state(&window, "media-info"));
+    let video = std::env::args().find(|s| s.ends_with(".mp4")).unwrap();
+    open_uri(&window, std::path::Path::new(&video));
+    let menu = popup(&window, true);
+    wait("video context menu mapped", || menu.is_mapped());
+    assert!(
+        labels(&menu.menu_model().unwrap())
+            .iter()
+            .any(|s| s == "Play / Pause")
+    );
+    menu.popdown();
+    window.close();
+    eprintln!(
+        "PASS context menu: empty suppression, ordered photo/video actions, live zoom/preference state, native Escape dismissal and cleanup; external chooser/file-manager integration NOT TESTED"
+    );
+}

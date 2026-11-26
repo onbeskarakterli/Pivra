@@ -15,6 +15,8 @@ pub(super) mod slideshow;
 #[path = "toolbar.rs"]
 mod toolbar;
 
+#[path = "window/context_menu.rs"]
+mod context_menu;
 #[path = "window/folder_watch.rs"]
 mod folder_watch;
 use folder_watch::{FolderWatch, watch};
@@ -836,6 +838,14 @@ pub(super) fn build(app: &adw::Application, settings: &Settings, file: Option<Op
         );
         groups.append(&toolbar::slideshow_group(&window));
         groups.append(&info_button);
+        context_menu::install(
+            &window,
+            context.clone(),
+            &view,
+            &zoom_toggle,
+            &toast_overlay,
+            current_delete_toast.clone(),
+        );
         let keys = gtk::EventControllerKey::new();
         keys.set_propagation_phase(gtk::PropagationPhase::Capture);
         let weak_window = window.downgrade();

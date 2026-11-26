@@ -258,3 +258,29 @@ Formatting, locked compilation and the single focused
 `media_filter::tests::filtering_active_photo_or_video_never_changes_viewer_selection`
 regression PASS (both photo→Videos and video→Photos, All restore/natural order).
 Physical GNOME visual confirmation remains pending.
+
+
+## Native viewport context menu (unreleased)
+
+Right-clicking the photo/video viewport opens a native Gio/GTK popover. The
+window/context_menu module routes Rename, Zoom, display mode, fullscreen,
+Start/Stop Slideshow, Media Info and Trash to their existing owners. Thumbnail
+Strip reflects the saved shared preference, independent of minimap suppression;
+its pin state is retained. Videos additionally offer Play / Pause through the
+existing playback controls. Empty windows have no media menu. Menu state follows
+existing actions/toggles; navigation dismisses an old popup. Only button 3 opens
+it, leaving left-button panning and the separate minimap unchanged.
+
+Open With uses GTK FileLauncher with always-ask application selection; Show in
+Files uses its containing-folder integration. Neither changes a default file
+association. Operations are asynchronous, cancellable on window close and report
+non-cancellation errors through existing toasts. Controller closures hold weak
+viewer/action references to avoid retaining the Picture through its own handler.
+
+Validation: formatting and locked compilation PASS. The focused Xvfb context-menu
+gate covers empty suppression, photo/video menu entries/order, live zoom and
+saved thumbnail state, Escape dismissal without closing the viewer, and close.
+Photo pixels are controlled; no native decoder/GPU acceptance is claimed.
+Physical GNOME remains NOT TESTED: application chooser/cancel and launching an
+installed application, file-manager reveal/selection, menu pointer placement,
+checkmarks, slideshow, minimap/pan, rename and Trash/Undo integration.

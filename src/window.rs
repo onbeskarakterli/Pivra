@@ -97,9 +97,9 @@ fn update_title(window: &adw::ApplicationWindow, title: &adw::WindowTitle, conte
     empty_state::update(window, context.collection.current().is_some());
     update_navigation_actions(window, context);
     let Some(selected) = context.collection.current() else {
-        window.set_title(Some("No media selected — Pivra"));
-        title.set_title("No media selected");
-        title.set_subtitle("Use arrow keys to select remaining media.");
+        window.set_title(Some(APP_NAME));
+        title.set_title(APP_NAME);
+        title.set_subtitle("");
         return;
     };
     let name = selected

@@ -309,3 +309,47 @@ scrollbar clearance, sidebar, resize and fullscreen checks remain passing.
 These are controlled photo pixels and SDK GTK/file chooser tests; physical
 GNOME/portal presentation, secure decode and GPU acceptance were not rerun.
 No full regression suite, release build, packaging or version change was done.
+
+## Context-menu dismissal and cascading submenu correction
+
+At `d6f54fe`, the menu unconditionally popped down on `notify::title`.
+FolderWatch reconciles every five seconds and calls update_title even for an
+unchanged selection. GTK's set_title emits notify even for identical text.
+A focused reproduction on that unmodified implementation failed with
+“unchanged selection/title refresh dismissed context menu”. No pointer leave
+was necessary. The menu now tracks selected-file URI identity through the
+existing title/state update path; only a real selection change dismisses an
+obsolete menu. Repeated popup requests while open do not rebuild the model;
+slideshow state changes replace only their own label row.
+
+GTK supports native NESTED menus, but its model-button hover delay is internal
+(80 ms in the reviewed GTK 4.24.1 source), without a public setting for the
+requested 200 ms. Display Mode therefore uses the supported custom-menu slot:
+a GtkMenuButton owns a separate GtkPopoverMenu/GdkPopup, positioned right with
+GTK/GDK screen-edge fallback. It retains the existing Fit/Fill/100% Gio actions
+and radio state. A single 200 ms hover source is cancelled on leave/unmap; leave
+never hides an already open child. There is no polling, standalone window,
+private GTK widget manipulation, positioning offset or CSS submenu workaround.
+
+Child Escape/Left returns focus to the parent; Right and click open the child.
+The root does not cascade-close merely because the child returns focus. Mode
+action activation closes the whole chain, including GTK's native order where
+the child is already hidden before action dispatch. Closing/unmapping the root
+hides the child, cancels hover and disconnects its temporary action handler when
+the row is destroyed. File actions, ordering, right-button ownership, panning,
+minimap, empty-state Open File and underlying media actions are unchanged.
+
+Validation: fmt and locked check PASS. The single focused X11/Xvfb context-menu
+gate PASS: unchanged-title/repeated-popup stability, all photo/video entries,
+200 ms one-shot hover, distinct parent/child native surfaces, emitted GTK
+enter/leave without closure, real Escape/Right/Left and Down/Return activation,
+whole-chain cleanup, zoom and saved thumbnail preference state. The pre-fix
+failure is retained above; no assertions were removed. Photo pixels remain
+controlled; this is not secure decode or hardware acceptance.
+
+Physical GNOME pointer travel, diagonal crossings, outside-click behavior,
+screen-edge left placement, theme/accessibility presentation and external
+application/file-manager integration remain NOT TESTED here. Placement is
+subject to the compositor's popup constraints; no absolute-side guarantee is
+made for a screen without sufficient room. No full regression matrix, packaging,
+release build, version or publication changes were performed.

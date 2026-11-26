@@ -1025,9 +1025,6 @@ pub(super) fn context_menu(app: &adw::Application) {
             "Rename",
             "Zoom",
             "Display Mode",
-            "Fit",
-            "Fill",
-            "100%",
             "Fullscreen",
             "Start Slideshow",
             "Thumbnail Strip",
@@ -1035,6 +1032,96 @@ pub(super) fn context_menu(app: &adw::Application) {
             "Move to Trash"
         ]
     );
+    // Folder reconciliation notifies title even when the selected media and
+    // title are unchanged. This must not dismiss a menu under the pointer.
+    window.set_title(window.title().as_deref());
+    assert!(
+        menu.is_visible(),
+        "unchanged selection/title refresh dismissed context menu"
+    );
+    assert!(menu.flags().contains(gtk::PopoverMenuFlags::NESTED));
+    let original_model = menu.menu_model();
+    let modes = widget(&window, "display-mode-submenu-button")
+        .downcast::<gtk::MenuButton>()
+        .unwrap();
+    let child = modes
+        .popover()
+        .unwrap()
+        .downcast::<gtk::PopoverMenu>()
+        .unwrap();
+    assert_eq!(
+        labels(&child.menu_model().unwrap()),
+        ["Fit", "Fill", "100%"]
+    );
+    assert_eq!(child.position(), gtk::PositionType::Right);
+    let motion = modes
+        .observe_controllers()
+        .iter::<glib::Object>()
+        .filter_map(Result::ok)
+        .find_map(|c| c.downcast::<gtk::EventControllerMotion>().ok())
+        .unwrap();
+    let started = Instant::now();
+    motion.emit_by_name::<()>("enter", &[&5f64, &5f64]);
+    assert!(
+        !child.is_visible(),
+        "hover must not open the submenu immediately"
+    );
+    wait("delayed cascading submenu", || child.is_mapped());
+    assert!(started.elapsed() >= Duration::from_millis(150));
+    assert!(menu.is_mapped());
+    assert_eq!(menu.visible_submenu().as_deref(), Some("main"));
+    assert_ne!(
+        menu.surface(),
+        child.surface(),
+        "submenu needs its own native popup surface"
+    );
+    motion.emit_by_name::<()>("leave", &[]);
+    assert!(
+        menu.is_visible() && child.is_visible(),
+        "crossing into submenu must keep both open"
+    );
+    window.set_title(window.title().as_deref());
+    assert!(menu.is_visible() && child.is_visible());
+    assert_eq!(
+        menu.menu_model(),
+        original_model,
+        "title refresh rebuilt menu"
+    );
+    let again = popup(&window, false);
+    assert_eq!(
+        again.menu_model(),
+        original_model,
+        "repeated popup rebuilt menu"
+    );
+    assert!(child.is_visible());
+    native_key("Escape");
+    wait("Escape closes only active child", || !child.is_visible());
+    assert!(menu.is_mapped());
+    modes.grab_focus();
+    native_key("Right");
+    wait("keyboard Right reopens submenu", || child.is_mapped());
+    native_key("Left");
+    wait("keyboard Left returns to root", || !child.is_visible());
+    assert!(menu.is_mapped());
+    modes.popup();
+    wait("click-open submenu", || child.is_mapped());
+    native_key("Down");
+    pump();
+    native_key("Return");
+    wait("mode action closes entire chain", || {
+        !menu.is_visible() && !child.is_visible()
+    });
+    assert_eq!(
+        window
+            .lookup_action("image-mode")
+            .unwrap()
+            .state()
+            .and_then(|v| v.get::<String>())
+            .as_deref(),
+        Some("fill")
+    );
+    let menu = popup(&window, false);
+    wait("reopened root", || menu.is_mapped());
     let zoom = widget(&window, "wheel-zoom-toggle")
         .downcast::<gtk::ToggleButton>()
         .unwrap();
@@ -1057,6 +1144,10 @@ pub(super) fn context_menu(app: &adw::Application) {
     assert!(state(&window, "media-info"));
     let video = std::env::args().find(|s| s.ends_with(".mp4")).unwrap();
     open_uri(&window, std::path::Path::new(&video));
+    assert!(
+        !menu.is_visible(),
+        "selection change must dismiss obsolete menu"
+    );
     let menu = popup(&window, true);
     wait("video context menu mapped", || menu.is_mapped());
     assert!(
@@ -1067,6 +1158,6 @@ pub(super) fn context_menu(app: &adw::Application) {
     menu.popdown();
     window.close();
     eprintln!(
-        "PASS context menu: empty suppression, ordered photo/video actions, live zoom/preference state, native Escape dismissal and cleanup; external chooser/file-manager integration NOT TESTED"
+        "PASS context menu: ordered photo/video actions, unchanged-title/repeated-popup stability, 200ms hover, distinct cascading surface, parent/child crossing, Escape/Right/Left, native mode activation and chain cleanup, zoom/preferences; external chooser/file-manager and native GNOME pointer integration NOT TESTED"
     );
 }

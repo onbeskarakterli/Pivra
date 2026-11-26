@@ -3,8 +3,28 @@ use super::{FileContext, show_latest_toast, slideshow};
 use crate::image_view::ImageView;
 use adw::prelude::*;
 use gtk::{gdk, gio, glib};
-use pivra::{media::MediaKind, viewing::ViewMode};
-use std::{cell::RefCell, rc::Rc};
+use pivra::media::MediaKind;
+use std::{cell::RefCell, path::Path, rc::Rc};
+
+#[path = "context_menu/submenu.rs"]
+mod submenu;
+
+// Selection identity, not title notifications, determines whether an open menu
+// has become obsolete. Folder reconciliation also updates an unchanged title.
+pub(super) fn selection_changed(window: &adw::ApplicationWindow, path: Option<&Path>) {
+    if let Some(action) = window
+        .lookup_action("context-media")
+        .and_downcast::<gio::SimpleAction>()
+    {
+        let uri = path
+            .map(|p| gio::File::for_path(p).uri().to_string())
+            .unwrap_or_default()
+            .to_variant();
+        if action.state().as_ref() != Some(&uri) {
+            action.set_state(&uri);
+        }
+    }
+}
 
 fn model(window: &adw::ApplicationWindow, video: bool) -> gio::Menu {
     let menu = gio::Menu::new();
@@ -22,13 +42,9 @@ fn model(window: &adw::ApplicationWindow, video: bool) -> gio::Menu {
         viewing.append(Some("Play / Pause"), Some("win.context-playback"));
     }
     viewing.append(Some("Zoom"), Some("win.context-zoom"));
-    let modes = gio::Menu::new();
-    for mode in ViewMode::ALL {
-        let item = gio::MenuItem::new(Some(mode.label()), None);
-        item.set_action_and_target_value(Some("win.image-mode"), Some(&mode.id().to_variant()));
-        modes.append_item(&item);
-    }
-    viewing.append_submenu(Some("Display Mode"), &modes);
+    let modes = gio::MenuItem::new(Some("Display Mode"), None);
+    modes.set_attribute_value("custom", Some(&"display-mode".to_variant()));
+    viewing.append_item(&modes);
     viewing.append(Some("Fullscreen"), Some("win.context-fullscreen"));
     viewing.append(
         Some(if slideshow::active(window) {
@@ -213,9 +229,20 @@ pub(super) fn install(
     });
     window.add_action(&playback);
 
+    let target = gio::SimpleAction::new_stateful("context-media", None, &"".to_variant());
+    target.set_enabled(false);
+    window.add_action(&target);
+    selection_changed(
+        window,
+        context.borrow().collection.current().map(|i| i.path()),
+    );
     let photo = view.widget().child().expect("photo viewport");
-    for (widget, video) in [(photo, false), (view.video_widget().clone().upcast(), true)] {
-        let popover = gtk::PopoverMenu::from_model(None::<&gio::Menu>);
+    for widget in [photo, view.video_widget().clone().upcast()] {
+        let popover =
+            gtk::PopoverMenu::from_model_full(&gio::Menu::new(), gtk::PopoverMenuFlags::NESTED);
+        // Closing a child on focus return/Escape must leave the root open.
+        // Actual action activation explicitly closes the coordinated chain.
+        popover.set_cascade_popdown(false);
         popover.set_widget_name("media-context-menu");
         popover.set_has_arrow(false);
         popover.set_parent(&widget);
@@ -243,6 +270,9 @@ pub(super) fn install(
             let Some(menu) = menu.upgrade() else {
                 return;
             };
+            if menu.is_visible() {
+                return;
+            }
             if let Some(playback) = playback.upgrade() {
                 playback.set_enabled(
                     video
@@ -253,13 +283,14 @@ pub(super) fn install(
                 );
             }
             menu.set_menu_model(Some(&model(&window, video)));
+            submenu::install(&menu, &window);
             menu.set_pointing_to(Some(&gdk::Rectangle::new(x as i32, y as i32, 1, 1)));
             gesture.set_state(gtk::EventSequenceState::Claimed);
             menu.popup();
         });
         widget.add_controller(click);
         let menu = popover.downgrade();
-        window.connect_notify_local(Some("title"), move |_, _| {
+        target.connect_notify_local(Some("state"), move |_, _| {
             if let Some(menu) = menu.upgrade() {
                 menu.popdown();
             }
@@ -271,7 +302,29 @@ pub(super) fn install(
             action.connect_notify_local(Some("state"), move |_, _| {
                 if let (Some(menu), Some(window)) = (menu.upgrade(), weak.upgrade()) {
                     if menu.is_visible() {
-                        menu.set_menu_model(Some(&model(&window, video)));
+                        // Update only this row, preserving the root model and
+                        // any open Display Mode surface/focus.
+                        if let Some(viewing) = menu
+                            .menu_model()
+                            .and_then(|m| m.item_link(1, "section"))
+                            .and_downcast::<gio::Menu>()
+                        {
+                            let index = viewing.n_items() - 1;
+                            let label = if slideshow::active(&window) {
+                                "Stop Slideshow"
+                            } else {
+                                "Start Slideshow"
+                            };
+                            if viewing
+                                .item_attribute_value(index, "label", None)
+                                .and_then(|v| v.get::<String>())
+                                .as_deref()
+                                != Some(label)
+                            {
+                                viewing.remove(index);
+                                viewing.append(Some(label), Some("win.context-slideshow"));
+                            }
+                        }
                     }
                 }
             });

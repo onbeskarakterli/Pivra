@@ -94,6 +94,7 @@ fn trash_entries(original: &std::path::Path) -> Vec<gio::File> {
 }
 
 fn update_title(window: &adw::ApplicationWindow, title: &adw::WindowTitle, context: &FileContext) {
+    context_menu::selection_changed(window, context.collection.current().map(|item| item.path()));
     empty_state::update(window, context.collection.current().is_some());
     update_navigation_actions(window, context);
     let Some(selected) = context.collection.current() else {

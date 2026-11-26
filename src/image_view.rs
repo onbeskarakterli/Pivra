@@ -390,7 +390,7 @@ impl ImageView {
         // Disconnect callbacks before dropping streams; error recovery holds a
         // view only until this explicit detach, not past close/unrealize.
         let transition = view.transition.clone();
-        window.connect_destroy(move |_| transition.clear());
+        window.connect_destroy(move |_| transition.shutdown());
         let information = view.information.clone();
         window.connect_destroy(move |_| information.close());
         let inhibitor = view.video_inhibit.clone();
@@ -414,7 +414,7 @@ impl ImageView {
         });
         let closing = view.clone();
         window.connect_close_request(move |_| {
-            closing.transition.clear();
+            closing.transition.shutdown();
             closing.stop_video();
             glib::Propagation::Proceed
         });
@@ -926,8 +926,7 @@ impl ImageView {
     // Per-window slideshow policy; native GPU renderer is unchanged.
     #[allow(dead_code, reason = "Standalone image probes omit slideshow settings")]
     pub(super) fn set_slideshow_effect(&self, effect: pivra::slideshow::Effect) {
-        self.transition
-            .set_fade(effect == pivra::slideshow::Effect::Fade);
+        self.transition.set_effect(effect);
     }
     #[allow(
         dead_code,

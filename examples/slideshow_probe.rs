@@ -82,6 +82,8 @@ mod development_features;
 mod render_frame;
 #[path = "support/slideshow_click.rs"]
 mod slideshow_click;
+#[path = "support/slideshow_effects.rs"]
+mod slideshow_effects;
 #[path = "support/toolbar_ux.rs"]
 mod toolbar_ux;
 fn pump() {
@@ -373,6 +375,10 @@ fn main() {
     app.register(None::<&gio::Cancellable>).unwrap();
     if std::env::args().any(|s| s == "--development-context-menu") {
         development_features::context_menu(&app);
+        return;
+    }
+    if std::env::args().any(|s| s == "--development-slideshow-effects") {
+        slideshow_effects::run(&app);
         return;
     }
     if std::env::args().any(|s| s == "--development-slideshow-click") {

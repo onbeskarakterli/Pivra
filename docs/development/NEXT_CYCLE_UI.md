@@ -424,3 +424,29 @@ Validation: fmt/check PASS; focused X11 slideshow-click gate PASS with controlle
 photos: ordinary-click isolation, immediate advance, no old deadline firing,
 drag exclusion, paused advancement and last-to-first wrap. Physical GNOME mouse
 and secure media acceptance remain pending; no full regression matrix was run.
+
+## Additional slideshow transitions (unreleased)
+
+The existing single frame-clock photo layer now offers Fade, No transition,
+Slide Left/Right/Up/Down and Zoom In/Out through the same persisted selector.
+Duration remains the existing 300 ms; no separate duration setting exists.
+Only slideshow photo-to-photo transitions animate. Ordinary navigation and
+video/EOS routing are unchanged.
+
+Snapshots use the actual rendered Picture (including Fit/Fill letterboxing),
+not a raw texture stretched to viewport dimensions. Directional/zoom effects
+wait for GTK after-paint and WidgetPaintable publication before sampling the new
+frame. They retain two bounded render nodes, uniformly transform/clip them and
+never read pixels back or start another decode/animation pipeline. Rapid loads,
+errors, resize, effect changes, stop and close cancel pending handlers/ticks;
+the widget snapshot source is detached outside active transitions/slideshow.
+A narrowly documented GTK 4.16 compatibility expectation covers the public
+named-theme color lookup (its replacement requires GTK 4.20), keeping native
+background colors rather than hardcoding them.
+
+Validation: fmt/check PASS; existing effect-ID round-trip test expanded to all
+eight choices: 1 PASS. Focused X11 effects gate PASS: every non-None effect paints
+a real GTK frame and cleans its layer; alternating Fit/Fill and wide/portrait
+photos, persistence and ordinary-navigation isolation are covered with controlled
+pixels. Physical GNOME visual polish, native media and GPU acceptance are not
+claimed. No full regression or packaging was run.

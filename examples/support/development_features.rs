@@ -961,24 +961,58 @@ pub(super) fn zoom_state(app: &adw::Application) {
 }
 
 pub(super) fn context_menu(app: &adw::Application) {
-    fn labels(model: &gio::MenuModel) -> Vec<String> {
-        let mut found = Vec::new();
-        for i in 0..model.n_items() {
-            if let Some(label) = model
-                .item_attribute_value(i, "label", None)
-                .and_then(|v| v.get::<String>())
-            {
-                found.push(label);
-            }
-            for link in ["section", "submenu"] {
-                if let Some(child) = model.item_link(i, link) {
-                    found.extend(labels(&child));
-                }
+    fn rows(menu: &gtk::Popover) -> Vec<gtk::Button> {
+        let mut result = Vec::new();
+        let mut child = menu.child().unwrap().first_child();
+        while let Some(widget) = child {
+            child = widget.next_sibling();
+            if let Ok(button) = widget.downcast::<gtk::Button>() {
+                result.push(button);
             }
         }
-        found
+        result
     }
-    fn popup(window: &adw::ApplicationWindow, video: bool) -> gtk::PopoverMenu {
+    fn label(button: &gtk::Button) -> gtk::Label {
+        button
+            .child()
+            .unwrap()
+            .first_child()
+            .unwrap()
+            .downcast()
+            .unwrap()
+    }
+    fn font(text: &gtk::Label) -> gtk::pango::FontDescription {
+        let font = text
+            .layout()
+            .iter()
+            .run_readonly()
+            .unwrap()
+            .item()
+            .analysis()
+            .font();
+        gtk::pango::prelude::FontExt::describe(&font)
+    }
+    fn labels(menu: &gtk::Popover) -> Vec<String> {
+        rows(menu)
+            .iter()
+            .map(|b| label(b).text().to_string())
+            .collect()
+    }
+    fn motion(button: &gtk::Button) -> gtk::EventControllerMotion {
+        button
+            .observe_controllers()
+            .iter::<glib::Object>()
+            .filter_map(Result::ok)
+            .find_map(|c| c.downcast::<gtk::EventControllerMotion>().ok())
+            .unwrap()
+    }
+    fn popup(window: &adw::ApplicationWindow, video: bool) -> gtk::Popover {
+        wait("owning window active", || {
+            window
+                .surface()
+                .and_downcast::<gtk::gdk::Toplevel>()
+                .is_some_and(|s| s.state().contains(gtk::gdk::ToplevelState::FOCUSED))
+        });
         let picture = widgets(window.upcast_ref())
             .into_iter()
             .filter_map(|w| w.downcast::<gtk::Picture>().ok())
@@ -992,11 +1026,12 @@ pub(super) fn context_menu(app: &adw::Application) {
             .find(|c| c.button() == 3)
             .unwrap();
         click.emit_by_name::<()>("pressed", &[&1i32, &30f64, &30f64]);
-        let menu = widgets(picture.upcast_ref())
+        widgets(picture.upcast_ref())
             .into_iter()
-            .find_map(|w| w.downcast::<gtk::PopoverMenu>().ok())
-            .unwrap();
-        menu
+            .find(|w| w.widget_name() == "media-context-menu")
+            .unwrap()
+            .downcast()
+            .unwrap()
     }
     let dir = tempfile::tempdir().unwrap();
     let path = dir.path().join("1.png");
@@ -1015,10 +1050,11 @@ pub(super) fn context_menu(app: &adw::Application) {
     open_uri(&window, &path);
     photo_presented(&window);
     let menu = popup(&window, false);
-    wait("context menu mapped", || menu.is_mapped());
-    let items = labels(&menu.menu_model().unwrap());
+    wait("context menu mapped/allocated", || {
+        menu.is_mapped() && rows(&menu).iter().all(|b| b.width() > 0)
+    });
     assert_eq!(
-        items,
+        labels(&menu),
         [
             "Open With…",
             "Show in Files",
@@ -1032,83 +1068,130 @@ pub(super) fn context_menu(app: &adw::Application) {
             "Move to Trash"
         ]
     );
-    // Folder reconciliation notifies title even when the selected media and
-    // title are unchanged. This must not dismiss a menu under the pointer.
+    let buttons = rows(&menu);
+    let first_font = font(&label(&buttons[0]));
+    assert_eq!(first_font.weight(), gtk::pango::Weight::Normal);
+    assert!(
+        gtk::IconTheme::for_display(&gtk::prelude::WidgetExt::display(&window))
+            .has_icon("object-select-symbolic")
+    );
+    let first_x = label(&buttons[0]).compute_bounds(&buttons[0]).unwrap().x();
+    let first_height = buttons[0].height();
+    for button in &buttons {
+        let text = label(button);
+        assert_eq!(font(&text), first_font, "row font: {}", text.text());
+        assert!(
+            (text.compute_bounds(button).unwrap().x() - first_x).abs() <= 1.,
+            "row label alignment: {}",
+            text.text()
+        );
+        assert_eq!(button.height(), first_height, "row height: {}", text.text());
+        assert!(first_x < 24., "unnecessary leading indicator space");
+    }
+    let thumbnail = buttons[7].clone();
+    let indicator = thumbnail.child().unwrap().last_child().unwrap();
+    let saved = pivra::settings::thumbnail_preference().enabled();
+    let dimensions = thumbnail.measure(gtk::Orientation::Horizontal, -1);
+    for enabled in [true, false, saved] {
+        pivra::settings::thumbnail_preference().set_enabled(enabled);
+        assert_eq!(indicator.opacity(), if enabled { 1. } else { 0. });
+        assert_eq!(
+            thumbnail.measure(gtk::Orientation::Horizontal, -1),
+            dimensions,
+            "checkmark changed row allocation"
+        );
+    }
+    eprintln!(
+        "MENU_ROWS label_x={first_x} height={first_height} font={}; trailing check keeps allocation",
+        first_font
+    );
     window.set_title(window.title().as_deref());
     assert!(
         menu.is_visible(),
         "unchanged selection/title refresh dismissed context menu"
     );
-    assert!(menu.flags().contains(gtk::PopoverMenuFlags::NESTED));
-    let original_model = menu.menu_model();
-    let modes = widget(&window, "display-mode-submenu-button")
-        .downcast::<gtk::MenuButton>()
+    let original_content = menu.child();
+    let modes = buttons[4].clone();
+    let child = widget(&window, "display-mode-submenu")
+        .downcast::<gtk::Popover>()
         .unwrap();
-    let child = modes
-        .popover()
-        .unwrap()
-        .downcast::<gtk::PopoverMenu>()
-        .unwrap();
-    assert_eq!(
-        labels(&child.menu_model().unwrap()),
-        ["Fit", "Fill", "100%"]
-    );
+    assert_eq!(labels(&child), ["Fit", "Fill", "100%"]);
+    for button in rows(&child) {
+        assert_eq!(font(&label(&button)), first_font);
+    }
     assert_eq!(child.position(), gtk::PositionType::Right);
-    let motion = modes
-        .observe_controllers()
-        .iter::<glib::Object>()
-        .filter_map(Result::ok)
-        .find_map(|c| c.downcast::<gtk::EventControllerMotion>().ok())
-        .unwrap();
+    let hover = motion(&modes);
+    // A cancelled hover must not reopen after the original deadline.
+    hover.emit_by_name::<()>("enter", &[&5f64, &5f64]);
+    hover.emit_by_name::<()>("leave", &[]);
+    let passed = std::rc::Rc::new(std::cell::Cell::new(false));
+    let elapsed = passed.clone();
+    glib::timeout_add_local_once(Duration::from_millis(250), move || elapsed.set(true));
+    wait("cancelled hover deadline", || passed.get());
+    assert!(!child.is_visible() && menu.is_visible());
     let started = Instant::now();
-    motion.emit_by_name::<()>("enter", &[&5f64, &5f64]);
-    assert!(
-        !child.is_visible(),
-        "hover must not open the submenu immediately"
-    );
-    wait("delayed cascading submenu", || child.is_mapped());
+    hover.emit_by_name::<()>("enter", &[&5f64, &5f64]);
+    assert!(!child.is_visible(), "hover must not open immediately");
+    wait("200ms cascading submenu", || child.is_mapped());
     assert!(started.elapsed() >= Duration::from_millis(150));
     assert!(menu.is_mapped());
-    assert_eq!(menu.visible_submenu().as_deref(), Some("main"));
-    assert_ne!(
-        menu.surface(),
-        child.surface(),
-        "submenu needs its own native popup surface"
+    assert_ne!(menu.surface(), child.surface());
+    assert_eq!(
+        menu.root().and_downcast::<adw::ApplicationWindow>(),
+        Some(window.clone())
     );
-    motion.emit_by_name::<()>("leave", &[]);
+    assert_eq!(
+        child.root().and_downcast::<adw::ApplicationWindow>(),
+        Some(window.clone())
+    );
+    assert_eq!(
+        child
+            .surface()
+            .unwrap()
+            .dynamic_cast::<gtk::gdk::Popup>()
+            .unwrap()
+            .parent(),
+        menu.surface()
+    );
+    hover.emit_by_name::<()>("leave", &[]);
     assert!(
         menu.is_visible() && child.is_visible(),
-        "crossing into submenu must keep both open"
+        "parent-to-child gap closed menu"
     );
+    hover.emit_by_name::<()>("enter", &[&5f64, &5f64]);
+    assert!(
+        child.is_visible(),
+        "returning to submenu parent closed child"
+    );
+    motion(&buttons[2]).emit_by_name::<()>("enter", &[&5f64, &5f64]);
+    assert!(
+        !child.is_visible() && menu.is_visible(),
+        "unrelated root row must close only child"
+    );
+    hover.emit_by_name::<()>("enter", &[&5f64, &5f64]);
+    wait("submenu reopens", || child.is_mapped());
     window.set_title(window.title().as_deref());
     assert!(menu.is_visible() && child.is_visible());
     assert_eq!(
-        menu.menu_model(),
-        original_model,
-        "title refresh rebuilt menu"
+        popup(&window, false).child(),
+        original_content,
+        "repeated popup rebuilt rows"
     );
-    let again = popup(&window, false);
-    assert_eq!(
-        again.menu_model(),
-        original_model,
-        "repeated popup rebuilt menu"
-    );
-    assert!(child.is_visible());
     native_key("Escape");
     wait("Escape closes only active child", || !child.is_visible());
     assert!(menu.is_mapped());
     modes.grab_focus();
     native_key("Right");
-    wait("keyboard Right reopens submenu", || child.is_mapped());
+    wait("keyboard Right", || child.is_mapped());
     native_key("Left");
-    wait("keyboard Left returns to root", || !child.is_visible());
+    wait("keyboard Left", || !child.is_visible());
     assert!(menu.is_mapped());
-    modes.popup();
-    wait("click-open submenu", || child.is_mapped());
+    modes.emit_clicked();
+    wait("clicked submenu", || child.is_mapped());
     native_key("Down");
     pump();
     native_key("Return");
-    wait("mode action closes entire chain", || {
+    wait("mode activation closes chain", || {
         !menu.is_visible() && !child.is_visible()
     });
     assert_eq!(
@@ -1121,7 +1204,7 @@ pub(super) fn context_menu(app: &adw::Application) {
         Some("fill")
     );
     let menu = popup(&window, false);
-    wait("reopened root", || menu.is_mapped());
+    wait("root reopened", || menu.is_mapped());
     let zoom = widget(&window, "wheel-zoom-toggle")
         .downcast::<gtk::ToggleButton>()
         .unwrap();
@@ -1129,19 +1212,68 @@ pub(super) fn context_menu(app: &adw::Application) {
     assert_eq!(state(&window, "context-zoom"), zoom.is_active());
     window.lookup_action("context-zoom").unwrap().activate(None);
     assert_eq!(state(&window, "context-zoom"), zoom.is_active());
-    let saved = pivra::settings::thumbnail_preference().enabled();
     window
         .lookup_action("context-thumbnails")
         .unwrap()
         .activate(None);
     assert_eq!(state(&window, "context-thumbnails"), !saved);
     pivra::settings::thumbnail_preference().set_enabled(saved);
-    assert_eq!(state(&window, "context-thumbnails"), saved);
     native_key("Escape");
-    wait("Escape dismisses context menu", || !menu.is_visible());
-    assert!(window.is_visible(), "menu Escape must not close the viewer");
+    wait("Escape closes root", || !menu.is_visible());
+    assert!(window.is_visible());
     window.lookup_action("media-info").unwrap().activate(None);
     assert!(state(&window, "media-info"));
+    // A separate real GTK window takes focus through the window manager.
+    let menu = popup(&window, false);
+    wait("popup before focus transfer", || menu.is_mapped());
+    let modes = widget(&window, "display-mode-submenu-button")
+        .downcast::<gtk::Button>()
+        .unwrap();
+    let child = widget(&window, "display-mode-submenu")
+        .downcast::<gtk::Popover>()
+        .unwrap();
+    modes.emit_clicked();
+    wait("child before focus transfer", || child.is_mapped());
+    let other = gtk::Window::builder()
+        .title("TEST focus destination")
+        .default_width(200)
+        .default_height(120)
+        .build();
+    other.present();
+    wait("focus destination mapped", || other.is_mapped());
+    let id = std::process::Command::new("xdotool")
+        .args([
+            "search",
+            "--onlyvisible",
+            "--name",
+            "^TEST focus destination$",
+        ])
+        .output()
+        .unwrap();
+    assert!(id.status.success());
+    let id = String::from_utf8(id.stdout).unwrap();
+    assert!(
+        std::process::Command::new("xdotool")
+            .args(["windowactivate", id.lines().last().unwrap()])
+            .status()
+            .unwrap()
+            .success()
+    );
+    wait("window manager transfers focus", || {
+        other.is_active() && !window.is_active()
+    });
+    wait("inactive window dismisses full popup chain", || {
+        !menu.is_visible() && !child.is_visible()
+    });
+    other.close();
+    window.present();
+    wait("owner active again", || window.is_active());
+    let menu = popup(&window, false);
+    wait("popup before owner hide", || menu.is_mapped());
+    window.set_visible(false);
+    assert!(!menu.is_visible());
+    window.present();
+    wait("owner remapped", || window.is_active());
     let video = std::env::args().find(|s| s.ends_with(".mp4")).unwrap();
     open_uri(&window, std::path::Path::new(&video));
     assert!(
@@ -1149,15 +1281,11 @@ pub(super) fn context_menu(app: &adw::Application) {
         "selection change must dismiss obsolete menu"
     );
     let menu = popup(&window, true);
-    wait("video context menu mapped", || menu.is_mapped());
-    assert!(
-        labels(&menu.menu_model().unwrap())
-            .iter()
-            .any(|s| s == "Play / Pause")
-    );
+    wait("video menu", || menu.is_mapped());
+    assert!(labels(&menu).iter().any(|s| s == "Play / Pause"));
     menu.popdown();
     window.close();
     eprintln!(
-        "PASS context menu: ordered photo/video actions, unchanged-title/repeated-popup stability, 200ms hover, distinct cascading surface, parent/child crossing, Escape/Right/Left, native mode activation and chain cleanup, zoom/preferences; external chooser/file-manager and native GNOME pointer integration NOT TESTED"
+        "PASS context menu: uniform rows/check geometry, title/reopen stability, cancelled 200ms hover, sibling/gap lifecycle, owned popup surfaces, native keyboard/action routing, real window focus transfer/hide cleanup, photo/video actions; native GNOME pointer/edge behavior NOT TESTED"
     );
 }

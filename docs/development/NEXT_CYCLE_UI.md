@@ -353,3 +353,59 @@ application/file-manager integration remain NOT TESTED here. Placement is
 subject to the compositor's popup constraints; no absolute-side guarantee is
 made for a screen without sufficient room. No full regression matrix, packaging,
 release build, version or publication changes were performed.
+
+## Shared context rows and popup ownership follow-up
+
+The previous mixed renderer combined GtkModelButton's shared leading indicator
+size group with a separate GtkMenuButton. Checked actions reserved leading
+space for unrelated labels; the Display Mode label also inherited a different
+button font. The actual old GTK tree showed Sans 13.333px for ordinary model
+labels and Sans Bold 13.333px for Display Mode. These were separate control and
+layout policies, not an image viewport or media transform issue.
+
+The renderer now uses one small rows helper: native GtkButtons, a shared label
+layout and a 16-logical-pixel trailing indicator. Unchecked indicators use zero
+opacity without removing their allocation. Menu classes and a common normal
+text weight retain the theme's font family/size; no item-specific CSS or offset
+compensation is applied. Root and Fit/Fill/100% rows use the same construction,
+explicit accessible menu/check/radio roles and existing Gio action bindings.
+
+A single Menus lifecycle controller owns a root GtkPopover and at most one
+child transient GtkPopover through weak references. Every unrelated root row's
+pointer/focus entry closes the current child and cancels pending hover. Leaving
+Display Mode only cancels a pending open, preserving an already open child while
+crossing the gap or returning to its parent. The one-shot 200 ms open uses a
+generation check; unmap/close invalidates stale callbacks. Window inactivity,
+compositor toplevel focus loss/minimization, suspension, hide/unmap and destroy
+close the entire chain. Popups remain children of the correct media widget/row;
+no application windows or explicit global input grabs are used for menus.
+
+The old ownership was already a GdkPopup/widget hierarchy, but it lacked owning
+window activation/minimization observers. Closing only on selected-media change
+and close-request was insufficient when switching windows. On X11, an owned
+popup's native grab can temporarily make GtkWindow::is_active false; actual
+external deactivation is distinguished using the owning GdkToplevel FOCUSED
+state and its event notifications. No polling, idle retry or focus-close timer
+is used. Other GTK windows do not inherit or keep the menu above them.
+
+The selected-file URI/five-second-title-refresh fix and all existing file,
+zoom, fullscreen, slideshow, thumbnail and playback action-handler bodies were
+compared against ee4af27 and remain unchanged. The empty-state Open File code,
+main window builder, GPU engine, media operations and preferences are untouched.
+Only menu presentation/lifetime and its focused test changed.
+
+Validation: fmt and locked compilation PASS without warnings. The same focused
+X11/Xvfb/xfwm4 context-menu gate PASS with real GTK objects: action order and
+photo/video entries, shaped Pango normal fonts, equal row heights/label starts,
+constant checked/unchecked geometry, available check icon, 200 ms hover and
+cancellation past its deadline, sibling entry versus parent/child gap, native
+popup surface ownership, real keyboard selection/Escape/Left/Right, unchanged
+title/reopen stability, zoom/preference state, real window-manager focus transfer
+to another GTK window and owner-hide cleanup. Measured rows: label x=0 relative
+to the button, 24 logical pixels high, Noto Sans 9.999 in this SDK/theme.
+
+Photo pixels are controlled and this is not secure decoder/GPU acceptance.
+Physical GNOME pointer paths, native Wayland window switching/minimization,
+screen-edge placement, outside clicks and assistive-technology presentation
+remain for user acceptance. GTK/GDK/compositor popup constraints still determine
+edge placement. No full regression suite, release build or packaging was run.

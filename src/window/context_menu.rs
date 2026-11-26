@@ -6,6 +6,8 @@ use gtk::{gdk, gio, glib};
 use pivra::media::MediaKind;
 use std::{cell::RefCell, path::Path, rc::Rc};
 
+#[path = "context_menu/rows.rs"]
+mod rows;
 #[path = "context_menu/submenu.rs"]
 mod submenu;
 
@@ -26,43 +28,69 @@ pub(super) fn selection_changed(window: &adw::ApplicationWindow, path: Option<&P
     }
 }
 
-fn model(window: &adw::ApplicationWindow, video: bool) -> gio::Menu {
-    let menu = gio::Menu::new();
-    let files = gio::Menu::new();
+fn populate(
+    root: &gtk::Popover,
+    menus: &Rc<submenu::Menus>,
+    window: &adw::ApplicationWindow,
+    video: bool,
+) {
+    let content = gtk::Box::new(gtk::Orientation::Vertical, 0);
+    let add =
+        |label, action| content.append(&rows::action(window, menus, label, action, None, true));
     for (label, action) in [
-        ("Open With…", "win.open-with"),
-        ("Show in Files", "win.show-in-files"),
-        ("Rename", "win.rename-media"),
+        ("Open With…", "open-with"),
+        ("Show in Files", "show-in-files"),
+        ("Rename", "rename-media"),
     ] {
-        files.append(Some(label), Some(action));
+        add(label, action);
     }
-    menu.append_section(None, &files);
-    let viewing = gio::Menu::new();
+    content.append(&gtk::Separator::new(gtk::Orientation::Horizontal));
     if video {
-        viewing.append(Some("Play / Pause"), Some("win.context-playback"));
+        add("Play / Pause", "context-playback");
     }
-    viewing.append(Some("Zoom"), Some("win.context-zoom"));
-    let modes = gio::MenuItem::new(Some("Display Mode"), None);
-    modes.set_attribute_value("custom", Some(&"display-mode".to_variant()));
-    viewing.append_item(&modes);
-    viewing.append(Some("Fullscreen"), Some("win.context-fullscreen"));
-    viewing.append(
-        Some(if slideshow::active(window) {
+    add("Zoom", "context-zoom");
+    let (button, _, arrow) = rows::row("Display Mode", gtk::AccessibleRole::MenuItem);
+    button.set_widget_name("display-mode-submenu-button");
+    arrow.set_icon_name(Some("pan-end-symbolic"));
+    arrow.set_opacity(1.);
+    let child = gtk::Popover::builder()
+        .has_arrow(false)
+        .accessible_role(gtk::AccessibleRole::Menu)
+        .build();
+    child.set_widget_name("display-mode-submenu");
+    child.add_css_class("menu");
+    let modes = gtk::Box::new(gtk::Orientation::Vertical, 0);
+    for mode in pivra::viewing::ViewMode::ALL {
+        modes.append(&rows::action(
+            window,
+            menus,
+            mode.label(),
+            "image-mode",
+            Some(mode.id()),
+            false,
+        ));
+    }
+    child.set_child(Some(&modes));
+    menus.watch_parent(&button, &child);
+    content.append(&button);
+    add("Fullscreen", "context-fullscreen");
+    let (label, name) = (
+        if slideshow::active(window) {
             "Stop Slideshow"
         } else {
             "Start Slideshow"
-        }),
-        Some("win.context-slideshow"),
+        },
+        "context-slideshow",
     );
-    menu.append_section(None, &viewing);
-    let interface = gio::Menu::new();
-    interface.append(Some("Thumbnail Strip"), Some("win.context-thumbnails"));
-    interface.append(Some("Media Info"), Some("win.media-info"));
-    menu.append_section(None, &interface);
-    let destructive = gio::Menu::new();
-    destructive.append(Some("Move to Trash"), Some("win.trash-selected"));
-    menu.append_section(None, &destructive);
-    menu
+    let slide = rows::action(window, menus, label, name, None, true);
+    slide.set_widget_name("context-slideshow-row");
+    content.append(&slide);
+    content.append(&gtk::Separator::new(gtk::Orientation::Horizontal));
+    add("Thumbnail Strip", "context-thumbnails");
+    add("Media Info", "media-info");
+    content.append(&gtk::Separator::new(gtk::Orientation::Horizontal));
+    add("Move to Trash", "trash-selected");
+    root.set_child(Some(&content));
 }
 
 pub(super) fn install(
@@ -238,25 +266,25 @@ pub(super) fn install(
     );
     let photo = view.widget().child().expect("photo viewport");
     for widget in [photo, view.video_widget().clone().upcast()] {
-        let popover =
-            gtk::PopoverMenu::from_model_full(&gio::Menu::new(), gtk::PopoverMenuFlags::NESTED);
-        // Closing a child on focus return/Escape must leave the root open.
-        // Actual action activation explicitly closes the coordinated chain.
-        popover.set_cascade_popdown(false);
+        let popover = gtk::Popover::builder()
+            .has_arrow(false)
+            .accessible_role(gtk::AccessibleRole::Menu)
+            .build();
         popover.set_widget_name("media-context-menu");
-        popover.set_has_arrow(false);
+        popover.add_css_class("menu");
         popover.set_parent(&widget);
+        let menus = submenu::Menus::new(&popover, window);
         let click = gtk::GestureClick::new();
         click.set_button(3);
         click.set_propagation_phase(gtk::PropagationPhase::Capture);
         let menu = popover.downgrade();
+        let state = Rc::downgrade(&menus);
         let selected = context.clone();
         let weak = window.downgrade();
-        // A controller belongs to the Picture; it must not own its ImageView.
         let player = Rc::downgrade(&player);
         let playback = playback.downgrade();
         click.connect_pressed(move |gesture, _, x, y| {
-            let Some(window) = weak.upgrade() else {
+            let Some(window) = weak.upgrade().filter(|w| submenu::Menus::owner_active(w)) else {
                 return;
             };
             let Some(video) = selected
@@ -267,7 +295,7 @@ pub(super) fn install(
             else {
                 return;
             };
-            let Some(menu) = menu.upgrade() else {
+            let (Some(menu), Some(menus)) = (menu.upgrade(), state.upgrade()) else {
                 return;
             };
             if menu.is_visible() {
@@ -282,62 +310,48 @@ pub(super) fn install(
                             .is_some_and(|m| m.is_prepared() && m.error().is_none()),
                 );
             }
-            menu.set_menu_model(Some(&model(&window, video)));
-            submenu::install(&menu, &window);
+            populate(&menu, &menus, &window, video);
             menu.set_pointing_to(Some(&gdk::Rectangle::new(x as i32, y as i32, 1, 1)));
             gesture.set_state(gtk::EventSequenceState::Claimed);
             menu.popup();
         });
         widget.add_controller(click);
-        let menu = popover.downgrade();
+        let state = Rc::downgrade(&menus);
         target.connect_notify_local(Some("state"), move |_, _| {
-            if let Some(menu) = menu.upgrade() {
-                menu.popdown();
+            if let Some(menus) = state.upgrade() {
+                menus.close();
             }
         });
-        // Keep Start/Stop wording current even when F5/Escape changes the session.
         if let Some(action) = window.lookup_action("slideshow") {
             let menu = popover.downgrade();
             let weak = window.downgrade();
             action.connect_notify_local(Some("state"), move |_, _| {
                 if let (Some(menu), Some(window)) = (menu.upgrade(), weak.upgrade()) {
-                    if menu.is_visible() {
-                        // Update only this row, preserving the root model and
-                        // any open Display Mode surface/focus.
-                        if let Some(viewing) = menu
-                            .menu_model()
-                            .and_then(|m| m.item_link(1, "section"))
-                            .and_downcast::<gio::Menu>()
-                        {
-                            let index = viewing.n_items() - 1;
-                            let label = if slideshow::active(&window) {
-                                "Stop Slideshow"
-                            } else {
-                                "Start Slideshow"
-                            };
-                            if viewing
-                                .item_attribute_value(index, "label", None)
-                                .and_then(|v| v.get::<String>())
-                                .as_deref()
-                                != Some(label)
-                            {
-                                viewing.remove(index);
-                                viewing.append(Some(label), Some("win.context-slideshow"));
+                    if let Some(content) = menu.child() {
+                        let mut row = content.first_child();
+                        while let Some(widget) = row {
+                            if widget.widget_name() == "context-slideshow-row" {
+                                if let Some(label) = widget
+                                    .first_child()
+                                    .and_then(|content| content.first_child())
+                                    .and_downcast::<gtk::Label>()
+                                {
+                                    let text = if slideshow::active(&window) {
+                                        "Stop Slideshow"
+                                    } else {
+                                        "Start Slideshow"
+                                    };
+                                    label.set_label(text);
+                                    widget
+                                        .update_property(&[gtk::accessible::Property::Label(text)]);
+                                }
+                                break;
                             }
+                            row = widget.next_sibling();
                         }
                     }
                 }
             });
         }
-        let menu = popover.downgrade();
-        window.connect_close_request(move |_| {
-            if let Some(menu) = menu.upgrade() {
-                menu.popdown();
-            }
-            glib::Propagation::Proceed
-        });
-        window.connect_destroy(move |_| {
-            popover.unparent();
-        });
     }
 }

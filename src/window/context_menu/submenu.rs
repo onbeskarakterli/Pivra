@@ -1,121 +1,250 @@
-//! Public GTK custom-menu slot with a coordinated, right-facing submenu.
+//! One owner for transient popup lifetime and the cancellable hover generation.
 use adw::prelude::*;
-use gtk::{gdk, gio, glib};
-use pivra::viewing::ViewMode;
-use std::{cell::RefCell, rc::Rc, time::Duration};
+use gtk::{gdk, glib};
+use std::{
+    cell::{Cell, RefCell},
+    rc::Rc,
+    time::Duration,
+};
 
-pub(super) fn install(root: &gtk::PopoverMenu, window: &adw::ApplicationWindow) {
-    let modes = gio::Menu::new();
-    for mode in ViewMode::ALL {
-        let item = gio::MenuItem::new(Some(mode.label()), None);
-        item.set_action_and_target_value(Some("win.image-mode"), Some(&mode.id().to_variant()));
-        modes.append_item(&item);
+pub(super) struct Menus {
+    root: glib::WeakRef<gtk::Popover>,
+    child: RefCell<Option<glib::WeakRef<gtk::Popover>>>,
+    pending: RefCell<Option<glib::SourceId>>,
+    generation: Cell<u64>,
+}
+impl Menus {
+    pub(super) fn new(root: &gtk::Popover, window: &adw::ApplicationWindow) -> Rc<Self> {
+        let state = Rc::new(Self {
+            root: root.downgrade(),
+            child: RefCell::new(None),
+            pending: RefCell::new(None),
+            generation: Cell::new(0),
+        });
+        let closing = state.clone();
+        root.connect_unmap(move |_| closing.close_child());
+        let closing = state.clone();
+        window.connect_is_active_notify(move |w| {
+            if !w.is_active() && !Self::owner_active(w) {
+                closing.close();
+            }
+        });
+        let weak = Rc::downgrade(&state);
+        window.connect_realize(move |window| {
+            if let Some(state) = weak.upgrade() {
+                state.watch_surface(window);
+            }
+        });
+        if window.is_realized() {
+            state.watch_surface(window);
+        }
+        let closing = state.clone();
+        window.connect_suspended_notify(move |w| {
+            if w.is_suspended() {
+                closing.close();
+            }
+        });
+        let closing = state.clone();
+        window.connect_unmap(move |_| closing.close());
+        let closing = state.clone();
+        window.connect_close_request(move |_| {
+            closing.close();
+            glib::Propagation::Proceed
+        });
+        let closing = state.clone();
+        window.connect_destroy(move |_| {
+            closing.close();
+            if let Some(root) = closing.root.upgrade() {
+                root.unparent();
+            }
+        });
+        state
     }
-    let popup = gtk::PopoverMenu::from_model_full(&modes, gtk::PopoverMenuFlags::NESTED);
-    popup.set_widget_name("display-mode-submenu");
-    popup.set_has_arrow(false);
-    popup.set_valign(gtk::Align::Start);
-    let button = gtk::MenuButton::builder()
-        .label("Display Mode")
-        .direction(gtk::ArrowType::Right)
-        .has_frame(false)
-        .hexpand(true)
-        .popover(&popup)
-        .build();
-    button.set_widget_name("display-mode-submenu-button");
-    // GtkMenuButton supplies a real child GdkPopup, including screen-edge flip,
-    // click activation and accessibility. No private GtkModelButton hooks.
-    root.add_child(&button, "display-mode");
-    let pending = Rc::new(RefCell::new(None::<glib::SourceId>));
-    let motion = gtk::EventControllerMotion::new();
-    let timer = pending.clone();
-    let weak = button.downgrade();
-    let parent = root.downgrade();
-    motion.connect_enter(move |_, _, _| {
-        if timer.borrow().is_some() {
+    pub(super) fn owner_active(window: &adw::ApplicationWindow) -> bool {
+        // A native popup grab can send a synthetic focus-out to GtkWindow on
+        // X11. The compositor's owning toplevel stays FOCUSED in that case.
+        window
+            .surface()
+            .and_downcast::<gdk::Toplevel>()
+            .map_or_else(
+                || window.is_active(),
+                |s| s.state().contains(gdk::ToplevelState::FOCUSED),
+            )
+    }
+    fn watch_surface(self: &Rc<Self>, window: &adw::ApplicationWindow) {
+        if let Some(surface) = window.surface().and_downcast::<gdk::Toplevel>() {
+            let weak = window.downgrade();
+            let state = Rc::downgrade(self);
+            surface.connect_notify_local(Some("state"), move |surface, _| {
+                if let (Some(window), Some(state)) = (weak.upgrade(), state.upgrade()) {
+                    if !Self::owner_active(&window)
+                        || surface.state().contains(gdk::ToplevelState::MINIMIZED)
+                    {
+                        state.close();
+                    }
+                }
+            });
+        }
+    }
+    fn cancel_hover(&self) {
+        self.generation.set(self.generation.get().wrapping_add(1));
+        if let Some(id) = self.pending.borrow_mut().take() {
+            id.remove();
+        }
+    }
+    pub(super) fn close_child(&self) {
+        self.cancel_hover();
+        let child = self.child.borrow_mut().take().and_then(|c| c.upgrade());
+        if let Some(child) = child {
+            child.popdown();
+        }
+    }
+    pub(super) fn close(&self) {
+        self.close_child();
+        if let Some(root) = self.root.upgrade() {
+            root.popdown();
+        }
+    }
+    fn open_child(&self, child: &gtk::Popover) {
+        self.cancel_hover();
+        if child.is_visible() {
             return;
         }
-        let weak = weak.clone();
-        let parent = parent.clone();
-        let fired = timer.clone();
-        let id = glib::timeout_add_local_once(Duration::from_millis(200), move || {
-            fired.borrow_mut().take();
-            if let (Some(button), Some(parent)) = (weak.upgrade(), parent.upgrade()) {
-                if button.is_mapped() && parent.is_mapped() && !button.is_active() {
-                    button.popup();
-                }
+        self.close_child();
+        if !self.root.upgrade().is_some_and(|p| p.is_mapped()) {
+            return;
+        }
+        self.child.replace(Some(child.downgrade()));
+        child.popup();
+        if let Some(first) = child.child().and_then(|content| content.first_child()) {
+            first.grab_focus();
+        }
+    }
+    pub(super) fn watch_other(self: &Rc<Self>, button: &gtk::Button) {
+        let motion = gtk::EventControllerMotion::new();
+        let state = Rc::downgrade(self);
+        let weak = button.downgrade();
+        motion.connect_enter(move |_, _, _| {
+            if let Some(state) = state.upgrade() {
+                state.close_child();
             }
-        });
-        *timer.borrow_mut() = Some(id);
-    });
-    let timer = pending.clone();
-    motion.connect_leave(move |_| {
-        // Crossing into the child popup only cancels a pending open. It must
-        // never pop down an already open submenu or its parent.
-        if let Some(id) = timer.borrow_mut().take() {
-            id.remove();
-        }
-    });
-    button.add_controller(motion);
-    let timer = pending;
-    let child = popup.downgrade();
-    button.connect_unmap(move |_| {
-        if let Some(id) = timer.borrow_mut().take() {
-            id.remove();
-        }
-        if let Some(child) = child.upgrade() {
-            child.set_visible(false);
-        }
-    });
-    let keys = gtk::EventControllerKey::new();
-    keys.set_propagation_phase(gtk::PropagationPhase::Capture);
-    let weak = button.downgrade();
-    keys.connect_key_pressed(move |_, key, _, modifiers| {
-        if key == gdk::Key::Right && modifiers.is_empty() {
             if let Some(button) = weak.upgrade() {
-                button.popup();
-            }
-            return glib::Propagation::Stop;
-        }
-        glib::Propagation::Proceed
-    });
-    button.add_controller(keys);
-    let keys = gtk::EventControllerKey::new();
-    keys.set_propagation_phase(gtk::PropagationPhase::Capture);
-    let weak = button.downgrade();
-    keys.connect_key_pressed(move |_, key, _, modifiers| {
-        if matches!(key, gdk::Key::Left | gdk::Key::Escape) && modifiers.is_empty() {
-            if let Some(button) = weak.upgrade() {
-                button.popdown();
                 button.grab_focus();
             }
-            return glib::Propagation::Stop;
-        }
-        glib::Propagation::Proceed
-    });
-    popup.add_controller(keys);
-    // A mode action, including reselecting the same mode, is a normal menu
-    // activation and closes the whole chain. Returning focus is not activation.
-    if let Some(action) = window
-        .lookup_action("image-mode")
-        .and_downcast::<gio::SimpleAction>()
-    {
-        let parent = root.downgrade();
-        let handler = action.connect_activate(move |_, _| {
-            if let Some(parent) = parent.upgrade() {
-                // GTK may already have hidden the child before dispatching the
-                // action. Root visibility is the correct chain-lifetime guard.
-                if parent.is_visible() {
-                    parent.popdown();
-                }
+        });
+        button.add_controller(motion);
+        let focus = gtk::EventControllerFocus::new();
+        let state = Rc::downgrade(self);
+        focus.connect_enter(move |_| {
+            if let Some(state) = state.upgrade() {
+                state.close_child();
             }
         });
-        let action = action.downgrade();
-        let handler = RefCell::new(Some(handler));
-        button.connect_destroy(move |_| {
-            if let (Some(action), Some(handler)) = (action.upgrade(), handler.borrow_mut().take()) {
-                action.disconnect(handler);
+        button.add_controller(focus);
+    }
+    pub(super) fn watch_parent(self: &Rc<Self>, button: &gtk::Button, popup: &gtk::Popover) {
+        popup.set_parent(button);
+        popup.set_position(gtk::PositionType::Right);
+        popup.set_valign(gtk::Align::Start);
+        button.update_property(&[gtk::accessible::Property::HasPopup(true)]);
+        button.update_state(&[gtk::accessible::State::Expanded(Some(false))]);
+        let weak = button.downgrade();
+        popup.connect_visible_notify(move |popup| {
+            if let Some(button) = weak.upgrade() {
+                button.update_state(&[gtk::accessible::State::Expanded(Some(popup.is_visible()))]);
             }
+        });
+        let motion = gtk::EventControllerMotion::new();
+        let state = Rc::downgrade(self);
+        let weak = button.downgrade();
+        let child = popup.downgrade();
+        motion.connect_enter(move |_, _, _| {
+            let (Some(state), Some(button), Some(child)) =
+                (state.upgrade(), weak.upgrade(), child.upgrade())
+            else {
+                return;
+            };
+            state.cancel_hover();
+            button.grab_focus();
+            if child.is_visible() {
+                return;
+            }
+            let generation = state.generation.get();
+            let state_ref = Rc::downgrade(&state);
+            let weak = button.downgrade();
+            let child = child.downgrade();
+            let id = glib::timeout_add_local_once(Duration::from_millis(200), move || {
+                let Some(state) = state_ref.upgrade() else {
+                    return;
+                };
+                state.pending.borrow_mut().take();
+                if state.generation.get() != generation {
+                    return;
+                }
+                if let (Some(button), Some(child)) = (weak.upgrade(), child.upgrade()) {
+                    if button.is_mapped() {
+                        state.open_child(&child);
+                    }
+                }
+            });
+            *state.pending.borrow_mut() = Some(id);
+        });
+        let state = Rc::downgrade(self);
+        motion.connect_leave(move |_| {
+            // Preserve an open child while crossing the gap. Only another root
+            // row (or an explicit dismissal) ends that child session.
+            if let Some(state) = state.upgrade() {
+                state.cancel_hover();
+            }
+        });
+        button.add_controller(motion);
+        let state = Rc::downgrade(self);
+        let child = popup.downgrade();
+        button.connect_clicked(move |_| {
+            if let (Some(state), Some(child)) = (state.upgrade(), child.upgrade()) {
+                state.open_child(&child);
+            }
+        });
+        let keys = gtk::EventControllerKey::new();
+        keys.set_propagation_phase(gtk::PropagationPhase::Capture);
+        let state = Rc::downgrade(self);
+        let child = popup.downgrade();
+        keys.connect_key_pressed(move |_, key, _, modifiers| {
+            if key == gdk::Key::Right && modifiers.is_empty() {
+                if let (Some(state), Some(child)) = (state.upgrade(), child.upgrade()) {
+                    state.open_child(&child);
+                }
+                return glib::Propagation::Stop;
+            }
+            glib::Propagation::Proceed
+        });
+        button.add_controller(keys);
+        let keys = gtk::EventControllerKey::new();
+        keys.set_propagation_phase(gtk::PropagationPhase::Capture);
+        let state = Rc::downgrade(self);
+        let parent = button.downgrade();
+        keys.connect_key_pressed(move |_, key, _, modifiers| {
+            if matches!(key, gdk::Key::Escape | gdk::Key::Left) && modifiers.is_empty() {
+                if let Some(state) = state.upgrade() {
+                    state.close_child();
+                }
+                if let Some(parent) = parent.upgrade() {
+                    parent.grab_focus();
+                }
+                return glib::Propagation::Stop;
+            }
+            glib::Propagation::Proceed
+        });
+        popup.add_controller(keys);
+        let state = Rc::downgrade(self);
+        button.connect_unmap(move |_| {
+            if let Some(state) = state.upgrade() {
+                state.close_child();
+            }
+        });
+        let child = popup.clone();
+        button.connect_destroy(move |_| {
+            child.unparent();
         });
     }
 }

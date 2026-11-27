@@ -1,9 +1,12 @@
-> Current release target: **0.2.7**. Native Arch staging, package build and owner acceptance passed.
-> See [v0.2.7 validation evidence](../../docs/releases/PIVRA_V0.2.7_RC_VALIDATION.md); immutable source hash and publication are separate checks.
+> Published stable: **0.2.7**. Current development candidate: **0.2.8**.
+> The [v0.2.7 validation evidence](../../docs/releases/PIVRA_V0.2.7_RC_VALIDATION.md)
+> is historical. See [v0.2.8 gates](../../docs/releases/PIVRA_V0.2.8_RC_VALIDATION.md)
+> for package acceptance on the current source.
 
 # Building Pivra from source on Linux (experimental)
 
-Pivra **0.2.7** includes fullscreen slideshow, persistent toolbar preferences and in-window Open. XWayland is the temporary default where available due to the GTK Wayland EGL lifecycle issue. Native Arch build, staging, package installation and owner GNOME acceptance passed; immutable publication source hashes remain a separate verification. Non-Arch distribution acceptance remains unverified.
+Pivra's XWayland default still applies where available due to the GTK Wayland
+EGL lifecycle issue. Non-Arch distribution acceptance remains unverified.
 
 ## Common Makefile interface (development branch)
 
@@ -127,12 +130,11 @@ regression pass.
 
 Run `bash packaging/arch/stage-video-candidate.sh` on clean native Arch for the
 single candidate staging step. It does not run makepkg or install system files.
-After explicit immutable-source approval, use a separate release workspace for
-makepkg source verification, real .SRCINFO generation and package checks.
-`python3 scripts/release_preflight.py --version 0.2.7 --candidate --staging-root
-/path/to/stage` validates this candidate. Final preflight omits --candidate and
-requires README/release notes to identify v0.2.7 as current stable; that handoff
-is authorized by the project owner, but final source archive and publication still require verification.
+The script reads the version from Cargo. To inspect existing v0.2.8 staging,
+run `python3 scripts/release_preflight.py --version 0.2.8 --candidate
+--staging-root /path/to/stage`. See the
+[native Arch workflow](../../docs/packaging/README.md#arch-candidate-gates)
+for local makepkg testing and the separate immutable-source gate.
 
 ## Known limitations
 
@@ -155,6 +157,6 @@ is authorized by the project owner, but final source archive and publication sti
 - The historical accepted `Preload exceeds cache entry budget` observation is not
   claimed fixed; see the existing release/audit records.
 
-See the [v0.2.7 release notes](../../docs/releases/PIVRA_V0.2.7_RELEASE_NOTES.md),
-[candidate report](../../docs/releases/PIVRA_V0.2.7_RC_VALIDATION.md) and
+See the [v0.2.8 draft notes](../../docs/releases/PIVRA_V0.2.8_RELEASE_NOTES.md),
+[candidate report](../../docs/releases/PIVRA_V0.2.8_RC_VALIDATION.md) and
 [LGPL rebuild instructions](../../docs/diagnostics/VIDEO_ADAPTER_REBUILD.md).

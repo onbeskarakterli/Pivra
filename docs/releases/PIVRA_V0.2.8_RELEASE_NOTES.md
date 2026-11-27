@@ -1,8 +1,8 @@
 # Pivra v0.2.8 draft release notes
 
-**Upcoming development candidate. Publication and native acceptance are pending.**
+**Release candidate. Native Arch package acceptance and publication are pending.**
 The current stable release is [v0.2.7](PIVRA_V0.2.7_RELEASE_NOTES.md).
-The development source and package recipe still report 0.2.7.
+The candidate source reports version 0.2.8 and the Arch recipe targets 0.2.8-1.
 
 ## Implemented on dev
 
@@ -26,13 +26,16 @@ The development source and package recipe still report 0.2.7.
   plays outside slideshow, Pivra can request display-sleep inhibition.
 - Release testing fixed rapid slideshow round trips that could reissue a load
   and suppress the planned photo transition.
+- Video click controls distinguish a single click for play/pause from a
+  double click for fullscreen, including when the video is already fullscreen.
 
 ## Evidence and remaining gates
 
 The [validation report](PIVRA_V0.2.8_RC_VALIDATION.md) records 241 Rust tests,
-249 executed Python tests and 54 controlled GUI/video cases passing. Native
-Arch build and installation, physical GNOME acceptance, secure photo and
-animation decoding, and desktop Trash/Undo remain open for this source.
+249 executed Python tests and 54 controlled GUI/video cases passing on the
+earlier regression source. The owner confirmed 5/5 for the video mouse fix
+on physical GNOME. Native Arch build and installation of the 0.2.8 package
+remain pending. The validation report lists the scope of the other native checks.
 
 The Open dialog and next-photo latency reports remain open. Measurements and
 the paused investigation are recorded in the [Open diagnostics](../diagnostics/OPEN_FILE_LATENCY.md).

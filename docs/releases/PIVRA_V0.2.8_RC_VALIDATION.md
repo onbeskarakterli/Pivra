@@ -1,15 +1,16 @@
 # Pivra v0.2.8 pre-release validation
 
-**Status: ready for documentation review and physical acceptance. Publication is
-blocked pending native verification and source approval.** The published stable
-release is v0.2.7. The version in Cargo and the Arch recipe remains 0.2.7.
+**Status: v0.2.8 prepared for native Arch package validation. Publication awaits
+native package verification, immutable source approval and explicit authorization.**
+The published stable release is v0.2.7.
 
 This run began at `9793b723fa9442b909dc77fe17813f71f7e05480`.
 Validated development source after fixes:
 `91da58dd60a361a458fb56fe402269f262bfee31`.
 Earlier passing probes ran on the same production code where unaffected, and
 the affected gates were rerun. This report and later document edits are separate
-from the tested source. Neither this SHA nor this report is an approved archive.
+from the tested source, which still reported 0.2.7 during these tests. Neither
+this SHA nor this report is an approved archive.
 
 ## Automated validation
 
@@ -108,16 +109,27 @@ gates. The stock GTK Wayland limitation in earlier records remains open. The
 [Open latency report](../diagnostics/OPEN_FILE_LATENCY.md) records the unresolved
 chooser and subsequent navigation reports.
 
-Documentation review found a packaging prerequisite. The existing local
-validator hard-codes 0.2.6 while the recipe and staging preflight target 0.2.7.
-Align them with the future release version before testing the native artifact.
-After that and explicit source approval, use the version-matched
-`python3 packaging/arch/validate-release.py --approved-source SHA --sha256 HASH`
-workflow in a native Arch environment. Review the actual package before a local
-install, run `pacman -Qip`, `pacman -Qlp`, `pacman -Qkk pivra`, and check the
-installed desktop entry, icon, helper and GUI. Prior v0.2.7 package evidence
-remains in its historical record.
+## Packaging follow-up
 
-The controlled gates support documentation cleanup and user acceptance.
-Release approval remains pending on secure native media and Trash/Undo,
-physical GNOME and hardware checks, and the exact native package.
+- The owner reports **5/5 PASS** for the video mouse interaction fix
+  `d73d0af3931331c8b17662343c8a4c9e654aefbe` on physical GNOME. This is
+  acceptance of the mouse fix before version preparation.
+- Cargo and the Arch recipe now declare 0.2.8. The preflight accepts the
+  candidate marker while README continues to identify stable v0.2.7.
+  The Arch validator checks the selected version and supports a checksummed
+  local source archive from an exact commit. Use the
+  [native package workflow](../packaging/README.md#arch-candidate-gates)
+  for `makepkg`, `.SRCINFO`, local installation and installed desktop checks.
+- Native package build, package installation and installed desktop
+  acceptance of 0.2.8 are pending. The earlier native skips above retain
+  their original scope. Prior v0.2.7 package evidence remains historical.
+- The publication archive, checksum and publication approval remain open.
+
+| Packaging-preparation check | Result |
+| --- | --- |
+| `cargo fmt --all -- --check`, `cargo check --locked` | PASS in the Debian SDK. |
+| `cargo test --locked --test cli`, `target/debug/pivra --version` | 7 PASS. The executable reports `Pivra 0.2.8`. |
+| `python3 -B tests/test_release_source.py -v` | 7 PASS, including exact-commit archiving, local and immutable-source recipe guards, and modeled `.SRCINFO` consistency. |
+| Shell syntax, source version/recipe alignment, collector checksum, desktop entry and both SVG icon IDs/paths | PASS on source files. |
+| `bash packaging/linux/dependencies.sh check` | PASS for native development APIs and GStreamer elements in the Debian SDK. |
+| Arch ownership, actual `.SRCINFO` generation, `makepkg`, package contents and installed launch | NOT RUN in the Debian SDK. Both Arch entry points exited 77. The validator reported missing `makepkg`, `pacman` and `bsdtar`. |

@@ -21,33 +21,65 @@ and runtime providers with the scripts for the selected distribution.
 
 ## Arch candidate gates
 
-The [PKGBUILD](../../packaging/arch/PKGBUILD) and staging preflight target
-0.2.7. The [local validator](../../packaging/arch/validate-release.py) still
-hard-codes `VERSION = '0.2.6'` and rejects an approved source at another
-version. Version preparation must align all three components before native
-v0.2.8 validation. The README files in the packaging tree retain earlier
-version-specific instructions. Current results are in the
-[v0.2.8 validation record](../releases/PIVRA_V0.2.8_RC_VALIDATION.md).
+The [PKGBUILD](../../packaging/arch/PKGBUILD) targets **0.2.8-1**. The staging
+script reads the Cargo version and the Arch validator checks the exact
+requested version. The [candidate record](../releases/PIVRA_V0.2.8_RC_VALIDATION.md)
+tracks the remaining gates.
 
-1. Prepare the target version and staging commands during the authorized
-   release phase. Verify Arch native ownership with
-   `bash packaging/arch/verify-video-dependencies.sh`. The current staging
-   script is `bash packaging/arch/stage-video-candidate.sh` and has a fixed
-   0.2.7 preflight target that requires updating with future version preparation.
-2. Review and approve the exact immutable commit and real GitHub archive
-   SHA-256. Preserve the source approval gate, the single `pivra` package and
-   `options=('!debug')`. Keep local `release-source.conf`, `.SRCINFO` and build
-   artifacts outside the application repository.
-3. Use the matching version of `python3 packaging/arch/validate-release.py
-   --approved-source SHA --sha256 HASH` on native Arch. Review the tool's
-   source-verification, generated metadata, package list, checked build and
-   extracted-content evidence. Run as an ordinary user.
-4. In the intended test system, verify artifact metadata and inventory with
-   `pacman -Qip` and `pacman -Qlp`. Install the reviewed local artifact and
-   check `pacman -Qkk pivra`, `pivra --version`, application-menu launch,
-   installed icon, desktop integration and sibling thumbnail helper. Inspect
-   the package list for unintended debug/test artifacts and compare install
-   and removal behavior using disposable media and config.
+### Build and verify the local v0.2.8 candidate
+
+Use a native Arch x86_64 test machine with the PKGBUILD's dependencies.
+If dependencies are missing, install the prerequisites with
+`bash packaging/linux/dependencies.sh install` and
+`sudo pacman -S --needed desktop-file-utils libarchive`. Run the validator
+as an ordinary user from the reviewed `dev` checkout. Substitute the exact
+40-character commit being tested for `<candidate-commit>`.
+
+```sh
+python3 -B scripts/release_preflight.py --version 0.2.8 --candidate
+bash packaging/arch/verify-video-dependencies.sh
+python3 -B packaging/arch/validate-release.py --version 0.2.8 --local-candidate '<candidate-commit>'
+```
+
+The validator archives the specified local Git commit, computes its SHA-256,
+and creates a private workspace with a `candidate-source.conf` and a local
+`source` entry. It runs `makepkg --verifysource --force`,
+`makepkg --printsrcinfo`, `makepkg --packagelist`, and
+`makepkg --cleanbuild --force --check`. It checks the single
+`pivra-0.2.8-1-x86_64` package, executable and helper, desktop entry and
+icons, release docs, LGPL notices and corresponding sources. The printed
+`Package:` path identifies the verified artifact. The printed workspace retains
+`.SRCINFO`, package contents and logs. `build.log` can be followed during the
+build. `bash packaging/arch/stage-video-candidate.sh` remains available as a
+separate DESTDIR check.
+
+Set `package` to the exact printed path and review it before installing.
+The local package has the same name as the published package and replaces
+an existing Pivra installation on the test machine.
+
+```sh
+package='/absolute/path/from-the-validator/pivra-0.2.8-1-x86_64.pkg.tar.zst'
+pacman -Qip "$package" &&
+pacman -Qlp "$package" &&
+sudo pacman -U -- "$package" &&
+/usr/bin/pivra --version &&
+pacman -Qkk pivra &&
+desktop-file-validate /usr/share/applications/io.github.onbeskarakterli.Pivra.desktop &&
+test -x /usr/bin/pivra-thumbnail-factory
+```
+
+Expect `Pivra 0.2.8` and zero altered files. Verify the icon and GUI launch
+from the installed application menu, and open disposable media from Nautilus.
+
+### Verify an approved publication source separately
+
+Keep local files and generated `.SRCINFO` out of Git. The local Git archive's
+SHA-256 belongs to that artifact. Once the owner approves the actual GitHub
+commit archive and its independently verified SHA-256, run
+`python3 -B packaging/arch/validate-release.py --version 0.2.8 --approved-source SHA --sha256 HASH`.
+That mode requires the immutable GitHub URL and generates separate
+`release-source.conf` and `.SRCINFO` files. The recipe rejects both configs
+being present together and keeps `options=('!debug')` in both modes.
 
 Distribution builds must include the mandatory adapter and GNOME thumbnail
 helper, exact corresponding sources and license notices. Follow the

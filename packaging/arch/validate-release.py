@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
-"""Native Arch validation of an explicitly approved immutable source; never install.
+"""Build and inspect an Arch package from an exact commit; never install.
 
-No moving-ref inputs, dependency installation, repository writes or publication.
-Passing --approved-source is the caller's explicit source-approval attestation.
+--local-candidate archives a local Git commit for testing only.
+--approved-source requires the owner's approved GitHub archive checksum.
 """
 import argparse
 import hashlib
@@ -18,12 +18,25 @@ import tempfile
 import tomllib
 import urllib.request
 
-VERSION = '0.2.6'
+ROOT = Path(__file__).resolve().parents[2]
 
-def source_url(commit):
+def require_commit(commit):
     if not re.fullmatch(r'[0-9a-f]{40}', commit):
         raise ValueError('full immutable 40-character source commit required')
+
+def source_url(commit):
+    require_commit(commit)
     return f'https://github.com/onbeskarakterli/Pivra/archive/{commit}.tar.gz'
+
+def archive_local(repo, commit, target):
+    require_commit(commit)
+    git = ['git', '--no-replace-objects', '-C', str(repo)]
+    kind = subprocess.check_output(git + ['cat-file', '-t', commit], text=True).strip()
+    if kind != 'commit':
+        raise ValueError('local candidate must identify a commit object')
+    with target.open('xb') as output:
+        subprocess.run(git + ['archive', '--format=tar.gz', f'--prefix=Pivra-{commit}/', commit],
+                       stdout=output, check=True)
 
 def digest(path):
     with path.open('rb') as file:
@@ -71,11 +84,11 @@ def fields(text):
             result.setdefault(key, []).append(value)
     return result
 
-def verify_srcinfo(text, commit, sha256, collector_sha256):
+def verify_srcinfo(text, version, archive_source, sha256, collector_sha256):
     data = fields(text)
-    expected = {'pkgbase': ['pivra'], 'pkgname': ['pivra'], 'pkgver': [VERSION],
+    expected = {'pkgbase': ['pivra'], 'pkgname': ['pivra'], 'pkgver': [version],
                 'pkgrel': ['1'], 'arch': ['x86_64'], 'license': ['GPL-3.0-only'],
-                'source': [f'pivra-{VERSION}.tar.gz::{source_url(commit)}', 'collect-licenses.py'],
+                'source': [archive_source, 'collect-licenses.py'],
                 'sha256sums': [sha256, collector_sha256]}
     for key, value in expected.items():
         if data.get(key) != value:
@@ -103,14 +116,18 @@ def run(args, cwd, env, log):
     return stdout
 
 
-def verify_contents(root, source, source_sha256):
+def verify_contents(root, source, version, source_sha256, recipe, config_name):
     metadata = fields((root / '.PKGINFO').read_text())
-    for key, value in {'pkgname': ['pivra'], 'pkgver': [VERSION + '-1'], 'arch': ['x86_64'], 'license': ['GPL-3.0-only']}.items():
+    for key, value in {'pkgname': ['pivra'], 'pkgver': [version + '-1'], 'arch': ['x86_64'], 'license': ['GPL-3.0-only']}.items():
         if metadata.get(key) != value:
             raise ValueError('package metadata mismatch: ' + key)
+    if {p.name for p in (root / 'usr/bin').iterdir()} != {'pivra', 'pivra-thumbnail-factory'}:
+        raise ValueError('unexpected package executable inventory')
+    if any(p.exists() or p.is_symlink() for p in (root / 'usr/lib/debug', root / 'usr/src/debug')):
+        raise ValueError('unexpected packaged debug files')
     binary = root / 'usr/bin/pivra'
     subprocess.run(['python3', str(source / 'packaging/linux/verify-video-binary.py'), str(binary)], check=True)
-    if subprocess.check_output([str(binary), '--version'], text=True).strip() != f'Pivra {VERSION}':
+    if subprocess.check_output([str(binary), '--version'], text=True).strip() != f'Pivra {version}':
         raise ValueError('packaged binary version mismatch')
     helper = root / 'usr/bin/pivra-thumbnail-factory'
     if not helper.is_file() or not os.access(helper, os.X_OK):
@@ -126,8 +143,11 @@ def verify_contents(root, source, source_sha256):
             raise ValueError('desktop/icon differs from approved source: ' + relative)
     docs = root / 'usr/share/doc/pivra'
     corresponding = docs / 'corresponding-source'
-    if digest(corresponding / f'pivra-{VERSION}.tar.gz') != source_sha256:
-        raise ValueError('packaged application source differs from approved archive')
+    if digest(corresponding / f'pivra-{version}.tar.gz') != source_sha256:
+        raise ValueError('packaged application source differs from verified archive')
+    for name in ('PKGBUILD', config_name, 'collect-licenses.py'):
+        if digest(corresponding / name) != digest(recipe / name):
+            raise ValueError('packaged build instructions differ: ' + name)
     for original in (source / 'native/video').iterdir():
         if original.is_file() and digest(corresponding / 'video-adapter' / original.name) != digest(original):
             raise ValueError('modified adapter source/notice missing or changed: ' + original.name)
@@ -136,8 +156,9 @@ def verify_contents(root, source, source_sha256):
             raise ValueError('packaged LGPL text differs')
     if digest(root / 'usr/share/licenses/pivra/LICENSE') != digest(source / 'LICENSE'):
         raise ValueError('packaged GPL text differs')
-    if digest(docs / f'PIVRA_V{VERSION}_RELEASE_NOTES.md') != digest(source / f'docs/releases/PIVRA_V{VERSION}_RELEASE_NOTES.md'):
-        raise ValueError('packaged release notes differ')
+    for name in (f'PIVRA_V{version}_RELEASE_NOTES.md', f'PIVRA_V{version}_RC_VALIDATION.md'):
+        if digest(docs / name) != digest(source / 'docs/releases' / name):
+            raise ValueError('packaged release document differs: ' + name)
     inventory = json.loads((root / 'usr/share/licenses/pivra/third-party/inventory.json').read_text())
     lock = tomllib.loads((source / 'Cargo.lock').read_text())
     expected = {(p['name'], p['version']) for p in lock['package'] if p.get('source', '').startswith('registry+')}
@@ -161,34 +182,58 @@ def verify_contents(root, source, source_sha256):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('--approved-source', required=True, help='Owner-approved immutable SHA; do not use before approval')
-    parser.add_argument('--sha256', required=True, help='Owner-approved real archive SHA-256')
+    mode = parser.add_mutually_exclusive_group(required=True)
+    mode.add_argument('--local-candidate', metavar='COMMIT', help='Archive this exact local Git commit for testing')
+    mode.add_argument('--approved-source', metavar='COMMIT', help='Owner-approved GitHub archive commit')
+    parser.add_argument('--version', help='Expected X.Y.Z; defaults to the checkout Cargo.toml version')
+    parser.add_argument('--sha256', help='Required only for the owner-approved GitHub archive')
     args = parser.parse_args()
-    source_url(args.approved_source)
-    if not re.fullmatch(r'[0-9a-f]{64}', args.sha256):
-        parser.error('64-character approved SHA-256 required')
+    version = args.version or tomllib.loads((ROOT / 'Cargo.toml').read_text())['package']['version']
+    if not re.fullmatch(r'[0-9]+\.[0-9]+\.[0-9]+', version):
+        parser.error('expected a numeric X.Y.Z version')
+    commit = args.local_candidate or args.approved_source
+    require_commit(commit)
+    if args.approved_source and not re.fullmatch(r'[0-9a-f]{64}', args.sha256 or ''):
+        parser.error('--approved-source requires a 64-character --sha256')
+    if args.local_candidate and args.sha256 is not None:
+        parser.error('--local-candidate computes its own archive checksum')
     if os.geteuid() == 0:
         parser.error('makepkg must run as an ordinary user')
-    missing = [p for p in ('makepkg', 'pacman', 'bsdtar', 'readelf', 'desktop-file-validate') if not shutil.which(p)]
+    required = ['makepkg', 'pacman', 'bsdtar', 'readelf', 'desktop-file-validate']
+    if args.local_candidate:
+        required.append('git')
+    missing = [p for p in required if not shutil.which(p)]
     if missing:
         parser.exit(77, 'NOT RUN: native Arch tools missing: ' + ', '.join(missing) + '\n')
-    work = Path(tempfile.mkdtemp(prefix='pivra-025-package-'))
+    work = Path(tempfile.mkdtemp(prefix=f'pivra-{version}-package-'))
     print('Retained validation workspace:', work, flush=True)
-    archive = work / f'pivra-{VERSION}.tar.gz'
-    download(args.approved_source, archive)
-    if digest(archive) != args.sha256:
+    archive = work / f'pivra-{version}.tar.gz'
+    if args.local_candidate:
+        archive_local(ROOT, commit, archive)
+        config_name = 'candidate-source.conf'
+        url = ''
+    else:
+        download(commit, archive)
+        config_name = 'release-source.conf'
+        url = source_url(commit)
+    sha256 = digest(archive)
+    if args.approved_source and sha256 != args.sha256:
         raise ValueError('downloaded archive checksum differs; no build attempted')
-    source = extract_source(archive, work / 'source', args.approved_source)
+    print(f'SOURCE {config_name} commit={commit} sha256={sha256}', flush=True)
+    source = extract_source(archive, work / 'source', commit)
     manifest = tomllib.loads((source / 'Cargo.toml').read_text())['package']
-    if manifest['version'] != VERSION or manifest['license'] != 'GPL-3.0-only':
-        raise ValueError('approved source version/license mismatch')
+    lock = tomllib.loads((source / 'Cargo.lock').read_text())
+    locked_versions = [p['version'] for p in lock['package'] if p['name'] == 'pivra' and 'source' not in p]
+    if manifest['version'] != version or locked_versions != [version] or manifest['license'] != 'GPL-3.0-only':
+        raise ValueError('source Cargo.toml/Cargo.lock version or license mismatch')
     recipe = work / 'recipe'; recipe.mkdir()
     for name in ('PKGBUILD', 'collect-licenses.py'):
         shutil.copyfile(source / 'packaging/arch' / name, recipe / name)
     shutil.copyfile(archive, recipe / archive.name)
-    (recipe / 'release-source.conf').write_text(
-        '# Explicit caller source approval; not publication authorization.\n'
-        f"release_commit='{args.approved_source}'\nrelease_url='{source_url(args.approved_source)}'\nrelease_sha256='{args.sha256}'\n")
+    description = ('Local candidate only. Git archive checksum is not a GitHub release checksum.'
+                   if args.local_candidate else 'Explicit caller source approval; not publication authorization.')
+    (recipe / config_name).write_text(
+        f"# {description}\nrelease_commit='{commit}'\nrelease_url='{url}'\nrelease_sha256='{sha256}'\n")
     env = dict(os.environ, PKGDEST=str(work / 'packages'), SRCDEST=str(recipe),
                BUILDDIR=str(work / 'build'), LOGDEST=str(work / 'logs'))
     for name in ('packages', 'build', 'logs'): (work / name).mkdir()
@@ -202,11 +247,12 @@ def main():
     makepkg = ['makepkg', '--config', str(config)]
     run(makepkg + ['--verifysource', '--force'], recipe, env, work / 'verifysource.log')
     info = run(makepkg + ['--printsrcinfo'], recipe, env, work / 'srcinfo.log')
-    verify_srcinfo(info, args.approved_source, args.sha256, digest(recipe / 'collect-licenses.py'))
+    archive_source = f'{archive.name}::{url}' if url else archive.name
+    verify_srcinfo(info, version, archive_source, sha256, digest(recipe / 'collect-licenses.py'))
     (recipe / '.SRCINFO').write_text(info)
     planned = run(makepkg + ['--packagelist'], recipe, env, work / 'packagelist.log').splitlines()
     packages = [Path(p).resolve() for p in planned if p.strip()]
-    if len(packages) != 1 or not packages[0].is_relative_to(work) or not packages[0].name.startswith(f'pivra-{VERSION}-1-x86_64.pkg.tar.'):
+    if len(packages) != 1 or not packages[0].is_relative_to(work) or not packages[0].name.startswith(f'pivra-{version}-1-x86_64.pkg.tar.'):
         raise ValueError('expected one private pivra package, never pivra-debug or external output')
     run(makepkg + ['--cleanbuild', '--force', '--check'], recipe, env, work / 'build.log')
     package = packages[0]
@@ -215,9 +261,10 @@ def main():
         raise ValueError('unsafe package member path')
     unpacked = work / 'unpacked'; unpacked.mkdir()
     run(['bsdtar', '-xf', str(package), '--no-same-owner', '--no-same-permissions', '-C', str(unpacked)], recipe, env, work / 'extract.log')
-    verify_contents(unpacked, source, args.sha256)
+    verify_contents(unpacked, source, version, sha256, recipe, config_name)
     subprocess.run(['desktop-file-validate', str(unpacked / 'usr/share/applications/io.github.onbeskarakterli.Pivra.desktop')], check=True)
     print('PASS native makepkg source/.SRCINFO/clean build/contents; package SHA256:', digest(package))
+    print('Package:', package)
     print('NOT RUN: installation, main/tag/GitHub/AUR publication. Outputs:', work)
 
 if __name__ == '__main__':

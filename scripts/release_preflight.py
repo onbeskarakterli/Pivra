@@ -18,7 +18,7 @@ def git(*args):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--version", required=True, help="Release version, e.g. 0.2.7")
+    parser.add_argument("--version", required=True, help="Target release version (X.Y.Z)")
     parser.add_argument("--binary", type=Path, help="Inspect an actual GPU-enabled distribution ELF")
     parser.add_argument("--staging-root", type=Path, help="Inspect an actual PREFIX=/usr DESTDIR staging tree")
     parser.add_argument("--candidate", action="store_true", help="Validate the exact target candidate; publication/source approval remain separate")
@@ -80,7 +80,7 @@ def main():
             or "release candidate" in text.splitlines()[0].lower()
         ):
             errors.append("Publication handoff: release notes must carry stable-release source wording, not RC status")
-    if notes_name not in recipe:
+    if notes_name not in recipe and "PIVRA_V${pkgver}_RELEASE_NOTES.md" not in recipe:
         errors.append("PKGBUILD must install target-version release notes")
 
     binary = args.binary

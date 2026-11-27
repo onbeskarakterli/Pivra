@@ -16,9 +16,10 @@ published [v0.2.5](PIVRA_V0.2.5_RELEASE_NOTES.md) and the unreleased
    package in `Cargo.lock`, the version displayed by Pivra and the release
    packaging metadata consistent. Run the version-matched candidate/final
    preflight on the reviewed source and actual staged artifact.
-4. Review the immutable source archive and verify the real SHA-256. Obtain
-   explicit approval for that source. Validate the local native Arch build,
-   `.SRCINFO`, installed package, runtime behavior and source/notice inventory.
+4. Validate the native Arch candidate, `.SRCINFO`, installed package, runtime
+   behavior and source/notice inventory with an exact local commit archive.
+   For publication, verify the real SHA-256 of the immutable GitHub archive,
+   obtain explicit approval for that source and validate its package separately.
    See the [packaging guide](../packaging/README.md).
 5. After explicit publication approval, promote the authorized stable source
    to `main` through the applicable GitHub review/protection workflow.
@@ -31,6 +32,6 @@ published [v0.2.5](PIVRA_V0.2.5_RELEASE_NOTES.md) and the unreleased
    version in agreement. Numeric-only stable release preflight applies when
    preparing a stable release version.
 
-The versioning policy describes future work. Current v0.2.8 preparation leaves
-the checked-in source and recipe at 0.2.7. Keep owner reports, controlled tests
-and final artifact verification attributed to their real environment and SHA.
+The checked-in v0.2.8 source and recipe are prepared for local package
+validation. Keep owner reports, controlled tests and final artifact verification
+attributed to their real environment and SHA.

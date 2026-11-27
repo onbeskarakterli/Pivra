@@ -1,8 +1,8 @@
 # Pivra v0.2.8 pre-release validation
 
-**The owner accepted the local v0.2.8 package and authorized stable publication.**
-Final tagged-source verification, a native Arch build of that source and
-distribution publication are separate gates. See the owner evidence below.
+**Final native Arch validation and installation passed, as reported by the owner.**
+The owner authorized stable publication. GitHub Release and AUR publication
+are tracked separately below.
 
 This run began at `9793b723fa9442b909dc77fe17813f71f7e05480`.
 Validated development source after fixes:
@@ -161,9 +161,36 @@ is open. [Open latency report](../diagnostics/OPEN_FILE_LATENCY.md)
 
 ## Final distribution gates
 
-The owner-authorized release follows the existing `dev` → `main` pull request
-workflow. Record the verified annotated tag, target commit and immutable
-GitHub archive digest after integration. The local archive and package hashes
-above identify only the owner-tested artifacts. Use the immutable commit archive
-for a separate Arch build and generated `.SRCINFO`. GitHub Release and AUR
-publication require those results. [Arch packaging workflow](../packaging/README.md)
+PR #13 merged the release into `main`. The annotated `v0.2.8` tag object is
+`07944624c8247f7c7a0f58fb02e8e49bb0f0ff6d` and points to the merge commit
+`21e1f53e94e4f3bfbc8c50cc5ca381cf3a117c55`. The tagged tree matched the
+reviewed development tree. Both GitHub archives were downloaded and their
+432 files, including executable bits, matched the tagged tree.
+
+| Final artifact | SHA-256 |
+| --- | --- |
+| [GitHub commit archive used by the Arch recipe](https://github.com/onbeskarakterli/Pivra/archive/21e1f53e94e4f3bfbc8c50cc5ca381cf3a117c55.tar.gz) | `8fde2aa2a694ab727806c2b733651d77360b7dbadd5076b5a6c45172c38e2ad3` |
+| [GitHub tag archive](https://github.com/onbeskarakterli/Pivra/archive/refs/tags/v0.2.8.tar.gz) | `2c3fb88cd519eea4125c0cc9b475668ebb7f30fe9b46b5f38d8959aa4860f655` |
+| Final native Arch package `pivra 0.2.8-1` | `2a0955c997ce37a5f79a7f981be7fa278505ecae627bd866188d7f1baac89f38` |
+
+The owner reported these native results from
+`/tmp/pivra-0.2.8-package-7_ro2pg0`. The earlier local candidate and its
+physical GNOME checks remain recorded above.
+
+| Final native gate | Owner result |
+| --- | --- |
+| Release source verification, `makepkg --verifysource`, generated `.SRCINFO` and clean checked package build | PASS |
+| GPU ELF dependencies, package contents, version and helper, LGPL and modified sources | PASS |
+| Corresponding locked crate sources | PASS, 184 |
+| Final package installation and integrity | PASS, `Pivra 0.2.8`, `pivra 0.2.8-1`, 1331 files and zero altered |
+
+The Arch recipe uses the immutable GitHub commit archive and
+`options=('!debug')`. [Arch packaging workflow](../packaging/README.md)
+
+| Publication action | Verification |
+| --- | --- |
+| Annotated `v0.2.8` tag | Remote object and target SHA verified. |
+| GitHub Release | BLOCKED in the cloud environment. The API request returned HTTP 403 and the public latest-release link still pointed to v0.2.7. |
+| AUR `pivra 0.2.8-1` | BLOCKED in the cloud environment. The AUR HTTPS proxy returned HTTP 403 and the SSH client could not load its system configuration. Remote version and commit are unverified. |
+
+The next development version requires verified publication on both services.

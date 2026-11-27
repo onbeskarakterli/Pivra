@@ -1,4 +1,4 @@
-> Stable source version **0.2.8**.
+> Stable source version **0.2.8**. The development checkout reports **0.2.9-dev**.
 > The [v0.2.7 validation evidence](../../docs/releases/PIVRA_V0.2.7_RC_VALIDATION.md)
 > is historical. See [v0.2.8 gates](../../docs/releases/PIVRA_V0.2.8_RC_VALIDATION.md)
 > for package acceptance on the current source.
@@ -128,8 +128,9 @@ regression pass.
 
 ## Candidate checks and publication handoff
 
-Run `bash packaging/arch/stage-video-candidate.sh` on clean native Arch for the
-single candidate staging step. It does not run makepkg or install system files.
+Use `bash packaging/arch/stage-video-candidate.sh` on clean native Arch
+with a numeric candidate version on `dev`. It stages files under a
+temporary root.
 The script reads the version from Cargo. To inspect existing v0.2.8 staging,
 run `python3 scripts/release_preflight.py --version 0.2.8 --candidate
 --staging-root /path/to/stage`. See the

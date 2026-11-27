@@ -1,5 +1,8 @@
 # Develop Pivra
 
+The `dev` branch reports `0.2.9-dev`. The current stable release and Arch
+package are v0.2.8 and `0.2.8-1`, respectively.
+
 Work on `dev` and keep commits small and independently reviewable. The
 [architecture guide](../architecture/README.md) maps the source and shows where
 new behavior belongs. Put independent features in dedicated modules when the

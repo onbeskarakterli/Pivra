@@ -1272,7 +1272,7 @@ dependencies = [
 
 [[package]]
 name = "pivra"
-version = "0.2.8"
+version = "0.2.9-dev"
 dependencies = [
  "glycin",
  "gufo-exif",

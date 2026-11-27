@@ -65,7 +65,8 @@ No transition.
 
 ## Development on dev
 
-For development builds, see the [development guide](docs/development/README.md).
+**Unreleased development version: `0.2.9-dev`.** For development builds, see
+the [development guide](docs/development/README.md).
 The [validation record](docs/releases/PIVRA_V0.2.8_RC_VALIDATION.md) tracks
 the evidence and distribution status for v0.2.8.
 

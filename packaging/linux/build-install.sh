@@ -46,8 +46,11 @@ helper="$build_dir/pivra-thumbnail-factory"
 cargo_target_dir="$(cargo metadata --locked --no-deps --format-version 1 | python3 -c 'import json,sys; print(json.load(sys.stdin)["target_directory"])')"
 viewer="$cargo_target_dir/release/pivra"
 version=$(python3 -c 'import pathlib,tomllib; print(tomllib.loads(pathlib.Path("Cargo.toml").read_text())["package"]["version"])')
-release_notes="docs/releases/PIVRA_V${version}_RELEASE_NOTES.md"
-[[ -s "$release_notes" ]] || { echo "ERROR: missing release notes for $version" >&2; exit 1; }
+release_notes=''
+if [[ "$version" != *-dev ]]; then
+  release_notes="docs/releases/PIVRA_V${version}_RELEASE_NOTES.md"
+  [[ -s "$release_notes" ]] || { echo "ERROR: missing release notes for $version" >&2; exit 1; }
+fi
 raw_helper="$build_dir/pivra-raw-decoder"
 
 build_all() {
@@ -140,7 +143,9 @@ PYTHON
         "$sharedir/icons/hicolor/$variant/apps/$name.svg"
     done
     install -Dm644 LICENSE "$sharedir/licenses/pivra/LICENSE"
-    install -Dm644 "$release_notes" "$sharedir/doc/pivra/$(basename -- "$release_notes")"
+    if [[ -n "$release_notes" ]]; then
+      install -Dm644 "$release_notes" "$sharedir/doc/pivra/$(basename -- "$release_notes")"
+    fi
     install -d "$sharedir/licenses/pivra/third-party" "$sharedir/licenses/pivra/video-adapter" \
       "$sharedir/doc/pivra/corresponding-source/crates" "$sharedir/doc/pivra/corresponding-source/video-adapter"
     cp -r --no-preserve=ownership "$distribution/notices/." "$sharedir/licenses/pivra/third-party/"

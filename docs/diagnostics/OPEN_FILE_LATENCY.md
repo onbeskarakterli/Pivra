@@ -2,6 +2,10 @@
 
 Status: **OPEN — physical GNOME ~2-second chooser and slow-next-photo reports
 not reproduced in the controlled SDK; no native performance fix claimed.**
+The project owner paused the investigation during release preparation. Resume
+it if further validation reproduces a release-blocking defect. The capture
+procedure below remains available for comparing native observations.
+
 Base: `a6bc6ae1f46944627eb3f149193e570460c5375a` on `dev`.
 
 ## Findings and scope

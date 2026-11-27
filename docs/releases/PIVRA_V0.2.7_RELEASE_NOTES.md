@@ -26,6 +26,6 @@ These notes describe the published `v0.2.7` source, not the newer `dev` branch. 
 
 ## After v0.2.7 publication — dev only
 
-The empty-window Open fix (`63c9a15`), Ctrl+O, media information panel, photo minimap, F2 rename, thumbnail type filters, video display-sleep inhibition and subsequent toolbar refinements belong to the next development cycle. See [post-v0.2.7 development notes](../development/NEXT_CYCLE_UI.md) for implementation and validation limits. They do not change this release's historical scope or empty-window Open limitation.
+The empty-window Open fix (`63c9a15`), Ctrl+O, media information panel, photo minimap, F2 rename, thumbnail type filters, video display-sleep inhibition and subsequent toolbar refinements belong to the next development cycle. See the [v0.2.8 draft notes](PIVRA_V0.2.8_RELEASE_NOTES.md) and [post-v0.2.7 development notes](../development/NEXT_CYCLE_UI.md) for implementation and validation limits. They do not change this release's historical scope or empty-window Open limitation.
 
 See the [v0.2.7 validation and publication record](PIVRA_V0.2.7_RC_VALIDATION.md).

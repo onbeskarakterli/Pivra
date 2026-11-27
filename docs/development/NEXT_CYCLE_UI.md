@@ -1,6 +1,6 @@
 # Post-v0.2.7 viewer improvements
 
-**Unreleased development on `dev`, after the published stable v0.2.7.** The source version remains 0.2.7; none of the additional features below is included in that published tag. No release preparation.
+**Unreleased development on `dev`, after the published stable v0.2.7.** The source version remains 0.2.7; none of the additional features below is included in that published tag. See the [v0.2.8 validation record](../releases/PIVRA_V0.2.8_RC_VALIDATION.md) for current release gates.
 
 Stable installation and release scope: [README](../../README.md) and [v0.2.7 release notes](../releases/PIVRA_V0.2.7_RELEASE_NOTES.md). In particular, the empty-window Open fix below was implemented **after** publication; the limitation remains documented in the historical release notes.
 

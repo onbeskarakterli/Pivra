@@ -1,8 +1,8 @@
-# Faz 2 kapanışı — tarihsel 0.1.0 değerlendirmesi ve güncel dev v0.2.3
+# Faz 2 kapanışı — tarihsel 0.1.0 ve v0.2.3 kaydı
 
 25.10.2026 tarihli denetim; kapanış kararı 31.10.2026 · yalnız `dev`.
 
-**Güncel sürüm bağlamı:** v0.2.3 geliştirme dalı, yayımlanmadı; kararlı kaynak v0.2.1, AUR sürümü v0.2.1-3. Faz 2 ve PIV-18 DONE. Tarihsel 0.1.0 test ve yayın değerlendirmeleri korunur; v0.2.3 için yayın onayı anlamına gelmez.
+**Bu kaydın tarihsel sürüm bağlamı:** v0.2.3 geliştirme dalı, yayımlanmadı; kararlı kaynak v0.2.1, AUR sürümü v0.2.1-3. Faz 2 ve PIV-18 DONE. Tarihsel 0.1.0 test ve yayın değerlendirmeleri korunur; v0.2.3 için yayın onayı anlamına gelmez.
 
 ## Nihai kapanış — 31.10.2026 — DONE
 

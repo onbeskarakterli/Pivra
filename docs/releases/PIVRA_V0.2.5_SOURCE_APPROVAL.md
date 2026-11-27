@@ -1,5 +1,9 @@
 # Pivra 0.2.5 — immutable source review and native package validation
 
+> Historical record. Dates, versions, test outcomes and approval states below
+> describe the work captured at the time. See the [documentation index](../README.md)
+> for current development and release status.
+
 Status at preparation: **OWNER SOURCE APPROVAL PENDING**. This is not a release,
 tag, main promotion, package installation or AUR publication authorization.
 

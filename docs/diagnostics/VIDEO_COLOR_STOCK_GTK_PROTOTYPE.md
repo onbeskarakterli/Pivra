@@ -1,5 +1,9 @@
 # Issue #9 — application-owned stock-GTK GPU prototype
 
+> Historical record. Dates, versions, test outcomes and approval states below
+> describe the work captured at the time. See the [documentation index](../README.md)
+> for current development and release status.
+
 2026-11-03; source base `167a27479fbbb3e61268c5b375f70dc0e6f36a13`.
 **Implemented, opt-in GL prototype; not a production default or issue closure.**
 No GTK replacement, version, dependency lockfile, packaging or security-policy

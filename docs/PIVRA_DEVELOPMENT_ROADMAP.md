@@ -1,5 +1,9 @@
 # Pivra — Geliştirme Yol Haritası
 
+Güncel geliştirme, doğrulama ve yayın akışı için [belge dizini](README.md) ve
+[v0.2.8 doğrulama raporuna](releases/PIVRA_V0.2.8_RC_VALIDATION.md) bakın.
+Aşağıdaki sürüm bağlamları kayıt tarihlerini yansıtır.
+
 ## Mandatory release preparation checks (from v0.2.5 onward)
 
 Before any `dev` -> `main` merge or release tag, run `make release-preflight VERSION=X.Y.Z` on the target development source. After review, optional `make release-preflight VERSION=X.Y.Z RELEASE_CLEAN_OLD=1` removes only untracked old-version packaging archives. The script never recursively deletes Cargo caches or build directories, and never removes `release-source.conf`, `.SRCINFO`, or the current release archives.

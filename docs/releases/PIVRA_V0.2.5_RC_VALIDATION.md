@@ -211,7 +211,7 @@ native acceptance**, not an independent Codex run. No actual makepkg/publication
 is reported; the version remains intentionally 0.2.4.
 
 The one cache FAIL above is now historical. See the focused
-[GNOME cache freshness decision](../THUMBNAIL_CACHE_FRESHNESS.md): identical-byte
+[GNOME cache freshness decision](../architecture/THUMBNAIL_CACHE_FRESHNESS.md): identical-byte
 replacement with unchanged URI/mtime/size remains a valid persistent HIT, per
 `d9bbcc1`'s intended Trash-restore fix. The obsolete test expectation was corrected
 and changed-content/mtime/size, restored-file, metadata and in-flight identity

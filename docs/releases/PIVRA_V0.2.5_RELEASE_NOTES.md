@@ -35,7 +35,7 @@ AUR publication is approved by this source preparation.
 - The obsolete GNOME thumbnail test now matches the intentional valid-cache reuse
   policy after identical replacement/Trash restoration; changed metadata/content
   and in-flight identity checks have stronger regressions. Production freshness
-  logic is unchanged. See [the cache decision](../THUMBNAIL_CACHE_FRESHNESS.md).
+  logic is unchanged. See [the cache decision](../architecture/THUMBNAIL_CACHE_FRESHNESS.md).
 
 ## Acceptance evidence
 

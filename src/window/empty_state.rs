@@ -16,16 +16,31 @@ pub(super) fn install(window: &adw::ApplicationWindow, viewport: &gtk::Box, view
         .hexpand(true)
         .vexpand(true)
         .build();
-    page.set_widget_name("empty-media-state");
+    let version = gtk::Label::builder()
+        .label(env!("CARGO_PKG_VERSION"))
+        .css_classes(["caption", "dim-label"])
+        .halign(gtk::Align::Center)
+        .valign(gtk::Align::End)
+        .margin_bottom(12)
+        .can_target(false)
+        .build();
+    let empty = gtk::Overlay::builder()
+        .child(&page)
+        .hexpand(true)
+        .vexpand(true)
+        .build();
+    empty.set_widget_name("empty-media-state");
+    empty.add_overlay(&version);
+    empty.set_measure_overlay(&version, false);
     viewer.set_visible(false);
-    viewport.append(&page);
+    viewport.append(&empty);
 
     // Read-only presentation state, set from the existing catalog/title update.
     // The empty page never owns another viewer, catalog or chooser callback.
     let present = gio::SimpleAction::new_stateful("media-present", None, &false.to_variant());
     present.set_enabled(false);
     let viewer = viewer.downgrade();
-    let page = page.downgrade();
+    let empty = empty.downgrade();
     present.connect_notify_local(Some("state"), move |action, _| {
         let has_media = action
             .state()
@@ -34,8 +49,8 @@ pub(super) fn install(window: &adw::ApplicationWindow, viewport: &gtk::Box, view
         if let Some(viewer) = viewer.upgrade() {
             viewer.set_visible(has_media);
         }
-        if let Some(page) = page.upgrade() {
-            page.set_visible(!has_media);
+        if let Some(empty) = empty.upgrade() {
+            empty.set_visible(!has_media);
         }
     });
     window.add_action(&present);

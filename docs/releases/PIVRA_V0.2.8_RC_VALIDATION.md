@@ -93,7 +93,7 @@ long-session or hardware VRAM budget.
 | `bash packaging/arch/PKGBUILD` source guard | PASS as a negative check. Exit 1 with approved `release-source.conf` missing. |
 | `bash packaging/arch/verify-video-dependencies.sh` | SKIP, exit 77. This host has no Arch pacman. |
 | Native `makepkg`, package install, ownership and inventory, clean metadata, installed icon/menu launch and absence of debug/test artifacts | SKIP. No build-eligible Arch environment and no owner-approved immutable v0.2.8 source/configuration. A bounded pull of the Arch build image did not complete. |
-| Secure PNG/JPEG/EXIF and real photo format coverage | SKIP. `image_probe` and `image_probe --jpeg-first` stopped at the sandbox preflight with exit 77. `bwrap` reported `setting up uid map: Read-only file system`. |
+| Secure PNG/JPEG/EXIF and real photo format coverage | SKIP. `image_probe` and `image_probe --jpeg-first` reached the secure loader and returned exit 77. `bwrap` reported `setting up uid map: Read-only file system`. |
 | GIF, animated WebP/APNG, RAW, native thumbnail creation and active secure-decoder teardown | SKIP. No successful secure frame in this environment. |
 | Delete → system Trash → Undo | SKIP. `gio info trash:///` reported `Operation not supported` in the isolated desktop. Filesystem deletion, identity, missing-file and restoration-cache regressions are covered separately. |
 | Physical GNOME, GPU hardware, display sleep inhibition and installed package integration | SKIP. Requires the target desktop. |
@@ -108,7 +108,10 @@ gates. The stock GTK Wayland limitation in earlier records remains open. The
 [Open latency report](../diagnostics/OPEN_FILE_LATENCY.md) records the unresolved
 chooser and subsequent navigation reports.
 
-After source approval and version preparation, use the established
+Documentation review found a packaging prerequisite. The existing local
+validator hard-codes 0.2.6 while the recipe and staging preflight target 0.2.7.
+Align them with the future release version before testing the native artifact.
+After that and explicit source approval, use the version-matched
 `python3 packaging/arch/validate-release.py --approved-source SHA --sha256 HASH`
 workflow in a native Arch environment. Review the actual package before a local
 install, run `pacman -Qip`, `pacman -Qlp`, `pacman -Qkk pivra`, and check the

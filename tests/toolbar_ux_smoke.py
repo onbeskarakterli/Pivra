@@ -13,7 +13,7 @@ from video_gpu.lifecycle import session, run, ROOT
 def main():
     parser=argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--session',choices=['x11','sway'],required=True)
-    parser.add_argument('--development',choices=['open','info','minimap','layout','navigation','shortcuts','zoom-state','context-menu','slideshow-click','slideshow-effects','opening','reveal','open-latency','file-actions','video-mouse','all'])
+    parser.add_argument('--development',choices=['open','info','minimap','layout','navigation','shortcuts','zoom-state','context-menu','slideshow-click','slideshow-effects','opening','reveal','open-latency','file-actions','video-mouse','video-speed','all'])
     args=parser.parse_args()
     if args.development == 'video-mouse' and args.session != 'x11':
         parser.error('video-mouse requires real X11 input from xdotool')
@@ -24,8 +24,13 @@ def main():
         return subprocess.run(['dbus-run-session','--',sys.executable,'-B',__file__,*sys.argv[1:]],cwd=ROOT,env=env).returncode
     out=Path(os.environ['PIVRA_TOOLBAR_REPORT']);print('Logs:',out,flush=True)
     video=out/'video.mp4'
-    subprocess.run(['ffmpeg','-hide_banner','-loglevel','error','-f','lavfi','-i','testsrc2=size=192x96:rate=12',
-                    '-t','25' if args.development == 'video-mouse' else '1','-c:v','libx264','-pix_fmt','yuv420p',str(video)],check=True)
+    fixture = ['ffmpeg','-hide_banner','-loglevel','error','-f','lavfi','-i','testsrc2=size=192x96:rate=12']
+    if args.development == 'video-speed':
+        fixture += ['-f','lavfi','-i','sine=frequency=440:sample_rate=48000',
+                    '-c:a','aac','-x264-params',
+                    'colorprim=bt709:transfer=bt709:colormatrix=bt709:fullrange=off']
+    duration = {'video-mouse': '25', 'video-speed': '12'}.get(args.development, '1')
+    subprocess.run(fixture + ['-t',duration,'-c:v','libx264','-pix_fmt','yuv420p',str(video)],check=True)
     subprocess.run(['cargo','build','--locked','--example','slideshow_probe'],cwd=ROOT,check=True)
     env=dict(os.environ,GTK_A11Y='none',PIVRA_TRACE_SLIDESHOW='1')
     if args.development == 'open-latency':

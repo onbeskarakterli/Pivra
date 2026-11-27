@@ -92,6 +92,8 @@ mod slideshow_effects;
 mod toolbar_ux;
 #[path = "support/video_mouse.rs"]
 mod video_mouse;
+#[path = "support/video_speed.rs"]
+mod video_speed;
 fn pump() {
     // Reuse the existing frame barrier; no fixed wait stands in for rendering.
     for _ in 0..100 {
@@ -381,6 +383,10 @@ fn main() {
     app.register(None::<&gio::Cancellable>).unwrap();
     if std::env::args().any(|s| s == "--development-video-mouse") {
         video_mouse::run(&app);
+        return;
+    }
+    if std::env::args().any(|s| s == "--development-video-speed") {
+        video_speed::run(&app);
         return;
     }
     if std::env::args().any(|s| s == "--development-context-menu") {

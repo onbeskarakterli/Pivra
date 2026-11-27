@@ -24,6 +24,8 @@ pub(crate) mod thumbnail_overlay;
 mod video_controls;
 #[path = "video_inhibit.rs"]
 mod video_inhibit;
+#[path = "video_speed.rs"]
+pub(crate) mod video_speed;
 use adw::prelude::*;
 use gtk::{gio, glib};
 pub(super) use interaction::install_interaction;

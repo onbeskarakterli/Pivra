@@ -27,4 +27,7 @@ G_BEGIN_DECLS
 
 G_DECLARE_FINAL_TYPE (PivraGpuMediaFile, pivra_gpu_media_file, PIVRA, GPU_MEDIA_FILE, GtkMediaFile)
 
+gboolean pivra_gpu_has_pitch_filter (GtkMediaStream *stream);
+gboolean pivra_gpu_set_playback_rate (GtkMediaStream *stream, guint quarters);
+
 G_END_DECLS

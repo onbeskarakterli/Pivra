@@ -6,7 +6,7 @@ fn widget(window: &adw::ApplicationWindow, name: &str) -> gtk::Widget {
         .find(|w| w.widget_name() == name)
         .unwrap()
 }
-fn open_uri(window: &adw::ApplicationWindow, path: &std::path::Path) {
+pub(super) fn open_uri(window: &adw::ApplicationWindow, path: &std::path::Path) {
     window
         .lookup_action("open-file")
         .unwrap()

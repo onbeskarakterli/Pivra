@@ -1,6 +1,6 @@
 //! Native viewport menu; existing window actions remain the operation owners.
 use super::{FileContext, slideshow};
-use crate::image_view::ImageView;
+use crate::image_view::{ImageView, video_speed};
 use adw::prelude::*;
 use gtk::{gdk, gio};
 use pivra::media::MediaKind;
@@ -48,32 +48,26 @@ fn populate(
     content.append(&gtk::Separator::new(gtk::Orientation::Horizontal));
     if video {
         add("Play / Pause", "context-playback");
-    }
-    add("Zoom", "context-zoom");
-    let (button, _, arrow) = rows::row("Display Mode", gtk::AccessibleRole::MenuItem);
-    button.set_widget_name("display-mode-submenu-button");
-    arrow.set_icon_name(Some("pan-end-symbolic"));
-    arrow.set_opacity(1.);
-    let child = gtk::Popover::builder()
-        .has_arrow(false)
-        .accessible_role(gtk::AccessibleRole::Menu)
-        .build();
-    child.set_widget_name("display-mode-submenu");
-    child.add_css_class("menu");
-    let modes = gtk::Box::new(gtk::Orientation::Vertical, 0);
-    for mode in pivra::viewing::ViewMode::ALL {
-        modes.append(&rows::action(
+        add_submenu(
+            &content,
             window,
             menus,
-            mode.label(),
-            "image-mode",
-            Some(mode.id()),
-            false,
-        ));
+            "Playback Speed",
+            "playback-speed",
+            "video-speed",
+            video_speed::OPTIONS,
+        );
     }
-    child.set_child(Some(&modes));
-    menus.watch_parent(&button, &child);
-    content.append(&button);
+    add("Zoom", "context-zoom");
+    add_submenu(
+        &content,
+        window,
+        menus,
+        "Display Mode",
+        "display-mode",
+        "image-mode",
+        pivra::viewing::ViewMode::ALL.map(|mode| (mode.id(), mode.label())),
+    );
     add("Fullscreen", "context-fullscreen");
     let (label, name) = (
         if slideshow::active(window) {
@@ -92,6 +86,41 @@ fn populate(
     content.append(&gtk::Separator::new(gtk::Orientation::Horizontal));
     add("Move to Trash", "trash-selected");
     root.set_child(Some(&content));
+}
+
+fn add_submenu<'a>(
+    content: &gtk::Box,
+    window: &adw::ApplicationWindow,
+    menus: &Rc<submenu::Menus>,
+    label: &str,
+    id: &str,
+    action: &str,
+    options: impl IntoIterator<Item = (&'a str, &'a str)>,
+) {
+    let (button, _, arrow) = rows::row(label, gtk::AccessibleRole::MenuItem);
+    button.set_widget_name(&format!("{id}-submenu-button"));
+    arrow.set_icon_name(Some("pan-end-symbolic"));
+    arrow.set_opacity(1.);
+    let child = gtk::Popover::builder()
+        .has_arrow(false)
+        .accessible_role(gtk::AccessibleRole::Menu)
+        .build();
+    child.set_widget_name(&format!("{id}-submenu"));
+    child.add_css_class("menu");
+    let choices = gtk::Box::new(gtk::Orientation::Vertical, 0);
+    for (target, label) in options {
+        choices.append(&rows::action(
+            window,
+            menus,
+            label,
+            action,
+            Some(target),
+            false,
+        ));
+    }
+    child.set_child(Some(&choices));
+    menus.watch_parent(&button, &child);
+    content.append(&button);
 }
 
 pub(super) fn dismiss(window: &adw::ApplicationWindow) {

@@ -1,4 +1,5 @@
 //! Compact native video controls, separate from animated-image playback.
+use super::video_speed::SpeedControl;
 use gtk::{glib, prelude::*};
 use std::{
     cell::Cell,
@@ -14,6 +15,7 @@ pub(super) struct Controls {
     time: gtk::Label,
     volume: gtk::Scale,
     mute: gtk::ToggleButton,
+    speed: SpeedControl,
     loop_button: gtk::ToggleButton,
     slideshow: Rc<Cell<bool>>,
     stream: Rc<std::cell::RefCell<Option<gtk::MediaStream>>>,
@@ -221,6 +223,7 @@ impl Controls {
                 media.set_volume(scale.value());
             }
         });
+        let speed = SpeedControl::new(window, stream.clone());
         for child in [
             rewind.upcast_ref::<gtk::Widget>(),
             play.upcast_ref(),
@@ -229,6 +232,7 @@ impl Controls {
             time.upcast_ref(),
             mute.upcast_ref(),
             volume.upcast_ref(),
+            speed.button.upcast_ref(),
             loop_button.upcast_ref(),
             fullscreen.upcast_ref(),
         ] {
@@ -242,6 +246,7 @@ impl Controls {
             time,
             volume,
             mute,
+            speed,
             loop_button,
             stream,
             updating,
@@ -264,7 +269,7 @@ impl Controls {
                 let media = refresh.stream.borrow().clone();
                 if let Some(media) = media.as_ref() {
                     // A paused fullscreen video keeps its controls visible.
-                    if !fullscreen || !media.is_playing() {
+                    if !fullscreen || !media.is_playing() || refresh.speed.is_open() {
                         refresh.bar.set_visible(true);
                     } else if !refresh.scrubbing.get()
                         && refresh.last_activity.get().elapsed() >= hide_after
@@ -367,6 +372,7 @@ impl Controls {
 
     pub fn attach(&self, media: Option<gtk::MediaStream>) {
         *self.stream.borrow_mut() = media;
+        self.speed.attach();
         self.bar.set_visible(self.stream.borrow().is_some());
         self.last_activity.set(Instant::now());
         self.scrubbing.set(false);

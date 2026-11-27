@@ -1,8 +1,8 @@
 # Post-v0.2.7 viewer improvements
 
-**Unreleased v0.2.8 development on `dev`, after the published stable v0.2.7.** The additional features below were implemented after that tag. See the [v0.2.8 validation record](../releases/PIVRA_V0.2.8_RC_VALIDATION.md) for current release gates.
+**Development record for v0.2.8.** The additional features below were implemented after the stable v0.2.7 tag. See the [v0.2.8 validation record](../releases/PIVRA_V0.2.8_RC_VALIDATION.md) for release evidence.
 
-Stable installation and release scope: [README](../../README.md) and [v0.2.7 release notes](../releases/PIVRA_V0.2.7_RELEASE_NOTES.md). In particular, the empty-window Open fix below was implemented **after** publication; the limitation remains documented in the historical release notes.
+See the [README](../../README.md) and [v0.2.8 release notes](../releases/PIVRA_V0.2.8_RELEASE_NOTES.md) for installation and release scope. The empty-window Open fix was implemented after v0.2.7 publication. The limitation remains documented in the [historical v0.2.7 notes](../releases/PIVRA_V0.2.7_RELEASE_NOTES.md).
 
 ## Empty-window Open
 

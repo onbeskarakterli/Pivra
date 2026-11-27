@@ -1,8 +1,8 @@
 # Pivra v0.2.8 pre-release validation
 
-**Status: v0.2.8 prepared for native Arch package validation. Publication awaits
-native package verification, immutable source approval and explicit authorization.**
-The published stable release is v0.2.7.
+**The owner accepted the local v0.2.8 package and authorized stable publication.**
+Final tagged-source verification, a native Arch build of that source and
+distribution publication are separate gates. See the owner evidence below.
 
 This run began at `9793b723fa9442b909dc77fe17813f71f7e05480`.
 Validated development source after fixes:
@@ -114,16 +114,13 @@ chooser and subsequent navigation reports.
 - The owner reports **5/5 PASS** for the video mouse interaction fix
   `d73d0af3931331c8b17662343c8a4c9e654aefbe` on physical GNOME. This is
   acceptance of the mouse fix before version preparation.
-- Cargo and the Arch recipe now declare 0.2.8. The preflight accepts the
-  candidate marker while README continues to identify stable v0.2.7.
+- The preparation commit aligned Cargo and the Arch recipe at 0.2.8.
   The Arch validator checks the selected version and supports a checksummed
   local source archive from an exact commit. Use the
   [native package workflow](../packaging/README.md#arch-candidate-gates)
   for `makepkg`, `.SRCINFO`, local installation and installed desktop checks.
-- Native package build, package installation and installed desktop
-  acceptance of 0.2.8 are pending. The earlier native skips above retain
-  their original scope. Prior v0.2.7 package evidence remains historical.
-- The publication archive, checksum and publication approval remain open.
+- The earlier native skips above retain their original scope. Prior
+  v0.2.7 package evidence remains historical.
 
 | Packaging-preparation check | Result |
 | --- | --- |
@@ -133,3 +130,40 @@ chooser and subsequent navigation reports.
 | Shell syntax, source version/recipe alignment, collector checksum, desktop entry and both SVG icon IDs/paths | PASS on source files. |
 | `bash packaging/linux/dependencies.sh check` | PASS for native development APIs and GStreamer elements in the Debian SDK. |
 | Arch ownership, actual `.SRCINFO` generation, `makepkg`, package contents and installed launch | NOT RUN in the Debian SDK. Both Arch entry points exited 77. The validator reported missing `makepkg`, `pacman` and `bsdtar`. |
+
+## Owner acceptance on native Arch and GNOME
+
+The owner accepted source commit `c47ea2bf617c7da70ffd183cee9a7a7944803424`
+and authorized stable publication. The following results and hashes are
+owner-reported from the native workspace `/tmp/pivra-0.2.8-package-47bznjto`.
+
+| Artifact | SHA-256 |
+| --- | --- |
+| Local Git source archive | `d2f7b32b6f1b177d66c2592f17c844be7501267e9e16a23b78fd5a679b338187` |
+| Local Arch package | `9509d59e1c224338a6177bc7d81dcc791e1510b21a1abeb2e32d843273bb97de` |
+
+| Native gate | Owner result |
+| --- | --- |
+| Source verification, actual `.SRCINFO` generation, clean build and package ELF, dependencies and contents | PASS |
+| Local install and package integrity | PASS, `pivra 0.2.8-1`, executable reports `Pivra 0.2.8`, 1331 files and zero altered |
+| Installed GNOME menu launch and icon, opening photos/videos from Nautilus | PASS |
+| GIF and other animation playback, hardware-accelerated video | PASS |
+| System Trash and Undo, slideshow and transitions | PASS |
+
+The full Rust, Python and GUI regression results above apply to the earlier
+tested source. The video mouse fix had subsequent targeted X11 coverage and
+physical GNOME acceptance (5/5). The native Arch results here apply to the
+accepted local package. The previously skipped GDB test class remains skipped.
+
+The Open File and next-photo latency investigation remains paused by owner
+decision after the reported delays could not be reproduced reliably. Its cause
+is open. [Open latency report](../diagnostics/OPEN_FILE_LATENCY.md)
+
+## Final distribution gates
+
+The owner-authorized release follows the existing `dev` → `main` pull request
+workflow. Record the verified annotated tag, target commit and immutable
+GitHub archive digest after integration. The local archive and package hashes
+above identify only the owner-tested artifacts. Use the immutable commit archive
+for a separate Arch build and generated `.SRCINFO`. GitHub Release and AUR
+publication require those results. [Arch packaging workflow](../packaging/README.md)

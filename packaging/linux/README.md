@@ -1,4 +1,4 @@
-> Published stable: **0.2.7**. Current development candidate: **0.2.8**.
+> Stable source version **0.2.8**.
 > The [v0.2.7 validation evidence](../../docs/releases/PIVRA_V0.2.7_RC_VALIDATION.md)
 > is historical. See [v0.2.8 gates](../../docs/releases/PIVRA_V0.2.8_RC_VALIDATION.md)
 > for package acceptance on the current source.
@@ -157,6 +157,6 @@ for local makepkg testing and the separate immutable-source gate.
 - The historical accepted `Preload exceeds cache entry budget` observation is not
   claimed fixed; see the existing release/audit records.
 
-See the [v0.2.8 draft notes](../../docs/releases/PIVRA_V0.2.8_RELEASE_NOTES.md),
-[candidate report](../../docs/releases/PIVRA_V0.2.8_RC_VALIDATION.md) and
+See the [v0.2.8 release notes](../../docs/releases/PIVRA_V0.2.8_RELEASE_NOTES.md),
+[validation report](../../docs/releases/PIVRA_V0.2.8_RC_VALIDATION.md) and
 [LGPL rebuild instructions](../../docs/diagnostics/VIDEO_ADAPTER_REBUILD.md).

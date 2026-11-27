@@ -1,7 +1,7 @@
 # Arch packaging
 
-The recipe targets **pivra 0.2.8-1** with `options=('!debug')`. The published
-stable version is v0.2.7. Follow the [native Arch candidate workflow](../../docs/packaging/README.md#build-and-verify-the-local-v028-candidate)
+The stable source targets **pivra 0.2.8-1** with `options=('!debug')`.
+Follow the [native Arch candidate workflow](../../docs/packaging/README.md#build-and-verify-the-local-v028-candidate)
 to build an exact local Git commit and generate local `.SRCINFO`, then install
 the reviewed artifact explicitly on the test system. The recipe requires a
 verified source archive in either mode. Publication requires a separate

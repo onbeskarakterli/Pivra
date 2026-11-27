@@ -1,8 +1,8 @@
 # Linux builds and Arch package validation
 
-The published stable package is v0.2.7. Source installation from the stable tag
-is described in the [project README](../../README.md). For local development
-builds, the Makefile wraps [Linux dependency checks](../../packaging/linux/dependencies.sh)
+This guide covers the v0.2.8 Arch recipe. The [project README](../../README.md)
+describes source installation from the stable tag. For local builds, the
+Makefile wraps [Linux dependency checks](../../packaging/linux/dependencies.sh)
 and [build/install/stage commands](../../packaging/linux/build-install.sh).
 
 ```sh

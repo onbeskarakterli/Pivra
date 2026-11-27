@@ -1,10 +1,10 @@
 # Pivra release workflow
 
-The published stable release is [v0.2.7](PIVRA_V0.2.7_RELEASE_NOTES.md).
-v0.2.8 is under preparation. Its [draft notes](PIVRA_V0.2.8_RELEASE_NOTES.md)
-and [validation record](PIVRA_V0.2.8_RC_VALIDATION.md) describe the current
-candidate. Earlier release records retain their original outcomes, including
-published [v0.2.5](PIVRA_V0.2.5_RELEASE_NOTES.md) and the unreleased
+The [v0.2.8 release notes](PIVRA_V0.2.8_RELEASE_NOTES.md) describe the stable
+source. The [validation record](PIVRA_V0.2.8_RC_VALIDATION.md) tracks the
+accepted package and remaining publication gates. Earlier records retain their
+original outcomes, including [v0.2.7](PIVRA_V0.2.7_RELEASE_NOTES.md),
+[v0.2.5](PIVRA_V0.2.5_RELEASE_NOTES.md) and the unreleased
 [v0.2.6 candidate](PIVRA_V0.2.6_RC_VALIDATION.md).
 
 1. Develop on `dev` and freeze features for the target release. Complete
@@ -18,20 +18,16 @@ published [v0.2.5](PIVRA_V0.2.5_RELEASE_NOTES.md) and the unreleased
    preflight on the reviewed source and actual staged artifact.
 4. Validate the native Arch candidate, `.SRCINFO`, installed package, runtime
    behavior and source/notice inventory with an exact local commit archive.
-   For publication, verify the real SHA-256 of the immutable GitHub archive,
-   obtain explicit approval for that source and validate its package separately.
-   See the [packaging guide](../packaging/README.md).
-5. After explicit publication approval, promote the authorized stable source
-   to `main` through the applicable GitHub review/protection workflow.
-   Verify the tag points to the approved source before creating the GitHub
-   Release. Publish the AUR package against the approved archive and verify
-   the package version, metadata and install. Record actual remote outcomes.
-6. After stable publication, move `dev` to the next intended version with a
-   `-dev` suffix. Publishing v0.2.8 would lead to `0.2.9-dev` on `dev`, and
-   publishing v0.2.9 would lead to `0.2.10-dev`. Keep Cargo and the displayed
-   version in agreement. Numeric-only stable release preflight applies when
-   preparing a stable release version.
+   After explicit approval, promote the stable source to `main` through the
+   GitHub review workflow and create the annotated tag.
+5. Verify the tag target and the SHA-256 of the immutable GitHub commit
+   archive. Validate the package from that archive in a separate native Arch
+   build. Publish the GitHub Release and AUR package after the final source
+   and package checks, then record actual remote outcomes. [Packaging guide](../packaging/README.md)
+6. Once both GitHub and AUR publication are verified, synchronize `dev` and
+   bump its version to the next `-dev` version. v0.2.8 is followed by
+   `0.2.9-dev`, and v0.2.9 by `0.2.10-dev`. Keep the Cargo and displayed
+   versions in agreement. Numeric preflight targets apply to stable versions.
 
-The checked-in v0.2.8 source and recipe are prepared for local package
-validation. Keep owner reports, controlled tests and final artifact verification
-attributed to their real environment and SHA.
+Attribute owner reports, controlled tests and final artifact verification to
+their actual environment and source SHA.

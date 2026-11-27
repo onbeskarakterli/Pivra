@@ -58,15 +58,17 @@ def main():
 
     readme = (ROOT / "README.md").read_text()
     candidate_marker = f"**Upcoming release candidate: v{version}.**"
-    stable_marker = f"**Current stable release: v{version}.**"
+    stable_markers = (f"**Current stable release: v{version}.**",
+                      f"**Stable release source: v{version}.**")
+    stable_handoff = any(marker in readme for marker in stable_markers)
     if args.candidate:
-        if candidate_marker not in readme and stable_marker not in readme:
+        if candidate_marker not in readme and not stable_handoff:
             errors.append("README must identify the exact target candidate or current stable release")
         report = ROOT / "docs" / "releases" / f"PIVRA_V{version}_RC_VALIDATION.md"
         if not report.is_file():
             errors.append("Missing candidate validation report")
-    elif stable_marker not in readme or candidate_marker in readme:
-        errors.append("Publication handoff: README must identify target as current stable, not upcoming/unreleased")
+    elif not stable_handoff or candidate_marker in readme:
+        errors.append("Publication handoff: README must identify the target stable release source")
     notes_name = f"PIVRA_V{version}_RELEASE_NOTES.md"
     notes = ROOT / "docs" / "releases" / notes_name
     if not notes.is_file():
@@ -76,7 +78,9 @@ def main():
         if f"# Pivra v{version}" not in text:
             errors.append("Release notes version differs from target")
         if not args.candidate and (
-            not any(marker in text for marker in ("**Status: Published stable release.**", "**Status: Stable-release source prepared for approval.**"))
+            not any(marker in text for marker in ("**Status: Published stable release.**",
+                                                  "**Status: Stable-release source prepared for approval.**",
+                                                  "**Status: Stable release source.**"))
             or "release candidate" in text.splitlines()[0].lower()
         ):
             errors.append("Publication handoff: release notes must carry stable-release source wording, not RC status")

@@ -1,5 +1,9 @@
 # v0.2.7 slideshow — feature branch validation
 
+> Historical record. Dates, versions, test outcomes and approval states below
+> describe the work captured at the time. See the [documentation index](../README.md)
+> for current development and release status.
+
 Date: 2026-11-23. **TESTING — physical GNOME acceptance pending.**
 Subsequent owner-reported native EOS SIGSEGV: **OPEN; native acceptance BLOCKED**.
 See the [focused investigation and GDB command](V027_SLIDESHOW_EOS_SIGSEGV.md).

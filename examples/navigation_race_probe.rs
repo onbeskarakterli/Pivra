@@ -62,13 +62,10 @@ fn wait(mut ready: impl FnMut() -> bool) {
 }
 
 fn text(view: &image_view::ImageView) -> String {
-    view.widget()
-        .child()
-        .unwrap()
-        .next_sibling()
-        .unwrap()
-        .downcast::<gtk::Label>()
-        .unwrap()
+    let picture = view.widget().child().expect("photo overlay child");
+    std::iter::successors(picture.next_sibling(), |w| w.next_sibling())
+        .find_map(|w| w.downcast::<gtk::Label>().ok())
+        .expect("image status overlay")
         .text()
         .to_string()
 }

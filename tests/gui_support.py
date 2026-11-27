@@ -50,7 +50,7 @@ def wait_image_error(process):
     import time
     captured = b""
     deadline = time.monotonic() + 15
-    while b"Pivra: image load failed:" not in captured:
+    while b"Pivra: image load failed for " not in captured:
         assert process.poll() is None, "app exited before controlled image failure"
         assert time.monotonic() < deadline, "image failure did not arrive"
         if select.select([process.stderr], [], [], 0.1)[0]:
@@ -62,6 +62,6 @@ def check_image_diagnostics(stderr, blocked=False):
     if not blocked:
         assert stderr == "", stderr
         return
-    assert stderr.startswith("Pivra: image load failed:"), stderr
+    assert stderr.startswith("Pivra: image load failed for "), stderr
     assert "panicked" not in stderr and "CRITICAL" not in stderr, stderr
     print("BLOCKED image decode/pixels: secure loader failure observed; lifecycle/catalog checks only")

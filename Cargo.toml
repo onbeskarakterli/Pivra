@@ -1,6 +1,6 @@
 [package]
 name = "pivra"
-version = "0.2.7"
+version = "0.2.8"
 edition = "2024"
 rust-version = "1.85"
 description = "A lightweight GNOME image viewer with seamless photo and video navigation"
@@ -14,6 +14,8 @@ gtk = { package = "gtk4", version = "0.10", features = ["v4_16"] }
 adw = { package = "libadwaita", version = "0.8", features = ["v1_2"] }
 
 glycin = { version = "=3.0.8", features = ["gdk4"] }
+# Reuse Glycin's already-locked EXIF parser for the optional information panel.
+gufo-exif = "=0.3.1"
 
 [dev-dependencies]
 # Probe-only ownership diagnostics; tracing already exists in Glycin dependencies.

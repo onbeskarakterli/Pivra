@@ -56,6 +56,7 @@ static LAST_FILTERS: AtomicUsize = AtomicUsize::new(usize::MAX);
 unsafe extern "C" {
     fn pivra_gpu_backend_type() -> glib::ffi::GType;
     fn pivra_gpu_eligible(uri: *const std::ffi::c_char) -> std::ffi::c_int;
+    fn pivra_gpu_take_information() -> *mut std::ffi::c_char;
     fn pivra_gpu_live_filters() -> std::ffi::c_int;
     fn pivra_gpu_live_contexts() -> std::ffi::c_int;
     fn pivra_gpu_held_frames() -> std::ffi::c_int;
@@ -79,7 +80,24 @@ fn discover(path: &Path) -> Backend {
     {
         let uri = std::ffi::CString::new(gio::File::for_path(path).uri().as_str()).unwrap();
         // The native discoverer owns its resources and has a two-second deadline.
-        if unsafe { pivra_gpu_eligible(uri.as_ptr()) } == 1 {
+        let key = pivra::image_cache::FileKey::read(path).ok();
+        let eligible = unsafe { pivra_gpu_eligible(uri.as_ptr()) };
+        let text = unsafe { pivra_gpu_take_information() };
+        if !text.is_null() {
+            let text: glib::GString = unsafe { glib::translate::from_glib_full(text) };
+            if let Some(key) =
+                key.filter(|k| pivra::image_cache::FileKey::read(path).ok().as_ref() == Some(k))
+            {
+                pivra::media_information::remember(
+                    key,
+                    text.lines()
+                        .filter_map(|s| s.split_once('\t'))
+                        .map(|(k, v)| (k.to_owned(), v.to_owned()))
+                        .collect(),
+                );
+            }
+        }
+        if eligible == 1 {
             return Backend::Gpu;
         }
     }

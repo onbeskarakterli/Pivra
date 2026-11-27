@@ -61,10 +61,17 @@ fn fullscreen(w: &adw::ApplicationWindow, p: &gtk::Picture, header: &adw::Header
             );
             pump();
         }
+        let viewport = if p.is_mapped() {
+            p.clone().upcast::<gtk::Widget>()
+        } else {
+            assert_eq!(w.title().as_deref(), Some("Pivra"));
+            find::<gtk::Widget>(w.upcast_ref(), "empty-media-state")
+        };
+        assert!(viewport.is_mapped(), "active content is not mapped");
         assert_eq!(
-            (p.width(), p.height()),
+            (viewport.width(), viewport.height()),
             (w.width(), w.height()),
-            "chrome still allocates photo space"
+            "chrome still allocates content space"
         );
     }
     assert_eq!(
@@ -302,6 +309,11 @@ fn production(app: &adw::Application, native: bool) {
         .unwrap()
         .downcast::<adw::ApplicationWindow>()
         .unwrap();
+    // The earlier geometry cases intentionally persist Actual. The strip
+    // checks need a fitted photo so the minimap does not mask navigation UI.
+    w.lookup_action("image-mode")
+        .expect("image mode action")
+        .activate(Some(&"fit".to_variant()));
     let header: adw::HeaderBar = find(w.upcast_ref(), "pivra-header");
     let p = find_picture(w.upcast_ref());
     wait(|| p.paintable().is_some() && w.title().is_some_and(|t| t.ends_with("(25 candidates)")));
@@ -334,6 +346,17 @@ fn production(app: &adw::Application, native: bool) {
         (bounds.y() - toggle.y() - toggle.height()).abs() <= 1.,
         "TH-06 flush toggle regressed"
     );
+    // Keep the strip mapped during keyboard/scroll checks. Auto-hide with a
+    // real outside pointer is covered separately by the catalog regression.
+    let controls: gtk::Box = find(w.upcast_ref(), "thumbnail-controls");
+    let pin = controls
+        .last_child()
+        .and_downcast::<gtk::ToggleButton>()
+        .unwrap();
+    if !pin.is_active() {
+        pin.emit_clicked();
+    }
+    assert!(pin.is_active());
     let row: gtk::Box = find(w.upcast_ref(), "thumbnail-items");
     wait(|| row.first_child().is_some());
     for _ in 0..18 {
@@ -342,12 +365,27 @@ fn production(app: &adw::Application, native: bool) {
     wait(|| w.title().unwrap().starts_with("19.png"));
     image_bytes(&w, &p);
     let selected: gtk::Button = find(w.upcast_ref(), "thumbnail-cell-19");
-    wait(|| {
-        let b = selected.compute_bounds(&row).unwrap();
-        f64::from(b.x()) >= strip.hadjustment().value() - 1.
-            && f64::from(b.x() + b.width())
-                <= strip.hadjustment().value() + strip.hadjustment().page_size() + 1.
-    });
+    let deadline = std::time::Instant::now() + std::time::Duration::from_secs(20);
+    loop {
+        let bounds = selected.compute_bounds(&row).unwrap();
+        let adjustment = strip.hadjustment();
+        if f64::from(bounds.x()) >= adjustment.value() - 1.
+            && f64::from(bounds.x() + bounds.width())
+                <= adjustment.value() + adjustment.page_size() + 1.
+        {
+            break;
+        }
+        assert!(
+            std::time::Instant::now() < deadline,
+            "fullscreen selected thumbnail not fully visible: mapped={}, bounds={bounds:?}, scroll={}, page={}, upper={}, width={}",
+            strip.is_mapped(),
+            adjustment.value(),
+            adjustment.page_size(),
+            adjustment.upper(),
+            strip.width(),
+        );
+        pump();
+    }
     let selected_overlay: gtk::Overlay = selected
         .child()
         .expect("selected thumbnail content")
@@ -411,7 +449,7 @@ fn production(app: &adw::Application, native: bool) {
     assert!(key_event(&w, gdk::Key::Escape));
     fullscreen(&w, &p, &header, false);
     std::fs::remove_file(root.path().join("broken.png")).unwrap();
-    wait(|| w.title().unwrap().starts_with("No media selected"));
+    wait(|| w.title().as_deref() == Some("Pivra"));
     assert!(p.paintable().is_none());
     assert!(key_event(&w, gdk::Key::f));
     fullscreen(&w, &p, &header, true);

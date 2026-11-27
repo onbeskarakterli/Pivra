@@ -1,17 +1,15 @@
 //! PIV-12 extension of the existing production-window probe, sharing its helpers.
 use super::*;
 fn status(w: &adw::ApplicationWindow) -> String {
-    picture(w)
-        .next_sibling()
-        .unwrap()
-        .downcast::<gtk::Label>()
-        .unwrap()
-        .text()
-        .to_string()
+    photo_status(&picture(w)).text().to_string()
 }
-fn failure(w: &adw::ApplicationWindow, native: bool) {
+fn failure(w: &adw::ApplicationWindow, native: bool, retained: &Option<gtk::gdk::Paintable>) {
     wait(|| status(w).starts_with("Unable to display image."));
-    assert!(picture(w).paintable().is_none());
+    assert_eq!(
+        &picture(w).paintable(),
+        retained,
+        "failed load replaced the previous paintable"
+    );
     let message = status(w);
     if native {
         assert!(
@@ -45,13 +43,14 @@ pub(super) fn run(app: &adw::Application, native: bool) {
     healthy(&first, native, true);
     healthy(&second, native, false);
     let survivor = picture(&second).paintable();
+    let retained = picture(&first).paintable();
     let cases = [
         ("2.jpg", std::fs::read(fixtures.join("broken.jpg")).unwrap()),
         ("3.png", std::fs::read(fixtures.join("broken.png")).unwrap()),
         ("4.png", good[..20].to_vec()),
         ("5.jpg", b"this is plain text, not an image".to_vec()),
         ("6.jpg", vec![]),
-        ("7.webp", b"unsupported candidate".to_vec()),
+        ("7.webp", b"invalid WebP candidate".to_vec()),
         ("8.png", good.clone()),
     ];
     for (name, bytes) in &cases {
@@ -61,7 +60,7 @@ pub(super) fn run(app: &adw::Application, native: bool) {
     for name in ["2.jpg", "3.png", "4.png", "5.jpg", "6.jpg"] {
         action(&first, "next-media");
         assert!(first.title().unwrap().starts_with(name));
-        failure(&first, native);
+        failure(&first, native, &retained);
         assert_eq!(picture(&second).paintable(), survivor);
         assert!(!banner(&second).reveals_child());
     }
@@ -75,13 +74,13 @@ pub(super) fn run(app: &adw::Application, native: bool) {
     action(&first, "reload-media");
     action(&first, "reload-media");
     action(&first, "next-media");
-    wait(|| status(&first).starts_with("This image format is not supported yet."));
+    failure(&first, native, &retained);
     settle();
     assert!(first.title().unwrap().starts_with("7.webp"));
-    std::fs::write(root.path().join("7.webp"), b"modified unsupported format").unwrap();
+    std::fs::write(root.path().join("7.webp"), b"modified invalid WebP").unwrap();
     wait(|| banner(&first).reveals_child());
     action(&first, "reload-media");
-    assert!(status(&first).starts_with("This image format is not supported yet."));
+    failure(&first, native, &retained);
     action(&first, "next-media");
     healthy(&first, native, false);
     assert!(first.title().unwrap().starts_with("8.png"));
@@ -93,22 +92,18 @@ pub(super) fn run(app: &adw::Application, native: bool) {
     action(&first, "reload-media");
     action(&first, "next-media");
     settle();
-    assert!(status(&first).starts_with("Video playback is not available yet."));
+    wait(|| status(&first).starts_with("Video: "));
     assert!(!banner(&first).reveals_child());
     std::fs::write(root.path().join("9.mp4"), b"changed video candidate").unwrap();
     wait(|| banner(&first).reveals_child());
     action(&first, "reload-media");
-    assert!(status(&first).starts_with("Video playback is not available yet."));
+    wait(|| status(&first).starts_with("Video: "));
     assert!(!banner(&first).reveals_child());
     // Delete a selected file immediately after scheduling a real production load.
     // Scheduling is not proof the secure decoder was active at deletion time.
     action(&first, "previous-media");
     std::fs::remove_file(root.path().join("8.png")).unwrap();
-    wait(|| {
-        first
-            .title()
-            .is_some_and(|s| s.starts_with("No media selected"))
-    });
+    wait(|| first.title().as_deref() == Some("Pivra"));
     assert!(picture(&first).paintable().is_none());
     action(&first, "next-media");
     healthy(&first, native, false);

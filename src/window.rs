@@ -3,24 +3,36 @@
 use crate::{image_view::ImageView, input::OpenedFile};
 use adw::prelude::*;
 use gtk::{gdk, gio, glib};
-use pivra::{APP_NAME, catalog::MediaCollection, discovery, media::MediaKind, settings::Settings};
-use std::{
-    cell::{Cell, RefCell},
-    path::PathBuf,
-    rc::Rc,
-    sync::{
-        Arc,
-        atomic::{AtomicBool, Ordering},
-    },
-    time::Duration,
-};
+use pivra::{APP_NAME, catalog::MediaCollection, media::MediaKind, settings::Settings};
+use std::{cell::RefCell, path::PathBuf, rc::Rc, sync::Arc};
 
 #[path = "fullscreen.rs"]
 pub(super) mod fullscreen;
+#[path = "rename_dialog.rs"]
+mod rename_dialog;
 #[path = "slideshow_window.rs"]
 pub(super) mod slideshow;
 #[path = "toolbar.rs"]
 mod toolbar;
+
+#[path = "window/context_menu.rs"]
+mod context_menu;
+#[path = "window/empty_state.rs"]
+mod empty_state;
+#[path = "window/folder_watch.rs"]
+mod folder_watch;
+use folder_watch::{FolderWatch, watch};
+#[path = "window/application_chooser.rs"]
+mod application_chooser;
+#[path = "window/file_chooser.rs"]
+mod file_chooser;
+#[path = "window/open_folder.rs"]
+mod open_folder;
+#[path = "window/reveal.rs"]
+mod reveal;
+#[path = "window/slideshow_interaction.rs"]
+mod slideshow_interaction;
+use open_folder::save_last_open_folder;
 
 // Keep one current notification, shared by Trash and slideshow status.
 fn show_latest_toast(
@@ -49,6 +61,7 @@ fn show_latest_toast(
 }
 
 struct FileContext {
+    own_rename: Option<(PathBuf, PathBuf)>,
     collection: MediaCollection,
     suffix: Option<String>,
     warning: bool,
@@ -88,30 +101,14 @@ fn trash_entries(original: &std::path::Path) -> Vec<gio::File> {
     entries
 }
 
-fn load_last_open_folder() -> Option<gio::File> {
-    let path = glib::user_config_dir().join("pivra/last-open-dir.conf");
-    let folder = PathBuf::from(std::fs::read_to_string(path).ok()?.trim());
-    folder.is_dir().then(|| gio::File::for_path(folder))
-}
-
-fn save_last_open_folder(folder: &std::path::Path) {
-    let config = glib::user_config_dir().join("pivra");
-    if let Err(error) = std::fs::create_dir_all(&config).and_then(|_| {
-        std::fs::write(
-            config.join("last-open-dir.conf"),
-            folder.as_os_str().as_encoded_bytes(),
-        )
-    }) {
-        eprintln!("Pivra: could not save last open folder: {error}");
-    }
-}
-
 fn update_title(window: &adw::ApplicationWindow, title: &adw::WindowTitle, context: &FileContext) {
+    context_menu::selection_changed(window, context.collection.current().map(|item| item.path()));
+    empty_state::update(window, context.collection.current().is_some());
     update_navigation_actions(window, context);
     let Some(selected) = context.collection.current() else {
-        window.set_title(Some("No media selected — Pivra"));
-        title.set_title("No media selected");
-        title.set_subtitle("Use arrow keys to select remaining media.");
+        window.set_title(Some(APP_NAME));
+        title.set_title(APP_NAME);
+        title.set_subtitle("");
         return;
     };
     let name = selected
@@ -330,6 +327,10 @@ fn update_thumbnail_catalog(view: &ImageView, context: &FileContext) {
 }
 
 fn display_selected(view: &ImageView, context: &FileContext) {
+    let _timing = pivra::performance::Span::new("display_selected_ui");
+    if let Some(item) = context.collection.current() {
+        pivra::performance::media_event("media_selected", "request", item.path());
+    }
     update_thumbnail_catalog(view, context);
     let Some(item) = context.collection.current() else {
         view.set_neighbors(vec![]);
@@ -378,13 +379,12 @@ pub(super) fn build(app: &adw::Application, settings: &Settings, file: Option<Op
         .content(&content)
         .build();
     pivra::settings::window_state::install(&window, settings);
-    // Always keep Open at the far left of the header bar, including empty windows.
-    let open_button = gtk::Button::from_icon_name("document-open-symbolic");
-    open_button.set_tooltip_text(Some("Open media"));
-    header.pack_start(&open_button);
-    if let Some(opened) = file {
+    {
         let context = Rc::new(RefCell::new(FileContext {
-            collection: MediaCollection::new(vec![opened.item.clone()]),
+            own_rename: None,
+            collection: MediaCollection::new(
+                file.iter().map(|opened| opened.item.clone()).collect(),
+            ),
             suffix: None,
             warning: false,
             revision: 0,
@@ -408,7 +408,6 @@ pub(super) fn build(app: &adw::Application, settings: &Settings, file: Option<Op
         fullscreen::install(
             &window,
             &picture,
-            view.video_widget(),
             &[header.clone().upcast(), banner.clone().upcast()],
         );
         let menu = gio::Menu::new();
@@ -435,6 +434,7 @@ pub(super) fn build(app: &adw::Application, settings: &Settings, file: Option<Op
         mode_button.set_widget_name("display-mode-selector");
         let groups = gtk::Box::new(gtk::Orientation::Horizontal, 8);
         groups.set_widget_name("viewer-controls");
+        groups.set_visible(file.is_some());
         let display_group = gtk::Box::new(gtk::Orientation::Horizontal, 0);
         display_group.set_widget_name("display-controls");
         display_group.add_css_class("linked");
@@ -465,7 +465,7 @@ pub(super) fn build(app: &adw::Application, settings: &Settings, file: Option<Op
         });
         zoom_toggle.set_child(Some(&lens));
         zoom_toggle.set_widget_name("wheel-zoom-toggle");
-        // Use the GNOME accent color only while wheel zoom is enabled.
+        // The same GNOME accent represents explicit wheel mode or manual zoom.
         zoom_toggle.connect_toggled(|button| {
             if button.is_active() {
                 button.add_css_class("suggested-action");
@@ -477,7 +477,52 @@ pub(super) fn build(app: &adw::Application, settings: &Settings, file: Option<Op
         zoom_group.set_widget_name("zoom-controls");
         zoom_group.append(&zoom_toggle);
         groups.append(&zoom_group);
-        let zoom_for_key = zoom_toggle.clone();
+        let wheel_zoom = view.zoom_wheel_state();
+        let action = window
+            .lookup_action("image-mode")
+            .expect("view mode action");
+        let input_handler = Rc::new(std::cell::OnceCell::<glib::SignalHandlerId>::new());
+        let sync_zoom = {
+            let button = zoom_toggle.downgrade();
+            let mode = action.downgrade();
+            let wheel = wheel_zoom.clone();
+            let handler = input_handler.clone();
+            Rc::new(move || {
+                let Some(button) = button.upgrade() else {
+                    return;
+                };
+                let manual = mode
+                    .upgrade()
+                    .and_then(|a| a.state())
+                    .is_some_and(|v| v.str() == Some("manual"));
+                // Feedback from the image state must not enable/persist wheel
+                // mode. Ctrl+wheel remains temporary and cannot leak to a photo.
+                let handler = handler.get().expect("zoom input binding");
+                button.block_signal(handler);
+                button.set_active(wheel.get() || manual);
+                button.unblock_signal(handler);
+                button.set_tooltip_text(Some(if wheel.get() {
+                    "Wheel zoom enabled"
+                } else {
+                    "Wheel changes photos; hold Ctrl or left mouse button to zoom"
+                }));
+            })
+        };
+        let choose_zoom = {
+            let wheel = wheel_zoom.clone();
+            let sync = sync_zoom.clone();
+            Rc::new(move |enabled| {
+                wheel.set(enabled);
+                pivra::settings::save_wheel_zoom(enabled);
+                sync();
+            })
+        };
+        let changed = choose_zoom.clone();
+        input_handler
+            .set(zoom_toggle.connect_toggled(move |button| changed(button.is_active())))
+            .expect("single zoom input binding");
+        wheel_zoom.set(pivra::settings::load_wheel_zoom());
+        sync_zoom();
         let zoom_window = window.downgrade();
         let zoom_key = gtk::EventControllerKey::new();
         zoom_key.set_propagation_phase(gtk::PropagationPhase::Capture);
@@ -495,26 +540,13 @@ pub(super) fn build(app: &adw::Application, settings: &Settings, file: Option<Op
             {
                 return glib::Propagation::Proceed;
             }
-            zoom_for_key.set_active(!zoom_for_key.is_active());
+            choose_zoom(!wheel_zoom.get());
             glib::Propagation::Stop
         });
         window.add_controller(zoom_key);
-        let zoom_view = view.clone();
-        zoom_toggle.connect_toggled(move |button| {
-            zoom_view.set_zoom_wheel_enabled(button.is_active());
-            pivra::settings::save_wheel_zoom(button.is_active());
-            button.set_tooltip_text(Some(if button.is_active() {
-                "Wheel zoom enabled"
-            } else {
-                "Wheel changes photos; hold left mouse button to zoom"
-            }));
-        });
-        zoom_toggle.set_active(pivra::settings::load_wheel_zoom());
         let weak_button = mode_button.downgrade();
-        let action = window
-            .lookup_action("image-mode")
-            .expect("view mode action");
         action.connect_notify_local(Some("state"), move |action, _| {
+            sync_zoom();
             if let Some(button) = weak_button.upgrade() {
                 let state = action.state();
                 let id = state.as_ref().and_then(|v| v.str()).unwrap_or("fit");
@@ -571,8 +603,48 @@ pub(super) fn build(app: &adw::Application, settings: &Settings, file: Option<Op
         install_navigation_arrows(view.widget());
         let toast_overlay = adw::ToastOverlay::new();
         let current_delete_toast = Rc::new(RefCell::new(None::<adw::Toast>));
+        rename_dialog::install(
+            &window,
+            &title,
+            context.clone(),
+            view.clone(),
+            &banner,
+            folder_watch.clone(),
+            rename_dialog::Toasts {
+                overlay: &toast_overlay,
+                current: current_delete_toast.clone(),
+            },
+        );
         toast_overlay.set_child(Some(view.widget()));
-        viewport.prepend(&toast_overlay);
+        let viewer_row = gtk::Box::new(gtk::Orientation::Horizontal, 0);
+        toast_overlay.set_hexpand(true);
+        toast_overlay.set_vexpand(true);
+        viewer_row.set_vexpand(true);
+        viewer_row.append(&toast_overlay);
+        viewer_row.append(view.information_widget());
+        viewport.prepend(&viewer_row);
+        empty_state::install(&window, &viewport, &viewer_row);
+        let info_button = gtk::ToggleButton::builder()
+            .icon_name("help-about-symbolic")
+            .tooltip_text("Media information (I)")
+            .build();
+        info_button.set_widget_name("media-information-button");
+        info_button.set_action_name(Some("win.media-info"));
+        let info = gio::SimpleAction::new_stateful("media-info", None, &false.to_variant());
+        let info_view = view.clone();
+        let weak_button = info_button.downgrade();
+        info.connect_activate(move |action, _| {
+            let show = !action
+                .state()
+                .and_then(|v| v.get::<bool>())
+                .unwrap_or(false);
+            action.set_state(&show.to_variant());
+            info_view.show_information(show);
+            if let Some(button) = weak_button.upgrade() {
+                button.set_active(show);
+            }
+        });
+        window.add_action(&info);
         placeholder.set_vexpand(false);
         update_title(&window, &title, &context.borrow());
         display_selected(&view, &context.borrow());
@@ -584,6 +656,11 @@ pub(super) fn build(app: &adw::Application, settings: &Settings, file: Option<Op
             let view = view.clone();
             let banner = banner.clone();
             action.connect_activate(move |_, _| {
+                let _timing = pivra::performance::Span::new(if forward {
+                    "next_media_ui"
+                } else {
+                    "previous_media_ui"
+                });
                 let Some(window) = weak_window.upgrade() else {
                     return;
                 };
@@ -777,6 +854,15 @@ pub(super) fn build(app: &adw::Application, settings: &Settings, file: Option<Op
             current_delete_toast.clone(),
         );
         groups.append(&toolbar::slideshow_group(&window));
+        groups.append(&info_button);
+        context_menu::install(
+            &window,
+            context.clone(),
+            &view,
+            &zoom_toggle,
+            &toast_overlay,
+            current_delete_toast.clone(),
+        );
         let keys = gtk::EventControllerKey::new();
         keys.set_propagation_phase(gtk::PropagationPhase::Capture);
         let weak_window = window.downgrade();
@@ -794,6 +880,12 @@ pub(super) fn build(app: &adw::Application, settings: &Settings, file: Option<Op
             ) {
                 if key == gdk::Key::F5 {
                     slides.start();
+                    return glib::Propagation::Stop;
+                }
+                if matches!(key, gdk::Key::i | gdk::Key::I) {
+                    if let Some(window) = weak_window.upgrade() {
+                        gio::prelude::ActionGroupExt::activate_action(&window, "media-info", None);
+                    }
                     return glib::Propagation::Stop;
                 }
                 if weak_window.upgrade().is_some_and(|w| slideshow::active(&w)) {
@@ -832,6 +924,12 @@ pub(super) fn build(app: &adw::Application, settings: &Settings, file: Option<Op
             if key == gdk::Key::Delete {
                 if let Some(window) = weak_window.upgrade() {
                     gio::prelude::ActionGroupExt::activate_action(&window, "trash-selected", None);
+                }
+                return glib::Propagation::Stop;
+            }
+            if key == gdk::Key::F2 {
+                if let Some(window) = weak_window.upgrade() {
+                    gio::prelude::ActionGroupExt::activate_action(&window, "rename-media", None);
                 }
                 return glib::Propagation::Stop;
             }
@@ -908,51 +1006,58 @@ pub(super) fn build(app: &adw::Application, settings: &Settings, file: Option<Op
         let open_status = placeholder.clone();
         let open_banner = banner.clone();
         let open_watch = folder_watch.clone();
-        open_button.connect_clicked(move |_| {
-            let Some(window) = open_window.upgrade() else {
+        let controls = groups.downgrade();
+        let open_file = gio::SimpleAction::new("open-file", Some(glib::VariantTy::STRING));
+        open_file.connect_activate(move |_, value| {
+            let _timing = pivra::performance::Span::new("open_file_apply_ui");
+            let Some(uri) = value.and_then(|v| v.str()) else {
                 return;
             };
-            let dialog = gtk::FileDialog::new();
-            dialog.set_title("Open media");
-            if let Some(folder) = load_last_open_folder() {
-                dialog.set_initial_folder(Some(&folder));
-            }
-            let weak = window.downgrade();
-            let context = open_context.clone();
-            let view = open_view.clone();
-            let title = open_title.clone();
-            let status = open_status.clone();
-            let banner = open_banner.clone();
-            let watcher = open_watch.clone();
-            dialog.open(Some(&window), None::<&gio::Cancellable>, move |result| {
-                let Ok(file) = result else { return };
-                let Some(window) = weak.upgrade() else { return };
+            let Some(window) = open_window.upgrade().filter(|w| w.is_visible()) else {
+                return;
+            };
+            let file = gio::File::for_uri(uri);
+            let opened = {
+                let _timing = pivra::performance::Span::new("open_file_validate_ui");
                 let Ok(opened) = OpenedFile::from_file(&file) else {
                     eprintln!("Pivra: selected file could not be opened");
                     return;
                 };
-                if let Some(parent) = file.path().and_then(|p| p.parent().map(|p| p.to_owned())) {
-                    save_last_open_folder(&parent);
-                }
-                gio::prelude::ActionGroupExt::activate_action(&window, "slideshow-stop", None);
-                if let Some(previous) = watcher.borrow_mut().take() {
-                    previous.stop();
-                }
-                {
-                    let mut state = context.borrow_mut();
-                    state.collection = MediaCollection::new(vec![opened.item.clone()]);
-                    state.suffix = None;
-                    state.warning = false;
-                    state.revision = state.revision.wrapping_add(1);
-                    banner.set_reveal_child(false);
-                    update_title(&window, &title, &state);
-                    display_selected(&view, &state);
-                }
-                *watcher.borrow_mut() = Some(watch(
-                    &window, &title, &status, &banner, view, context, opened,
-                ));
-            });
+                opened
+            };
+            if let Some(parent) = file.path().and_then(|p| p.parent().map(|p| p.to_owned())) {
+                let _timing = pivra::performance::Span::new("open_file_save_folder_ui");
+                save_last_open_folder(&parent);
+            }
+            gio::prelude::ActionGroupExt::activate_action(&window, "slideshow-stop", None);
+            if let Some(previous) = open_watch.borrow_mut().take() {
+                previous.stop();
+            }
+            {
+                let mut state = open_context.borrow_mut();
+                state.collection = MediaCollection::new(vec![opened.item.clone()]);
+                state.suffix = None;
+                state.warning = false;
+                state.revision = state.revision.wrapping_add(1);
+                open_banner.set_reveal_child(false);
+                update_title(&window, &open_title, &state);
+                display_selected(&open_view, &state);
+            }
+            if let Some(controls) = controls.upgrade() {
+                controls.set_visible(true);
+            }
+            *open_watch.borrow_mut() = Some(watch(
+                &window,
+                &open_title,
+                &open_status,
+                &open_banner,
+                open_view.clone(),
+                open_context.clone(),
+                opened,
+            ));
         });
+        window.add_action(&open_file);
+        file_chooser::install(&window, app);
         let closing_watch = folder_watch.clone();
         window.connect_close_request(move |_| {
             if let Some(watch) = closing_watch.borrow_mut().take() {
@@ -967,357 +1072,16 @@ pub(super) fn build(app: &adw::Application, settings: &Settings, file: Option<Op
             }
         });
         window.present();
-        *folder_watch.borrow_mut() = Some(watch(
-            &window,
-            &title,
-            &placeholder,
-            &banner,
-            view,
-            context,
-            opened,
-        ));
-    } else {
-        window.present();
-    }
-}
-
-// Only main-context callbacks own this state. Blocking scans receive paths and
-// an atomic cancellation flag, never GTK objects. One scan and one timer maximum.
-struct FolderWatch {
-    window: glib::WeakRef<adw::ApplicationWindow>,
-    title: glib::WeakRef<adw::WindowTitle>,
-    status: glib::WeakRef<gtk::Label>,
-    banner: glib::WeakRef<gtk::Revealer>,
-    context: Rc<RefCell<FileContext>>,
-    view: ImageView,
-    directory: PathBuf,
-    cancelled: Arc<AtomicBool>,
-    monitor: RefCell<Option<gio::FileMonitor>>,
-    timer: RefCell<Option<glib::SourceId>>,
-    fallback_poll: RefCell<Option<glib::SourceId>>,
-    running: Cell<bool>,
-    dirty: Cell<bool>,
-    initialized: Cell<bool>,
-    link_monitors: RefCell<Vec<gio::FileMonitor>>,
-    link_targets: RefCell<Vec<(PathBuf, PathBuf)>>,
-}
-
-impl FolderWatch {
-    fn stop(&self) {
-        self.cancelled.store(true, Ordering::Relaxed);
-        if let Some(timer) = self.timer.borrow_mut().take() {
-            timer.remove();
-        }
-        if let Some(poll) = self.fallback_poll.borrow_mut().take() {
-            poll.remove();
-        }
-        for monitor in self.link_monitors.borrow_mut().drain(..) {
-            monitor.cancel();
-        }
-        if let Some(monitor) = self.monitor.borrow_mut().take() {
-            monitor.cancel();
+        if let Some(opened) = file {
+            *folder_watch.borrow_mut() = Some(watch(
+                &window,
+                &title,
+                &placeholder,
+                &banner,
+                view,
+                context,
+                opened,
+            ));
         }
     }
-
-    fn watch_links(self: &Rc<Self>, targets: Vec<(PathBuf, PathBuf)>) {
-        if *self.link_targets.borrow() == targets {
-            return;
-        }
-        for monitor in self.link_monitors.borrow_mut().drain(..) {
-            monitor.cancel();
-        }
-        self.link_targets.replace(targets.clone());
-        // Directory events refer to target names, not aliases. Follow only file
-        // candidate symlinks in the same lexical folder, including dangling aliases.
-        for (alias, target) in targets {
-            match gio::File::for_path(target).monitor_file(
-                gio::FileMonitorFlags::WATCH_MOVES,
-                None::<&gio::Cancellable>,
-            ) {
-                Ok(monitor) => {
-                    let weak = Rc::downgrade(self);
-                    monitor.connect_changed(move |_, _, _, event| {
-                        let Some(state) = weak.upgrade() else {
-                            return;
-                        };
-                        if state.cancelled.load(Ordering::Relaxed) {
-                            return;
-                        }
-                        state
-                            .view
-                            .invalidate_cache_paths(std::slice::from_ref(&alias));
-                        let mut context = state.context.borrow_mut();
-                        if context
-                            .collection
-                            .current()
-                            .is_some_and(|item| item.path() == alias)
-                            && !matches!(
-                                event,
-                                gio::FileMonitorEvent::Deleted
-                                    | gio::FileMonitorEvent::MovedOut
-                                    | gio::FileMonitorEvent::Unmounted
-                                    | gio::FileMonitorEvent::PreUnmount
-                            )
-                        {
-                            context.revision = context.revision.wrapping_add(1);
-                            if let Some(banner) = state.banner.upgrade() {
-                                banner.set_reveal_child(true);
-                            }
-                        }
-                        drop(context);
-                        state.schedule();
-                    });
-                    self.link_monitors.borrow_mut().push(monitor);
-                }
-                Err(error) => eprintln!("{APP_NAME}: symlink target monitor unavailable: {error}"),
-            }
-        }
-    }
-
-    fn schedule(self: &Rc<Self>) {
-        if self.cancelled.load(Ordering::Relaxed) {
-            return;
-        }
-        self.dirty.set(true);
-        if self.running.get() || self.timer.borrow().is_some() {
-            return;
-        }
-        let state = self.clone();
-        // Fixed trailing window: sustained events cannot postpone scans forever.
-        let timer = glib::timeout_add_local_once(Duration::from_millis(120), move || {
-            state.timer.borrow_mut().take();
-            state.scan();
-        });
-        self.timer.replace(Some(timer));
-    }
-
-    fn scan(self: &Rc<Self>) {
-        if self.cancelled.load(Ordering::Relaxed) {
-            return;
-        }
-        self.running.set(true);
-        self.dirty.set(false);
-        let directory = self.directory.clone();
-        let cancelled = self.cancelled.clone();
-        let job = gio::spawn_blocking(move || {
-            discovery::scan_directory(&directory, &cancelled).map(|report| {
-                let mut links: Vec<_> = std::fs::read_dir(&directory)
-                    .into_iter()
-                    .flatten()
-                    .take_while(|_| !cancelled.load(Ordering::Relaxed))
-                    .filter_map(|entry| {
-                        let path = entry.ok()?.path();
-                        discovery::candidate_kind(&path)?;
-                        if !std::fs::symlink_metadata(&path).ok()?.is_symlink() {
-                            return None;
-                        }
-                        let target = std::fs::read_link(&path).ok()?;
-                        let target = if target.is_absolute() {
-                            target
-                        } else {
-                            directory.join(target)
-                        };
-                        let target = std::fs::canonicalize(&target).unwrap_or(target);
-                        Some((path, target))
-                    })
-                    .collect();
-                links.sort();
-                (report, links)
-            })
-        });
-        let state = self.clone();
-        glib::MainContext::default().spawn_local(async move {
-            let result = job.await.unwrap_or_else(|_| Err(std::io::Error::other("folder worker failed")));
-            state.running.set(false);
-            if state.cancelled.load(Ordering::Relaxed) { return; }
-            if state.dirty.get() { state.schedule(); return; }
-            let (Some(window), Some(title), Some(status)) =
-                (state.window.upgrade(), state.title.upgrade(), state.status.upgrade()) else { return; };
-            let mut context = state.context.borrow_mut();
-            match result {
-                Ok((report, links)) => {
-                    state.watch_links(links);
-                    let warnings = report.issues.len() + usize::from(state.monitor.borrow().is_none());
-                    for issue in &report.issues {
-                        eprintln!("{APP_NAME}: folder scan incomplete: {:?}: {}", issue.path, issue.error);
-                    }
-                    // A periodic fallback scan must not cancel thumbnail work
-                    // when the directory's media catalog is unchanged.
-                    let catalog_changed = context.collection.items().iter().map(|item| item.path())
-                        .ne(report.collection.items().iter().map(|item| item.path()));
-                    let missing = if catalog_changed {
-                        context.collection.replace_preserving(report.collection.items().to_vec())
-                    } else {
-                        false
-                    };
-                    if missing {
-                        context.revision = context.revision.wrapping_add(1);
-                        state.view.show_message("Selected media was removed or is inaccessible. Use arrow keys to continue.");
-                        if let Some(banner) = state.banner.upgrade() { banner.set_reveal_child(false); }
-                    }
-                    state.view.set_neighbors(context.collection.photo_neighbors());
-                    if catalog_changed {
-                        update_thumbnail_catalog(&state.view, &context);
-                        state.view.invalidate_thumbnails();
-                    }
-                    state.view.finish_initial_thumbnail_catalog(context.collection.selected_index());
-                    let count = context.collection.items().len();
-                    let suffix = if warnings == 0 {
-                        format!("{count} {}", if count == 1 { "candidate" } else { "candidates" })
-                    } else { format!("{count} {}, {warnings} {}", if count == 1 { "candidate" } else { "candidates" }, if warnings == 1 { "warning" } else { "warnings" }) };
-                    status.set_text(&if state.monitor.borrow().is_none() {
-                        format!("{suffix}. Folder monitoring unavailable; reopen to update.")
-                    } else { format!("{suffix}.") });
-                    context.suffix = Some(suffix);
-                    context.warning = warnings != 0;
-                }
-                Err(error) => {
-                    eprintln!("{APP_NAME}: folder scan failed: {error}");
-                    if state.initialized.get() {
-                        context.collection.replace_preserving(vec![]);
-                    }
-                    context.suffix = Some("folder scan failed".into());
-                    context.warning = true;
-                    update_thumbnail_catalog(&state.view, &context);
-                    // Revalidate the reconciled catalog: rebuilding the model may
-                    // cancel an older metadata epoch (e.g. replace + delete).
-                    state.view.invalidate_thumbnails();
-                    if state.initialized.get() {
-                        state.view.show_message("Folder unavailable. Media cannot be accessed.");
-                    }
-                    if let Some(banner) = state.banner.upgrade() { banner.set_reveal_child(false); }
-                    status.set_text("Folder scan failed. Folder unavailable.");
-                }
-            }
-            state.initialized.set(true);
-            update_title(&window, &title, &context);
-        });
-    }
-}
-
-fn watch(
-    window: &adw::ApplicationWindow,
-    title: &adw::WindowTitle,
-    status: &gtk::Label,
-    banner: &gtk::Revealer,
-    view: ImageView,
-    context: Rc<RefCell<FileContext>>,
-    opened: OpenedFile,
-) -> Rc<FolderWatch> {
-    let directory = opened
-        .item
-        .path()
-        .parent()
-        .unwrap_or_else(|| std::path::Path::new("."))
-        .to_owned();
-    let state = Rc::new(FolderWatch {
-        window: window.downgrade(),
-        title: title.downgrade(),
-        status: status.downgrade(),
-        banner: banner.downgrade(),
-        context,
-        view,
-        directory: directory.clone(),
-        cancelled: Arc::new(AtomicBool::new(false)),
-        monitor: RefCell::new(None),
-        timer: RefCell::new(None),
-        fallback_poll: RefCell::new(None),
-        running: Cell::new(false),
-        dirty: Cell::new(false),
-        initialized: Cell::new(false),
-        link_monitors: RefCell::new(vec![]),
-        link_targets: RefCell::new(vec![]),
-    });
-    match gio::File::for_path(&directory).monitor_directory(
-        gio::FileMonitorFlags::WATCH_MOVES,
-        None::<&gio::Cancellable>,
-    ) {
-        Ok(monitor) => {
-            let weak = Rc::downgrade(&state);
-            monitor.connect_changed(move |_, file, other, event| {
-                let Some(state) = weak.upgrade() else {
-                    return;
-                };
-                if state.cancelled.load(Ordering::Relaxed) {
-                    return;
-                }
-                let path = file.path();
-                let affected: Vec<_> = path
-                    .iter()
-                    .cloned()
-                    .chain(other.and_then(|f| f.path()))
-                    .collect();
-                state.view.invalidate_cache_paths(&affected);
-                let mut retarget = None;
-                let mut context = state.context.borrow_mut();
-                let selected = context
-                    .collection
-                    .current()
-                    .map(|item| item.path().to_owned());
-                if matches!(
-                    event,
-                    gio::FileMonitorEvent::Renamed | gio::FileMonitorEvent::Moved
-                ) {
-                    if let (Some(old), Some(new)) =
-                        (path.as_ref(), other.and_then(|file| file.path()))
-                    {
-                        if selected.as_ref() == Some(old) {
-                            retarget = Some((old.clone(), new.clone()));
-                        }
-                        context.collection.rename_selected(old, &new);
-                    }
-                }
-                let changed = matches!(
-                    event,
-                    gio::FileMonitorEvent::Changed
-                        | gio::FileMonitorEvent::ChangesDoneHint
-                        | gio::FileMonitorEvent::AttributeChanged
-                        | gio::FileMonitorEvent::Created
-                        | gio::FileMonitorEvent::MovedIn
-                        | gio::FileMonitorEvent::Renamed
-                        | gio::FileMonitorEvent::Moved
-                );
-                if changed
-                    && selected.as_ref().is_some_and(|selected| {
-                        path.as_ref() == Some(selected)
-                            || other.and_then(|file| file.path()).as_ref() == Some(selected)
-                    })
-                {
-                    if let Some(banner) = state.banner.upgrade() {
-                        context.revision = context.revision.wrapping_add(1);
-                        banner.set_reveal_child(true);
-                    }
-                }
-                drop(context);
-                if let Some((old, new)) = retarget {
-                    state.view.retarget_pending(&old, &new);
-                }
-                state.schedule();
-            });
-            state.monitor.replace(Some(monitor));
-        }
-        Err(error) => {
-            eprintln!("{APP_NAME}: folder monitor unavailable: {error}");
-            status
-                .set_text("Folder monitoring unavailable; reopen the file to update its catalog.");
-        }
-    }
-    // Some backends do not deliver directory notifications reliably.
-    // Periodically reconcile the catalog as a fallback while this window lives.
-    let weak = Rc::downgrade(&state);
-    let poll = glib::timeout_add_local(Duration::from_secs(5), move || {
-        let Some(state) = weak.upgrade() else {
-            return glib::ControlFlow::Break;
-        };
-        if state.cancelled.load(Ordering::Relaxed) {
-            return glib::ControlFlow::Break;
-        }
-        if !state.running.get() {
-            state.schedule();
-        }
-        glib::ControlFlow::Continue
-    });
-    state.fallback_poll.replace(Some(poll));
-    state.scan();
-    state
 }

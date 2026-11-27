@@ -1,5 +1,7 @@
 # Pivra v0.2.5 — Final release candidate preparation
 
+> Historical preparation record for published v0.2.5. The statuses and checks below describe that preparation period, not the current release. **Current stable: v0.2.7**, published on GitHub and AUR; see the [v0.2.7 release notes](PIVRA_V0.2.7_RELEASE_NOTES.md).
+
 Current base: `c15e0af082ff52cef577ec226d1d12be20c8e0cf`, dev.
 Cargo.toml, the Pivra Cargo.lock entry and PKGBUILD now consistently declare
 **0.2.5**; pkgrel=1 and options=('!debug') remain. This is an **upcoming candidate**,
@@ -209,7 +211,7 @@ native acceptance**, not an independent Codex run. No actual makepkg/publication
 is reported; the version remains intentionally 0.2.4.
 
 The one cache FAIL above is now historical. See the focused
-[GNOME cache freshness decision](../THUMBNAIL_CACHE_FRESHNESS.md): identical-byte
+[GNOME cache freshness decision](../architecture/THUMBNAIL_CACHE_FRESHNESS.md): identical-byte
 replacement with unchanged URI/mtime/size remains a valid persistent HIT, per
 `d9bbcc1`'s intended Trash-restore fix. The obsolete test expectation was corrected
 and changed-content/mtime/size, restored-file, metadata and in-flight identity

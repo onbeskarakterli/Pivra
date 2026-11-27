@@ -6,15 +6,31 @@ mod actual_paintable;
 mod animation;
 #[path = "gpu_video.rs"]
 pub(crate) mod gpu_video;
+#[path = "information_panel.rs"]
+mod information_panel;
+#[path = "image_view/interaction.rs"]
+mod interaction;
+#[path = "minimap.rs"]
+mod minimap;
 #[path = "photo_transition.rs"]
 mod photo_transition;
+#[path = "image_view/presentation.rs"]
+mod presentation;
+#[path = "image_view/presentation_trace.rs"]
+mod presentation_trace;
 #[path = "thumbnail_overlay.rs"]
 pub(crate) mod thumbnail_overlay;
 #[path = "video_controls.rs"]
 mod video_controls;
+#[path = "video_inhibit.rs"]
+mod video_inhibit;
 use adw::prelude::*;
 use gtk::{gio, glib};
+pub(super) use interaction::install_interaction;
+use interaction::install_video_interaction;
 use pivra::viewing::{Resampling, Transform, ViewMode};
+use presentation::manual;
+pub(super) use presentation::{present_animation_frame, present_filtered};
 use std::{
     cell::{Cell, RefCell},
     path::PathBuf,
@@ -33,6 +49,7 @@ pub(super) struct ImageView {
     overlay: gtk::Overlay,
     thumbnail_strip: thumbnail_overlay::ThumbnailStrip,
     picture: gtk::Picture,
+    frame_trace: Option<Rc<presentation_trace::Observer>>,
     video: gtk::Picture,
     video_stream: Rc<RefCell<Option<gtk::MediaFile>>>,
     video_surface: Rc<RefCell<Option<gtk::gdk::Surface>>>,
@@ -60,6 +77,9 @@ pub(super) struct ImageView {
     transition: Rc<photo_transition::Transition>,
     slideshow_paused: Rc<Cell<bool>>,
     video_observer: Rc<RefCell<Option<VideoObserver>>>,
+    information: Rc<information_panel::Panel>,
+    minimap: Rc<minimap::Map>,
+    video_inhibit: Rc<video_inhibit::VideoInhibit>,
 }
 type VideoObserver = Box<dyn Fn(Option<&gtk::MediaFile>)>;
 
@@ -326,7 +346,21 @@ impl ImageView {
             }
         });
         window.add_action(&quality_action);
+        let minimap = minimap::Map::new(
+            &picture,
+            texture.clone(),
+            transform.clone(),
+            &mode_action,
+            filter.clone(),
+            phase.clone(),
+        );
+        overlay.add_overlay(minimap.widget());
+        overlay.set_measure_overlay(minimap.widget(), false);
         let view = Self {
+            frame_trace: presentation_trace::Observer::new(&picture, window),
+            video_inhibit: video_inhibit::VideoInhibit::new(window),
+            minimap,
+            information: information_panel::Panel::new(),
             transition,
             slideshow_paused: Rc::new(Cell::new(false)),
             video_observer: Rc::default(),
@@ -360,10 +394,31 @@ impl ImageView {
         // Disconnect callbacks before dropping streams; error recovery holds a
         // view only until this explicit detach, not past close/unrealize.
         let transition = view.transition.clone();
-        window.connect_destroy(move |_| transition.clear());
+        window.connect_destroy(move |_| transition.shutdown());
+        let information = view.information.clone();
+        window.connect_destroy(move |_| information.close());
+        let inhibitor = view.video_inhibit.clone();
+        window.connect_destroy(move |_| inhibitor.close());
+        let inhibitor = view.video_inhibit.clone();
+        window.connect_close_request(move |_| {
+            inhibitor.close();
+            glib::Propagation::Proceed
+        });
+        let minimap = view.minimap.clone();
+        window.connect_destroy(move |_| minimap.close());
+        let minimap = view.minimap.clone();
+        window.connect_close_request(move |_| {
+            minimap.close();
+            glib::Propagation::Proceed
+        });
+        let information = view.information.clone();
+        window.connect_close_request(move |_| {
+            information.close();
+            glib::Propagation::Proceed
+        });
         let closing = view.clone();
         window.connect_close_request(move |_| {
-            closing.transition.clear();
+            closing.transition.shutdown();
             closing.stop_video();
             glib::Propagation::Proceed
         });
@@ -433,6 +488,14 @@ impl ImageView {
     pub(super) fn set_zoom_wheel_enabled(&self, enabled: bool) {
         self.zoom_wheel.set(enabled);
     }
+    /// Share the existing input preference with the toolbar, not a second zoom flag.
+    #[allow(
+        dead_code,
+        reason = "Standalone rendering probes omit the production toolbar"
+    )]
+    pub(super) fn zoom_wheel_state(&self) -> Rc<Cell<bool>> {
+        self.zoom_wheel.clone()
+    }
 
     // Lifecycle probes consume this diagnostic; production has no stats UI.
     #[allow(dead_code, reason = "Used by selected standalone lifecycle probes")]
@@ -471,6 +534,20 @@ impl ImageView {
     pub(super) fn widget(&self) -> &gtk::Overlay {
         &self.overlay
     }
+    #[allow(
+        dead_code,
+        reason = "Standalone rendering probes do not install a sidebar"
+    )]
+    pub(super) fn information_widget(&self) -> &gtk::Revealer {
+        self.information.widget()
+    }
+    #[allow(
+        dead_code,
+        reason = "Standalone rendering probes do not install a sidebar"
+    )]
+    pub(super) fn show_information(&self, show: bool) {
+        self.information.show(show);
+    }
 
     #[allow(dead_code)] // Some standalone view probes never display a non-image selection.
     pub(super) fn show_message(&self, message: &str) {
@@ -483,6 +560,7 @@ impl ImageView {
     #[allow(dead_code)] // Standalone image probes do not open videos.
     pub(super) fn load_video(&self, path: &std::path::Path) {
         self.prepare("", true);
+        self.information.select(Some(path.to_owned()));
         self.loading_spinner.set_visible(true);
         let expected = self.animation_generation.get();
         let this = self.clone();
@@ -589,6 +667,9 @@ impl ImageView {
                             !this.video_stream.borrow().as_ref().is_some_and(|s| Some(s.clone()) == failed.upgrade()) {
                             return;
                         }
+                        // F2 may have renamed this same playing stream since
+                        // its error handler was installed. Keep fallback valid.
+                        let path = this.video_path.borrow().clone().unwrap_or(path);
                         this.stop_video();
                         this.status.set_visible(false);
                         this.start_video_with_state(&path, gpu_video::Backend::Stock, Some(resume));
@@ -654,6 +735,8 @@ impl ImageView {
         self.video.set_visible(true);
         self.video_controls
             .attach(Some(media.clone().upcast::<gtk::MediaStream>()));
+        self.information.bind_video(&media);
+        self.video_inhibit.bind(&media);
         // Bind slideshow EOS observations before play, not on a later timer.
         // Outside slideshow the optional observer does not modify the stream.
         if let Some(observer) = self.video_observer.borrow().as_ref() {
@@ -671,6 +754,8 @@ impl ImageView {
         }
     }
     fn stop_video(&self) {
+        self.video_inhibit.unbind();
+        self.information.unbind_video();
         gpu_video::trace_binding(c"video-retire-begin");
         // Disconnect slideshow notifications while we still own the emitter,
         // including asynchronous GPU -> stock fallback (not just navigation).
@@ -716,6 +801,8 @@ impl ImageView {
         gpu_video::trace_binding(c"video-retire-end");
     }
     fn prepare(&self, message: &str, cancel: bool) {
+        self.minimap.hide();
+        self.information.select(None);
         self.transition.clear();
         self.stop_video();
         self.animation_generation
@@ -819,6 +906,21 @@ impl ImageView {
             self.mode_action.activate(Some(&mode));
         }
     }
+    #[allow(dead_code, reason = "Standalone view probes omit rename actions")]
+    pub(super) fn media_renamed(&self, old: &std::path::Path, new: &std::path::Path) {
+        self.information.renamed(old, new);
+        self.retarget_pending(old, new);
+        if self.video_path.borrow().as_deref() == Some(old) {
+            self.video_path.replace(Some(new.to_owned()));
+        }
+        if self.requested.borrow().as_deref() == Some(old) {
+            self.requested.replace(Some(new.to_owned()));
+        }
+        let mut state = self.prefetch.borrow_mut();
+        if state.current_path.as_deref() == Some(old) {
+            state.current_path = Some(new.to_owned());
+        }
+    }
 
     #[allow(dead_code)] // Probe diagnostics, not a user-visible debug indicator.
     pub(super) fn phase(&self) -> Phase {
@@ -828,8 +930,7 @@ impl ImageView {
     // Per-window slideshow policy; native GPU renderer is unchanged.
     #[allow(dead_code, reason = "Standalone image probes omit slideshow settings")]
     pub(super) fn set_slideshow_effect(&self, effect: pivra::slideshow::Effect) {
-        self.transition
-            .set_fade(effect == pivra::slideshow::Effect::Fade);
+        self.transition.set_effect(effect);
     }
     #[allow(
         dead_code,
@@ -843,6 +944,7 @@ impl ImageView {
         reason = "Standalone image probes omit window slideshow controls"
     )]
     pub(super) fn set_slideshow(&self, active: bool) {
+        self.minimap.set_slideshow(active);
         self.transition.enable(active);
         if !active {
             self.slideshow_paused.set(false);
@@ -902,11 +1004,16 @@ impl ImageView {
         on_completion: impl FnOnce() + 'static,
         on_result: impl FnOnce(bool) + 'static,
     ) {
+        pivra::performance::media_event("image_requested", "foreground", &path);
+        let _dispatch = pivra::performance::Span::new("image_request_ui");
+        self.information.select(Some(path.clone()));
+        self.minimap.hide();
         self.transition.capture(
             &self.picture,
             self.phase.get() == Phase::FullReady && self.video_stream.borrow().is_none(),
         );
         let transition = self.transition.clone();
+        let information = Rc::downgrade(&self.information);
         let mut measurement = pivra::performance::Span::new("image_request_to_ready_callback");
         measurement.status("abandoned");
         let on_result = move |success| {
@@ -920,6 +1027,8 @@ impl ImageView {
         let generation = self.animation_generation.clone();
         let expected = generation.get().wrapping_add(1);
         generation.set(expected);
+        let frame_trace = self.frame_trace.clone();
+        let ready_path = path.clone();
         let animation_path = path.clone();
         let animation_picture = self.picture.downgrade();
         let animation_texture = self.texture.clone();
@@ -1025,6 +1134,9 @@ impl ImageView {
                             preload::Output::Raw(texture, key) => (texture, key),
                         };
                         let cost = texture_cost(decoded.width() as u32, decoded.height() as u32);
+                        if let Some(information) = information.upgrade() {
+                            information.image_ready(decoded.width(), decoded.height());
+                        }
                         {
                             let mut state = prefetch.borrow_mut();
                             state.active_large =
@@ -1054,6 +1166,14 @@ impl ImageView {
                             transform.clone(),
                             filter.clone(),
                         );
+                        pivra::performance::media_event(
+                            "image_paintable_ready",
+                            "ready",
+                            &ready_path,
+                        );
+                        if let Some(trace) = &frame_trace {
+                            trace.ready(&ready_path);
+                        }
                         status.set_visible(false);
                         animation::start(
                             animation_path,
@@ -1105,7 +1225,9 @@ impl ImageView {
             move || {
                 prefetch.borrow_mut().admission(requested);
                 let loading = token.clone();
+                let waiting = pivra::performance::Span::new("image_worker_queue_wait");
                 let job = gio::spawn_blocking(move || {
+                    drop(waiting);
                     preload::fetch(&path, &loading, &cache, allow_cache, None)
                 });
                 glib::MainContext::default().spawn_local(async move {
@@ -1135,368 +1257,6 @@ impl ImageView {
     }
 }
 
-/// Attached only to the photo widget: header/menu/banner events never enter here.
-/// Video uses GTK's current MediaFile paintable, with only a lightweight
-/// snapshot transform. No extra decoder or video frame buffering is involved.
-fn install_video_interaction(
-    video: &gtk::Picture,
-    stream: Rc<RefCell<Option<gtk::MediaFile>>>,
-    transform: Rc<RefCell<Transform>>,
-    mode_action: &gio::SimpleAction,
-    zoom_wheel: Rc<Cell<bool>>,
-) {
-    let pointer = Rc::new(Cell::new((0.0, 0.0)));
-    let motion = gtk::EventControllerMotion::new();
-    let entered = pointer.clone();
-    motion.connect_enter(move |_, x, y| entered.set((x, y)));
-    let moved = pointer.clone();
-    motion.connect_motion(move |_, x, y| moved.set((x, y)));
-    video.add_controller(motion);
-
-    let scroll = gtk::EventControllerScroll::new(gtk::EventControllerScrollFlags::VERTICAL);
-    scroll.set_propagation_phase(gtk::PropagationPhase::Capture);
-    let source = stream.clone();
-    let state = transform.clone();
-    let action = mode_action.clone();
-    let weak = video.downgrade();
-    scroll.connect_scroll(move |controller, _, dy| {
-        if dy == 0.0 {
-            return glib::Propagation::Stop;
-        }
-        let zoom = zoom_wheel.get()
-            || controller.current_event_state().intersects(
-                gtk::gdk::ModifierType::BUTTON1_MASK | gtk::gdk::ModifierType::CONTROL_MASK,
-            );
-        let Some(video) = weak.upgrade() else {
-            return glib::Propagation::Proceed;
-        };
-        if !zoom {
-            if let Some(window) = video.root().and_downcast::<adw::ApplicationWindow>() {
-                let direction = if dy > 0.0 {
-                    "next-media"
-                } else {
-                    "previous-media"
-                };
-                gio::prelude::ActionGroupExt::activate_action(&window, direction, None);
-            }
-            return glib::Propagation::Stop;
-        }
-        let dimensions = source.borrow().as_ref().map(|media| {
-            (
-                media.intrinsic_width() as f64,
-                media.intrinsic_height() as f64,
-            )
-        });
-        let Some(dimensions) = dimensions else {
-            return glib::Propagation::Proceed;
-        };
-        let mode = action
-            .state()
-            .and_then(|value| value.str().and_then(ViewMode::from_id))
-            .unwrap_or(ViewMode::Fit);
-        if state.borrow_mut().zoom(
-            dimensions,
-            (video.width() as f64, video.height() as f64),
-            mode,
-            pointer.get(),
-            dy,
-        ) {
-            if let Some(paintable) = video.paintable() {
-                paintable.invalidate_contents();
-            }
-            action.set_state(&"manual".to_variant());
-        }
-        glib::Propagation::Stop
-    });
-    video.add_controller(scroll);
-
-    let drag = gtk::GestureDrag::new();
-    drag.set_button(1);
-    drag.set_propagation_phase(gtk::PropagationPhase::Capture);
-    let last = Rc::new(Cell::new(None::<(f64, f64)>));
-    let begin = last.clone();
-    let begin_stream = stream.clone();
-    drag.connect_drag_begin(move |gesture, _, _| {
-        if begin_stream.borrow().is_some() {
-            begin.set(Some((0.0, 0.0)));
-            gesture.set_state(gtk::EventSequenceState::Claimed);
-        }
-    });
-    let offset = last.clone();
-    let weak = video.downgrade();
-    let action = mode_action.clone();
-    drag.connect_drag_update(move |_, x, y| {
-        let Some(previous) = offset.get() else {
-            return;
-        };
-        let Some(video) = weak.upgrade() else {
-            return;
-        };
-        let dimensions = stream.borrow().as_ref().map(|media| {
-            (
-                media.intrinsic_width() as f64,
-                media.intrinsic_height() as f64,
-            )
-        });
-        let Some(dimensions) = dimensions else {
-            return;
-        };
-        if !x.is_finite() || !y.is_finite() {
-            return;
-        }
-        offset.set(Some((x, y)));
-        let mode = action
-            .state()
-            .and_then(|value| value.str().and_then(ViewMode::from_id))
-            .unwrap_or(ViewMode::Fit);
-        if transform.borrow_mut().pan(
-            dimensions,
-            (video.width() as f64, video.height() as f64),
-            mode,
-            (x - previous.0, y - previous.1),
-        ) {
-            if let Some(paintable) = video.paintable() {
-                paintable.invalidate_contents();
-            }
-            action.set_state(&"manual".to_variant());
-        }
-    });
-    let end = last.clone();
-    drag.connect_drag_end(move |_, _, _| end.set(None));
-    drag.connect_cancel(move |_, _| last.set(None));
-    video.add_controller(drag);
-}
-
-pub(super) fn install_interaction(
-    picture: &gtk::Picture,
-    texture: Rc<RefCell<Option<gtk::gdk::Texture>>>,
-    transform: Rc<RefCell<Transform>>,
-    action: &gio::SimpleAction,
-    filter: Rc<Cell<Resampling>>,
-    zoom_wheel: Rc<Cell<bool>>,
-) {
-    let pointer = Rc::new(Cell::new((0., 0.)));
-    let motion = gtk::EventControllerMotion::new();
-    let entered = pointer.clone();
-    motion.connect_enter(move |_, x, y| entered.set((x, y)));
-    let position = pointer.clone();
-    motion.connect_motion(move |_, x, y| position.set((x, y)));
-    picture.add_controller(motion);
-    let scroll = gtk::EventControllerScroll::new(gtk::EventControllerScrollFlags::VERTICAL);
-    scroll.set_propagation_phase(gtk::PropagationPhase::Capture);
-    let weak = picture.downgrade();
-    let source = texture.clone();
-    let state = transform.clone();
-    let mode_action = action.clone();
-    let scroll_filter = filter.clone();
-    scroll.connect_scroll(move |controller, _, dy| {
-        let zoom = zoom_wheel.get()
-            || controller.current_event_state().intersects(
-                gtk::gdk::ModifierType::BUTTON1_MASK | gtk::gdk::ModifierType::CONTROL_MASK,
-            );
-        if !zoom {
-            if let Some(picture) = weak.upgrade() {
-                if let Some(window) = picture.root().and_downcast::<adw::ApplicationWindow>() {
-                    let action = if dy > 0.0 {
-                        "next-media"
-                    } else {
-                        "previous-media"
-                    };
-                    if dy != 0.0 {
-                        gio::prelude::ActionGroupExt::activate_action(&window, action, None);
-                    }
-                }
-            }
-            return glib::Propagation::Stop;
-        }
-        let Some(picture) = weak.upgrade() else {
-            return glib::Propagation::Proceed;
-        };
-        if !picture.is_mapped() {
-            return glib::Propagation::Proceed;
-        }
-        let source = source.borrow();
-        let Some(texture) = source.as_ref() else {
-            return glib::Propagation::Proceed;
-        };
-        let mode = mode_action
-            .state()
-            .and_then(|v| v.str().and_then(ViewMode::from_id))
-            .unwrap_or(ViewMode::Actual);
-        let changed = state.borrow_mut().zoom(
-            (texture.width() as f64, texture.height() as f64),
-            (picture.width() as f64, picture.height() as f64),
-            mode,
-            pointer.get(),
-            dy,
-        );
-        if changed {
-            manual(
-                &picture,
-                texture,
-                state.clone(),
-                mode,
-                &mode_action,
-                scroll_filter.clone(),
-            );
-        }
-        glib::Propagation::Stop
-    });
-    picture.add_controller(scroll);
-    let drag = gtk::GestureDrag::new();
-    drag.set_button(1);
-    drag.set_propagation_phase(gtk::PropagationPhase::Capture);
-    let last = Rc::new(Cell::new(None::<(f64, f64)>));
-    let start = last.clone();
-    let source = texture.clone();
-    let drag_generation = Rc::new(Cell::new(0));
-    let began_generation = drag_generation.clone();
-    let began_transform = transform.clone();
-    drag.connect_drag_begin(move |gesture, _, _| {
-        if source.borrow().is_some() && gesture.widget().is_some_and(|w| w.is_mapped()) {
-            began_generation.set(began_transform.borrow().generation());
-            start.set(Some((0., 0.)));
-            gesture.set_state(gtk::EventSequenceState::Claimed);
-        }
-    });
-    let weak = picture.downgrade();
-    let offsets = last.clone();
-    let state = transform;
-    let mode_action = action.clone();
-    drag.connect_drag_update(move |_, x, y| {
-        if drag_generation.get() != state.borrow().generation() {
-            // Zoom while holding the left button changes the transform
-            // generation; rebase the drag instead of disabling it permanently.
-            drag_generation.set(state.borrow().generation());
-            offsets.set(Some((x, y)));
-            return;
-        }
-        let Some(previous) = offsets.get() else {
-            return;
-        };
-        let Some(picture) = weak.upgrade() else {
-            return;
-        };
-        if !picture.is_mapped() {
-            offsets.set(None);
-            return;
-        }
-        let source = texture.borrow();
-        let Some(texture) = source.as_ref() else {
-            offsets.set(None);
-            return;
-        };
-        if !x.is_finite() || !y.is_finite() {
-            return;
-        }
-        offsets.set(Some((x, y)));
-        let mode = mode_action
-            .state()
-            .and_then(|v| v.str().and_then(ViewMode::from_id))
-            .unwrap_or(ViewMode::Actual);
-        let changed = state.borrow_mut().pan(
-            (texture.width() as f64, texture.height() as f64),
-            (picture.width() as f64, picture.height() as f64),
-            mode,
-            (x - previous.0, y - previous.1),
-        );
-        if changed {
-            manual(
-                &picture,
-                texture,
-                state.clone(),
-                mode,
-                &mode_action,
-                filter.clone(),
-            );
-        }
-    });
-    let end = last.clone();
-    drag.connect_drag_end(move |_, _, _| end.set(None));
-    drag.connect_cancel(move |_, _| last.set(None));
-    picture.add_controller(drag);
-}
-fn manual(
-    picture: &gtk::Picture,
-    texture: &gtk::gdk::Texture,
-    transform: Rc<RefCell<Transform>>,
-    mode: ViewMode,
-    action: &gio::SimpleAction,
-    filter: Rc<Cell<Resampling>>,
-) {
-    picture.set_overflow(gtk::Overflow::Hidden);
-    picture.set_content_fit(gtk::ContentFit::Fill);
-    if let Some(current) = picture
-        .paintable()
-        .and_then(|p| p.downcast::<actual_paintable::ActualPaintable>().ok())
-        .filter(|p| p.has_transform(&transform) && p.has_texture(texture))
-    {
-        current.invalidate_contents();
-    } else {
-        picture.set_paintable(Some(&actual_paintable::ActualPaintable::transformed(
-            texture, transform, mode, filter,
-        )));
-    }
-    action.set_state(&"manual".to_variant());
-}
-
-/// Keep a single transformed paintable for all frames of one animation.
-pub(super) fn present_animation_frame(
-    picture: &gtk::Picture,
-    texture: &gtk::gdk::Texture,
-    id: &str,
-    transform: Rc<RefCell<Transform>>,
-    filter: Rc<Cell<Resampling>>,
-) {
-    let mode = ViewMode::from_id(id).unwrap_or(ViewMode::Actual);
-    if let Some(current) = picture
-        .paintable()
-        .and_then(|p| p.downcast::<actual_paintable::ActualPaintable>().ok())
-        .filter(|p| p.has_transform(&transform))
-    {
-        // Manual zoom lives in Transform, not in the incoming frame texture.
-        current.set_mode(mode);
-        current.update_texture(texture);
-        return;
-    }
-    picture.set_overflow(gtk::Overflow::Hidden);
-    picture.set_content_fit(gtk::ContentFit::Fill);
-    picture.set_paintable(Some(&actual_paintable::ActualPaintable::transformed(
-        texture, transform, mode, filter,
-    )));
-}
-
-pub(super) fn present_filtered(
-    picture: &gtk::Picture,
-    texture: Option<&gtk::gdk::Texture>,
-    id: &str,
-    transform: Rc<RefCell<Transform>>,
-    filter: Rc<Cell<Resampling>>,
-) {
-    let mode = ViewMode::from_id(id).unwrap_or(ViewMode::Actual);
-    if id != "manual" && filter.get() == Resampling::Smooth && mode != ViewMode::Actual {
-        present(picture, texture, mode);
-        return;
-    }
-    let Some(texture) = texture else {
-        return;
-    };
-    if let Some(current) = picture
-        .paintable()
-        .and_then(|p| p.downcast::<actual_paintable::ActualPaintable>().ok())
-        .filter(|p| p.has_transform(&transform) && p.has_texture(texture))
-    {
-        current.set_mode(mode);
-        current.invalidate_contents();
-        return;
-    }
-    picture.set_overflow(gtk::Overflow::Hidden);
-    picture.set_content_fit(gtk::ContentFit::Fill);
-    picture.set_paintable(Some(&actual_paintable::ActualPaintable::transformed(
-        texture, transform, mode, filter,
-    )));
-}
-
 pub(super) fn present(picture: &gtk::Picture, texture: Option<&gtk::gdk::Texture>, mode: ViewMode) {
     picture.set_overflow(gtk::Overflow::Hidden);
     match mode {
@@ -1514,7 +1274,6 @@ pub(super) fn present(picture: &gtk::Picture, texture: Option<&gtk::gdk::Texture
         }
     }
 }
-
 // Compatibility entry points used by standalone PIV-09 regression examples.
 #[allow(dead_code)]
 pub(super) fn build(window: &adw::ApplicationWindow, path: PathBuf) -> gtk::Overlay {

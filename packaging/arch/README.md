@@ -1,11 +1,15 @@
-> Current recipe target: **pivra 0.2.6-1**, options=('!debug'). Development
-> candidate only. Native ownership-patched Wayland and X11 are user-reported 9/9;
-> stock GTK Wayland remains 8/9. Risk decisions and v0.2.6 immutable source/checksum approval are pending. See [current candidate gates](../../docs/releases/PIVRA_V0.2.6_RC_VALIDATION.md).
-> Older release sections below are historical, including approved v0.2.5 inputs.
+# Arch packaging
 
-# Arch packaging — v0.2.6 development candidate
+The stable source targets **pivra 0.2.8-1** with `options=('!debug')`.
+Follow the [native Arch candidate workflow](../../docs/packaging/README.md#build-and-verify-the-local-v028-candidate)
+to build an exact local Git commit and generate local `.SRCINFO`, then install
+the reviewed artifact explicitly on the test system. The recipe requires a
+verified source archive in either mode. Publication requires a separate
+approved GitHub archive and checksum. See the
+[current candidate gates](../../docs/releases/PIVRA_V0.2.8_RC_VALIDATION.md).
+The sections below record older releases and candidates.
 
-## Current v0.2.6 release boundary
+## Historical v0.2.6 release boundary
 
 Cargo.toml, Cargo.lock's Pivra entry, pkgver, source validator and staging
 preflight agree on **0.2.6**, pkgrel=1, one pkgname=pivra,
@@ -288,8 +292,8 @@ Arch release package bytes and installed-helper generation remain NOT RUN here.
 
 ## v0.2.5 GPU distribution preparation
 
-> Historical v0.2.5 record; the recipe/scripts in the current checkout target
-> v0.2.6. Follow the current candidate gates linked above for new package work.
+> Historical v0.2.5 record. Follow the current candidate gates linked above
+> for new package work.
 
 The current development release candidate is 0.2.5. Version preparation is
 authorized; immutable source approval and actual makepkg validation remain separate. GPU distribution builds are mandatory and check native GStreamer

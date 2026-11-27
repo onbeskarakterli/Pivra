@@ -12,15 +12,15 @@ mod image_loader {
     use std::path::Path;
     pub enum LoadedFrame {
         Native(secure_image_loader::LoadedFrame),
-        Controlled(bool),
+        Controlled(bool, (i32, i32)),
     }
     impl LoadedFrame {
         pub fn texture(&self) -> gdk::Texture {
             match self {
                 Self::Native(f) => f.texture(),
-                Self::Controlled(second) => gdk::MemoryTexture::new(
-                    64,
-                    32,
+                Self::Controlled(second, (width, height)) => gdk::MemoryTexture::new(
+                    *width,
+                    *height,
                     gdk::MemoryFormat::R8g8b8a8,
                     &glib::Bytes::from_owned(
                         if *second {
@@ -28,9 +28,9 @@ mod image_loader {
                         } else {
                             [40, 100, 180, 255]
                         }
-                        .repeat(64 * 32),
+                        .repeat((*width * *height) as usize),
                     ),
-                    64 * 4,
+                    *width as usize * 4,
                 )
                 .upcast(),
             }
@@ -46,11 +46,17 @@ mod image_loader {
         if cancel.is_cancelled() {
             return Err("controlled cancellation".into());
         }
+        super::CONTROLLED_LOADS.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
         if !path.is_file() || path.file_name().is_some_and(|s| s == "3.png") {
             return Err("controlled bad/missing photo, not decoder evidence".into());
         }
         Ok(LoadedFrame::Controlled(
             path.file_name().is_some_and(|s| s == "2.png"),
+            if path.file_name().is_some_and(|s| s == "portrait.png") {
+                (640, 1280)
+            } else {
+                (64, 32)
+            },
         ))
     }
     pub async fn preload(
@@ -69,10 +75,23 @@ mod input;
 mod window;
 use gtk::{gio, glib, prelude::*};
 use std::time::{Duration, Instant};
+static CONTROLLED_LOADS: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(0);
+#[path = "support/development_features.rs"]
+mod development_features;
+#[path = "support/open_latency.rs"]
+mod open_latency;
+#[path = "support/opening.rs"]
+mod opening;
 #[path = "support/render_frame.rs"]
 mod render_frame;
+#[path = "support/slideshow_click.rs"]
+mod slideshow_click;
+#[path = "support/slideshow_effects.rs"]
+mod slideshow_effects;
 #[path = "support/toolbar_ux.rs"]
 mod toolbar_ux;
+#[path = "support/video_mouse.rs"]
+mod video_mouse;
 fn pump() {
     // Reuse the existing frame barrier; no fixed wait stands in for rendering.
     for _ in 0..100 {
@@ -360,6 +379,71 @@ fn main() {
         .flags(gio::ApplicationFlags::NON_UNIQUE)
         .build();
     app.register(None::<&gio::Cancellable>).unwrap();
+    if std::env::args().any(|s| s == "--development-video-mouse") {
+        video_mouse::run(&app);
+        return;
+    }
+    if std::env::args().any(|s| s == "--development-context-menu") {
+        development_features::context_menu(&app);
+        return;
+    }
+    if std::env::args().any(|s| s == "--development-slideshow-effects") {
+        slideshow_effects::run(&app);
+        return;
+    }
+    if std::env::args().any(|s| s == "--development-slideshow-click") {
+        slideshow_click::run(&app);
+        return;
+    }
+    if std::env::args()
+        .any(|s| s == "--development-open-direct" || s == "--development-open-chooser")
+    {
+        open_latency::run(
+            &app,
+            std::env::args().any(|s| s == "--development-open-direct"),
+        );
+        return;
+    }
+    if std::env::args().any(|s| s == "--development-reveal") {
+        opening::reveal(&app);
+        return;
+    }
+    if std::env::args().any(|s| s == "--development-opening") {
+        opening::run(&app);
+        return;
+    }
+    if std::env::args().any(|s| s == "--development-open") {
+        development_features::open(&app);
+        return;
+    }
+    if std::env::args().any(|s| s == "--development-file-actions") {
+        development_features::media_file_actions(&app);
+        return;
+    }
+    if std::env::args().any(|s| s == "--development-info") {
+        development_features::info(&app);
+        return;
+    }
+    if std::env::args().any(|s| s == "--development-minimap") {
+        development_features::minimap(&app);
+        return;
+    }
+    if std::env::args().any(|s| s == "--development-layout") {
+        development_features::layout(&app);
+        return;
+    }
+    if std::env::args().any(|s| s == "--development-navigation") {
+        development_features::navigation(&app);
+        return;
+    }
+    if std::env::args().any(|s| s == "--development-shortcuts") {
+        development_features::shortcuts(&app);
+        return;
+    }
+    if std::env::args().any(|s| s == "--development-zoom-state") {
+        development_features::zoom_state(&app);
+        return;
+    }
     let dir = tempfile::tempdir().unwrap();
     for (name, source) in [
         ("1.png", "tests/fixtures/images/wide.png"),

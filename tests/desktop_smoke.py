@@ -61,7 +61,7 @@ def main():
                     deadline = time.monotonic() + 15
                     while True:
                         log.seek(0)
-                        if "Pivra: image load failed:" in log.read(): break
+                        if "Pivra: image load failed for " in log.read(): break
                         assert time.monotonic() < deadline, "no controlled loader failure"
                         time.sleep(0.1)
                 request_close(window)

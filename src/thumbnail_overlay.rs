@@ -80,6 +80,7 @@ pub(crate) fn install(
     // An invisible, full-width resize hit area covers the strip's top edge.
     // It is a separate overlay so horizontal thumbnail gestures stay intact.
     let resize_edge = gtk::Box::new(gtk::Orientation::Horizontal, 0);
+    resize_edge.set_widget_name("thumbnail-resize-edge");
     resize_edge.set_hexpand(true);
     resize_edge.set_halign(gtk::Align::Fill);
     resize_edge.set_valign(gtk::Align::End);
@@ -125,6 +126,19 @@ pub(crate) fn install(
     overlay.set_measure_overlay(&resize_edge, false);
     overlay.set_clip_overlay(&resize_edge, true);
     let thumbnails = ThumbnailStrip::new(items, strip.clone());
+    let filter = gtk::DropDown::from_strings(&["All", "Photos", "Videos"]);
+    filter.set_widget_name("thumbnail-media-filter");
+    filter.set_tooltip_text(Some("Thumbnail media filter"));
+    filter.set_enable_search(false);
+    controls.prepend(&filter);
+    let filtered = thumbnails.clone();
+    filter.connect_selected_notify(move |filter| {
+        filtered.set_filter(match filter.selected() {
+            1 => pivra::media_filter::MediaFilter::Photos,
+            2 => pivra::media_filter::MediaFilter::Videos,
+            _ => pivra::media_filter::MediaFilter::All,
+        });
+    });
     let saved_height = pivra::settings::load_thumbnail_height();
     strip.set_height_request(saved_height);
     thumbnails.resize_cells(saved_height);
@@ -164,6 +178,13 @@ pub(crate) fn install(
         shown: Cell::new(false),
         timeout: RefCell::new(None),
         listener: RefCell::new(None),
+    });
+    let weak = Rc::downgrade(&state);
+    strip.connect_unmap(move |_| {
+        if let Some(state) = weak.upgrade() {
+            state.resizing.set(false);
+            state.update_resize_cursor(None);
+        }
     });
     let weak = Rc::downgrade(&state);
     let listener: Rc<dyn Fn(bool)> = Rc::new(move |_| {
@@ -231,6 +252,7 @@ pub(crate) fn install(
                 f64::from(b.y())
             });
         if !begin_state.shown.get()
+            || !strip.is_mapped()
             || !begin_state.preference.enabled()
             || y < top - 10.0
             || y > top + 10.0
@@ -517,6 +539,7 @@ impl Visibility {
             |bounds| f64::from(bounds.y()),
         );
         let on_border = self.shown.get()
+            && strip.is_mapped()
             && self.preference.enabled()
             && y.is_some_and(|position| (position - top).abs() <= 10.0);
         let cursor = if on_border { Some("ns-resize") } else { None };

@@ -121,7 +121,7 @@ pub(super) fn slideshow_group(window: &adw::ApplicationWindow) -> gtk::Box {
     group.append(&button);
 
     let model = gio::Menu::new();
-    for effect in [Effect::Fade, Effect::None] {
+    for effect in Effect::ALL {
         let item = gio::MenuItem::new(Some(effect.label()), None);
         item.set_action_and_target_value(
             Some("win.slideshow-transition"),

@@ -1,5 +1,9 @@
 # Pivra — Geliştirme Yol Haritası
 
+Güncel geliştirme, doğrulama ve yayın akışı için [belge dizini](README.md) ve
+[v0.2.8 doğrulama raporuna](releases/PIVRA_V0.2.8_RC_VALIDATION.md) bakın.
+Aşağıdaki sürüm bağlamları kayıt tarihlerini yansıtır.
+
 ## Mandatory release preparation checks (from v0.2.5 onward)
 
 Before any `dev` -> `main` merge or release tag, run `make release-preflight VERSION=X.Y.Z` on the target development source. After review, optional `make release-preflight VERSION=X.Y.Z RELEASE_CLEAN_OLD=1` removes only untracked old-version packaging archives. The script never recursively deletes Cargo caches or build directories, and never removes `release-source.conf`, `.SRCINFO`, or the current release archives.
@@ -14,7 +18,7 @@ Also require native fmt, strict Clippy, all-target tests, actual GUI acceptance 
 - This cleanup is for `dev`; any v0.2.4 release/AUR update requires separate validation and approval.
 
 
-**Aktif geliştirme sürümü: v0.2.7 (`dev`, yayın adayı).** Cargo.toml, Cargo.lock ve Arch paketleme şablonu v0.2.7 hedeflidir. Yayınlanmış kararlı sürüm v0.2.5; GitHub Release/AUR bu çalışmada değiştirilmedi. **Faz 2 / PIV-18 DONE (31.10.2026).** Erken önizleme geliştirilmeyecek; 64 MP desteği kullanıcı tarafından test edilip kabul edildi. 31.10 tarihli DNG deneyi ayrıca başarılı test edildi, ancak varsayılan olarak kapalıdır. Sürüm numarası değişimi yeni yayın, etiket veya AUR güncellemesi değildir. Aşağıdaki eski sürüm ve TESTING kayıtları tarihsel kanıtlardır.
+**Güncel kararlı sürüm: v0.2.7 — GitHub ve AUR yayını proje sahibi tarafından doğrulandı.** `dev`, yayın sonrası ek ve henüz yayımlanmamış özellikler içerir; kaynak sürümünün hâlâ 0.2.7 olması bu özellikleri kararlı yayının parçası yapmaz. Slayt gösterisi kararlı v0.2.7 kapsamındadır; boş pencere Open düzeltmesi, bilgi paneli, minimap ve diğer yeni arayüz özellikleri [yayın sonrası geliştirme kaydındadır](development/NEXT_CYCLE_UI.md). **Faz 2 / PIV-18 DONE (31.10.2026).** Erken önizleme geliştirilmeyecek; 64 MP desteği kullanıcı tarafından test edilip kabul edildi. 31.10 tarihli DNG deneyi ayrıca başarılı test edildi, ancak varsayılan olarak kapalıdır. Sürüm numarası değişimi yeni yayın, etiket veya AUR güncellemesi değildir. Aşağıdaki eski sürüm ve TESTING kayıtları tarihsel kanıtlardır.
 
 
 ## B6-F2 — Son RC kabulü: teknik GO — 29.10.2026

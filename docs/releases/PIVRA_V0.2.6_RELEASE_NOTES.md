@@ -1,8 +1,10 @@
 # Pivra v0.2.6 — development release candidate
 
+> Historical unreleased development candidate record for v0.2.6. The statuses and checks below describe that preparation period, not the current release. **Current stable: v0.2.7**, published on GitHub and AUR; see the [v0.2.7 release notes](PIVRA_V0.2.7_RELEASE_NOTES.md).
+
 **Status: Development candidate; isolated GTK native acceptance PASS. Stock GTK mixed-playback limitation and release risk decisions remain open. Not published.**
 
-The current stable release remains v0.2.5. This candidate is limited to
+At the time of this candidate, the stable release was v0.2.5. This candidate was limited to
 performance, RAM ownership, GPU resource lifetime and regression coverage.
 
 - Path-specific folder notifications keep unrelated decoded image cache entries,

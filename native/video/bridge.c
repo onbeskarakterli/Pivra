@@ -5,6 +5,14 @@
 #include "current_context.h"
 #include "lifecycle.h"
 
+/* Metadata from the existing eligibility discoverer, not another pipeline. */
+static GPrivate last_information = G_PRIVATE_INIT(g_free);
+char *pivra_gpu_take_information(void) {
+  char *text = g_private_get(&last_information);
+  g_private_set(&last_information, NULL);
+  return text;
+}
+
 void pivra_gpu_trace_binding(const char *stage) {
   static gint samples;
   if (!g_getenv("PIVRA_TRACE_VIDEO") || g_atomic_int_add(&samples,1) >= 128) return;
@@ -27,6 +35,7 @@ GType pivra_gpu_backend_type(void) {
   return pivra_gpu_media_file_get_type();
 }
 int pivra_gpu_eligible(const char *uri) {
+  g_private_replace(&last_information, NULL);
   GError *error=NULL;int result=0;
   if(!gst_init_check(NULL,NULL,&error)) { g_clear_error(&error);return 0; }
   GstDiscoverer *d=gst_discoverer_new(2*GST_SECOND,&error);
@@ -35,6 +44,19 @@ int pivra_gpu_eligible(const char *uri) {
   if(info && !error && gst_discoverer_info_get_result(info)==GST_DISCOVERER_OK) {
     GList *videos=gst_discoverer_info_get_video_streams(info);
     GList *subtitles=gst_discoverer_info_get_subtitle_streams(info);
+    if(videos) {
+      GstDiscovererVideoInfo *v=videos->data;
+      GstCaps *caps=gst_discoverer_stream_info_get_caps(videos->data);
+      gchar *codec=caps ? gst_pb_utils_get_codec_description(caps) : NULL;
+      GString *text=g_string_new(NULL);
+      if(codec) g_string_append_printf(text,"Codec\t%s\n",codec);
+      guint n=gst_discoverer_video_info_get_framerate_num(v), d=gst_discoverer_video_info_get_framerate_denom(v);
+      if(n && d) g_string_append_printf(text,"Frame rate\t%.3f fps\n",(double)n/d);
+      guint bitrate=gst_discoverer_video_info_get_bitrate(v);
+      if(bitrate) g_string_append_printf(text,"Bitrate\t%u bit/s\n",bitrate);
+      g_private_replace(&last_information,g_string_free(text,FALSE));
+      g_free(codec);if(caps)gst_caps_unref(caps);
+    }
     if(!subtitles && g_list_length(videos)==1 && !gst_discoverer_video_info_is_image(videos->data)) {
       GstCaps *caps=gst_discoverer_stream_info_get_caps(videos->data);
       if(caps && g_getenv("PIVRA_TRACE_VIDEO")) {

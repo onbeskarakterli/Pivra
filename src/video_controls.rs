@@ -28,6 +28,14 @@ fn clock(us: i64) -> String {
     format!("{}:{:02}", secs / 60, secs % 60)
 }
 
+pub(super) fn toggle_playback(media: &impl IsA<gtk::MediaStream>) {
+    if media.is_playing() {
+        media.pause();
+    } else {
+        media.play();
+    }
+}
+
 impl Controls {
     pub fn set_slideshow(&self, active: bool) {
         self.slideshow.set(active);
@@ -53,11 +61,7 @@ impl Controls {
         let current = stream.clone();
         play.connect_clicked(move |_| {
             if let Some(media) = current.borrow().as_ref() {
-                if media.is_playing() {
-                    media.pause();
-                } else {
-                    media.play();
-                }
+                toggle_playback(media);
             }
         });
 
@@ -316,13 +320,7 @@ impl Controls {
             return false;
         };
         match (key, ctrl) {
-            (gtk::gdk::Key::space, false) => {
-                if media.is_playing() {
-                    media.pause();
-                } else {
-                    media.play();
-                }
-            }
+            (gtk::gdk::Key::space, false) => toggle_playback(&media),
             (gtk::gdk::Key::Left, true) | (gtk::gdk::Key::Right, true) => {
                 if !media.is_seekable() {
                     return false;

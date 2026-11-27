@@ -325,8 +325,13 @@ impl Session {
         }
         context.collection.select(index);
         context.revision = context.revision.wrapping_add(1);
-        update_title(&window, &self.title, &context);
         let path = context.collection.current().map(|i| i.path());
+        // A rapid round trip can end at the last polled path. Record the
+        // navigation revision now so the observer does not reload that photo
+        // as though a folder monitor had reported an external edit.
+        self.revision.set(Some(context.revision));
+        self.last_path.replace(path.map(std::path::Path::to_owned));
+        update_title(&window, &self.title, &context);
         self.trace("display-selected-begin", path);
         display_selected(&self.view, &context);
         self.trace("display-selected-return", path);
@@ -455,6 +460,9 @@ pub(super) fn install(
     toasts: &adw::ToastOverlay,
     current_toast: Rc<RefCell<Option<adw::Toast>>>,
 ) -> Rc<Session> {
+    if let Some(picture) = view.widget().child().and_downcast::<gtk::Picture>() {
+        super::slideshow_interaction::install(window, &picture);
+    }
     let seconds = pivra::settings::load_slideshow_interval();
     let this = Rc::new(Session {
         window: window.downgrade(),

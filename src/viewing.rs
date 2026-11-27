@@ -56,6 +56,104 @@ pub struct Geometry {
     pub width: f64,
     pub height: f64,
 }
+/// Visible source-image rectangle in normalized coordinates; None when fully visible.
+pub fn visible_region(image: Geometry, viewport: (f64, f64)) -> Option<Geometry> {
+    if [
+        image.x,
+        image.y,
+        image.width,
+        image.height,
+        viewport.0,
+        viewport.1,
+    ]
+    .iter()
+    .any(|v| !v.is_finite())
+        || image.width <= 0.
+        || image.height <= 0.
+        || viewport.0 <= 0.
+        || viewport.1 <= 0.
+    {
+        return None;
+    }
+    if image.x >= -0.5
+        && image.y >= -0.5
+        && image.x + image.width <= viewport.0 + 0.5
+        && image.y + image.height <= viewport.1 + 0.5
+    {
+        return None;
+    }
+    let x = (-image.x / image.width).clamp(0., 1.);
+    let y = (-image.y / image.height).clamp(0., 1.);
+    let right = ((viewport.0 - image.x) / image.width).clamp(0., 1.);
+    let bottom = ((viewport.1 - image.y) / image.height).clamp(0., 1.);
+    (right > x && bottom > y).then_some(Geometry {
+        x,
+        y,
+        width: right - x,
+        height: bottom - y,
+    })
+}
+#[cfg(test)]
+mod minimap_tests {
+    use super::*;
+    #[test]
+    fn fit_is_hidden_and_zoom_pan_resize_track_the_visible_source() {
+        let mut t = Transform::default();
+        let img = (1600., 1200.);
+        let vp = (800., 600.);
+        assert_eq!(
+            visible_region(t.geometry(img, vp, ViewMode::Fit).unwrap(), vp),
+            None
+        );
+        let r = visible_region(t.geometry(img, vp, ViewMode::Actual).unwrap(), vp).unwrap();
+        assert_eq!(
+            r,
+            Geometry {
+                x: 0.25,
+                y: 0.25,
+                width: 0.5,
+                height: 0.5
+            }
+        );
+        t.pan(img, vp, ViewMode::Actual, (1e6, 1e6));
+        let r = visible_region(t.geometry(img, vp, ViewMode::Actual).unwrap(), vp).unwrap();
+        assert_eq!((r.x, r.y), (0., 0.));
+        let larger = (1000., 800.);
+        let r = visible_region(t.geometry(img, larger, ViewMode::Actual).unwrap(), larger).unwrap();
+        assert_eq!(r.width, 1000. / 1600.);
+        assert_eq!(r.height, 800. / 1200.);
+        t.reset();
+        assert_eq!(
+            visible_region(t.geometry(img, larger, ViewMode::Fit).unwrap(), larger),
+            None
+        );
+    }
+    #[test]
+    fn invalid_or_nonintersecting_geometry_is_not_a_minimap() {
+        for g in [
+            Geometry {
+                x: f64::NAN,
+                y: 0.,
+                width: 1.,
+                height: 1.,
+            },
+            Geometry {
+                x: 0.,
+                y: 0.,
+                width: 0.,
+                height: 1.,
+            },
+            Geometry {
+                x: 1000.,
+                y: 1000.,
+                width: 20.,
+                height: 20.,
+            },
+        ] {
+            assert_eq!(visible_region(g, (100., 100.)), None);
+        }
+    }
+}
 #[cfg(test)]
 mod tests {
     use super::*;

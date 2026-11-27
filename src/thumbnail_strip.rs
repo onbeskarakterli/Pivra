@@ -3,6 +3,7 @@ use super::{CELL_HEIGHT, CELL_WIDTH};
 use gtk::{gdk, gio, glib, prelude::*};
 use pivra::{
     image_cache::{FileKey, texture_cost},
+    media_filter::MediaFilter,
     thumbnail_manager::Manager,
     thumbnail_provider::Error,
 };
@@ -12,10 +13,12 @@ use std::{
     path::PathBuf,
     rc::Rc,
 };
+#[path = "thumbnail_strip/sizing.rs"]
+mod sizing;
+use sizing::{display_cost, display_size};
+
 const BUDGET: usize = 16 * 1024 * 1024;
 const LIMIT: usize = 64;
-#[cfg(test)]
-use pivra::thumbnail_manager::Permit;
 #[derive(Clone, Copy, PartialEq, Eq)]
 enum Phase {
     Pending,
@@ -50,6 +53,7 @@ struct Active {
     epoch: u64,
 }
 struct Inner {
+    filter: Cell<MediaFilter>,
     items: gtk::Box,
     scroller: gtk::ScrolledWindow,
     entries: RefCell<Vec<Entry>>,
@@ -93,6 +97,7 @@ pub(crate) struct ThumbnailStrip(Rc<Inner>);
 impl ThumbnailStrip {
     pub(super) fn new(items: gtk::Box, scroller: gtk::ScrolledWindow) -> Self {
         let inner = Rc::new(Inner {
+            filter: Cell::new(MediaFilter::All),
             items,
             scroller,
             entries: RefCell::new(Vec::new()),
@@ -286,6 +291,39 @@ impl ThumbnailStrip {
             self.0.warm_hidden();
         }
     }
+    pub(super) fn set_filter(&self, filter: MediaFilter) {
+        let i = &self.0;
+        if i.filter.replace(filter) == filter {
+            return;
+        }
+        let cancel_active = i.active.borrow().as_ref().is_some_and(|a| {
+            i.entries
+                .borrow()
+                .iter()
+                .find(|e| e.path == a.path)
+                .is_some_and(|e| !i.included(e))
+        });
+        if cancel_active {
+            i.pause();
+        }
+        if let Some(token) = i.warming.borrow().as_ref() {
+            token.cancel();
+        }
+        for entry in i.entries.borrow().iter() {
+            if let Some(w) = &entry.widgets {
+                w.button.set_visible(i.included(entry));
+            }
+        }
+        i.last_visible.set(None);
+        i.initial.set(i.selected.get());
+        i.restore.set(None);
+        if i.scroller.is_mapped() {
+            i.build();
+            i.scroller.queue_draw();
+        } else {
+            i.warm_hidden();
+        }
+    }
     pub(crate) fn resize_cells(&self, panel_height: i32) {
         let height = (panel_height - 34).max(CELL_HEIGHT);
         let width =
@@ -323,8 +361,9 @@ impl ThumbnailStrip {
                     && self.0.scroller.is_mapped()
                     && (self.0.retry.borrow().is_some()
                         || self.0.building.borrow().is_some()
-                        || e.iter()
-                            .any(|e| matches!(e.phase, Phase::Pending | Phase::Loading)))),
+                        || e.iter().any(|e| {
+                            self.0.included(e) && matches!(e.phase, Phase::Pending | Phase::Loading)
+                        }))),
             started: self.0.started.get(),
             decoded_max: self.0.decoded_max.get(),
             largest_texture: e.iter().map(|e| e.cost).max().unwrap_or(0),
@@ -444,6 +483,7 @@ impl ThumbnailStrip {
         }
         for entry in i.entries.borrow().iter() {
             if let Some(w) = &entry.widgets {
+                w.button.set_visible(i.included(entry));
                 w.button
                     .set_widget_name(&format!("thumbnail-cell-{}", entry.index.get()));
                 if Some(entry.index.get()) == selected {
@@ -459,6 +499,7 @@ impl ThumbnailStrip {
         } else if i.initialized.get() && i.scroller.is_mapped() {
             // File restoration creates pending cells during an asynchronous
             // folder reconciliation; kick the visible scheduler immediately.
+            i.build();
             i.drive();
         }
     }
@@ -468,6 +509,11 @@ impl ThumbnailStrip {
     }
 }
 impl Inner {
+    fn included(&self, entry: &Entry) -> bool {
+        self.filter
+            .get()
+            .includes(pivra::discovery::candidate_kind(&entry.path))
+    }
     // Prime GNOME/Freedesktop disk caches after folder discovery even when
     // the overlay is hidden. Bound to a small initial batch and one worker;
     // visible-cell decoding remains owned by the normal viewport scheduler.
@@ -508,7 +554,10 @@ impl Inner {
         // Prioritize the selected image, then the neighbors actually expected
         // in the initial viewport, not unrelated images at the folder start.
         if let Some(n) = selected {
-            if entries[n].phase == Phase::Pending && !crate::raw_loader::is_dng(&entries[n].path) {
+            if self.included(&entries[n])
+                && entries[n].phase == Phase::Pending
+                && !crate::raw_loader::is_dng(&entries[n].path)
+            {
                 paths.push(entries[n].path.clone());
             }
         }
@@ -518,6 +567,7 @@ impl Inner {
             // delay all visible photo thumbnails. Visible DNG uses the normal
             // priority scheduler below.
             if e.phase == Phase::Pending
+                && self.included(e)
                 && !crate::raw_loader::is_dng(&e.path)
                 && !paths.contains(&e.path)
             {
@@ -832,7 +882,11 @@ impl Inner {
     }
     fn build(self: &Rc<Self>) {
         if self.building.borrow().is_some()
-            || !self.entries.borrow().iter().any(|e| e.widgets.is_none())
+            || !self
+                .entries
+                .borrow()
+                .iter()
+                .any(|e| e.widgets.is_none() && self.included(e))
         {
             return;
         }
@@ -846,7 +900,11 @@ impl Inner {
                 return glib::ControlFlow::Break;
             }
             let mut entries = i.entries.borrow_mut();
-            for entry in entries.iter_mut().filter(|e| e.widgets.is_none()).take(8) {
+            for entry in entries
+                .iter_mut()
+                .filter(|e| e.widgets.is_none() && i.included(e))
+                .take(8)
+            {
                 let button = gtk::Button::new();
                 button.add_css_class("pivra-thumbnail-cell");
                 let (cell_width, cell_height) = i.cell_size.get();
@@ -975,7 +1033,7 @@ impl Inner {
                     icon,
                 });
             }
-            if entries.iter().any(|e| e.widgets.is_none()) {
+            if entries.iter().any(|e| e.widgets.is_none() && i.included(e)) {
                 glib::ControlFlow::Continue
             } else {
                 i.building.borrow_mut().take();
@@ -1005,7 +1063,9 @@ impl Inner {
         // The measured content must include the final cell, not a provisional
         // hidden-strip adjustment range. This is a layout certificate, not a sleep.
         let Some(last) = entries
-            .last()
+            .iter()
+            .rev()
+            .find(|e| self.included(e))
             .and_then(|e| e.widgets.as_ref())
             .and_then(|w| w.button.compute_bounds(&self.items))
         else {
@@ -1018,7 +1078,7 @@ impl Inner {
         if let Some(index) = self.initial.get() {
             if let Some(bounds) = entries
                 .iter()
-                .find(|e| e.index.get() == index)
+                .find(|e| e.index.get() == index && self.included(e))
                 .and_then(|e| e.widgets.as_ref())
                 .and_then(|w| w.button.compute_bounds(&self.items))
             {
@@ -1047,6 +1107,9 @@ impl Inner {
         // Actual allocations include theme padding and fractional HiDPI layout;
         // a guessed fixed pitch can omit a still-visible edge cell.
         let mut shown = entries.iter().enumerate().filter_map(|(n, e)| {
+            if !self.included(e) {
+                return None;
+            }
             let b = e.widgets.as_ref()?.button.compute_bounds(&self.items)?;
             (f64::from(b.x()) < adj.value() + adj.page_size()
                 && f64::from(b.x() + b.width()) > adj.value())
@@ -1094,11 +1157,14 @@ impl Inner {
         let near = visible.start.saturating_sub(2)..(visible.end + 2).min(entries.len());
         self.clock.set(self.clock.get().wrapping_add(1));
         for (n, e) in entries.iter_mut().enumerate() {
-            if visible.contains(&n) {
+            if visible.contains(&n) && self.included(e) {
                 e.used = self.clock.get();
             }
             if let Some(w) = &e.widgets {
-                if visible.contains(&n) && matches!(e.phase, Phase::Pending | Phase::Loading) {
+                if visible.contains(&n)
+                    && self.included(e)
+                    && matches!(e.phase, Phase::Pending | Phase::Loading)
+                {
                     if pivra::discovery::candidate_kind(&e.path)
                         == Some(pivra::media::MediaKind::Video)
                     {
@@ -1119,6 +1185,7 @@ impl Inner {
         let warming_paths = self.warming_paths.borrow();
         let pending = |n: usize| {
             entries[n].phase == Phase::Pending
+                && self.included(&entries[n])
                 && (!warming || !warming_paths.contains(&entries[n].path))
         };
         let next = selected
@@ -1350,7 +1417,7 @@ impl Inner {
                     .min_by_key(|(n, e)| {
                         (
                             Some(e.index.get()) == i.selected.get(),
-                            visible.contains(n),
+                            visible.contains(n) && i.included(e),
                             e.used,
                         )
                     })
@@ -1516,24 +1583,6 @@ fn display_texture(texture: &gdk::Texture, scale: i32) -> Result<gdk::Texture, S
     )
 }
 
-fn display_cost(width: i32, height: i32) -> Option<usize> {
-    usize::try_from(width)
-        .ok()?
-        .checked_mul(usize::try_from(height).ok()?)?
-        .checked_mul(8)
-}
-
-fn display_size(width: i32, height: i32, scale: i32) -> (i32, i32) {
-    let scale = scale.clamp(1, 2);
-    let ratio = (f64::from(CELL_WIDTH * scale) / f64::from(width))
-        .min(f64::from(CELL_HEIGHT * scale) / f64::from(height))
-        .min(1.);
-    (
-        (f64::from(width) * ratio).floor().max(1.) as i32,
-        (f64::from(height) * ratio).floor().max(1.) as i32,
-    )
-}
-
 // User-facing click diagnosis is opt-in and independent of thumbnail decode logs.
 // A deferred click must still address the very same catalog item.
 fn fallback_target_valid(
@@ -1600,222 +1649,5 @@ impl Drop for Inner {
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-    #[test]
-    fn admission_cancellation_and_permanent_failures_are_not_retryable() {
-        assert!(matches!(provider_failure(Error::Busy), Work::Busy));
-        assert!(matches!(
-            provider_failure(Error::Cancelled),
-            Work::Cancelled
-        ));
-        for error in [
-            Error::Ineligible,
-            Error::InvalidSource("bad data".into()),
-            Error::SourceUnavailable("permission denied".into()),
-            Error::GenerationFailed("unknown decoder error".into()),
-            Error::ProviderUnavailable,
-        ] {
-            assert!(matches!(provider_failure(error), Work::Failed(_)));
-        }
-        assert!(matches!(
-            provider_failure(Error::TimedOut),
-            Work::TransientFailure(_)
-        ));
-        assert!(matches!(
-            provider_failure(Error::ProviderTemporarilyUnavailable),
-            Work::TransientFailure(_)
-        ));
-    }
-    #[test]
-    fn automatic_failure_retry_is_bounded_to_one_without_reset() {
-        let mut retries = 0;
-        assert!(retry_failure_once(&mut retries));
-        for _ in 0..1000 {
-            assert!(!retry_failure_once(&mut retries));
-        }
-        assert_eq!(retries, 1);
-    }
-    #[test]
-    fn over_budget_visible_entries_do_not_spin_until_viewport_changes() {
-        let mut entries: Vec<_> = (0..65)
-            .map(|index| Entry {
-                index: Rc::new(Cell::new(index)),
-                path: PathBuf::from(index.to_string()),
-                widgets: None,
-                phase: Phase::Evicted,
-                texture: None,
-                keys: None,
-                cost: 0,
-                used: 0,
-                failure_retries: 0,
-            })
-            .collect();
-        let last = Cell::new(None);
-        reconsider_evicted(&mut entries, &(0..64), &last, None);
-        assert!(entries[..64].iter().all(|e| e.phase == Phase::Pending));
-        for e in &mut entries[..64] {
-            e.phase = Phase::Evicted;
-        } // RAM eviction after admission
-        reconsider_evicted(&mut entries, &(0..64), &last, None);
-        assert!(entries[..64].iter().all(|e| e.phase == Phase::Evicted));
-        reconsider_evicted(&mut entries, &(1..65), &last, None);
-        assert!(entries[1..].iter().all(|e| e.phase == Phase::Pending));
-        assert!(entries[0].phase == Phase::Evicted);
-    }
-    #[test]
-    fn deferred_click_rejects_catalog_replacement_and_index_reuse() {
-        let entries = vec![Entry {
-            index: Rc::new(Cell::new(2)),
-            path: PathBuf::from("/pictures/new.jpg"),
-            widgets: None,
-            phase: Phase::Pending,
-            texture: None,
-            keys: None,
-            cost: 0,
-            used: 0,
-            failure_retries: 0,
-        }];
-        assert!(!fallback_target_valid(
-            10,
-            11,
-            2,
-            std::path::Path::new("/pictures/old.jpg"),
-            &entries
-        ));
-        assert!(!fallback_target_valid(
-            10,
-            10,
-            2,
-            std::path::Path::new("/pictures/old.jpg"),
-            &entries
-        ));
-        assert!(fallback_target_valid(
-            10,
-            10,
-            2,
-            std::path::Path::new("/pictures/new.jpg"),
-            &entries
-        ));
-        assert!(!fallback_target_valid(
-            10,
-            10,
-            3,
-            std::path::Path::new("/pictures/new.jpg"),
-            &entries
-        ));
-    }
-    #[test]
-    fn rgba8_density_and_conservative_upload_charge_fit_both_caps() {
-        for scale in 1..=4 {
-            for (w, h) in [(512, 512), (4096, 3072), (64, 32), (1, 32768)] {
-                let (width, height) = display_size(w, h, scale);
-                assert!(width > 0 && height > 0 && width <= w && height <= h);
-                assert!(width <= CELL_WIDTH * 2 && height <= CELL_HEIGHT * 2);
-                // One texture must fit. The cache is bounded by BOTH count
-                // and bytes; large thumbnails require eviction below LIMIT.
-                let cost = display_cost(width, height).unwrap();
-                assert!(cost <= BUDGET);
-                assert!((BUDGET / cost).min(LIMIT) >= 1);
-                assert!((BUDGET / cost).min(LIMIT) * cost <= BUDGET);
-            }
-        }
-        assert_eq!(texture_cost(512, 512), Some(8 * 1024 * 1024));
-        assert_eq!(display_cost(160, 160), Some(204800));
-    }
-    #[test]
-    fn evicted_offscreen_selection_is_reconsidered_without_paint_retry_loop() {
-        let mut entries: Vec<_> = (0..5)
-            .map(|index| Entry {
-                index: Rc::new(Cell::new(index)),
-                path: PathBuf::new(),
-                widgets: None,
-                phase: Phase::Evicted,
-                texture: None,
-                keys: None,
-                cost: 0,
-                used: 0,
-                failure_retries: 0,
-            })
-            .collect();
-        let last = Cell::new(None);
-        reconsider_evicted(&mut entries, &(0..1), &last, Some(4));
-        assert!(entries[0].phase == Phase::Pending && entries[4].phase == Phase::Pending);
-        assert!(entries[1..4].iter().all(|e| e.phase == Phase::Evicted));
-        entries[4].phase = Phase::Evicted;
-        reconsider_evicted(&mut entries, &(0..1), &last, Some(4));
-        assert!(entries[4].phase == Phase::Evicted);
-    }
-    #[test]
-    fn generated_memory_texture_owns_pixels_and_never_invents_cache_identity() {
-        use pivra::freedesktop_generator::{GeneratedThumbnail, Metrics};
-        use pivra::freedesktop_thumbnail::SizeClass;
-        let root = tempfile::tempdir().unwrap();
-        let path = root.path().join("source.png");
-        std::fs::write(&path, b"controlled source identity only").unwrap();
-        let key = FileKey::read(&path).unwrap();
-        let t = GeneratedThumbnail {
-            source: key.clone(),
-            class: SizeClass::Normal,
-            width: 4,
-            height: 2,
-            stride: 16,
-            pixels: glib::Bytes::from_owned([20u8, 40, 60, 128].repeat(8)),
-            metrics: Metrics {
-                decoded_width: 4,
-                decoded_height: 2,
-                frame_bytes: 32,
-                download_bytes: 32,
-                output_bytes: 32,
-                decode_time: std::time::Duration::ZERO,
-                resize_time: std::time::Duration::ZERO,
-            },
-        };
-        let cancel = gio::Cancellable::new();
-        let deadline = std::time::Instant::now() + std::time::Duration::from_secs(10);
-        let Work::Hit(texture, source, cache, _) = memory_work(&t, &cancel, deadline, 1) else {
-            panic!("memory pixels");
-        };
-        assert_eq!(source, key);
-        assert!(cache.is_none());
-        assert_eq!((texture.width(), texture.height()), (4, 2));
-        assert!(!matches!(
-            memory_work(&t, &cancel, std::time::Instant::now(), 1),
-            Work::Hit(..)
-        ));
-        std::fs::write(&path, b"changed").unwrap();
-        assert!(!matches!(
-            memory_work(&t, &cancel, deadline, 1),
-            Work::Hit(..)
-        ));
-        cancel.cancel();
-        assert!(!matches!(
-            memory_work(&t, &cancel, deadline, 1),
-            Work::Hit(..)
-        ));
-        drop(t);
-        let mut downloader = gdk::TextureDownloader::new(&texture);
-        downloader.set_format(gdk::MemoryFormat::R8g8b8a8);
-        let (bytes, _) = downloader.download_bytes();
-        for pixel in bytes.chunks_exact(4) {
-            for (actual, expected) in pixel.iter().zip([20u8, 40, 60, 128]) {
-                assert!(actual.abs_diff(expected) <= 1);
-            }
-        }
-    }
-    #[test]
-    fn global_worker_bound_deduplicates_and_releases_paths() {
-        let root = tempfile::tempdir().unwrap();
-        let a = root.path().join("a");
-        let b = root.path().join("b");
-        let c = root.path().join("c");
-        let first = Permit::take(&a).unwrap();
-        assert!(Permit::take(&a).is_none());
-        let second = Permit::take(&b).unwrap();
-        assert!(Permit::take(&c).is_none());
-        drop(first);
-        assert!(Permit::take(&c).is_some());
-        drop(second);
-        assert_eq!(Permit::active_count(), 0);
-    }
-}
+#[path = "thumbnail_strip/tests.rs"]
+mod tests;

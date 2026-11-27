@@ -18,18 +18,46 @@ pub enum Effect {
     #[default]
     Fade,
     None,
+    SlideLeft,
+    SlideRight,
+    SlideUp,
+    SlideDown,
+    ZoomIn,
+    ZoomOut,
 }
 impl Effect {
+    pub const ALL: [Self; 8] = [
+        Self::Fade,
+        Self::None,
+        Self::SlideLeft,
+        Self::SlideRight,
+        Self::SlideUp,
+        Self::SlideDown,
+        Self::ZoomIn,
+        Self::ZoomOut,
+    ];
     pub fn id(self) -> &'static str {
         match self {
             Self::Fade => "fade",
             Self::None => "none",
+            Self::SlideLeft => "slide-left",
+            Self::SlideRight => "slide-right",
+            Self::SlideUp => "slide-up",
+            Self::SlideDown => "slide-down",
+            Self::ZoomIn => "zoom-in",
+            Self::ZoomOut => "zoom-out",
         }
     }
     pub fn from_id(id: &str) -> Option<Self> {
         match id {
             "fade" => Some(Self::Fade),
             "none" => Some(Self::None),
+            "slide-left" => Some(Self::SlideLeft),
+            "slide-right" => Some(Self::SlideRight),
+            "slide-up" => Some(Self::SlideUp),
+            "slide-down" => Some(Self::SlideDown),
+            "zoom-in" => Some(Self::ZoomIn),
+            "zoom-out" => Some(Self::ZoomOut),
             _ => None,
         }
     }
@@ -37,6 +65,12 @@ impl Effect {
         match self {
             Self::Fade => "Fade",
             Self::None => "No transition",
+            Self::SlideLeft => "Slide Left",
+            Self::SlideRight => "Slide Right",
+            Self::SlideUp => "Slide Up",
+            Self::SlideDown => "Slide Down",
+            Self::ZoomIn => "Zoom In",
+            Self::ZoomOut => "Zoom Out",
         }
     }
 }
@@ -195,7 +229,7 @@ mod tests {
     }
     #[test]
     fn only_supported_effects_round_trip() {
-        for effect in [Effect::Fade, Effect::None] {
+        for effect in Effect::ALL {
             assert_eq!(Effect::from_id(effect.id()), Some(effect));
         }
         assert_eq!(Effect::from_id("spin"), None);

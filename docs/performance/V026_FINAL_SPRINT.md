@@ -1,5 +1,9 @@
 # v0.2.6 final development sprint — measured changes, native blocker open
 
+> Historical record. Dates, versions, test outcomes and approval states below
+> describe the work captured at the time. See the [documentation index](../README.md)
+> for current development and release status.
+
 Implementation commit: `25d4b9eddd169b2d25385dccbcdde136b465ae5f`.
 Recorded 2026-11-19. Base: `1e25d0a850c1af174ec1a697e1bda2eb9ac27cab`, dev.
 **PARTIAL / NO-GO for release.** Version 0.2.6 is a development candidate; stable

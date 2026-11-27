@@ -18,7 +18,7 @@ def git(*args):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--version", required=True, help="Release version, e.g. 0.2.7")
+    parser.add_argument("--version", required=True, help="Target release version (X.Y.Z)")
     parser.add_argument("--binary", type=Path, help="Inspect an actual GPU-enabled distribution ELF")
     parser.add_argument("--staging-root", type=Path, help="Inspect an actual PREFIX=/usr DESTDIR staging tree")
     parser.add_argument("--candidate", action="store_true", help="Validate the exact target candidate; publication/source approval remain separate")
@@ -58,15 +58,17 @@ def main():
 
     readme = (ROOT / "README.md").read_text()
     candidate_marker = f"**Upcoming release candidate: v{version}.**"
-    stable_marker = f"**Current stable release: v{version}.**"
+    stable_markers = (f"**Current stable release: v{version}.**",
+                      f"**Stable release source: v{version}.**")
+    stable_handoff = any(marker in readme for marker in stable_markers)
     if args.candidate:
-        if candidate_marker not in readme and stable_marker not in readme:
+        if candidate_marker not in readme and not stable_handoff:
             errors.append("README must identify the exact target candidate or current stable release")
         report = ROOT / "docs" / "releases" / f"PIVRA_V{version}_RC_VALIDATION.md"
         if not report.is_file():
             errors.append("Missing candidate validation report")
-    elif stable_marker not in readme or candidate_marker in readme:
-        errors.append("Publication handoff: README must identify target as current stable, not upcoming/unreleased")
+    elif not stable_handoff or candidate_marker in readme:
+        errors.append("Publication handoff: README must identify the target stable release source")
     notes_name = f"PIVRA_V{version}_RELEASE_NOTES.md"
     notes = ROOT / "docs" / "releases" / notes_name
     if not notes.is_file():
@@ -76,11 +78,13 @@ def main():
         if f"# Pivra v{version}" not in text:
             errors.append("Release notes version differs from target")
         if not args.candidate and (
-            not any(marker in text for marker in ("**Status: Published stable release.**", "**Status: Stable-release source prepared for approval.**"))
+            not any(marker in text for marker in ("**Status: Published stable release.**",
+                                                  "**Status: Stable-release source prepared for approval.**",
+                                                  "**Status: Stable release source.**"))
             or "release candidate" in text.splitlines()[0].lower()
         ):
             errors.append("Publication handoff: release notes must carry stable-release source wording, not RC status")
-    if notes_name not in recipe:
+    if notes_name not in recipe and "PIVRA_V${pkgver}_RELEASE_NOTES.md" not in recipe:
         errors.append("PKGBUILD must install target-version release notes")
 
     binary = args.binary

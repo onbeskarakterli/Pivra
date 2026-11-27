@@ -7,6 +7,13 @@
 
 /* Metadata from the existing eligibility discoverer, not another pipeline. */
 static GPrivate last_information = G_PRIVATE_INIT(g_free);
+static void trace_video_route(gboolean gpu, const char *reason)
+{
+  if (g_getenv("PIVRA_TRACE_VIDEO"))
+    g_printerr("PIVRA_VIDEO_ROUTE backend=%s stage=discovery reason=%s\n",
+               gpu ? "gpu" : "stock", reason);
+}
+
 char *pivra_gpu_take_information(void) {
   char *text = g_private_get(&last_information);
   g_private_set(&last_information, NULL);
@@ -37,13 +44,21 @@ GType pivra_gpu_backend_type(void) {
 int pivra_gpu_eligible(const char *uri) {
   g_private_replace(&last_information, NULL);
   GError *error=NULL;int result=0;
-  if(!gst_init_check(NULL,NULL,&error)) { g_clear_error(&error);return 0; }
+  if(!gst_init_check(NULL,NULL,&error)) {
+    trace_video_route(FALSE, "gstreamer-initialization-failed");
+    g_clear_error(&error);return 0;
+  }
   GstDiscoverer *d=gst_discoverer_new(2*GST_SECOND,&error);
-  if(!d) { g_clear_error(&error);return 0; }
+  if(!d) {
+    trace_video_route(FALSE, "discoverer-unavailable");
+    g_clear_error(&error);return 0;
+  }
   GstDiscovererInfo *info=gst_discoverer_discover_uri(d,uri,&error);
+  const char *reason = "video-discovery-failed";
   if(info && !error && gst_discoverer_info_get_result(info)==GST_DISCOVERER_OK) {
     GList *videos=gst_discoverer_info_get_video_streams(info);
     GList *subtitles=gst_discoverer_info_get_subtitle_streams(info);
+    guint video_count = g_list_length(videos);
     if(videos) {
       GstDiscovererVideoInfo *v=videos->data;
       GstCaps *caps=gst_discoverer_stream_info_get_caps(videos->data);
@@ -57,16 +72,24 @@ int pivra_gpu_eligible(const char *uri) {
       g_private_replace(&last_information,g_string_free(text,FALSE));
       g_free(codec);if(caps)gst_caps_unref(caps);
     }
-    if(!subtitles && g_list_length(videos)==1 && !gst_discoverer_video_info_is_image(videos->data)) {
+    if(!subtitles && video_count==1 && !gst_discoverer_video_info_is_image(videos->data)) {
       GstCaps *caps=gst_discoverer_stream_info_get_caps(videos->data);
       if(caps && g_getenv("PIVRA_TRACE_VIDEO")) {
         gchar *text=gst_caps_to_string(caps);g_printerr("PIVRA_GPU_DISCOVERY %s\n",text);g_free(text);
       }
       result=pivra_gpu_caps_eligible(caps);
+      reason = result ? "bt709-h264-eligible" : "video-metadata-outside-gpu-policy";
       if(caps) gst_caps_unref(caps);
-    }
+    } else if (subtitles) reason = "subtitles";
+    else if (video_count != 1) reason = "video-stream-count";
+    else reason = "still-image-stream";
     gst_discoverer_stream_info_list_free(videos);gst_discoverer_stream_info_list_free(subtitles);
+  } else if (g_getenv("PIVRA_TRACE_VIDEO")) {
+    g_printerr("PIVRA_VIDEO_DISCOVERER status=%d detail=%s\n",
+               info ? (int)gst_discoverer_info_get_result(info) : -1,
+               error ? error->message : "none");
   }
+  trace_video_route(result, reason);
   if(info) gst_discoverer_info_unref(info);
   g_clear_error(&error);g_object_unref(d);return result;
 }

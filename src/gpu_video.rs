@@ -110,6 +110,14 @@ pub async fn choose(path: PathBuf, current: impl Fn() -> bool) -> Option<Backend
         if !cfg!(pivra_gpu_backend) {
             eprintln!("Pivra GPU backend unavailable at build time; stock video retained");
         }
+        if std::env::var_os("PIVRA_TRACE_VIDEO").is_some() {
+            let reason = if cfg!(pivra_gpu_backend) {
+                "explicit-stock-override"
+            } else {
+                "gpu-adapter-not-built"
+            };
+            eprintln!("PIVRA_VIDEO_ROUTE backend=stock stage=selection reason={reason}");
+        }
         return current().then_some(Backend::Stock);
     }
     let Some(key) = identity(&path) else {
@@ -236,11 +244,63 @@ fn stock(path: &Path) -> gtk::MediaFile {
 }
 #[allow(dead_code)] // Standalone GPU probes intentionally have no native window surface.
 pub fn open_selected(path: &Path, backend: Backend) -> Result<gtk::MediaFile, String> {
-    open_selected_on_surface(path, backend, None)
+    // Offscreen probes supply the renderer choice before constructing a window.
+    let renderer = if gtk::minor_version() < 20 {
+        "ngl"
+    } else {
+        "gl"
+    };
+    let backend =
+        if backend == Backend::Gpu && std::env::var("GSK_RENDERER").as_deref() != Ok(renderer) {
+            Backend::Stock
+        } else {
+            backend
+        };
+    open_media_file(path, backend, None)
 }
+
 /// Production supplies its realized native surface before setting the filename:
 /// GtkPicture/ActualPaintable does not forward GtkMediaStream realization.
 pub fn open_selected_on_surface(
+    path: &Path,
+    backend: Backend,
+    surface: &gtk::gdk::Surface,
+    renderer: Option<&gtk::gsk::Renderer>,
+) -> Result<gtk::MediaFile, String> {
+    let backend = if backend == Backend::Gpu {
+        let gl = renderer.is_some_and(window_renderer_supports_gl_video);
+        if std::env::var_os("PIVRA_TRACE_VIDEO").is_some() {
+            let realized = renderer.map(|r| r.type_().name()).unwrap_or("none");
+            let requested = std::env::var("GSK_RENDERER").unwrap_or_else(|_| "automatic".into());
+            let (selected, reason) = if gl {
+                ("gpu", "realized-opengl-renderer")
+            } else {
+                ("stock", "incompatible-realized-renderer")
+            };
+            eprintln!(
+                "PIVRA_VIDEO_ROUTE backend={selected} stage=renderer reason={reason} requested={requested} realized={realized}"
+            );
+        }
+        if gl { Backend::Gpu } else { Backend::Stock }
+    } else {
+        backend
+    };
+    open_media_file(path, backend, Some(surface))
+}
+
+fn window_renderer_supports_gl_video(renderer: &gtk::gsk::Renderer) -> bool {
+    renderer.is_realized()
+        && if gtk::minor_version() < 18 {
+            // GTK 4.16 has separate legacy and modern OpenGL renderers.
+            renderer.type_().name() == "GskNglRenderer"
+        } else {
+            // GTK 4.18 folded NGL into the public GL type. Aliases and
+            // failed renderer requests are resolved by GTK at realization.
+            renderer.is::<gtk::gsk::GLRenderer>()
+        }
+}
+
+fn open_media_file(
     path: &Path,
     backend: Backend,
     surface: Option<&gtk::gdk::Surface>,
@@ -257,17 +317,6 @@ pub fn open_selected_on_surface(
             return Err(error.to_string());
         }
         return Ok(media);
-    }
-    let renderer = if gtk::minor_version() < 20 {
-        "ngl"
-    } else {
-        "gl"
-    };
-    if std::env::var("GSK_RENDERER").as_deref() != Ok(renderer) {
-        eprintln!(
-            "Pivra GPU correction unavailable with selected renderer; stock retained (requires {renderer})"
-        );
-        return open_selected_on_surface(path, Backend::Stock, surface);
     }
     #[cfg(pivra_gpu_backend)]
     {

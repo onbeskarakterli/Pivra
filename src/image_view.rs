@@ -616,7 +616,12 @@ impl ImageView {
             self.status.set_visible(true);
             return;
         };
-        let media = match gpu_video::open_selected_on_surface(path, backend, Some(&surface)) {
+        let media = match gpu_video::open_selected_on_surface(
+            path,
+            backend,
+            &surface,
+            window.renderer().as_ref(),
+        ) {
             Ok(media) => media,
             Err(error) if backend == gpu_video::Backend::Gpu => {
                 eprintln!(

@@ -1,4 +1,5 @@
 //! One per-window speed action for the transport and context menu.
+use super::gpu_video;
 use adw::prelude::*;
 use gtk::{gio, glib};
 use std::{
@@ -48,6 +49,46 @@ fn set_rate(stream: &gtk::MediaStream, quarters: u32) -> bool {
     {
         let _ = (stream, quarters);
         false
+    }
+}
+
+fn readiness_issue(stream: &gtk::MediaStream) -> Option<(&'static str, &'static str)> {
+    if stream.error().is_some() {
+        Some((
+            "stream-error",
+            "Playback speed is unavailable after a video error",
+        ))
+    } else if !stream.is_prepared() {
+        Some((
+            "awaiting-preroll",
+            "Playback speed will be available when the video is ready",
+        ))
+    } else if !stream.is_seekable() {
+        Some(("unseekable", "Playback speed requires a seekable video"))
+    } else if stream.is_ended() {
+        Some(("ended", "Resume or seek to change playback speed"))
+    } else if stream.is_seeking() {
+        Some(("seek-in-progress", "Waiting for the video seek to finish"))
+    } else if stream.property::<bool>("playback-rate-pending") {
+        Some((
+            "rate-in-progress",
+            "Waiting for GStreamer to confirm playback speed",
+        ))
+    } else {
+        None
+    }
+}
+
+fn trace_availability(stream: &gtk::MediaStream, enabled: bool, reason: &str) {
+    if std::env::var_os("PIVRA_TRACE_VIDEO").is_some() {
+        eprintln!(
+            "PIVRA_VIDEO_SPEED backend={} enabled={enabled} reason={reason} prepared={} seekable={} seeking={} ended={}",
+            stream.type_().name(),
+            stream.is_prepared(),
+            stream.is_seekable(),
+            stream.is_seeking(),
+            stream.is_ended(),
+        );
     }
 }
 
@@ -134,19 +175,35 @@ impl SpeedControl {
         self.action.set_state(&"1".to_variant());
         self.action.set_enabled(false);
         self.button.set_sensitive(false);
-        let stream = self.current.borrow().clone();
-        let Some(stream) = stream.filter(supports_rate) else {
-            self.button
-                .set_tooltip_text(Some("Playback speed is unavailable for this video"));
+        let Some(stream) = self.current.borrow().clone() else {
             return;
         };
-        self.button.set_tooltip_text(Some("Playback speed"));
+        if !supports_rate(&stream) {
+            let owned = stream
+                .downcast_ref::<gtk::MediaFile>()
+                .is_some_and(gpu_video::is_owned);
+            let (reason, tooltip) = if owned {
+                (
+                    "scaletempo-unavailable",
+                    "Playback speed requires the GStreamer scaletempo plugin",
+                )
+            } else {
+                (
+                    "stock-backend-no-rate-api",
+                    "Playback speed is unavailable in the GTK stock player",
+                )
+            };
+            trace_availability(&stream, false, reason);
+            self.button.set_tooltip_text(Some(tooltip));
+            return;
+        }
 
         let current = Rc::downgrade(&self.current);
         let action = self.action.downgrade();
         let button = self.button.downgrade();
         let preferred = self.preferred.clone();
         let restored = Cell::new(false);
+        let last_reason = Cell::new(None);
         let update = Rc::new(move |stream: &gtk::MediaStream, confirmed: bool| {
             let (Some(slot), Some(action), Some(button)) =
                 (current.upgrade(), action.upgrade(), button.upgrade())
@@ -156,11 +213,6 @@ impl SpeedControl {
             if slot.borrow().as_ref() != Some(stream) {
                 return;
             }
-            let ready = stream.is_prepared()
-                && stream.is_seekable()
-                && !stream.is_seeking()
-                && !stream.is_ended()
-                && stream.error().is_none();
             let rate = stream.property::<u32>("playback-rate-quarters");
             if confirmed {
                 preferred.set(rate);
@@ -169,16 +221,22 @@ impl SpeedControl {
             if action.state().as_ref() != Some(&value) {
                 action.set_state(&value);
             }
-            if ready
+            if readiness_issue(stream).is_none()
                 && !restored.replace(true)
                 && rate != preferred.get()
                 && !set_rate(stream, preferred.get())
             {
                 eprintln!("Pivra: could not restore playback speed on the selected video");
             }
-            let enabled = ready && !stream.property::<bool>("playback-rate-pending");
+            let issue = readiness_issue(stream);
+            let enabled = issue.is_none();
             action.set_enabled(enabled);
             button.set_sensitive(enabled);
+            let (reason, tooltip) = issue.unwrap_or(("ready", "Playback speed"));
+            if last_reason.replace(Some(reason)) != Some(reason) {
+                trace_availability(stream, enabled, reason);
+                button.set_tooltip_text(Some(tooltip));
+            }
         });
         update(&stream, false);
         for name in [

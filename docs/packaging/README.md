@@ -21,10 +21,12 @@ and runtime providers with the scripts for the selected distribution.
 
 ## Arch candidate gates
 
-The [PKGBUILD](../../packaging/arch/PKGBUILD) targets **0.2.8-1**. The staging
-script reads the Cargo version and the Arch validator checks the exact
-requested version. The [candidate record](../releases/PIVRA_V0.2.8_RC_VALIDATION.md)
-tracks the remaining gates.
+The [PKGBUILD](../../packaging/arch/PKGBUILD) targets the published
+**0.2.8-1** package. The staging script reads the Cargo version and the Arch
+validator checks the exact requested version. The
+[v0.2.8 validation record](../releases/PIVRA_V0.2.8_RC_VALIDATION.md) records
+native acceptance and publication. The local candidate commands below
+describe the v0.2.8 preparation workflow on the matching numeric source.
 
 ### Build and verify the local v0.2.8 candidate
 

@@ -1,8 +1,8 @@
 # Pivra v0.2.8 pre-release validation
 
-**Final native Arch validation and installation passed, as reported by the owner.**
-The owner authorized stable publication. GitHub Release and AUR publication
-are tracked separately below.
+**v0.2.8 is published on GitHub and AUR.** Final native Arch validation and
+installation passed, as reported by the owner. Publication verification is
+recorded separately below.
 
 This run began at `9793b723fa9442b909dc77fe17813f71f7e05480`.
 Validated development source after fixes:
@@ -190,7 +190,9 @@ The Arch recipe uses the immutable GitHub commit archive and
 | Publication action | Verification |
 | --- | --- |
 | Annotated `v0.2.8` tag | Remote object and target SHA verified. |
-| GitHub Release | BLOCKED in the cloud environment. The API request returned HTTP 403 and the public latest-release link still pointed to v0.2.7. |
-| AUR `pivra 0.2.8-1` | BLOCKED in the cloud environment. The AUR HTTPS proxy returned HTTP 403 and the SSH client could not load its system configuration. Remote version and commit are unverified. |
+| GitHub Release | PASS. The latest-release link resolves to `v0.2.8` and the public release feed shows **Pivra v0.2.8** with release notes. [GitHub Release](https://github.com/onbeskarakterli/Pivra/releases/tag/v0.2.8) |
+| AUR `pivra 0.2.8-1` | PASS through Arch Linux's official AUR Git mirror. The package branch points to `2fc1041fe0ebd09290536b340f7871c9155de902`. The mirrored `PKGBUILD`, `.SRCINFO`, and license collector matched the validated publication bundle. The source commit, URL and SHA-256 in `release-source.conf` also matched. [AUR package](https://aur.archlinux.org/packages/pivra) · [Mirrored AUR commit](https://github.com/archlinux/aur/commit/2fc1041fe0ebd09290536b340f7871c9155de902) |
 
-The next development version requires verified publication on both services.
+Direct cloud publication had been blocked by GitHub API HTTP 403 and AUR
+access restrictions. The owner completed publication externally. Direct AUR
+RPC access from the cloud still returned HTTP 403 during verification.

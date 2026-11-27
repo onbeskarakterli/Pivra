@@ -1,8 +1,8 @@
 # Pivra documentation
 
-This documentation describes the Pivra v0.2.8 stable source. The
-[validation record](releases/PIVRA_V0.2.8_RC_VALIDATION.md) tracks the accepted
-package, source verification and distribution publication.
+Pivra v0.2.8 is the current stable release on GitHub and AUR. The
+[validation record](releases/PIVRA_V0.2.8_RC_VALIDATION.md) documents the
+accepted package, source verification and publication.
 
 | What you need | Where to start |
 | --- | --- |

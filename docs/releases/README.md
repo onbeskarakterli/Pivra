@@ -1,8 +1,8 @@
 # Pivra release workflow
 
-The [v0.2.8 release notes](PIVRA_V0.2.8_RELEASE_NOTES.md) describe the stable
-source. The [validation record](PIVRA_V0.2.8_RC_VALIDATION.md) tracks the
-accepted package and remaining publication gates. Earlier records retain their
+The [v0.2.8 release notes](PIVRA_V0.2.8_RELEASE_NOTES.md) describe the current
+stable release. The [validation record](PIVRA_V0.2.8_RC_VALIDATION.md) records
+native acceptance and verified publication. Earlier records retain their
 original outcomes, including [v0.2.7](PIVRA_V0.2.7_RELEASE_NOTES.md),
 [v0.2.5](PIVRA_V0.2.5_RELEASE_NOTES.md) and the unreleased
 [v0.2.6 candidate](PIVRA_V0.2.6_RC_VALIDATION.md).

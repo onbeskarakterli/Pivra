@@ -1,7 +1,10 @@
 # Pivra v0.2.8
 
-**Status: Stable release source.** This release improves how Pivra opens,
+**Status: Published stable release.** This release improves how Pivra opens,
 organizes and presents media in a single viewer window.
+
+[GitHub Release](https://github.com/onbeskarakterli/Pivra/releases/tag/v0.2.8) ·
+[AUR package 0.2.8-1](https://aur.archlinux.org/packages/pivra)
 
 ## Opening and organizing media
 
@@ -42,9 +45,10 @@ packaging, release procedures and historical records.
 
 ## Compatibility and known limitations
 
-Native Arch/GNOME acceptance covers the installed local 0.2.8 package and
-physical video interaction. The validation record separates that result
-from the earlier regression suite and the checks for the final source.
+Native Arch/GNOME acceptance covers the local candidate and physical video
+interaction. The final tagged-source package also passed native build and
+installation. The validation record separates these results from earlier
+regression runs.
 [Validation record](PIVRA_V0.2.8_RC_VALIDATION.md)
 
 The intermittent Open File and next-photo delays remain unresolved. The

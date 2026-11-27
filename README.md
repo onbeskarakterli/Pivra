@@ -4,15 +4,15 @@ Pivra is a native Linux photo and video viewer built with Rust, GTK4 and
 libadwaita. It is designed for GNOME, with folder browsing, zoom and fullscreen
 slideshow. Native package and desktop acceptance has been recorded on Arch Linux.
 
-**Stable release source: v0.2.8.** Check the release and package pages for
-availability.
+**Current stable release: v0.2.8.** Available on GitHub and AUR.
 [GitHub release](https://github.com/onbeskarakterli/Pivra/releases/tag/v0.2.8) ·
 [AUR package](https://aur.archlinux.org/packages/pivra) ·
 [Stable release notes](docs/releases/PIVRA_V0.2.8_RELEASE_NOTES.md)
 
 ## Install stable v0.2.8
 
-On Arch Linux, check that the AUR page lists `0.2.8-1`, then install `pivra`:
+On Arch Linux, install `pivra` with your AUR helper. The published package
+version is `0.2.8-1`.
 
 ```sh
 yay -S pivra

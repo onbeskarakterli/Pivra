@@ -13,8 +13,10 @@ from video_gpu.lifecycle import session, run, ROOT
 def main():
     parser=argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--session',choices=['x11','sway'],required=True)
-    parser.add_argument('--development',choices=['open','info','minimap','layout','navigation','shortcuts','zoom-state','context-menu','slideshow-click','slideshow-effects','opening','reveal','open-latency','file-actions','all'])
+    parser.add_argument('--development',choices=['open','info','minimap','layout','navigation','shortcuts','zoom-state','context-menu','slideshow-click','slideshow-effects','opening','reveal','open-latency','file-actions','video-mouse','all'])
     args=parser.parse_args()
+    if args.development == 'video-mouse' and args.session != 'x11':
+        parser.error('video-mouse requires real X11 input from xdotool')
     if os.environ.get('PIVRA_TOOLBAR_PRIVATE_BUS')!='1':
         out=Path(tempfile.mkdtemp(prefix='pivra-toolbar-ux-'))
         env=dict(os.environ,PIVRA_TOOLBAR_PRIVATE_BUS='1',PIVRA_TOOLBAR_REPORT=str(out),
@@ -23,7 +25,7 @@ def main():
     out=Path(os.environ['PIVRA_TOOLBAR_REPORT']);print('Logs:',out,flush=True)
     video=out/'video.mp4'
     subprocess.run(['ffmpeg','-hide_banner','-loglevel','error','-f','lavfi','-i','testsrc2=size=192x96:rate=12',
-                    '-t','1','-c:v','libx264','-pix_fmt','yuv420p',str(video)],check=True)
+                    '-t','25' if args.development == 'video-mouse' else '1','-c:v','libx264','-pix_fmt','yuv420p',str(video)],check=True)
     subprocess.run(['cargo','build','--locked','--example','slideshow_probe'],cwd=ROOT,check=True)
     env=dict(os.environ,GTK_A11Y='none',PIVRA_TRACE_SLIDESHOW='1')
     if args.development == 'open-latency':

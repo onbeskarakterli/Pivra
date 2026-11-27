@@ -1,5 +1,5 @@
 //! Existing photo and video input controllers.
-use super::manual;
+use super::{manual, video_controls::toggle_playback};
 use adw::prelude::*;
 use gtk::{gio, glib};
 use pivra::viewing::{Resampling, Transform, ViewMode};
@@ -8,9 +8,7 @@ use std::{
     rc::Rc,
 };
 
-/// Attached only to the photo widget: header/menu/banner events never enter here.
-/// Video uses GTK's current MediaFile paintable, with only a lightweight
-/// snapshot transform. No extra decoder or video frame buffering is involved.
+/// Attach video input to the picture, outside the playback and thumbnail controls.
 pub(super) fn install_video_interaction(
     video: &gtk::Picture,
     stream: Rc<RefCell<Option<gtk::MediaFile>>>,
@@ -89,23 +87,25 @@ pub(super) fn install_video_interaction(
     let last = Rc::new(Cell::new(None::<(f64, f64)>));
     let begin = last.clone();
     let begin_stream = stream.clone();
-    drag.connect_drag_begin(move |gesture, _, _| {
+    drag.connect_drag_begin(move |_, _, _| {
         if begin_stream.borrow().is_some() {
             begin.set(Some((0.0, 0.0)));
-            gesture.set_state(gtk::EventSequenceState::Claimed);
         }
     });
+    let panning = Rc::new(Cell::new(false));
+    let moved = panning.clone();
     let offset = last.clone();
     let weak = video.downgrade();
     let action = mode_action.clone();
-    drag.connect_drag_update(move |_, x, y| {
+    let source = stream.clone();
+    drag.connect_drag_update(move |gesture, x, y| {
         let Some(previous) = offset.get() else {
             return;
         };
         let Some(video) = weak.upgrade() else {
             return;
         };
-        let dimensions = stream.borrow().as_ref().map(|media| {
+        let dimensions = source.borrow().as_ref().map(|media| {
             (
                 media.intrinsic_width() as f64,
                 media.intrinsic_height() as f64,
@@ -116,6 +116,13 @@ pub(super) fn install_video_interaction(
         };
         if !x.is_finite() || !y.is_finite() {
             return;
+        }
+        if !moved.get() {
+            if !video.drag_check_threshold(0, 0, x.round() as i32, y.round() as i32) {
+                return;
+            }
+            moved.set(true);
+            gesture.set_state(gtk::EventSequenceState::Claimed);
         }
         offset.set(Some((x, y)));
         let mode = action
@@ -137,7 +144,104 @@ pub(super) fn install_video_interaction(
     let end = last.clone();
     drag.connect_drag_end(move |_, _, _| end.set(None));
     drag.connect_cancel(move |_, _| last.set(None));
-    video.add_controller(drag);
+    video.add_controller(drag.clone());
+    install_video_clicks(video, &drag, stream, panning);
+}
+
+fn install_video_clicks(
+    video: &gtk::Picture,
+    drag: &gtk::GestureDrag,
+    stream: Rc<RefCell<Option<gtk::MediaFile>>>,
+    panning: Rc<Cell<bool>>,
+) {
+    let click = gtk::GestureClick::new();
+    click.set_button(1);
+    click.set_propagation_phase(gtk::PropagationPhase::Capture);
+    video.add_controller(click.clone());
+    click.group_with(drag);
+
+    let pressed = Rc::new(Cell::new(None::<glib::WeakRef<gtk::MediaFile>>));
+    let pending = Rc::new(Cell::new(None::<glib::WeakRef<gtk::MediaFile>>));
+    let stopped = Rc::new(Cell::new(false));
+    let press = pressed.clone();
+    let single = pending.clone();
+    let ended = stopped.clone();
+    let source = stream.clone();
+    let dragged = panning.clone();
+    click.connect_pressed(move |_, count, _, _| {
+        let media = source.borrow().clone();
+        dragged.set(false);
+        ended.set(false);
+        // A double click must start and finish on the same video, even if
+        // navigation replaces the stream between the two button presses.
+        let first = if count > 1 {
+            single.take().and_then(|media| media.upgrade())
+        } else {
+            None
+        };
+        press.set(
+            media
+                .filter(|media| count == 1 || first.as_ref() == Some(media))
+                .map(|media| media.downgrade()),
+        );
+    });
+
+    let source = stream.clone();
+    let weak = video.downgrade();
+    let single = pending.clone();
+    let finish_single = move || {
+        let media = single.take().and_then(|media| media.upgrade());
+        if let Some(media) = media {
+            let still_current = source.borrow().as_ref() == Some(&media);
+            if still_current && weak.upgrade().is_some_and(|video| video.is_mapped()) {
+                toggle_playback(&media);
+            }
+        }
+    };
+    // GTK decides when the multi-click sequence ends using the desktop settings.
+    let ended = stopped.clone();
+    let finish = finish_single.clone();
+    click.connect_stopped(move |_| {
+        ended.set(true);
+        finish();
+    });
+    let weak = video.downgrade();
+    let press = pressed.clone();
+    let single = pending.clone();
+    click.connect_released(move |_, count, x, y| {
+        let Some(media) = press.take().and_then(|media| media.upgrade()) else {
+            return;
+        };
+        let Some(video) = weak.upgrade() else {
+            return;
+        };
+        if panning.get()
+            || stream.borrow().as_ref() != Some(&media)
+            || !video.is_mapped()
+            || !video.contains(x, y)
+        {
+            return;
+        }
+        match count {
+            1 => {
+                single.set(Some(media.downgrade()));
+                // GTK can stop the sequence before the release of a long press.
+                if stopped.get() {
+                    finish_single();
+                }
+            }
+            2 => {
+                if let Some(window) = video.root().and_downcast::<adw::ApplicationWindow>() {
+                    gio::prelude::ActionGroupExt::activate_action(&window, "fullscreen", None);
+                }
+            }
+            _ => {}
+        }
+    });
+    video.connect_unmap(move |_| {
+        pressed.take();
+        pending.take();
+    });
 }
 
 pub(in super::super) fn install_interaction(

@@ -1,11 +1,7 @@
 //! Per-window fullscreen intent; compositor state owns presentation and chrome.
 use adw::prelude::*;
 use gtk::{gdk, gio, glib};
-use std::{
-    cell::{Cell, RefCell},
-    rc::Rc,
-    time::Duration,
-};
+use std::{cell::Cell, rc::Rc};
 
 fn request(window: &adw::ApplicationWindow, pending: &Cell<Option<bool>>, target: bool) {
     pending.set(Some(target));
@@ -15,7 +11,6 @@ fn request(window: &adw::ApplicationWindow, pending: &Cell<Option<bool>>, target
 pub(crate) fn install(
     window: &adw::ApplicationWindow,
     picture: &gtk::Picture,
-    video: &gtk::Picture,
     chrome: &[gtk::Widget],
 ) {
     let pending = Rc::new(Cell::new(None));
@@ -164,58 +159,6 @@ pub(crate) fn install(
                 }
                 gio::prelude::ActionGroupExt::activate_action(&window, "fullscreen", None);
             }
-        }
-    });
-
-    // Video single-click toggles playback only after the multi-click interval.
-    // A second click cancels it, so fullscreen never modifies playback state.
-    let video_click = gtk::GestureClick::new();
-    video_click.set_button(1);
-    video_click.set_propagation_phase(gtk::PropagationPhase::Capture);
-    video.add_controller(video_click.clone());
-    let delayed = Rc::new(RefCell::new(None::<glib::SourceId>));
-    let weak = window.downgrade();
-    let video_ref = video.downgrade();
-    let pending_click = delayed.clone();
-    video_click.connect_pressed(move |gesture, count, _, _| {
-        if let Some(id) = pending_click.borrow_mut().take() {
-            id.remove();
-        }
-        if count == 2 {
-            gesture.set_state(gtk::EventSequenceState::Claimed);
-            if let Some(window) = weak.upgrade() {
-                gio::prelude::ActionGroupExt::activate_action(&window, "fullscreen", None);
-            }
-        } else if count == 1 {
-            let video_ref = video_ref.clone();
-            let pending = pending_click.clone();
-            // Keep single-click response quick. Double-clicks slower than 300 ms
-            // may still trigger playback before fullscreen.
-            let id = glib::timeout_add_local_once(Duration::from_millis(300), move || {
-                pending.borrow_mut().take();
-                if let Some(video) = video_ref.upgrade() {
-                    if !video.is_visible() {
-                        return;
-                    }
-                    if let Some(stream) = video
-                        .paintable()
-                        .and_then(|paintable| paintable.downcast::<gtk::MediaStream>().ok())
-                    {
-                        if stream.is_playing() {
-                            stream.pause();
-                        } else {
-                            stream.play();
-                        }
-                    }
-                }
-            });
-            pending_click.replace(Some(id));
-        }
-    });
-    let cancel = delayed.clone();
-    window.connect_destroy(move |_| {
-        if let Some(id) = cancel.borrow_mut().take() {
-            id.remove();
         }
     });
 }

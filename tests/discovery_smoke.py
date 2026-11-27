@@ -40,7 +40,7 @@ def main():
                 assert process.returncode == 0 and stdout == "", (process.returncode, stdout, stderr)
                 stderr = image_error + stderr
                 assert f"Pivra: {error}" in stderr, stderr
-                if blocked: assert "Pivra: image load failed:" in stderr, stderr
+                if blocked: assert "Pivra: image load failed for " in stderr, stderr
                 else: assert "image load failed:" not in stderr, stderr
                 assert "panicked" not in stderr
                 assert (folder / "open.png").read_bytes() == payload

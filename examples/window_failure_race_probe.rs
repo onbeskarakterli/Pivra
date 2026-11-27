@@ -90,12 +90,21 @@ fn status(w: &adw::ApplicationWindow) -> String {
         .text()
         .to_string()
 }
-fn banner(w: &adw::ApplicationWindow) -> bool {
+fn refresh_banner(w: &adw::ApplicationWindow) -> gtk::Revealer {
     widgets(w.upcast_ref())
         .into_iter()
-        .find_map(|w| w.downcast::<gtk::Revealer>().ok())
-        .unwrap()
-        .reveals_child()
+        .filter_map(|widget| widget.downcast::<gtk::Revealer>().ok())
+        .find(|revealer| {
+            widgets(revealer.upcast_ref()).iter().any(|widget| {
+                widget
+                    .downcast_ref::<gtk::Button>()
+                    .is_some_and(|button| button.label().as_deref() == Some("Yenile"))
+            })
+        })
+        .expect("file change refresh banner")
+}
+fn banner(w: &adw::ApplicationWindow) -> bool {
+    refresh_banner(w).reveals_child()
 }
 fn open(app: &adw::Application, path: &Path) -> adw::ApplicationWindow {
     let old = app.windows();
@@ -372,11 +381,7 @@ fn main() {
     settle();
     action(&first, "reload-media", 6);
     std::fs::remove_file(dir.path().join("2.png")).unwrap();
-    wait(|| {
-        first
-            .title()
-            .is_some_and(|s| s.starts_with("No media selected"))
-    });
+    wait(|| first.title().as_deref() == Some("Pivra"));
     let removed_status = status(&first);
     for id in [5, 4, 3, 2, 0] {
         RELEASE[id].store(true, Ordering::SeqCst);

@@ -285,7 +285,9 @@ fn open_window(app: &adw::Application, path: &Path) -> adw::ApplicationWindow {
     w
 }
 fn status(p: &gtk::Picture) -> gtk::Label {
-    p.next_sibling().unwrap().downcast::<gtk::Label>().unwrap()
+    std::iter::successors(p.next_sibling(), |w| w.next_sibling())
+        .find_map(|w| w.downcast::<gtk::Label>().ok())
+        .expect("image status overlay")
 }
 fn selected(w: &adw::ApplicationWindow, name: &str) -> bool {
     w.title()
@@ -432,6 +434,12 @@ fn native_isolation(app: &adw::Application, fixtures: &Path) {
     );
     render(&first, &p, (4, 2), ViewMode::Fill, false);
     select(&first, ViewMode::Actual);
+    widgets(first.upcast_ref())
+        .into_iter()
+        .find(|w| w.widget_name() == "wheel-zoom-toggle")
+        .and_downcast::<gtk::ToggleButton>()
+        .expect("wheel zoom toggle")
+        .set_active(true);
     let scroll = p
         .observe_controllers()
         .iter::<glib::Object>()
@@ -531,15 +539,7 @@ fn native(app: &adw::Application) {
         wait(|| w.is_mapped());
         // Select during the load request; secure decoder timing is not certified.
         select(&w, ViewMode::Fill);
-        wait(|| {
-            p.paintable().is_some()
-                || p.next_sibling()
-                    .unwrap()
-                    .downcast::<gtk::Label>()
-                    .unwrap()
-                    .text()
-                    .starts_with("Unable")
-        });
+        wait(|| p.paintable().is_some() || status(&p).text().starts_with("Unable"));
         if p.paintable().is_none() && !baseline {
             eprintln!("NOT RUN secure baseline decode");
             std::process::exit(77);

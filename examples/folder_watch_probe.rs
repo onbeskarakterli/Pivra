@@ -59,8 +59,15 @@ fn picture(w: &adw::ApplicationWindow) -> gtk::Picture {
 fn banner(w: &adw::ApplicationWindow) -> gtk::Revealer {
     widgets(w.upcast_ref())
         .into_iter()
-        .find_map(|w| w.downcast().ok())
-        .unwrap()
+        .filter_map(|widget| widget.downcast::<gtk::Revealer>().ok())
+        .find(|revealer| {
+            widgets(revealer.upcast_ref()).iter().any(|widget| {
+                widget
+                    .downcast_ref::<gtk::Button>()
+                    .is_some_and(|button| button.label().as_deref() == Some("Yenile"))
+            })
+        })
+        .expect("file change refresh banner")
 }
 fn action(w: &adw::ApplicationWindow, name: &str) {
     gio::prelude::ActionGroupExt::activate_action(w, name, None);
@@ -88,17 +95,18 @@ fn open(app: &adw::Application, path: &Path) -> adw::ApplicationWindow {
     wait(|| count(&w, 1) && w.is_mapped());
     w
 }
+fn photo_status(picture: &gtk::Picture) -> gtk::Label {
+    std::iter::successors(picture.next_sibling(), |w| w.next_sibling())
+        .find_map(|w| w.downcast::<gtk::Label>().ok())
+        .expect("image status overlay")
+}
 fn pixels(w: &adw::ApplicationWindow, required: bool, baseline: bool) {
     if !required {
         settle();
         return;
     }
     let picture = picture(w);
-    let status = picture
-        .next_sibling()
-        .unwrap()
-        .downcast::<gtk::Label>()
-        .unwrap();
+    let status = photo_status(&picture);
     wait(|| picture.paintable().is_some() || status.text().starts_with("Unable to display image."));
     if picture.paintable().is_none() && baseline {
         eprintln!(
@@ -194,10 +202,7 @@ fn main() {
     wait(|| count(&w, 53));
     assert!(w.title().unwrap().starts_with("10.png"));
     std::fs::remove_file(dir.path().join("10.png")).unwrap();
-    wait(|| {
-        w.title()
-            .is_some_and(|s| s.starts_with("No media selected"))
-    });
+    wait(|| w.title().as_deref() == Some("Pivra"));
     assert!(picture(&w).paintable().is_none());
     action(&w, "next-media");
     wait(|| count(&w, 52));
@@ -208,14 +213,11 @@ fn main() {
     for entry in std::fs::read_dir(dir.path()).unwrap() {
         std::fs::remove_file(entry.unwrap().path()).unwrap();
     }
-    wait(|| {
-        w.title()
-            .is_some_and(|s| s.starts_with("No media selected"))
-    });
+    wait(|| w.title().as_deref() == Some("Pivra"));
     settle();
     std::fs::write(dir.path().join("new.png"), &initial).unwrap();
     settle();
-    assert!(w.title().unwrap().starts_with("No media selected"));
+    assert!(w.title().as_deref() == Some("Pivra"));
     action(&w, "next-media");
     wait(|| count(&w, 1));
     // Preserve lexical alias policy, including content changes outside the folder.
@@ -232,10 +234,7 @@ fn main() {
     assert_eq!(picture(&w).paintable(), alias_frame);
     assert!(banner(&second).reveals_child());
     std::fs::remove_file(other.path().join("only.png")).unwrap();
-    wait(|| {
-        w.title()
-            .is_some_and(|s| s.starts_with("No media selected"))
-    });
+    wait(|| second.title().as_deref() == Some("Pivra"));
     // Restore the independent window by explicit navigation, without auto-jump.
     std::fs::write(other.path().join("only.png"), &initial).unwrap();
     settle();
@@ -246,10 +245,7 @@ fn main() {
     // Rename the whole watched folder: controlled unavailable state, no crash.
     let moved = dir.path().with_extension("moved");
     std::fs::rename(dir.path(), &moved).unwrap();
-    wait(|| {
-        w.title()
-            .is_some_and(|s| s.starts_with("No media selected"))
-    });
+    wait(|| w.title().as_deref() == Some("Pivra"));
     let weak = w.downgrade();
     w.close();
     drop(w);

@@ -1,7 +1,7 @@
 //! Window-local history for successful filesystem operations.
 
 use super::{
-    FileContext, FolderWatch, TrashReceipt, display_selected, show_latest_toast,
+    FileContext, FolderWatch, TrashReceipt, batch_operations, display_selected, show_latest_toast,
     update_thumbnail_catalog, update_title,
 };
 use crate::image_view::ImageView;
@@ -11,7 +11,7 @@ use pivra::{media::MediaItem, rename::Reversal};
 use std::{
     cell::{Cell, RefCell},
     collections::VecDeque,
-    path::Path,
+    path::{Path, PathBuf},
     rc::Rc,
     sync::{Arc, Mutex},
 };
@@ -30,17 +30,25 @@ pub(super) fn run_file_operation<T>(operation: impl FnOnce() -> T) -> T {
 pub(super) enum Operation {
     Rename(Reversal),
     Trash(TrashReceipt),
+    TrashGroup(batch_operations::TrashGroup),
+}
+
+enum Outcome {
+    Single,
+    Group(batch_operations::TrashRestore),
 }
 
 impl Operation {
-    fn undo(&self) -> Result<(), String> {
+    fn undo(&self) -> Result<Outcome, String> {
         match self {
             Self::Rename(rename) => {
                 let (original, renamed) = rename.paths();
                 super::rename_dialog::with_metadata(renamed, original, || rename.undo())
+                    .map(|()| Outcome::Single)
                     .map_err(|error| error.to_string())
             }
-            Self::Trash(trash) => trash.restore(),
+            Self::Trash(trash) => trash.restore().map(|()| Outcome::Single),
+            Self::TrashGroup(group) => group.restore().map(Outcome::Group),
         }
     }
 }
@@ -173,7 +181,7 @@ impl Undo {
                 let (original, renamed) = rename.paths();
                 self.mark_rename(renamed, original)
             }
-            Operation::Trash(_) => None,
+            Operation::Trash(_) | Operation::TrashGroup(_) => None,
         };
         let worker_operation = operation.clone();
         let job = gio::spawn_blocking(move || run_file_operation(|| worker_operation.undo()));
@@ -181,7 +189,14 @@ impl Undo {
         glib::MainContext::default().spawn_local(async move {
             let _permit = permit;
             match job.await {
-                Ok(Ok(())) => {
+                Ok(Ok(Outcome::Group(restore))) => {
+                    if restore.remaining == 0 {
+                        manager.history.borrow_mut().entries.pop_back();
+                    }
+                    manager.restored_many(restore.paths);
+                    manager.notify(&restore.message);
+                }
+                Ok(Ok(Outcome::Single)) => {
                     manager.history.borrow_mut().entries.pop_back();
                     match operation.as_ref() {
                         Operation::Rename(rename) => {
@@ -190,9 +205,10 @@ impl Undo {
                             manager.notify("Rename undone");
                         }
                         Operation::Trash(trash) => {
-                            manager.restored(trash.path());
+                            manager.restored_many(vec![trash.path().to_owned()]);
                             manager.notify("File restored");
                         }
+                        Operation::TrashGroup(_) => unreachable!("group result handled separately"),
                     }
                 }
                 result => {
@@ -247,30 +263,74 @@ impl Undo {
         watch.schedule();
     }
 
-    fn restored(&self, path: &Path) {
-        let Some(watch) = self.watch_for(path) else {
+    pub(super) fn removed(&self, paths: &[PathBuf]) {
+        let Some(watch) = self.watches.borrow().clone() else {
             return;
         };
-        let Some(kind) = pivra::discovery::candidate_kind(path) else {
+        let paths: std::collections::HashSet<_> = paths
+            .iter()
+            .filter(|path| path.parent() == Some(watch.directory()))
+            .map(PathBuf::as_path)
+            .collect();
+        if paths.is_empty() {
             return;
-        };
-        let mut context = self.context.borrow_mut();
-        let mut items = context.collection.items().to_vec();
-        if !items.iter().any(|item| item.path() == path) {
-            items.push(MediaItem::new(path, kind));
-            items.sort_by(|a, b| pivra::natural::compare_paths(a.path(), b.path()));
-            context.collection.replace_preserving(items);
         }
+        let mut context = self.context.borrow_mut();
+        let old_index = context.collection.selected_index().unwrap_or(0);
+        let items = context
+            .collection
+            .items()
+            .iter()
+            .filter(|item| !paths.contains(item.path()))
+            .cloned()
+            .collect();
+        let removed_active = context.collection.replace_preserving(items);
+        if removed_active {
+            let next = old_index.min(context.collection.items().len().saturating_sub(1));
+            context.collection.select(next);
+            context.revision = context.revision.wrapping_add(1);
+        }
+        self.reconcile(&context, removed_active);
+        watch.schedule();
+    }
+
+    fn restored_many(&self, paths: Vec<PathBuf>) {
+        let Some(watch) = self.watches.borrow().clone() else {
+            return;
+        };
+        let additions: Vec<_> = paths
+            .into_iter()
+            .filter(|path| path.parent() == Some(watch.directory()))
+            .filter_map(|path| {
+                pivra::discovery::candidate_kind(&path).map(|kind| MediaItem::new(path, kind))
+            })
+            .collect();
+        if additions.is_empty() {
+            return;
+        }
+        let mut context = self.context.borrow_mut();
+        let new_selection = additions[0].path().to_owned();
+        let mut items = context.collection.items().to_vec();
+        let known: std::collections::HashSet<_> =
+            items.iter().map(|item| item.path().to_owned()).collect();
+        items.extend(
+            additions
+                .into_iter()
+                .filter(|item| !known.contains(item.path())),
+        );
+        items.sort_by(|a, b| pivra::natural::compare_paths(a.path(), b.path()));
+        context.collection.replace_preserving(items);
         let select_restored = context.collection.current().is_none();
         if select_restored {
-            let index = context
+            if let Some(index) = context
                 .collection
                 .items()
                 .iter()
-                .position(|item| item.path() == path)
-                .expect("restored item in catalog");
-            context.collection.select(index);
-            context.revision = context.revision.wrapping_add(1);
+                .position(|item| item.path() == new_selection)
+            {
+                context.collection.select(index);
+                context.revision = context.revision.wrapping_add(1);
+            }
         }
         self.reconcile(&context, select_restored);
         watch.schedule();

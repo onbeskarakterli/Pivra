@@ -1709,12 +1709,18 @@ pub(super) fn comparison(app: &adw::Application) {
 }
 
 pub(super) fn multi_selection(app: &adw::Application) {
-    let folder = tempfile::tempdir().unwrap();
+    let folder = if std::env::args().any(|arg| arg == "--check-batch-trash") {
+        let path = std::env::var_os("XDG_DATA_HOME").expect("isolated XDG data");
+        std::fs::create_dir_all(&path).unwrap();
+        tempfile::tempdir_in(path).unwrap()
+    } else {
+        tempfile::tempdir().unwrap()
+    };
     for name in ["1.png", "3-photo.png", "4.png"] {
         std::fs::copy("tests/fixtures/images/wide.png", folder.path().join(name)).unwrap();
     }
     let video = std::env::args().find(|s| s.ends_with(".mp4")).unwrap();
-    std::fs::copy(video, folder.path().join("2.mp4")).unwrap();
+    std::fs::copy(&video, folder.path().join("2.mp4")).unwrap();
     window::build(
         app,
         &Default::default(),
@@ -1827,6 +1833,59 @@ pub(super) fn multi_selection(app: &adw::Application) {
     let filter = widget(&window, "thumbnail-media-filter")
         .downcast::<gtk::DropDown>()
         .unwrap();
+    if std::env::args().any(|arg| arg == "--check-batch-trash") {
+        let undo = window.lookup_action("undo").unwrap();
+        native_key("Delete");
+        wait("exact batch confirmation", || {
+            chooser(&window).is_some_and(|dialog| {
+                widgets(dialog.upcast_ref()).iter().any(|w| {
+                    w.downcast_ref::<gtk::Label>()
+                        .is_some_and(|label| label.text() == "Move 3 files to Trash?")
+                })
+            })
+        });
+        let first = folder.path().join("1.png");
+        let second = folder.path().join("2.mp4");
+        let third = folder.path().join("3-photo.png");
+        std::fs::rename(&first, folder.path().join("original.backup")).unwrap();
+        std::fs::write(&first, b"external replacement").unwrap();
+        let dialog = chooser(&window).unwrap();
+        widgets(dialog.upcast_ref())
+            .into_iter()
+            .filter_map(|w| w.downcast::<gtk::Button>().ok())
+            .find(|button| button.label().as_deref() == Some("Move to Trash"))
+            .unwrap()
+            .emit_clicked();
+        wait("partial Trash is recorded as one entry", || {
+            !second.exists() && !third.exists() && undo.is_enabled()
+        });
+        assert_eq!(std::fs::read(&first).unwrap(), b"external replacement");
+        std::fs::write(&second, b"collision").unwrap();
+        wait("window focused for undo", || window.is_active());
+        native_key("ctrl+z");
+        wait("restore one of two and retain collision", || {
+            third.exists() && undo.is_enabled()
+        });
+        assert_eq!(std::fs::read(&second).unwrap(), b"collision");
+        let restored = std::fs::metadata(&third).unwrap();
+        std::fs::remove_file(&second).unwrap();
+        native_key("ctrl+z");
+        wait("retry restores the remaining file", || {
+            second.exists() && !undo.is_enabled()
+        });
+        use std::os::unix::fs::MetadataExt;
+        assert_eq!(std::fs::metadata(&third).unwrap().ino(), restored.ino());
+        assert_eq!(
+            std::fs::read(&second).unwrap(),
+            std::fs::read(&video).unwrap()
+        );
+        assert_eq!(std::fs::read(&first).unwrap(), b"external replacement");
+        window.close();
+        eprintln!(
+            "PASS batch Trash with real isolated GVfs, mixed media, external replacement after capture, grouped Undo and partial retry"
+        );
+        return;
+    }
     filter.set_selected(1);
     assert_eq!(count.text(), "2 selected");
     filter.set_selected(0);

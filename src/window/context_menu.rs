@@ -33,6 +33,7 @@ fn populate(
     menus: &Rc<submenu::Menus>,
     window: &adw::ApplicationWindow,
     video: bool,
+    marked: usize,
 ) {
     let content = gtk::Box::new(gtk::Orientation::Vertical, 0);
     let add =
@@ -98,7 +99,12 @@ fn populate(
     add("Thumbnail Strip", "context-thumbnails");
     add("Media Info", "media-info");
     content.append(&gtk::Separator::new(gtk::Orientation::Horizontal));
-    add("Move to Trash", "trash-selected");
+    let trash = if marked > 1 {
+        format!("Move {marked} Files to Trash")
+    } else {
+        "Move to Trash".into()
+    };
+    add(&trash, "trash-selected");
     root.set_child(Some(&content));
 }
 
@@ -289,7 +295,10 @@ pub(super) fn install(
                             .is_some_and(|m| m.is_prepared() && m.error().is_none()),
                 );
             }
-            populate(&menu, &menus, &window, video);
+            let marked = player
+                .upgrade()
+                .map_or(0, |view| view.marked_thumbnails().len());
+            populate(&menu, &menus, &window, video, marked);
             menu.set_pointing_to(Some(&gdk::Rectangle::new(x as i32, y as i32, 1, 1)));
             gesture.set_state(gtk::EventSequenceState::Claimed);
             menu.popup();

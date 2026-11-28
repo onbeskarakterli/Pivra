@@ -13,13 +13,13 @@ from video_gpu.lifecycle import session, run, ROOT
 def main():
     parser=argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--session',choices=['x11','sway'],required=True)
-    parser.add_argument('--development',choices=['open','info','minimap','layout','navigation','shortcuts','zoom-state','context-menu','slideshow-click','slideshow-effects','opening','reveal','open-latency','file-actions','undo','video-mouse','video-speed','video-frame','comparison','multi-selection','compare-selected','all'])
+    parser.add_argument('--development',choices=['open','info','minimap','layout','navigation','shortcuts','zoom-state','context-menu','slideshow-click','slideshow-effects','opening','reveal','open-latency','file-actions','undo','video-mouse','video-speed','video-frame','comparison','multi-selection','compare-selected','batch-trash','all'])
     args=parser.parse_args()
-    if args.development in ('video-mouse', 'undo', 'video-frame', 'comparison', 'multi-selection', 'compare-selected') and args.session != 'x11':
+    if args.development in ('video-mouse', 'undo', 'video-frame', 'comparison', 'multi-selection', 'compare-selected', 'batch-trash') and args.session != 'x11':
         parser.error(f'{args.development} requires real X11 input from xdotool')
     if os.environ.get('PIVRA_TOOLBAR_PRIVATE_BUS')!='1':
         fixture_parent = None
-        if args.development == 'undo' and Path(tempfile.gettempdir()).stat().st_dev != Path.home().stat().st_dev:
+        if args.development in ('undo', 'batch-trash') and Path(tempfile.gettempdir()).stat().st_dev != Path.home().stat().st_dev:
             # GLib disallows trashing files from a system-internal /tmp mount.
             fixture_parent = ROOT / 'target' if ROOT.stat().st_dev == Path.home().stat().st_dev else Path.home()
             fixture_parent.mkdir(exist_ok=True)
@@ -53,7 +53,10 @@ def main():
                      else ['development-open-direct','development-open-chooser'] if args.development == 'open-latency'
                      else ['development-'+args.development] if args.development else ['toolbar-ux','toolbar-ux-restore'])
             for mode in modes:
-                arguments = ['--development-multi-selection', '--check-compare-selected'] if mode == 'development-compare-selected' else ['--'+mode]
+                if args.development in ('compare-selected', 'batch-trash'):
+                    arguments = ['--development-multi-selection', '--check-'+args.development]
+                else:
+                    arguments = ['--'+mode]
                 result=run(mode,['target/debug/examples/slideshow_probe','--controlled',*arguments,video],active,out,timeout=60)
                 if result['status']!='PASS':return result['exit'] if result['exit']>0 else 1
                 if args.development == 'video-frame':

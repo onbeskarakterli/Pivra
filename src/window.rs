@@ -30,6 +30,8 @@ mod undo;
 #[path = "video_frame_export.rs"]
 mod video_frame_export;
 
+#[path = "window/batch_operations.rs"]
+mod batch_operations;
 #[path = "window/compare_view.rs"]
 mod compare_view;
 #[path = "window/context_menu.rs"]
@@ -97,6 +99,12 @@ fn editing(window: &adw::ApplicationWindow) -> bool {
 
 // Keep the original inode pinned across the move into Trash. A URI or
 // original pathname alone can be reused after an external removal.
+struct TrashSource {
+    original: PathBuf,
+    source: File,
+    directory: File,
+}
+
 struct TrashReceipt {
     original: PathBuf,
     source: File,
@@ -122,8 +130,8 @@ impl Drop for StagedRestore {
     }
 }
 
-impl TrashReceipt {
-    fn move_to_trash(original: PathBuf) -> Result<Self, String> {
+impl TrashSource {
+    fn capture(original: PathBuf) -> Result<Self, String> {
         // O_PATH | O_NOFOLLOW: identify the directory entry, including symlinks,
         // without opening the media payload.
         let source = OpenOptions::new()
@@ -133,6 +141,19 @@ impl TrashReceipt {
             .map_err(|error| error.to_string())?;
         let directory = File::open(original.parent().ok_or("Missing parent folder")?)
             .map_err(|error| error.to_string())?;
+        Ok(Self {
+            original,
+            source,
+            directory,
+        })
+    }
+
+    fn trash(self) -> Result<TrashReceipt, String> {
+        let Self {
+            original,
+            source,
+            directory,
+        } = self;
         let identity = source.metadata().map_err(|error| error.to_string())?;
         let previous = trash_entries(&original)?
             .into_iter()
@@ -150,13 +171,19 @@ impl TrashReceipt {
         gio::File::for_path(&original)
             .trash(None::<&gio::Cancellable>)
             .map_err(|error| error.to_string())?;
-        Ok(Self {
+        Ok(TrashReceipt {
             original,
             source,
             directory,
             previous,
             staged: Mutex::new(None),
         })
+    }
+}
+
+impl TrashReceipt {
+    fn move_to_trash(original: PathBuf) -> Result<Self, String> {
+        TrashSource::capture(original)?.trash()
     }
 
     fn path(&self) -> &Path {
@@ -905,6 +932,13 @@ pub(super) fn build(app: &adw::Application, settings: &Settings, file: Option<Op
         let trash_undo = undo.clone();
         let watches = folder_watch.clone();
         delete.connect_activate(move |_, _| {
+            let marked = trash_view.marked_thumbnails();
+            if marked.len() > 1 {
+                if let Some(window) = trash_window.upgrade() {
+                    batch_operations::trash(&window, marked, &trash_undo);
+                }
+                return;
+            }
             let Some(path) = trash_context
                 .borrow()
                 .collection

@@ -422,6 +422,10 @@ fn main() {
         development_features::open(&app);
         return;
     }
+    if std::env::args().any(|s| s == "--development-undo") {
+        development_features::media_undo(&app);
+        return;
+    }
     if std::env::args().any(|s| s == "--development-file-actions") {
         development_features::media_file_actions(&app);
         return;

@@ -1,25 +1,27 @@
 //! One current-file rename dialog, reusing the live viewer and folder monitor.
 use super::*;
-pub(super) struct Toasts<'a> {
-    pub overlay: &'a adw::ToastOverlay,
-    pub current: Rc<RefCell<Option<adw::Toast>>>,
+use std::{io, path::Path};
+
+pub(super) fn with_metadata<T>(
+    from: &Path,
+    to: &Path,
+    rename: impl FnOnce() -> io::Result<T>,
+) -> io::Result<T> {
+    let fields = pivra::media_information::lookup(from);
+    let result = rename()?;
+    if let Ok(key) = pivra::image_cache::FileKey::read(to) {
+        pivra::media_information::remember(key, fields);
+    }
+    Ok(result)
 }
 
 pub(super) fn install(
     window: &adw::ApplicationWindow,
-    title: &adw::WindowTitle,
     context: Rc<RefCell<FileContext>>,
-    view: ImageView,
-    banner: &gtk::Revealer,
-    watches: Rc<RefCell<Option<Rc<FolderWatch>>>>,
-    notifications: Toasts<'_>,
+    undo: Rc<undo::Undo>,
 ) {
     let action = gio::SimpleAction::new("rename-media", None);
     let weak_window = window.downgrade();
-    let title = title.downgrade();
-    let banner = banner.downgrade();
-    let toasts = notifications.overlay.downgrade();
-    let current_toast = notifications.current;
     action.connect_activate(move |action, _| {
         let Some(path) = context
             .borrow()
@@ -35,13 +37,8 @@ pub(super) fn install(
         action.set_enabled(false);
         let action = action.downgrade();
         let weak_window = weak_window.clone();
-        let title = title.clone();
-        let banner = banner.clone();
-        let toasts = toasts.clone();
-        let current_toast = current_toast.clone();
         let context = context.clone();
-        let view = view.clone();
-        let watches = watches.clone();
+        let undo = undo.clone();
         glib::MainContext::default().spawn_local(async move {
             let source = path.clone();
             let ticket = gio::spawn_blocking(move || pivra::rename::Ticket::capture(&source)).await;
@@ -54,19 +51,11 @@ pub(super) fn install(
                     if let Some(a) = action.upgrade() {
                         a.set_enabled(true);
                     }
-                    if let Some(t) = toasts.upgrade() {
-                        show_latest_toast(
-                            &t,
-                            &current_toast,
-                            adw::Toast::new(&format!(
-                                "Could not prepare rename: {}",
-                                match other {
-                                    Ok(Err(e)) => e.to_string(),
-                                    _ => "worker failed".into(),
-                                }
-                            )),
-                        );
-                    }
+                    let error = match other {
+                        Ok(Err(error)) => error.to_string(),
+                        _ => "worker failed".into(),
+                    };
+                    undo.notify(&format!("Could not prepare rename: {error}"));
                     return;
                 }
             };
@@ -126,70 +115,43 @@ pub(super) fn install(
                     }
                     return;
                 }
-                let target = path.parent().unwrap().join(&name);
-                context.borrow_mut().own_rename = Some((path.clone(), target));
+                let Some(permit) = undo.begin() else {
+                    if let Some(action) = action.upgrade() {
+                        action.set_enabled(true);
+                    }
+                    return;
+                };
+                let target = path.with_file_name(&name);
+                let marker = undo.mark_rename(&path, &target);
                 let ticket = ticket.clone();
                 let path = path.clone();
-                let context = context.clone();
-                let view = view.clone();
-                let watches = watches.clone();
                 let action = action.clone();
-                let weak_window = weak_window.clone();
-                let title = title.clone();
-                let banner = banner.clone();
-                let toasts = toasts.clone();
-                let current_toast = current_toast.clone();
-                glib::MainContext::default().spawn_local(async move {
-                    let old = path.clone();
-                    let result = gio::spawn_blocking(move || {
-                        let fields = pivra::media_information::lookup(&old);
-                        let new = ticket.rename(&name)?;
-                        if let Ok(key) = pivra::image_cache::FileKey::read(&new) {
-                            pivra::media_information::remember(key, fields);
-                        }
-                        Ok::<_, std::io::Error>(new)
+                let undo = undo.clone();
+                let job = gio::spawn_blocking(move || {
+                    undo::run_file_operation(|| {
+                        with_metadata(&path, &target, || ticket.rename_with_undo(&name))
                     })
-                    .await;
-                    if let Some(a) = action.upgrade() {
-                        a.set_enabled(true);
+                });
+                glib::MainContext::default().spawn_local(async move {
+                    let _permit = permit;
+                    let result = job.await;
+                    if let Some(action) = action.upgrade() {
+                        action.set_enabled(true);
                     }
-                    let Some(window) = weak_window.upgrade().filter(|w| w.is_visible()) else {
-                        return;
-                    };
                     match result {
-                        Ok(Ok(new)) => {
-                            let mut context = context.borrow_mut();
-                            context.collection.renamed(&path, &new);
-                            context.revision = context.revision.wrapping_add(1);
-                            if let Some(title) = title.upgrade() {
-                                update_title(&window, &title, &context);
-                            }
-                            if let Some(banner) = banner.upgrade() {
-                                banner.set_reveal_child(false);
-                            }
-                            view.media_renamed(&path, &new);
-                            update_thumbnail_catalog(&view, &context);
-                            view.set_neighbors(context.collection.photo_neighbors());
-                            drop(context);
-                            if let Some(watch) = watches.borrow().as_ref() {
-                                watch.schedule();
-                            }
+                        Ok(Ok(Some(rename))) => {
+                            let (original, renamed) = rename.paths();
+                            undo.renamed(original, renamed);
+                            undo.record(undo::Operation::Rename(rename), "File renamed");
                         }
+                        Ok(Ok(None)) => (),
                         other => {
-                            context.borrow_mut().own_rename = None;
-                            if let Some(t) = toasts.upgrade() {
-                                show_latest_toast(
-                                    &t,
-                                    &current_toast,
-                                    adw::Toast::new(&format!(
-                                        "Could not rename file: {}",
-                                        match other {
-                                            Ok(Err(e)) => e.to_string(),
-                                            _ => "worker failed".into(),
-                                        }
-                                    )),
-                                );
-                            }
+                            undo.clear_marker(marker);
+                            let error = match other {
+                                Ok(Err(error)) => error.to_string(),
+                                _ => "worker failed".into(),
+                            };
+                            undo.notify(&format!("Could not rename file: {error}"));
                         }
                     }
                 });

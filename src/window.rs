@@ -4,7 +4,18 @@ use crate::{image_view::ImageView, input::OpenedFile};
 use adw::prelude::*;
 use gtk::{gdk, gio, glib};
 use pivra::{APP_NAME, catalog::MediaCollection, media::MediaKind, settings::Settings};
-use std::{cell::RefCell, path::PathBuf, rc::Rc, sync::Arc};
+use std::{
+    cell::RefCell,
+    fs::{self, File, OpenOptions},
+    os::fd::AsRawFd,
+    os::unix::{
+        ffi::OsStrExt,
+        fs::{MetadataExt, OpenOptionsExt},
+    },
+    path::{Path, PathBuf},
+    rc::Rc,
+    sync::{Arc, Mutex},
+};
 
 #[path = "fullscreen.rs"]
 pub(super) mod fullscreen;
@@ -14,6 +25,8 @@ mod rename_dialog;
 pub(super) mod slideshow;
 #[path = "toolbar.rs"]
 mod toolbar;
+#[path = "undo.rs"]
+mod undo;
 
 #[path = "window/context_menu.rs"]
 mod context_menu;
@@ -34,7 +47,7 @@ mod reveal;
 mod slideshow_interaction;
 use open_folder::save_last_open_folder;
 
-// Keep one current notification, shared by Trash and slideshow status.
+// Keep one current notification per window.
 fn show_latest_toast(
     overlay: &adw::ToastOverlay,
     current: &Rc<RefCell<Option<adw::Toast>>>,
@@ -78,27 +91,208 @@ fn editing(window: &adw::ApplicationWindow) -> bool {
     false
 }
 
-// Identify the exact newly trashed entry rather than restoring an unrelated
-// older item with the same original path.
-fn trash_entries(original: &std::path::Path) -> Vec<gio::File> {
-    let root = gio::File::for_uri("trash:///");
-    let Ok(enumerator) = root.enumerate_children(
-        "standard::name,trash::orig-path",
-        gio::FileQueryInfoFlags::NONE,
-        None::<&gio::Cancellable>,
-    ) else {
-        return vec![];
-    };
-    let mut entries = vec![];
-    while let Ok(Some(info)) = enumerator.next_file(None::<&gio::Cancellable>) {
-        if info
-            .attribute_byte_string("trash::orig-path")
-            .is_some_and(|value| std::path::Path::new(value.as_str()) == original)
+// Keep the original inode pinned across the move into Trash. A URI or
+// original pathname alone can be reused after an external removal.
+struct TrashReceipt {
+    original: PathBuf,
+    source: File,
+    directory: File,
+    previous: Vec<gio::File>,
+    staged: Mutex<Option<StagedRestore>>,
+}
+
+struct StagedRestore {
+    directory: File,
+    path: PathBuf,
+}
+
+impl Drop for StagedRestore {
+    fn drop(&mut self) {
+        // A failed publish may still need recovery. Remove only empty staging folders.
+        if let (Ok(held), Ok(current)) =
+            (self.directory.metadata(), fs::symlink_metadata(&self.path))
+            && same_inode(&held, &current)
         {
-            entries.push(enumerator.child(&info));
+            let _ = fs::remove_dir(&self.path);
         }
     }
-    entries
+}
+
+impl TrashReceipt {
+    fn move_to_trash(original: PathBuf) -> Result<Self, String> {
+        // O_PATH | O_NOFOLLOW: identify the directory entry, including symlinks,
+        // without opening the media payload.
+        let source = OpenOptions::new()
+            .read(true)
+            .custom_flags(0x200000 | 0x20000)
+            .open(&original)
+            .map_err(|error| error.to_string())?;
+        let directory = File::open(original.parent().ok_or("Missing parent folder")?)
+            .map_err(|error| error.to_string())?;
+        let identity = source.metadata().map_err(|error| error.to_string())?;
+        let previous = trash_entries(&original)?
+            .into_iter()
+            .filter(|(_, info)| trash_identity(info) == Some((identity.dev(), identity.ino())))
+            .map(|(file, _)| file)
+            .collect();
+
+        check_trash_parent(&original, &directory)?;
+        if !same_inode(
+            &identity,
+            &fs::symlink_metadata(&original).map_err(|error| error.to_string())?,
+        ) {
+            return Err("The source file changed".into());
+        }
+        gio::File::for_path(&original)
+            .trash(None::<&gio::Cancellable>)
+            .map_err(|error| error.to_string())?;
+        Ok(Self {
+            original,
+            source,
+            directory,
+            previous,
+            staged: Mutex::new(None),
+        })
+    }
+
+    fn path(&self) -> &Path {
+        &self.original
+    }
+
+    fn restore(&self) -> Result<(), String> {
+        let source = self.source.metadata().map_err(|error| error.to_string())?;
+        let mut staged = self.staged.lock().map_err(|error| error.to_string())?;
+        let stage = match staged.as_ref() {
+            Some(stage) => stage,
+            None => {
+                check_trash_destination(&self.original, &self.directory)?;
+                staged.insert(self.stage(&source)?)
+            }
+        };
+        let publish = || -> Result<(), String> {
+            let staged_file = fs::symlink_metadata(
+                PathBuf::from(format!("/proc/self/fd/{}", stage.directory.as_raw_fd()))
+                    .join("media"),
+            )
+            .map_err(|error| error.to_string())?;
+            if !same_inode(&source, &staged_file) {
+                return Err("The file being restored changed".into());
+            }
+            check_trash_destination(&self.original, &self.directory)?;
+            pivra::rename::move_no_replace(
+                &stage.directory,
+                std::ffi::OsStr::new("media"),
+                &self.directory,
+                self.original.file_name().ok_or("Missing filename")?,
+            )
+            .map_err(|error| error.to_string())
+        };
+        if let Err(error) = publish() {
+            return Err(format!(
+                "{error}. File staged at {}",
+                stage.path.join("media").display()
+            ));
+        }
+        staged.take();
+        Ok(())
+    }
+
+    fn stage(&self, source: &fs::Metadata) -> Result<StagedRestore, String> {
+        let mut entries = trash_entries(&self.original)?
+            .into_iter()
+            .filter(|(file, info)| {
+                !self.previous.iter().any(|previous| previous.equal(file))
+                    && trash_identity(info) == Some((source.dev(), source.ino()))
+            });
+        let (entry, _) = entries
+            .next()
+            .ok_or("The original file was not found in Trash")?;
+        if entries.next().is_some() {
+            return Err("More than one Trash entry matches the original file".into());
+        }
+        // GVfs moves out of Trash using a destination check and then rename.
+        // Restore there only inside a private directory, then publish atomically.
+        let parent = self.original.parent().ok_or("Missing parent folder")?;
+        let path = glib::mkdtemp(parent.join(".pivra-restore-XXXXXX")).ok_or_else(|| {
+            format!(
+                "Could not prepare restore: {}",
+                std::io::Error::last_os_error()
+            )
+        })?;
+        let directory = match File::open(&path) {
+            Ok(directory) => directory,
+            Err(error) => {
+                let _ = fs::remove_dir(&path);
+                return Err(error.to_string());
+            }
+        };
+        let stage = StagedRestore { directory, path };
+        entry
+            .move_(
+                &gio::File::for_path(stage.path.join("media")),
+                gio::FileCopyFlags::NOFOLLOW_SYMLINKS | gio::FileCopyFlags::NO_FALLBACK_FOR_MOVE,
+                None::<&gio::Cancellable>,
+                None,
+            )
+            .map_err(|error| error.to_string())?;
+        Ok(stage)
+    }
+}
+
+fn same_inode(a: &fs::Metadata, b: &fs::Metadata) -> bool {
+    (a.dev(), a.ino()) == (b.dev(), b.ino())
+}
+
+fn check_trash_parent(path: &Path, directory: &File) -> Result<(), String> {
+    let held = directory.metadata().map_err(|error| error.to_string())?;
+    let current = fs::metadata(path.parent().ok_or("Missing parent folder")?)
+        .map_err(|error| error.to_string())?;
+    if !same_inode(&held, &current) {
+        return Err("The original folder changed".into());
+    }
+    Ok(())
+}
+
+fn check_trash_destination(path: &Path, directory: &File) -> Result<(), String> {
+    check_trash_parent(path, directory)?;
+    match fs::symlink_metadata(path) {
+        Ok(_) => Err("The destination already exists".into()),
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(()),
+        Err(error) => Err(error.to_string()),
+    }
+}
+
+fn trash_identity(info: &gio::FileInfo) -> Option<(u64, u64)> {
+    (info.has_attribute("unix::device") && info.has_attribute("unix::inode")).then(|| {
+        (
+            u64::from(info.attribute_uint32("unix::device")),
+            info.attribute_uint64("unix::inode"),
+        )
+    })
+}
+
+fn trash_entries(original: &Path) -> Result<Vec<(gio::File, gio::FileInfo)>, String> {
+    let root = gio::File::for_uri("trash:///");
+    let enumerator = root
+        .enumerate_children(
+            "standard::name,trash::orig-path,unix::device,unix::inode",
+            gio::FileQueryInfoFlags::NOFOLLOW_SYMLINKS,
+            None::<&gio::Cancellable>,
+        )
+        .map_err(|error| format!("Could not read Trash: {error}"))?;
+    let mut entries = vec![];
+    while let Some(info) = enumerator
+        .next_file(None::<&gio::Cancellable>)
+        .map_err(|error| format!("Could not read Trash: {error}"))?
+    {
+        if info
+            .attribute_byte_string("trash::orig-path")
+            .is_some_and(|value| value.as_bytes() == original.as_os_str().as_bytes())
+        {
+            entries.push((enumerator.child(&info), info));
+        }
+    }
+    Ok(entries)
 }
 
 fn update_title(window: &adw::ApplicationWindow, title: &adw::WindowTitle, context: &FileContext) {
@@ -370,7 +564,11 @@ pub(super) fn build(app: &adw::Application, settings: &Settings, file: Option<Op
     }
     let content = gtk::Box::new(gtk::Orientation::Vertical, 0);
     content.append(&header);
-    content.append(&viewport);
+    let toast_overlay = adw::ToastOverlay::new();
+    toast_overlay.set_child(Some(&viewport));
+    toast_overlay.set_hexpand(true);
+    toast_overlay.set_vexpand(true);
+    content.append(&toast_overlay);
     let window = adw::ApplicationWindow::builder()
         .application(app)
         .title(APP_NAME)
@@ -601,26 +799,21 @@ pub(super) fn build(app: &adw::Application, settings: &Settings, file: Option<Op
             }
         });
         install_navigation_arrows(view.widget());
-        let toast_overlay = adw::ToastOverlay::new();
-        let current_delete_toast = Rc::new(RefCell::new(None::<adw::Toast>));
-        rename_dialog::install(
+        let current_toast = Rc::new(RefCell::new(None::<adw::Toast>));
+        let undo = undo::Undo::install(
             &window,
+            &toast_overlay,
+            current_toast.clone(),
             &title,
+            &banner,
             context.clone(),
             view.clone(),
-            &banner,
             folder_watch.clone(),
-            rename_dialog::Toasts {
-                overlay: &toast_overlay,
-                current: current_delete_toast.clone(),
-            },
         );
-        toast_overlay.set_child(Some(view.widget()));
+        rename_dialog::install(&window, context.clone(), undo.clone());
         let viewer_row = gtk::Box::new(gtk::Orientation::Horizontal, 0);
-        toast_overlay.set_hexpand(true);
-        toast_overlay.set_vexpand(true);
         viewer_row.set_vexpand(true);
-        viewer_row.append(&toast_overlay);
+        viewer_row.append(view.widget());
         viewer_row.append(view.information_widget());
         viewport.prepend(&viewer_row);
         empty_state::install(&window, &viewport, &viewer_row);
@@ -694,102 +887,103 @@ pub(super) fn build(app: &adw::Application, settings: &Settings, file: Option<Op
         update_navigation_actions(&window, &context.borrow());
 
         // Delete moves the selected photo or video to the system Trash.
-        // Undo is bound to the specific new trash entry, never a path guess.
         let delete = gio::SimpleAction::new("trash-selected", None);
         let trash_context = context.clone();
         let trash_view = view.clone();
         let trash_title = title.clone();
         let trash_banner = banner.clone();
         let trash_window = window.downgrade();
-        let toasts = toast_overlay.clone();
-        let current_toast = current_delete_toast.clone();
+        let trash_undo = undo.clone();
+        let watches = folder_watch.clone();
         delete.connect_activate(move |_, _| {
-            let Some(window) = trash_window.upgrade() else {
-                return;
-            };
-            let mut context = trash_context.borrow_mut();
-            let Some(selected) = context.collection.current().cloned() else {
-                return;
-            };
-            let path = selected.path().to_owned();
-            let old_index = context.collection.selected_index().unwrap_or(0);
-            let old_entries = trash_entries(&path);
-            let file = gio::File::for_path(&path);
-            if let Err(error) = file.trash(None::<&gio::Cancellable>) {
-                show_latest_toast(
-                    &toasts,
-                    &current_toast,
-                    adw::Toast::new(&format!("Could not move to Trash: {error}")),
-                );
-                return;
-            }
-            let remaining: Vec<_> = context
+            let Some(path) = trash_context
+                .borrow()
                 .collection
-                .items()
-                .iter()
-                .filter(|item| item.path() != path)
-                .cloned()
-                .collect();
-            context.collection = MediaCollection::new(remaining);
-            if !context.collection.items().is_empty() {
-                let last_index = context.collection.items().len() - 1;
-                context.collection.select(old_index.min(last_index));
-            }
-            context.revision = context.revision.wrapping_add(1);
-            trash_banner.set_reveal_child(false);
-            update_title(&window, &trash_title, &context);
-            display_selected(&trash_view, &context);
-            drop(context);
-
-            let name = path.file_name().unwrap_or_default().to_string_lossy();
-            let toast = adw::Toast::new(&format!("Moved to Trash: {name}"));
-            // The Trash backend may update its GIO directory asynchronously.
-            // Always expose Undo and resolve the new entry when clicked, not
-            // immediately after trash() returns.
-            toast.set_button_label(Some("Undo"));
-            let undo_toasts = toasts.clone();
-            let undo_current_toast = current_toast.clone();
-            toast.connect_button_clicked(move |_| {
-                if path.exists() {
-                    show_latest_toast(
-                        &undo_toasts,
-                        &undo_current_toast,
-                        adw::Toast::new("Undo failed: destination already exists"),
-                    );
-                    return;
-                }
-                let trashed = trash_entries(&path)
-                    .into_iter()
-                    .find(|entry| !old_entries.iter().any(|old| old.equal(entry)));
-                let Some(trashed) = trashed else {
-                    show_latest_toast(
-                        &undo_toasts,
-                        &undo_current_toast,
-                        adw::Toast::new("Undo failed: trashed file not found"),
-                    );
+                .current()
+                .map(|item| item.path().to_owned())
+            else {
+                return;
+            };
+            let Some(permit) = trash_undo.begin() else {
+                return;
+            };
+            let worker_path = path.clone();
+            let job = gio::spawn_blocking(move || {
+                undo::run_file_operation(|| TrashReceipt::move_to_trash(worker_path))
+            });
+            let context = trash_context.clone();
+            let view = trash_view.clone();
+            let title = trash_title.clone();
+            let banner = trash_banner.clone();
+            let window = trash_window.clone();
+            let undo = trash_undo.clone();
+            let watches = watches.clone();
+            let original_watch = watches.borrow().clone();
+            glib::MainContext::default().spawn_local(async move {
+                let _permit = permit;
+                let result = job.await;
+                let Some(window) = window.upgrade().filter(|window| window.is_visible()) else {
                     return;
                 };
-                if let Err(error) = trashed.move_(
-                    &gio::File::for_path(&path),
-                    gio::FileCopyFlags::NONE,
-                    None::<&gio::Cancellable>,
-                    None,
-                ) {
-                    show_latest_toast(
-                        &undo_toasts,
-                        &undo_current_toast,
-                        adw::Toast::new(&format!("Undo failed: {error}")),
-                    );
+                let receipt = match result {
+                    Ok(Ok(receipt)) => receipt,
+                    other => {
+                        let error = match other {
+                            Ok(Err(error)) => error,
+                            _ => "worker failed".into(),
+                        };
+                        undo.notify(&format!("Could not move to Trash: {error}"));
+                        return;
+                    }
+                };
+                let current_watch = watches.borrow().clone();
+                if let Some(watch) = current_watch.filter(|watch| {
+                    original_watch
+                        .as_ref()
+                        .is_some_and(|original| Rc::ptr_eq(watch, original))
+                }) {
+                    let mut context = context.borrow_mut();
+                    let replacement = context.collection.selected_index().filter(|_| {
+                        context
+                            .collection
+                            .current()
+                            .is_some_and(|item| item.path() == path)
+                    });
+                    let remaining = context
+                        .collection
+                        .items()
+                        .iter()
+                        .filter(|item| item.path() != path)
+                        .cloned()
+                        .collect();
+                    context.collection.replace_preserving(remaining);
+                    if let Some(index) = replacement {
+                        let last_index = context.collection.items().len().saturating_sub(1);
+                        context.collection.select(index.min(last_index));
+                        context.revision = context.revision.wrapping_add(1);
+                        banner.set_reveal_child(false);
+                        update_title(&window, &title, &context);
+                        display_selected(&view, &context);
+                    } else {
+                        update_title(&window, &title, &context);
+                        update_thumbnail_catalog(&view, &context);
+                        view.set_neighbors(context.collection.photo_neighbors());
+                    }
+                    watch.schedule();
                 }
+                let name = path.file_name().unwrap_or_default().to_string_lossy();
+                undo.record(
+                    undo::Operation::Trash(receipt),
+                    &format!("Moved to Trash: {name}"),
+                );
             });
-            show_latest_toast(&toasts, &current_toast, toast);
         });
         window.add_action(&delete);
         // S saves the currently displayed video or animated-image frame beside its source.
         let save_frame = gio::SimpleAction::new("save-current-frame", None);
         let frame_context = context.clone();
         let frame_view = view.clone();
-        let frame_toasts = toast_overlay.clone();
+        let frame_undo = undo.clone();
         save_frame.connect_activate(move |_, _| {
             let source = {
                 let state = frame_context.borrow();
@@ -799,7 +993,7 @@ pub(super) fn build(app: &adw::Application, settings: &Settings, file: Option<Op
                     .map(|item| item.path().to_owned())
             };
             let Some(source) = source else {
-                frame_toasts.add_toast(adw::Toast::new("Could not save frame: no media selected"));
+                frame_undo.notify("Could not save frame: no media selected");
                 return;
             };
             let result = (|| -> Result<std::path::PathBuf, String> {
@@ -836,12 +1030,11 @@ pub(super) fn build(app: &adw::Application, settings: &Settings, file: Option<Op
                 Err("Frame filename limit reached".into())
             })();
             match result {
-                Ok(target) => frame_toasts.add_toast(adw::Toast::new(&format!(
+                Ok(target) => frame_undo.notify(&format!(
                     "Frame saved: {}",
                     target.file_name().unwrap_or_default().to_string_lossy()
-                ))),
-                Err(error) => frame_toasts
-                    .add_toast(adw::Toast::new(&format!("Could not save frame: {error}"))),
+                )),
+                Err(error) => frame_undo.notify(&format!("Could not save frame: {error}")),
             }
         });
         window.add_action(&save_frame);
@@ -851,7 +1044,7 @@ pub(super) fn build(app: &adw::Application, settings: &Settings, file: Option<Op
             context.clone(),
             view.clone(),
             &toast_overlay,
-            current_delete_toast.clone(),
+            current_toast.clone(),
         );
         groups.append(&toolbar::slideshow_group(&window));
         groups.append(&info_button);
@@ -861,7 +1054,7 @@ pub(super) fn build(app: &adw::Application, settings: &Settings, file: Option<Op
             &view,
             &zoom_toggle,
             &toast_overlay,
-            current_delete_toast.clone(),
+            current_toast.clone(),
         );
         let keys = gtk::EventControllerKey::new();
         keys.set_propagation_phase(gtk::PropagationPhase::Capture);
@@ -872,6 +1065,20 @@ pub(super) fn build(app: &adw::Application, settings: &Settings, file: Option<Op
                 && weak_window.upgrade().is_some_and(|w| editing(&w))
             {
                 return glib::Propagation::Proceed;
+            }
+            if key == gdk::Key::z
+                && modifiers.contains(gdk::ModifierType::CONTROL_MASK)
+                && !modifiers.intersects(
+                    gdk::ModifierType::SHIFT_MASK
+                        | gdk::ModifierType::ALT_MASK
+                        | gdk::ModifierType::SUPER_MASK
+                        | gdk::ModifierType::META_MASK,
+                )
+            {
+                if let Some(window) = weak_window.upgrade() {
+                    gio::prelude::ActionGroupExt::activate_action(&window, "undo", None);
+                }
+                return glib::Propagation::Stop;
             }
             if !modifiers.intersects(
                 gdk::ModifierType::CONTROL_MASK
@@ -1036,6 +1243,7 @@ pub(super) fn build(app: &adw::Application, settings: &Settings, file: Option<Op
             {
                 let mut state = open_context.borrow_mut();
                 state.collection = MediaCollection::new(vec![opened.item.clone()]);
+                state.own_rename = None;
                 state.suffix = None;
                 state.warning = false;
                 state.revision = state.revision.wrapping_add(1);

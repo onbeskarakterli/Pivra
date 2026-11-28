@@ -37,6 +37,10 @@ pub(super) struct FolderWatch {
 }
 
 impl FolderWatch {
+    pub(super) fn directory(&self) -> &std::path::Path {
+        &self.directory
+    }
+
     pub(super) fn stop(&self) {
         self.cancelled.store(true, Ordering::Relaxed);
         if let Some(timer) = self.timer.borrow_mut().take() {

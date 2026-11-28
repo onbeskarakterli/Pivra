@@ -1423,3 +1423,192 @@ pub(super) fn media_file_actions(app: &adw::Application) {
         "PASS GTK media filters and F2 rename: both active-media exclusions, preserved content and selected path, reordered catalog"
     );
 }
+
+pub(super) fn media_undo(app: &adw::Application) {
+    let data = std::env::var_os("XDG_DATA_HOME").expect("isolated XDG_DATA_HOME");
+    std::fs::create_dir_all(&data).unwrap();
+    let folder = tempfile::tempdir_in(data).unwrap();
+    let path = |name: &str| folder.path().join(name);
+    let a = path("A.png");
+    let b = path("B.png");
+    let c = path("C.png");
+    let d = path("D.png");
+    let e = path("E.png");
+    let other = path("other");
+    std::fs::create_dir(&other).unwrap();
+    let other = other.join("Elsewhere.png");
+    // An older Trash entry with the same original path must not be restored.
+    std::fs::write(&c, b"older version").unwrap();
+    gio::File::for_path(&c)
+        .trash(gio::Cancellable::NONE)
+        .unwrap();
+    for file in [&a, &c, &d, &other] {
+        std::fs::copy("tests/fixtures/images/wide.png", file).unwrap();
+    }
+    window::build(app, &pivra::settings::Settings::default(), None);
+    let window = app
+        .active_window()
+        .and_downcast::<adw::ApplicationWindow>()
+        .unwrap();
+    let undo = window.lookup_action("undo").unwrap();
+    let trash = window.lookup_action("trash-selected").unwrap();
+    let rename = || {
+        window.lookup_action("rename-media").unwrap().activate(None);
+        wait("rename dialog shown", || chooser(&window).is_some());
+        let dialog = chooser(&window)
+            .and_downcast::<adw::MessageDialog>()
+            .unwrap();
+        let entry = widgets(dialog.upcast_ref())
+            .into_iter()
+            .find(|w| w.widget_name() == "rename-filename")
+            .and_downcast::<gtk::Entry>()
+            .unwrap();
+        (dialog, entry)
+    };
+    let confirm_rename = |dialog: &adw::MessageDialog| {
+        widgets(dialog.upcast_ref())
+            .into_iter()
+            .filter_map(|w| w.downcast::<gtk::Button>().ok())
+            .find(|button| button.label().as_deref() == Some("Rename"))
+            .expect("rename button")
+            .emit_clicked();
+    };
+    let undo_toast = |title: &str| {
+        widgets(window.upcast_ref()).into_iter().find_map(|widget| {
+            widget.find_property("toast")?;
+            let toast = widget.property::<Option<adw::Toast>>("toast")?;
+            if !widget.is_mapped() || toast.title().as_deref() != Some(title) {
+                return None;
+            }
+            let button = widgets(&widget)
+                .into_iter()
+                .filter_map(|w| w.downcast::<gtk::Button>().ok())
+                .find(|button| button.is_mapped() && button.label().as_deref() == Some("Undo"))?;
+            Some((widget, toast, button))
+        })
+    };
+    let ctrl_z = || {
+        wait("viewer keyboard focus", || window.is_active());
+        native_key("ctrl+z");
+    };
+
+    open_uri(&window, &a);
+    let (dialog, entry) = rename();
+    entry.set_text("B.png");
+    confirm_rename(&dialog);
+    wait("rename recorded", || undo.is_enabled() && b.is_file());
+    wait("rename Undo toast", || undo_toast("File renamed").is_some());
+    let (stale_widget, stale_toast, _) = undo_toast("File renamed").unwrap();
+
+    let header = widget(&window, "pivra-header")
+        .downcast::<adw::HeaderBar>()
+        .unwrap();
+    let entry = gtk::Entry::new();
+    header.pack_start(&entry);
+    entry.set_text("editable text");
+    wait("editable mapped and viewer active", || {
+        entry.is_mapped() && window.is_active()
+    });
+    assert!(entry.grab_focus());
+    entry.select_region(0, -1);
+    native_key("x");
+    wait("real editable keystroke", || entry.text() == "x");
+    native_key("ctrl+z");
+    wait("Ctrl+Z performs native entry undo", || {
+        entry.text() == "editable text"
+    });
+    assert!(b.is_file() && !a.exists() && undo.is_enabled());
+    header.remove(&entry);
+
+    open_uri(&window, &c);
+    wait("mixed history folder ready", || {
+        window.title().is_some_and(|s| s.contains("3 candidates"))
+    });
+    trash.activate(None);
+    wait("Trash recorded and next item selected", || {
+        !c.exists() && undo.is_enabled() && selected(&window, "D.png")
+    });
+    wait("stale toast displaced", || !stale_widget.is_mapped());
+    let (dialog, entry) = rename();
+    entry.set_text("E.png");
+    confirm_rename(&dialog);
+    wait("latest rename recorded", || {
+        e.is_file() && undo.is_enabled()
+    });
+    stale_toast.emit_by_name::<()>("button-clicked", &[]);
+    assert!(undo.is_enabled() && b.is_file() && e.is_file());
+
+    std::os::unix::fs::symlink("missing-target", &d).unwrap();
+    ctrl_z();
+    let failure = || {
+        undo.is_enabled()
+            && widgets(window.upcast_ref()).iter().any(|widget| {
+                widget
+                    .downcast_ref::<gtk::Label>()
+                    .is_some_and(|label| label.text().starts_with("Undo failed:"))
+            })
+    };
+    wait("rename collision reported without losing history", failure);
+    assert!(e.is_file() && !c.exists() && d.is_symlink());
+    std::fs::remove_file(&d).unwrap();
+    ctrl_z();
+    wait("Ctrl+Z undoes latest rename", || {
+        d.is_file() && !e.exists() && selected(&window, "D.png") && undo.is_enabled()
+    });
+    std::os::unix::fs::symlink("missing-target", &c).unwrap();
+    ctrl_z();
+    wait("Trash collision reported without losing history", || {
+        undo.is_enabled() && has_text(&window, "Undo failed: The destination already exists")
+    });
+    assert!(c.is_symlink());
+    std::fs::remove_file(&c).unwrap();
+    ctrl_z();
+    wait("Ctrl+Z restores Trash without changing selection", || {
+        c.is_file() && selected(&window, "D.png") && has_text(&window, "File restored")
+    });
+    assert_eq!(std::fs::read(&c).unwrap(), std::fs::read(&d).unwrap());
+
+    open_uri(&window, &other);
+    ctrl_z();
+    wait("Ctrl+Z undoes earlier rename after changing folder", || {
+        a.is_file() && !b.exists() && selected(&window, "Elsewhere.png") && !undo.is_enabled()
+    });
+
+    // The last file exposes its Undo toast over the empty window.
+    trash.activate(None);
+    wait("last file removed with an Undo toast", || {
+        !other.exists()
+            && !state(&window, "media-present")
+            && undo.is_enabled()
+            && undo_toast("Moved to Trash: Elsewhere.png").is_some()
+    });
+    let (_, toast, button) = undo_toast("Moved to Trash: Elsewhere.png").unwrap();
+    button.emit_clicked();
+    wait("toast undo restores last file", || {
+        other.is_file() && selected(&window, "Elsewhere.png") && !undo.is_enabled()
+    });
+    toast.emit_by_name::<()>("button-clicked", &[]);
+    assert!(other.is_file() && !undo.is_enabled());
+
+    let (dialog, entry) = rename();
+    let expired = other.with_file_name("Expired.png");
+    entry.set_text("Expired.png");
+    confirm_rename(&dialog);
+    wait("new toast mapped", || {
+        expired.is_file() && undo_toast("File renamed").is_some()
+    });
+    let (expired_widget, expired_toast, _) = undo_toast("File renamed").unwrap();
+    wait("toast expires with keyboard history retained", || {
+        !expired_widget.is_mapped()
+    });
+    expired_toast.emit_by_name::<()>("button-clicked", &[]);
+    assert!(expired.is_file() && undo.is_enabled());
+    ctrl_z();
+    wait("keyboard can undo after toast expires", || {
+        other.is_file() && !expired.exists() && !undo.is_enabled()
+    });
+    window.close();
+    eprintln!(
+        "PASS real GIO Trash, mixed undo order, Ctrl+Z, editing focus, collision retry, toast identity and expiration"
+    );
+}

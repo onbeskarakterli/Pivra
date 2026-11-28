@@ -1,6 +1,6 @@
 //! Same-directory, no-clobber Linux rename. No copy/delete fallback.
 use std::{
-    ffi::CString,
+    ffi::{CString, OsStr},
     fs::{self, File, OpenOptions},
     io,
     os::{
@@ -11,6 +11,7 @@ use std::{
         },
     },
     path::{Path, PathBuf},
+    sync::Arc,
 };
 unsafe extern "C" {
     fn renameat2(
@@ -73,6 +74,21 @@ impl Ticket {
     }
     pub fn rename(&self, name: &str) -> io::Result<PathBuf> {
         validate_name(name).map_err(io::Error::other)?;
+        self.rename_entry(&self.name, OsStr::new(name))?;
+        Ok(self.parent.join(name))
+    }
+
+    pub fn rename_with_undo(self: &Arc<Self>, name: &str) -> io::Result<Option<Reversal>> {
+        let renamed = self.rename(name)?;
+        let original = self.parent.join(&self.name);
+        Ok((renamed != original).then(|| Reversal {
+            ticket: self.clone(),
+            original,
+            renamed,
+        }))
+    }
+
+    fn rename_entry(&self, from: &OsStr, to: &OsStr) -> io::Result<()> {
         let current_dir = fs::metadata(&self.parent)?;
         let held_dir = self.directory.metadata()?;
         if (current_dir.dev(), current_dir.ino()) != (held_dir.dev(), held_dir.ino()) {
@@ -82,31 +98,66 @@ impl Ticket {
         }
         let source = self.source.metadata()?;
         let current = fs::symlink_metadata(
-            PathBuf::from(format!("/proc/self/fd/{}", self.directory.as_raw_fd())).join(&self.name),
+            PathBuf::from(format!("/proc/self/fd/{}", self.directory.as_raw_fd())).join(from),
         )?;
         if (source.dev(), source.ino()) != (current.dev(), current.ino()) {
             return Err(io::Error::other("The source file changed; reopen the file"));
         }
-        let target = self.parent.join(name);
-        if self.name == name {
-            return Ok(target);
+        if from == to {
+            return Ok(());
         }
-        let old = CString::new(self.name.as_bytes()).map_err(io::Error::other)?;
-        let new = CString::new(name).map_err(io::Error::other)?;
-        // RENAME_NOREPLACE is atomic even when another process creates target.
-        let rc = unsafe {
-            renameat2(
-                self.directory.as_raw_fd(),
-                old.as_ptr(),
-                self.directory.as_raw_fd(),
-                new.as_ptr(),
-                1,
-            )
-        };
-        if rc != 0 {
-            return Err(io::Error::last_os_error());
-        }
-        Ok(target)
+        move_no_replace(&self.directory, from, &self.directory, to)
+    }
+}
+
+/// Atomically move a directory entry on the same filesystem without overwriting.
+pub fn move_no_replace(
+    from_directory: &File,
+    from: &OsStr,
+    to_directory: &File,
+    to: &OsStr,
+) -> io::Result<()> {
+    if [from, to]
+        .into_iter()
+        .any(|name| Path::new(name).file_name() != Some(name))
+    {
+        return Err(io::Error::other("Expected a single filename"));
+    }
+    let old = CString::new(from.as_bytes()).map_err(io::Error::other)?;
+    let new = CString::new(to.as_bytes()).map_err(io::Error::other)?;
+    // RENAME_NOREPLACE is atomic even when another process creates the target.
+    let rc = unsafe {
+        renameat2(
+            from_directory.as_raw_fd(),
+            old.as_ptr(),
+            to_directory.as_raw_fd(),
+            new.as_ptr(),
+            1,
+        )
+    };
+    if rc == 0 {
+        Ok(())
+    } else {
+        Err(io::Error::last_os_error())
+    }
+}
+
+pub struct Reversal {
+    ticket: Arc<Ticket>,
+    original: PathBuf,
+    renamed: PathBuf,
+}
+
+impl Reversal {
+    pub fn paths(&self) -> (&Path, &Path) {
+        (&self.original, &self.renamed)
+    }
+
+    pub fn undo(&self) -> io::Result<()> {
+        self.ticket.rename_entry(
+            self.renamed.file_name().unwrap(),
+            self.original.file_name().unwrap(),
+        )
     }
 }
 #[cfg(test)]
@@ -154,5 +205,58 @@ mod tests {
             io::ErrorKind::AlreadyExists
         );
         assert!(Ticket::capture(&dir.path().join("link.jpg")).is_err());
+    }
+    #[test]
+    fn reversal_refuses_replaced_sources_and_dangling_destinations() {
+        let dir = tempfile::tempdir().unwrap();
+        let original = dir.path().join("a.jpg");
+        let renamed = dir.path().join("b.jpg");
+        let moved = dir.path().join("moved.jpg");
+        fs::write(&original, b"untouched").unwrap();
+        let ticket = Arc::new(Ticket::capture(&original).unwrap());
+        assert!(ticket.rename_with_undo("a.jpg").unwrap().is_none());
+        let reversal = ticket.rename_with_undo("b.jpg").unwrap().unwrap();
+
+        std::os::unix::fs::symlink("missing", &original).unwrap();
+        assert_eq!(
+            reversal.undo().unwrap_err().kind(),
+            io::ErrorKind::AlreadyExists
+        );
+        assert!(original.is_symlink());
+        fs::remove_file(&original).unwrap();
+
+        fs::rename(&renamed, &moved).unwrap();
+        fs::write(&renamed, b"replacement").unwrap();
+        assert!(reversal.undo().is_err());
+        assert!(!original.exists());
+        assert_eq!(fs::read(&renamed).unwrap(), b"replacement");
+        fs::remove_file(&renamed).unwrap();
+        fs::rename(&moved, &renamed).unwrap();
+
+        reversal.undo().unwrap();
+        assert_eq!(fs::read(&original).unwrap(), b"untouched");
+        assert!(!renamed.exists());
+        assert!(reversal.undo().is_err());
+    }
+    #[test]
+    fn atomic_publish_between_directories_keeps_both_files_on_collision() {
+        let dir = tempfile::tempdir().unwrap();
+        let stage = dir.path().join("stage");
+        fs::create_dir(&stage).unwrap();
+        fs::write(stage.join("media"), b"restore").unwrap();
+        let target = dir.path().join("a.jpg");
+        fs::write(&target, b"collision").unwrap();
+        let staged = File::open(&stage).unwrap();
+        let original = File::open(dir.path()).unwrap();
+        let publish =
+            || move_no_replace(&staged, OsStr::new("media"), &original, OsStr::new("a.jpg"));
+
+        assert_eq!(publish().unwrap_err().kind(), io::ErrorKind::AlreadyExists);
+        assert_eq!(fs::read(&target).unwrap(), b"collision");
+        assert_eq!(fs::read(stage.join("media")).unwrap(), b"restore");
+        fs::remove_file(&target).unwrap();
+        publish().unwrap();
+        assert_eq!(fs::read(&target).unwrap(), b"restore");
+        assert!(!stage.join("media").exists());
     }
 }

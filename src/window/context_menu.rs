@@ -42,29 +42,47 @@ fn populate(
         ("Open...", "choose-media"),
         ("Open With…", "open-with"),
         ("Show in Files", "show-in-files"),
-        ("Rename", "rename-media"),
-        ("Copy To...", "copy-to"),
-        ("Move To...", "move-to"),
     ] {
         add(label, action);
     }
-    content.append(&gtk::Separator::new(gtk::Orientation::Horizontal));
-    add("Copy File Path", clipboard::PATH);
-    add(
-        if marked > 1 {
+    let rename = if marked > 1 {
+        format!("Rename {marked} Files...")
+    } else {
+        "Rename".into()
+    };
+    add(&rename, "rename-media");
+    append_cascade(&content, menus, "Transfer", "transfer", |choices| {
+        for (label, action) in [("Copy To...", "copy-to"), ("Move To...", "move-to")] {
+            choices.append(&rows::action(window, menus, label, action, None, false));
+        }
+    });
+    append_cascade(&content, menus, "Clipboard", "clipboard", |choices| {
+        let label = if marked > 1 {
             "Copy Files"
         } else {
             "Copy File"
-        },
-        clipboard::FILES,
-    );
-    if !video
-        && window
-            .lookup_action(clipboard::IMAGE)
-            .is_some_and(|action| action.is_enabled())
-    {
-        add("Copy Image", clipboard::IMAGE);
-    }
+        };
+        for (label, action) in [
+            ("Copy File Path", clipboard::PATH),
+            (label, clipboard::FILES),
+        ] {
+            choices.append(&rows::action(window, menus, label, action, None, false));
+        }
+        if !video
+            && window
+                .lookup_action(clipboard::IMAGE)
+                .is_some_and(|action| action.is_enabled())
+        {
+            choices.append(&rows::action(
+                window,
+                menus,
+                "Copy Image",
+                clipboard::IMAGE,
+                None,
+                false,
+            ));
+        }
+    });
     content.append(&gtk::Separator::new(gtk::Orientation::Horizontal));
     if video {
         add("Play / Pause", "context-playback");
@@ -77,7 +95,13 @@ fn populate(
             "video-speed",
             video_speed::OPTIONS,
         );
-        add("Save Video Frame...", video_frame_export::ACTION);
+        if window
+            .lookup_action(video_frame_export::ACTION)
+            .is_some_and(|action| action.is_enabled())
+        {
+            add("Save Video Frame...", video_frame_export::ACTION);
+        }
+        content.append(&gtk::Separator::new(gtk::Orientation::Horizontal));
     }
     add("Zoom", "context-zoom");
     add_submenu(
@@ -145,6 +169,27 @@ fn add_submenu<'a>(
     action: &str,
     options: impl IntoIterator<Item = (&'a str, &'a str)>,
 ) {
+    append_cascade(content, menus, label, id, |choices| {
+        for (target, label) in options {
+            choices.append(&rows::action(
+                window,
+                menus,
+                label,
+                action,
+                Some(target),
+                false,
+            ));
+        }
+    });
+}
+
+fn append_cascade(
+    content: &gtk::Box,
+    menus: &Rc<submenu::Menus>,
+    label: &str,
+    id: &str,
+    populate: impl FnOnce(&gtk::Box),
+) {
     let (button, _, arrow) = rows::row(label, gtk::AccessibleRole::MenuItem);
     button.set_widget_name(&format!("{id}-submenu-button"));
     arrow.set_icon_name(Some("pan-end-symbolic"));
@@ -156,16 +201,7 @@ fn add_submenu<'a>(
     child.set_widget_name(&format!("{id}-submenu"));
     child.add_css_class("menu");
     let choices = gtk::Box::new(gtk::Orientation::Vertical, 0);
-    for (target, label) in options {
-        choices.append(&rows::action(
-            window,
-            menus,
-            label,
-            action,
-            Some(target),
-            false,
-        ));
-    }
+    populate(&choices);
     child.set_child(Some(&choices));
     menus.watch_parent(&button, &child);
     content.append(&button);

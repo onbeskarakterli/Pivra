@@ -1060,8 +1060,12 @@ pub(super) fn context_menu(app: &adw::Application) {
             "Open With…",
             "Show in Files",
             "Rename",
+            "Transfer",
+            "Clipboard",
             "Zoom",
             "Display Mode",
+            "Sort By",
+            "Compare Images...",
             "Fullscreen",
             "Start Slideshow",
             "Thumbnail Strip",
@@ -1089,7 +1093,9 @@ pub(super) fn context_menu(app: &adw::Application) {
         assert_eq!(button.height(), first_height, "row height: {}", text.text());
         assert!(first_x < 24., "unnecessary leading indicator space");
     }
-    let thumbnail = buttons[8].clone();
+    let thumbnail = widget(&window, "context-action-context-thumbnails")
+        .downcast::<gtk::Button>()
+        .unwrap();
     let indicator = thumbnail.child().unwrap().last_child().unwrap();
     let saved = pivra::settings::thumbnail_preference().enabled();
     let dimensions = thumbnail.measure(gtk::Orientation::Horizontal, -1);
@@ -1112,7 +1118,9 @@ pub(super) fn context_menu(app: &adw::Application) {
         "unchanged selection/title refresh dismissed context menu"
     );
     let original_content = menu.child();
-    let modes = buttons[5].clone();
+    let modes = widget(&window, "display-mode-submenu-button")
+        .downcast::<gtk::Button>()
+        .unwrap();
     let child = widget(&window, "display-mode-submenu")
         .downcast::<gtk::Popover>()
         .unwrap();
@@ -1907,6 +1915,13 @@ pub(super) fn multi_selection(app: &adw::Application) {
             .find(|gesture| gesture.button() == 3)
             .unwrap();
         gesture.emit_by_name::<()>("pressed", &[&1i32, &30f64, &30f64]);
+        widget(&window, "clipboard-submenu-button")
+            .downcast::<gtk::Button>()
+            .unwrap()
+            .emit_clicked();
+        wait("clipboard cascade mapped", || {
+            widget(&window, "clipboard-submenu").is_mapped()
+        });
         let row = widget(&window, "context-action-copy-image")
             .downcast::<gtk::Button>()
             .unwrap();

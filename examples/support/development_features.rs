@@ -1800,6 +1800,38 @@ pub(super) fn multi_selection(app: &adw::Application) {
     wait("control-click marks active and target", || {
         count.is_mapped() && count.text() == "2 selected"
     });
+    if std::env::args().any(|arg| arg == "--check-export-comparison") {
+        let export = window.lookup_action("save-video-frame").unwrap();
+        window
+            .lookup_action("previous-media")
+            .unwrap()
+            .activate(None);
+        wait("ordinary video ready for capture", || {
+            selected(&window, "2.mp4") && export.is_enabled()
+        });
+        window
+            .lookup_action("compare-selected-images")
+            .unwrap()
+            .activate(None);
+        let root = widget(&window, "image-comparison");
+        wait("comparison suppresses export of hidden video", || {
+            root.is_mapped() && !export.is_enabled()
+        });
+        export.activate(None);
+        native_key("s");
+        pump();
+        assert!(chooser(&window).is_none());
+        native_key("Escape");
+        wait("ordinary video export restored after comparison", || {
+            !root.is_mapped() && export.is_enabled()
+        });
+        assert!(selected(&window, "2.mp4") && !window.lookup_action("undo").unwrap().is_enabled());
+        window.close();
+        eprintln!(
+            "PASS mapped video export guard through marked comparison and ordinary viewer restoration"
+        );
+        return;
+    }
     if std::env::args().any(|arg| arg == "--check-clipboard") {
         let clipboard = window.clipboard();
         let main = glib::MainContext::default();

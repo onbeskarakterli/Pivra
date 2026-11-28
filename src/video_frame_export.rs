@@ -24,6 +24,7 @@ static EXPORTING: AtomicBool = AtomicBool::new(false);
 struct Export {
     action: gio::SimpleAction,
     window: glib::WeakRef<adw::ApplicationWindow>,
+    picture: glib::WeakRef<gtk::Picture>,
     stream: RefCell<Option<(gtk::MediaFile, Vec<glib::SignalHandlerId>)>>,
     pending: RefCell<Option<gio::Cancellable>>,
     notify: Box<dyn Fn(&str)>,
@@ -31,9 +32,13 @@ struct Export {
 
 impl Export {
     fn ready(&self) -> bool {
-        self.window
+        self.picture
             .upgrade()
-            .is_some_and(|window| window.renderer().is_some())
+            .is_some_and(|picture| picture.is_mapped())
+            && self
+                .window
+                .upgrade()
+                .is_some_and(|window| window.renderer().is_some())
             && self.stream.borrow().as_ref().is_some_and(|(media, _)| {
                 matches!(
                     media.type_().name(),
@@ -110,6 +115,7 @@ pub(super) fn install(
     let export = Rc::new(Export {
         action: action.clone(),
         window: window.downgrade(),
+        picture: view.video_widget().downgrade(),
         stream: RefCell::new(None),
         pending: RefCell::new(None),
         notify: Box::new(notify),
@@ -120,6 +126,18 @@ pub(super) fn install(
     view.on_video_visibility(move |media| {
         if let Some(export) = observer.upgrade() {
             export.bind(media);
+        }
+    });
+    let observer = Rc::downgrade(&export);
+    view.video_widget().connect_map(move |_| {
+        if let Some(export) = observer.upgrade() {
+            export.refresh();
+        }
+    });
+    let observer = Rc::downgrade(&export);
+    view.video_widget().connect_unmap(move |_| {
+        if let Some(export) = observer.upgrade() {
+            export.refresh();
         }
     });
     let closing = export.clone();

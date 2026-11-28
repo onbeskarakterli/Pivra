@@ -442,7 +442,7 @@ impl ImageView {
         &self,
         path: &std::path::Path,
     ) -> Result<gtk::gdk::Texture, String> {
-        if self.video_path.borrow().as_deref() != Some(path) || !self.video.is_visible() {
+        if self.video_path.borrow().as_deref() != Some(path) || !self.video.is_mapped() {
             return Err("Video frame is not ready".into());
         }
         let stream = self.video_stream.borrow();

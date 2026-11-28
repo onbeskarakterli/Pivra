@@ -20,6 +20,7 @@ use std::{
 };
 
 const HISTORY_LIMIT: usize = 32;
+const HISTORY_FILE_LIMIT: usize = 192;
 static FILE_OPERATIONS: Mutex<()> = Mutex::new(());
 
 pub(super) fn run_file_operation<T>(operation: impl FnOnce() -> T) -> T {
@@ -45,6 +46,15 @@ enum Outcome {
 }
 
 impl Operation {
+    fn file_count(&self) -> usize {
+        match self {
+            Self::Rename(_) | Self::Trash(_) => 1,
+            Self::TrashGroup(group) => group.file_count(),
+            Self::MoveGroup(group) => group.file_count(),
+            Self::RenameGroup(group) => group.file_count(),
+        }
+    }
+
     fn undo(&self) -> Result<Outcome, String> {
         match self {
             Self::Rename(rename) => {
@@ -64,24 +74,31 @@ impl Operation {
 #[derive(Default)]
 struct History {
     next: u64,
-    entries: VecDeque<(u64, Arc<Operation>)>,
+    entries: VecDeque<(u64, Arc<Operation>, usize)>,
 }
 
 impl History {
     fn record(&mut self, operation: Operation) -> u64 {
         self.next += 1;
-        if self.entries.len() == HISTORY_LIMIT {
-            self.entries.pop_front();
+        let files = operation.file_count();
+        let mut reserved: usize = self.entries.iter().map(|(_, _, count)| count).sum();
+        // Evict complete chronological operations. Never truncate a group.
+        while self.entries.len() >= HISTORY_LIMIT || reserved + files > HISTORY_FILE_LIMIT {
+            let Some((_, _, count)) = self.entries.pop_front() else {
+                break;
+            };
+            reserved -= count;
         }
-        self.entries.push_back((self.next, Arc::new(operation)));
+        self.entries
+            .push_back((self.next, Arc::new(operation), files));
         self.next
     }
 
     fn latest(&self, requested: Option<u64>) -> Option<(u64, Arc<Operation>)> {
         self.entries
             .back()
-            .filter(|(id, _)| requested.is_none_or(|requested| requested == *id))
-            .cloned()
+            .filter(|(id, _, _)| requested.is_none_or(|requested| requested == *id))
+            .map(|(id, operation, _)| (*id, operation.clone()))
     }
 }
 
@@ -197,9 +214,15 @@ impl Undo {
         };
         let worker_operation = operation.clone();
         let job = gio::spawn_blocking(move || run_file_operation(|| worker_operation.undo()));
+        let hold = self
+            .window
+            .upgrade()
+            .and_then(|window| window.application())
+            .map(|app| app.hold());
         let manager = self.clone();
         glib::MainContext::default().spawn_local(async move {
             let _permit = permit;
+            let _hold = hold;
             match job.await {
                 Ok(Ok(Outcome::Renamed(result))) => {
                     let done = result.completed.len();
@@ -447,5 +470,37 @@ impl Drop for Permit {
     fn drop(&mut self) {
         self.0.busy.set(false);
         self.0.update_action();
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use pivra::rename::Ticket;
+
+    #[test]
+    fn grouped_history_evicts_whole_older_operations_and_preserves_newest_id() {
+        let dir = tempfile::tempdir().unwrap();
+        let source = dir.path().join("original.png");
+        std::fs::write(&source, b"media").unwrap();
+        let ticket = Arc::new(Ticket::capture(&source).unwrap());
+        let item = RenameStep::new(ticket, "renamed.png").unwrap();
+        let mut history = History::default();
+        let record = |history: &mut History, count| {
+            history.record(Operation::RenameGroup(BatchReversal::new(vec![
+                item.clone();
+                count
+            ])))
+        };
+        let oldest = record(&mut history, 96);
+        let middle = record(&mut history, 96);
+        let newest = record(&mut history, 96);
+        assert_eq!(history.entries.len(), 2);
+        assert_eq!(history.entries.front().unwrap().0, middle);
+        assert!(history.latest(Some(oldest)).is_none() && history.latest(Some(middle)).is_none());
+        assert_eq!(history.latest(None).unwrap().0, newest);
+        assert_eq!(history.latest(Some(newest)).unwrap().1.file_count(), 96);
+        history.entries.pop_back();
+        assert_eq!(history.latest(None).unwrap().0, middle);
     }
 }

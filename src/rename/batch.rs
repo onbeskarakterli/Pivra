@@ -43,6 +43,13 @@ impl BatchReversal {
         ))
     }
 
+    pub fn file_count(&self) -> usize {
+        self.0
+            .lock()
+            .unwrap_or_else(|error| error.into_inner())
+            .len()
+    }
+
     pub fn undo(&self) -> Result<RenameResult, String> {
         let mut remaining = self.0.lock().map_err(|_| "Rename history unavailable")?;
         let mut result = apply(std::mem::take(&mut *remaining));

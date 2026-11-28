@@ -170,6 +170,9 @@ pub(super) fn install(window: &adw::ApplicationWindow, view: &ImageView, undo: &
         if paths.len() < 2 {
             return;
         }
+        if !super::batch_operations::within_batch_limit(&undo, paths.len()) {
+            return;
+        }
         let Some(permit) = undo.begin() else {
             return;
         };

@@ -9,6 +9,18 @@ use std::{cell::RefCell, path::PathBuf, rc::Rc, sync::Mutex};
 #[path = "batch_operations/transfer.rs"]
 mod transfer;
 
+pub(super) const MAX_BATCH_FILES: usize = 128;
+
+pub(super) fn within_batch_limit(history: &Undo, count: usize) -> bool {
+    if count <= MAX_BATCH_FILES {
+        return true;
+    }
+    history.notify(&format!(
+        "Select at most {MAX_BATCH_FILES} files for one operation"
+    ));
+    false
+}
+
 pub(super) struct TrashGroup(Mutex<Vec<TrashReceipt>>);
 
 pub(super) struct GroupRestore {
@@ -19,6 +31,13 @@ pub(super) struct GroupRestore {
 }
 
 impl TrashGroup {
+    pub(super) fn file_count(&self) -> usize {
+        self.0
+            .lock()
+            .unwrap_or_else(|error| error.into_inner())
+            .len()
+    }
+
     pub(super) fn restore(&self) -> Result<GroupRestore, String> {
         let mut pending = self.0.lock().map_err(|_| "Trash history unavailable")?;
         let total = pending.len();
@@ -53,6 +72,9 @@ impl TrashGroup {
 }
 
 pub(super) fn trash(window: &adw::ApplicationWindow, paths: Vec<PathBuf>, history: &Rc<Undo>) {
+    if !within_batch_limit(history, paths.len()) {
+        return;
+    }
     let Some(permit) = history.begin() else {
         return;
     };
@@ -135,6 +157,13 @@ pub(super) fn trash(window: &adw::ApplicationWindow, paths: Vec<PathBuf>, histor
 pub(super) struct MoveGroup(Mutex<Vec<transfer::Moved>>);
 
 impl MoveGroup {
+    pub(super) fn file_count(&self) -> usize {
+        self.0
+            .lock()
+            .unwrap_or_else(|error| error.into_inner())
+            .len()
+    }
+
     pub(super) fn restore(&self) -> Result<GroupRestore, String> {
         let mut pending = self.0.lock().map_err(|_| "Move history unavailable")?;
         let total = pending.len();
@@ -188,6 +217,9 @@ pub(super) fn install_transfers(
                     return;
                 };
                 paths.push(item.path().to_owned());
+            }
+            if !within_batch_limit(&history, paths.len()) {
+                return;
             }
             let Some(permit) = history.begin() else {
                 return;

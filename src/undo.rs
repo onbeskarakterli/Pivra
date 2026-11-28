@@ -31,11 +31,12 @@ pub(super) enum Operation {
     Rename(Reversal),
     Trash(TrashReceipt),
     TrashGroup(batch_operations::TrashGroup),
+    MoveGroup(batch_operations::MoveGroup),
 }
 
 enum Outcome {
     Single,
-    Group(batch_operations::TrashRestore),
+    Group(batch_operations::GroupRestore),
 }
 
 impl Operation {
@@ -49,6 +50,7 @@ impl Operation {
             }
             Self::Trash(trash) => trash.restore().map(|()| Outcome::Single),
             Self::TrashGroup(group) => group.restore().map(Outcome::Group),
+            Self::MoveGroup(group) => group.restore().map(Outcome::Group),
         }
     }
 }
@@ -181,7 +183,7 @@ impl Undo {
                 let (original, renamed) = rename.paths();
                 self.mark_rename(renamed, original)
             }
-            Operation::Trash(_) | Operation::TrashGroup(_) => None,
+            Operation::Trash(_) | Operation::TrashGroup(_) | Operation::MoveGroup(_) => None,
         };
         let worker_operation = operation.clone();
         let job = gio::spawn_blocking(move || run_file_operation(|| worker_operation.undo()));
@@ -193,6 +195,7 @@ impl Undo {
                     if restore.remaining == 0 {
                         manager.history.borrow_mut().entries.pop_back();
                     }
+                    manager.removed(&restore.removed);
                     manager.restored_many(restore.paths);
                     manager.notify(&restore.message);
                 }
@@ -208,7 +211,9 @@ impl Undo {
                             manager.restored_many(vec![trash.path().to_owned()]);
                             manager.notify("File restored");
                         }
-                        Operation::TrashGroup(_) => unreachable!("group result handled separately"),
+                        Operation::TrashGroup(_) | Operation::MoveGroup(_) => {
+                            unreachable!("group result handled separately")
+                        }
                     }
                 }
                 result => {
@@ -294,7 +299,7 @@ impl Undo {
         watch.schedule();
     }
 
-    fn restored_many(&self, paths: Vec<PathBuf>) {
+    pub(super) fn restored_many(&self, paths: Vec<PathBuf>) {
         let Some(watch) = self.watches.borrow().clone() else {
             return;
         };

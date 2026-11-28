@@ -43,6 +43,8 @@ fn populate(
         ("Open With…", "open-with"),
         ("Show in Files", "show-in-files"),
         ("Rename", "rename-media"),
+        ("Copy To...", "copy-to"),
+        ("Move To...", "move-to"),
     ] {
         add(label, action);
     }

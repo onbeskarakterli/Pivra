@@ -1064,6 +1064,7 @@ pub(super) fn build(app: &adw::Application, settings: &Settings, file: Option<Op
             &toast_overlay,
             current_toast.clone(),
         );
+        batch_operations::install_transfers(&window, context.clone(), &view, &undo);
         compare_view::install(&window, &pages, &view, undo.clone());
         let keys = gtk::EventControllerKey::new();
         keys.set_propagation_phase(gtk::PropagationPhase::Capture);

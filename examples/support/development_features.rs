@@ -1800,6 +1800,58 @@ pub(super) fn multi_selection(app: &adw::Application) {
     wait("control-click marks active and target", || {
         count.is_mapped() && count.text() == "2 selected"
     });
+    if std::env::args().any(|arg| arg == "--check-sorting") {
+        let action = window.lookup_action("media-sort").unwrap();
+        let sort = |order: &str| action.activate(Some(&order.to_variant()));
+        let navigate = |name: &str| window.lookup_action(name).unwrap().activate(None);
+        let filter = widget(&window, "thumbnail-media-filter")
+            .downcast::<gtk::DropDown>()
+            .unwrap();
+        filter.set_selected(1);
+        sort("name-desc");
+        assert!(selected(&window, "3-photo.png") && count.text() == "2 selected");
+        assert_eq!(
+            CONTROLLED_LOADS.load(std::sync::atomic::Ordering::SeqCst),
+            loads
+        );
+        assert_eq!(
+            pivra::settings::load_media_sort(),
+            pivra::media_sort::Order::NameDescending
+        );
+        pivra::settings::save_view_mode(pivra::viewing::ViewMode::Actual);
+        assert_eq!(
+            pivra::settings::load_media_sort(),
+            pivra::media_sort::Order::NameDescending
+        );
+        navigate("next-media");
+        assert!(selected(&window, "2.mp4"));
+        navigate("previous-media");
+        assert!(selected(&window, "3-photo.png"));
+        navigate("slideshow");
+        navigate("slideshow-next");
+        assert!(selected(&window, "2.mp4"));
+        navigate("slideshow-stop");
+        navigate("previous-media");
+        assert!(selected(&window, "3-photo.png"));
+        std::fs::copy(
+            "tests/fixtures/images/wide.png",
+            folder.path().join("11.png"),
+        )
+        .unwrap();
+        wait("folder watcher applied new file", || {
+            window.title().is_some_and(|t| t.contains("5 candidates"))
+        });
+        navigate("previous-media");
+        assert!(selected(&window, "4.png"));
+        navigate("previous-media");
+        assert!(selected(&window, "11.png"));
+        assert_eq!(action.state().unwrap().str(), Some("name-desc"));
+        window.close();
+        eprintln!(
+            "PASS persisted order, marked/filtered state, ordinary and slideshow order, watcher insertion"
+        );
+        return;
+    }
     if std::env::args().any(|arg| arg == "--check-compare-selected") {
         let compare = window.lookup_action("compare-selected-images").unwrap();
         assert!(compare.is_enabled());

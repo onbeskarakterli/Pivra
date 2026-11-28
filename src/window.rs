@@ -42,6 +42,8 @@ mod context_menu;
 mod empty_state;
 #[path = "window/folder_watch.rs"]
 mod folder_watch;
+#[path = "window/media_sort_action.rs"]
+mod media_sort_action;
 use folder_watch::{FolderWatch, watch};
 #[path = "window/application_chooser.rs"]
 mod application_chooser;
@@ -84,6 +86,7 @@ fn show_latest_toast(
 struct FileContext {
     own_rename: Option<(PathBuf, PathBuf)>,
     own_batch_rename: bool,
+    order: pivra::media_sort::Order,
     collection: MediaCollection,
     suffix: Option<String>,
     warning: bool,
@@ -619,6 +622,7 @@ pub(super) fn build(app: &adw::Application, settings: &Settings, file: Option<Op
         let context = Rc::new(RefCell::new(FileContext {
             own_rename: None,
             own_batch_rename: false,
+            order: pivra::settings::load_media_sort(),
             collection: MediaCollection::new(
                 file.iter().map(|opened| opened.item.clone()).collect(),
             ),
@@ -1069,6 +1073,7 @@ pub(super) fn build(app: &adw::Application, settings: &Settings, file: Option<Op
             &toast_overlay,
             current_toast.clone(),
         );
+        media_sort_action::install(&window, &title, context.clone(), &view);
         batch_operations::install_transfers(&window, context.clone(), &view, &undo);
         compare_view::install(&window, &pages, &view, undo.clone());
         let keys = gtk::EventControllerKey::new();

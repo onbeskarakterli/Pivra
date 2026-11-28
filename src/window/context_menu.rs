@@ -72,6 +72,15 @@ fn populate(
         "image-mode",
         pivra::viewing::ViewMode::ALL.map(|mode| (mode.id(), mode.label())),
     );
+    add_submenu(
+        &content,
+        window,
+        menus,
+        "Sort By",
+        "media-sort",
+        super::media_sort_action::ACTION,
+        pivra::media_sort::Order::OPTIONS,
+    );
     if !video
         && window
             .lookup_action(super::compare_view::OPEN)

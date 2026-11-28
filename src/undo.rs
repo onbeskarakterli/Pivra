@@ -289,6 +289,10 @@ impl Undo {
         };
         let mut context = self.context.borrow_mut();
         context.collection.renamed(from, to);
+        let order = context.order;
+        if order != pivra::media_sort::Order::default() {
+            context.collection.sort_preserving(order);
+        }
         context.revision = context.revision.wrapping_add(1);
         self.view.media_renamed(from, to);
         self.reconcile(&context, false);
@@ -325,10 +329,10 @@ impl Undo {
             .map(|item| {
                 changes
                     .get(item.path())
-                    .map_or_else(|| item.clone(), |new| MediaItem::new(*new, item.kind()))
+                    .map_or_else(|| item.clone(), |new| item.at_path(*new))
             })
             .collect();
-        items.sort_by(|a, b| pivra::natural::compare_paths(a.path(), b.path()));
+        context.order.sort(&mut items);
         context.collection.replace_preserving(items);
         if let Some(old) = selection
             && let Some(new) = changes.get(old.as_path())
@@ -402,7 +406,7 @@ impl Undo {
                 .into_iter()
                 .filter(|item| !known.contains(item.path())),
         );
-        items.sort_by(|a, b| pivra::natural::compare_paths(a.path(), b.path()));
+        context.order.sort(&mut items);
         context.collection.replace_preserving(items);
         let select_restored = context.collection.current().is_none();
         if select_restored {

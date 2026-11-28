@@ -119,18 +119,21 @@ fn collect_entries(
         let Some(kind) = candidate_kind(&path) else {
             continue;
         };
-        let inspect = || -> io::Result<bool> {
+        let inspect = || -> io::Result<Option<fs::Metadata>> {
             // Follow file symlinks, but never recurse into a directory/link.
             if !fs::metadata(&path)?.is_file() {
-                return Ok(false);
+                return Ok(None);
             }
             let file = fs::File::open(&path)?;
             // No bytes are read; check the descriptor as well as the path.
-            Ok(file.metadata()?.is_file())
+            let metadata = file.metadata()?;
+            Ok(metadata.is_file().then_some(metadata))
         };
         match inspect() {
-            Ok(true) => items.push(MediaItem::new(path, kind)),
-            Ok(false) => {}
+            Ok(Some(metadata)) => {
+                items.push(MediaItem::new(path, kind).with_sort_fields((&metadata).into()))
+            }
+            Ok(None) => {}
             Err(error) => issues.push(ScanIssue { path, error }),
         }
     }

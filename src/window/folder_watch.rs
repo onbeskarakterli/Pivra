@@ -199,13 +199,14 @@ impl FolderWatch {
                     }
                     // A periodic fallback scan must not cancel thumbnail work
                     // when the directory's media catalog is unchanged.
+                    let mut items = report.collection.items().to_vec();
+                    if context.order != pivra::media_sort::Order::default() {
+                        context.order.sort(&mut items);
+                    }
                     let catalog_changed = context.collection.items().iter().map(|item| item.path())
-                        .ne(report.collection.items().iter().map(|item| item.path()));
-                    let missing = if catalog_changed {
-                        context.collection.replace_preserving(report.collection.items().to_vec())
-                    } else {
-                        false
-                    };
+                        .ne(items.iter().map(|item| item.path()));
+                    // A metadata-only refresh must still update the in-memory keys.
+                    let missing = context.collection.replace_preserving(items);
                     if missing {
                         context.revision = context.revision.wrapping_add(1);
                         state.view.show_message("Selected media was removed or is inaccessible. Use arrow keys to continue.");

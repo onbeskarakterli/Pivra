@@ -9,17 +9,43 @@ pub enum MediaKind {
 }
 
 /// A path and an explicitly supplied kind. Existence/readability is not implied.
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug)]
 pub struct MediaItem {
     path: PathBuf,
     kind: MediaKind,
+    sort_fields: Option<crate::media_sort::Fields>,
 }
+
+impl PartialEq for MediaItem {
+    fn eq(&self, other: &Self) -> bool {
+        self.path == other.path && self.kind == other.kind
+    }
+}
+impl Eq for MediaItem {}
 
 impl MediaItem {
     pub fn new(path: impl Into<PathBuf>, kind: MediaKind) -> Self {
         Self {
             path: path.into(),
             kind,
+            sort_fields: None,
+        }
+    }
+
+    pub(crate) fn with_sort_fields(mut self, fields: crate::media_sort::Fields) -> Self {
+        self.sort_fields = Some(fields);
+        self
+    }
+
+    pub(crate) fn sort_fields(&self) -> Option<crate::media_sort::Fields> {
+        self.sort_fields
+    }
+
+    pub fn at_path(&self, path: impl Into<PathBuf>) -> Self {
+        Self {
+            path: path.into(),
+            kind: self.kind,
+            sort_fields: self.sort_fields,
         }
     }
 

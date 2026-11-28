@@ -29,5 +29,6 @@ pub mod performance;
 pub mod inhibit;
 pub mod media_filter;
 pub mod media_information;
+pub mod media_sort;
 pub mod rename;
 pub mod slideshow;

@@ -152,45 +152,45 @@ pub fn save_thumbnail_pinned(pinned: bool) {
     }
 }
 
-/// Remember the last chosen Fit / Fill / 100% preset between launches.
-pub fn load_view_mode() -> crate::viewing::ViewMode {
-    use std::io::Read;
-    let path = glib::user_config_dir().join("pivra/view-mode.conf");
-    let mut content = Vec::new();
-    if std::fs::File::open(path)
-        .and_then(|f| f.take(32).read_to_end(&mut content))
-        .is_ok()
-    {
-        match content.as_slice() {
-            b"fill\n" => return crate::viewing::ViewMode::Fill,
-            b"actual\n" => return crate::viewing::ViewMode::Actual,
-            _ => {}
-        }
-    }
-    crate::viewing::ViewMode::Fit
+/// Read the existing view settings, including one-line legacy files.
+fn view_preferences() -> (crate::viewing::ViewMode, crate::media_sort::Order) {
+    let value = load_toolbar_preference("view-mode.conf").unwrap_or_default();
+    let mut lines = value.lines();
+    let view = lines
+        .next()
+        .and_then(crate::viewing::ViewMode::from_id)
+        .unwrap_or(crate::viewing::ViewMode::Fit);
+    let sort = lines
+        .next()
+        .and_then(|line| line.strip_prefix("sort="))
+        .and_then(crate::media_sort::Order::from_id)
+        .unwrap_or_default();
+    (view, sort)
 }
 
-pub fn save_view_mode(mode: crate::viewing::ViewMode) {
-    let dir = glib::user_config_dir().join("pivra");
-    let result = (|| -> Result<(), Box<dyn std::error::Error>> {
-        std::fs::create_dir_all(&dir)?;
-        let value: &[u8] = match mode {
-            crate::viewing::ViewMode::Fit => b"fit\n",
-            crate::viewing::ViewMode::Fill => b"fill\n",
-            crate::viewing::ViewMode::Actual => b"actual\n",
-        };
-        gio::File::for_path(dir.join("view-mode.conf")).replace_contents(
-            value,
-            None,
-            false,
-            gio::FileCreateFlags::PRIVATE | gio::FileCreateFlags::REPLACE_DESTINATION,
-            None::<&gio::Cancellable>,
-        )?;
-        Ok(())
-    })();
-    if let Err(err) = result {
-        eprintln!("Pivra: could not save view mode: {err}");
-    }
+fn save_view_preferences(view: crate::viewing::ViewMode, sort: crate::media_sort::Order) {
+    let value = if sort == crate::media_sort::Order::default() {
+        view.id().to_owned()
+    } else {
+        format!("{}\nsort={}", view.id(), sort.id())
+    };
+    save_toolbar_preference("view-mode.conf", &value);
+}
+
+pub fn load_view_mode() -> crate::viewing::ViewMode {
+    view_preferences().0
+}
+
+pub fn save_view_mode(view: crate::viewing::ViewMode) {
+    save_view_preferences(view, view_preferences().1);
+}
+
+pub fn load_media_sort() -> crate::media_sort::Order {
+    view_preferences().1
+}
+
+pub fn save_media_sort(order: crate::media_sort::Order) {
+    save_view_preferences(view_preferences().0, order);
 }
 
 /// Saved video audio controls shared by subsequent windows and launches.

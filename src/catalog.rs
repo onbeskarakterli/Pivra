@@ -30,12 +30,19 @@ impl MediaCollection {
         path.is_some() && self.selected.is_none()
     }
 
+    pub fn sort_preserving(&mut self, order: crate::media_sort::Order) {
+        let path = self.current().map(|item| item.path().to_owned());
+        order.sort(&mut self.items);
+        self.selected =
+            path.and_then(|path| self.items.iter().position(|item| item.path() == path));
+    }
+
     pub fn rename_selected(&mut self, old: &std::path::Path, new: &std::path::Path) {
         if let Some(index) = self
             .selected
             .filter(|_| self.current().is_some_and(|item| item.path() == old))
         {
-            self.items[index] = MediaItem::new(new, self.items[index].kind());
+            self.items[index] = self.items[index].at_path(new);
         }
     }
     /// Reconcile an explicit rename immediately; preserve selection and natural order.
@@ -49,7 +56,7 @@ impl MediaCollection {
         });
         for item in &mut self.items {
             if item.path() == old {
-                *item = MediaItem::new(new, item.kind());
+                *item = item.at_path(new);
             }
         }
         self.items

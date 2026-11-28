@@ -34,6 +34,8 @@ mod video_frame_export;
 mod batch_operations;
 #[path = "window/batch_rename.rs"]
 mod batch_rename;
+#[path = "window/clipboard.rs"]
+mod clipboard;
 #[path = "window/compare_view.rs"]
 mod compare_view;
 #[path = "window/context_menu.rs"]
@@ -1073,6 +1075,7 @@ pub(super) fn build(app: &adw::Application, settings: &Settings, file: Option<Op
             &toast_overlay,
             current_toast.clone(),
         );
+        clipboard::install(&window, context.clone(), &view, &undo);
         media_sort_action::install(&window, &title, context.clone(), &view);
         batch_operations::install_transfers(&window, context.clone(), &view, &undo);
         compare_view::install(&window, &pages, &view, undo.clone());
@@ -1090,6 +1093,25 @@ pub(super) fn build(app: &adw::Application, settings: &Settings, file: Option<Op
                 .upgrade()
                 .is_some_and(|window| compare_view::handle_key(&window, key, modifiers))
             {
+                return glib::Propagation::Stop;
+            }
+            if key.to_lower() == gdk::Key::c
+                && modifiers.contains(gdk::ModifierType::CONTROL_MASK)
+                && !modifiers.intersects(
+                    gdk::ModifierType::SHIFT_MASK
+                        | gdk::ModifierType::ALT_MASK
+                        | gdk::ModifierType::SUPER_MASK
+                        | gdk::ModifierType::META_MASK
+                        | gdk::ModifierType::HYPER_MASK,
+                )
+                && let Some(window) = weak_window.upgrade()
+                && window
+                    .lookup_action("context-media")
+                    .and_then(|action| action.state())
+                    .is_some_and(|uri| uri.str().is_some_and(|uri| !uri.is_empty()))
+                && let Some(action) = window.lookup_action(clipboard::FILES)
+            {
+                action.activate(None);
                 return glib::Propagation::Stop;
             }
             if key.to_lower() == gdk::Key::s

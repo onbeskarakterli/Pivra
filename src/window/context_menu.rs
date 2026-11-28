@@ -1,5 +1,5 @@
 //! Native viewport menu; existing window actions remain the operation owners.
-use super::{FileContext, slideshow, video_frame_export};
+use super::{FileContext, clipboard, slideshow, video_frame_export};
 use crate::image_view::{ImageView, video_speed};
 use adw::prelude::*;
 use gtk::{gdk, gio};
@@ -47,6 +47,23 @@ fn populate(
         ("Move To...", "move-to"),
     ] {
         add(label, action);
+    }
+    content.append(&gtk::Separator::new(gtk::Orientation::Horizontal));
+    add("Copy File Path", clipboard::PATH);
+    add(
+        if marked > 1 {
+            "Copy Files"
+        } else {
+            "Copy File"
+        },
+        clipboard::FILES,
+    );
+    if !video
+        && window
+            .lookup_action(clipboard::IMAGE)
+            .is_some_and(|action| action.is_enabled())
+    {
+        add("Copy Image", clipboard::IMAGE);
     }
     content.append(&gtk::Separator::new(gtk::Orientation::Horizontal));
     if video {
@@ -283,11 +300,11 @@ pub(super) fn install(
             let Some(window) = weak.upgrade().filter(submenu::Menus::owner_active) else {
                 return;
             };
-            let Some(video) = selected
+            let Some((video, path)) = selected
                 .borrow()
                 .collection
                 .current()
-                .map(|i| i.kind() == MediaKind::Video)
+                .map(|i| (i.kind() == MediaKind::Video, i.path().to_owned()))
             else {
                 return;
             };
@@ -306,9 +323,10 @@ pub(super) fn install(
                             .is_some_and(|m| m.is_prepared() && m.error().is_none()),
                 );
             }
-            let marked = player
-                .upgrade()
-                .map_or(0, |view| view.marked_thumbnails().len());
+            let marked = player.upgrade().map_or(0, |view| {
+                clipboard::update_image_action(&window, &view, &path);
+                view.marked_thumbnails().len()
+            });
             populate(&menu, &menus, &window, video, marked);
             menu.set_pointing_to(Some(&gdk::Rectangle::new(x as i32, y as i32, 1, 1)));
             gesture.set_state(gtk::EventSequenceState::Claimed);

@@ -585,6 +585,23 @@ impl ImageView {
             .flatten()
     }
 
+    #[allow(dead_code, reason = "Standalone view probes omit clipboard")]
+    pub(super) fn clipboard_texture(&self, path: &std::path::Path) -> Option<gtk::gdk::Texture> {
+        if self.animation_controls.bar.is_visible()
+            || path
+                .extension()
+                .and_then(|extension| extension.to_str())
+                .is_some_and(|extension| {
+                    ["gif", "apng"]
+                        .iter()
+                        .any(|known| extension.eq_ignore_ascii_case(known))
+                })
+        {
+            return None;
+        }
+        self.ready_texture(path)
+    }
+
     #[allow(dead_code)] // Some standalone view probes never display a non-image selection.
     pub(super) fn show_message(&self, message: &str) {
         self.prepare(message, true);

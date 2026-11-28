@@ -13,9 +13,9 @@ from video_gpu.lifecycle import session, run, ROOT
 def main():
     parser=argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--session',choices=['x11','sway'],required=True)
-    parser.add_argument('--development',choices=['open','info','minimap','layout','navigation','shortcuts','zoom-state','context-menu','slideshow-click','slideshow-effects','opening','reveal','open-latency','file-actions','undo','video-mouse','video-speed','video-frame','comparison','multi-selection','compare-selected','batch-trash','batch-rename','sorting','all'])
+    parser.add_argument('--development',choices=['open','info','minimap','layout','navigation','shortcuts','zoom-state','context-menu','slideshow-click','slideshow-effects','opening','reveal','open-latency','file-actions','undo','video-mouse','video-speed','video-frame','comparison','multi-selection','compare-selected','batch-trash','batch-rename','sorting','clipboard','all'])
     args=parser.parse_args()
-    if args.development in ('video-mouse', 'undo', 'video-frame', 'comparison', 'multi-selection', 'compare-selected', 'batch-trash', 'batch-rename', 'sorting') and args.session != 'x11':
+    if args.development in ('video-mouse', 'undo', 'video-frame', 'comparison', 'multi-selection', 'compare-selected', 'batch-trash', 'batch-rename', 'sorting', 'clipboard') and args.session != 'x11':
         parser.error(f'{args.development} requires real X11 input from xdotool')
     if os.environ.get('PIVRA_TOOLBAR_PRIVATE_BUS')!='1':
         fixture_parent = None
@@ -53,7 +53,7 @@ def main():
                      else ['development-open-direct','development-open-chooser'] if args.development == 'open-latency'
                      else ['development-'+args.development] if args.development else ['toolbar-ux','toolbar-ux-restore'])
             for mode in modes:
-                if args.development in ('compare-selected', 'batch-trash', 'batch-rename', 'sorting'):
+                if args.development in ('compare-selected', 'batch-trash', 'batch-rename', 'sorting', 'clipboard'):
                     arguments = ['--development-multi-selection', '--check-'+args.development]
                 else:
                     arguments = ['--'+mode]

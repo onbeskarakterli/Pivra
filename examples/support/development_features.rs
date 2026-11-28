@@ -1800,6 +1800,101 @@ pub(super) fn multi_selection(app: &adw::Application) {
     wait("control-click marks active and target", || {
         count.is_mapped() && count.text() == "2 selected"
     });
+    if std::env::args().any(|arg| arg == "--check-clipboard") {
+        let clipboard = window.clipboard();
+        let main = glib::MainContext::default();
+        native_key("ctrl+c");
+        wait("Ctrl+C sent the marked files", || {
+            has_text(&window, "2 files copied to clipboard")
+        });
+        let read = |mime| {
+            main.block_on(async {
+                let (stream, actual) = clipboard
+                    .read_future(&[mime], glib::Priority::DEFAULT)
+                    .await
+                    .unwrap();
+                assert_eq!(actual, mime);
+                stream
+                    .read_bytes_future(4096, glib::Priority::DEFAULT)
+                    .await
+                    .unwrap()
+            })
+        };
+        let expected = ["1.png", "3-photo.png"].map(|name| {
+            gio::File::for_path(folder.path().join(name))
+                .uri()
+                .to_string()
+        });
+        assert_eq!(
+            read("text/uri-list").as_ref(),
+            format!("{}\r\n", expected.join("\r\n")).as_bytes()
+        );
+        assert_eq!(
+            read("x-special/gnome-copied-files").as_ref(),
+            format!("copy\n{}", expected.join("\n")).as_bytes()
+        );
+        window
+            .lookup_action("copy-file-path")
+            .unwrap()
+            .activate(None);
+        let active = folder.path().join("3-photo.png");
+        assert_eq!(
+            main.block_on(clipboard.read_text_future())
+                .unwrap()
+                .unwrap(),
+            active.to_str().unwrap()
+        );
+
+        let header = widget(&window, "pivra-header")
+            .downcast::<adw::HeaderBar>()
+            .unwrap();
+        let entry = gtk::Entry::new();
+        entry.set_text("native text");
+        header.pack_start(&entry);
+        wait("editable text mapped", || entry.is_mapped());
+        assert!(entry.grab_focus());
+        entry.select_region(0, -1);
+        native_key("ctrl+c");
+        wait("editable copied text", || {
+            main.block_on(clipboard.read_text_future())
+                .unwrap()
+                .is_some_and(|text| text == "native text")
+        });
+        header.remove(&entry);
+
+        let photo = widgets(window.upcast_ref())
+            .into_iter()
+            .filter_map(|w| w.downcast::<gtk::Overlay>().ok())
+            .find_map(|overlay| overlay.child().and_downcast::<gtk::Picture>())
+            .unwrap();
+        let gesture = photo
+            .observe_controllers()
+            .iter::<glib::Object>()
+            .filter_map(Result::ok)
+            .filter_map(|w| w.downcast::<gtk::GestureClick>().ok())
+            .find(|gesture| gesture.button() == 3)
+            .unwrap();
+        gesture.emit_by_name::<()>("pressed", &[&1i32, &30f64, &30f64]);
+        let row = widget(&window, "context-action-copy-image")
+            .downcast::<gtk::Button>()
+            .unwrap();
+        row.emit_clicked();
+        assert!(!window.lookup_action("undo").unwrap().is_enabled());
+        assert_eq!(
+            CONTROLLED_LOADS.load(std::sync::atomic::Ordering::SeqCst),
+            loads
+        );
+        window.close();
+        let texture = main
+            .block_on(clipboard.read_texture_future())
+            .unwrap()
+            .unwrap();
+        assert_eq!((texture.width(), texture.height()), (64, 32));
+        eprintln!(
+            "PASS native Ctrl+C and clipboard URI targets, plain path, editable text, original image size and ownership after window close"
+        );
+        return;
+    }
     if std::env::args().any(|arg| arg == "--check-sorting") {
         let action = window.lookup_action("media-sort").unwrap();
         let sort = |order: &str| action.activate(Some(&order.to_variant()));

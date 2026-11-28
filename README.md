@@ -65,8 +65,13 @@ No transition.
 
 ## Development on dev
 
-**Unreleased development version: `0.2.9-dev`.** For development builds, see
-the [development guide](docs/development/README.md).
+**Unreleased development version: `0.2.9-dev`.** The development branch
+adds image comparison, thumbnail multi-selection, grouped file operations
+and Undo, sorting, clipboard actions, video speed control and frame export.
+The development shortcuts include Ctrl+Shift+C for comparison, Ctrl+C for
+file clipboard contents, Ctrl+Z for Undo and S for video frame export.
+[Development features and acceptance checklist](docs/development/V0.2.9_FEATURES.md) ·
+[Development guide](docs/development/README.md)
 The [validation record](docs/releases/PIVRA_V0.2.8_RC_VALIDATION.md) tracks
 the evidence and distribution status for v0.2.8.
 

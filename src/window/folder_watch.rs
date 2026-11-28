@@ -134,6 +134,10 @@ impl FolderWatch {
         if self.cancelled.load(Ordering::Relaxed) {
             return;
         }
+        if self.context.borrow().own_batch_rename {
+            self.dirty.set(true);
+            return;
+        }
         self.running.set(true);
         self.dirty.set(false);
         let directory = self.directory.clone();
@@ -173,6 +177,10 @@ impl FolderWatch {
             let result = job.await.unwrap_or_else(|_| Err(std::io::Error::other("folder worker failed")));
             state.running.set(false);
             if state.cancelled.load(Ordering::Relaxed) { return; }
+            if state.context.borrow().own_batch_rename {
+                state.dirty.set(true);
+                return;
+            }
             if state.dirty.get() {
                 pivra::performance::emit("folder_scan_superseded", "dirty", 0, 0);
                 state.schedule(); return;
@@ -298,8 +306,19 @@ pub(super) fn watch(
                     .chain(other.and_then(|f| f.path()))
                     .collect();
                 state.view.invalidate_cache_paths(&affected);
+                if affected
+                    .iter()
+                    .any(|path| pivra::rename::is_batch_temporary(path))
+                {
+                    state.schedule();
+                    return;
+                }
                 let mut retarget = None;
                 let mut context = state.context.borrow_mut();
+                if context.own_batch_rename {
+                    state.dirty.set(true);
+                    return;
+                }
                 let own_rename = context.own_rename.as_ref().is_some_and(|(old, new)| {
                     path.as_ref() == Some(old) && other.and_then(|f| f.path()).as_ref() == Some(new)
                 });

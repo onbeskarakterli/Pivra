@@ -1,4 +1,9 @@
 //! Same-directory, no-clobber Linux rename. No copy/delete fallback.
+mod batch;
+pub use batch::{
+    BatchReversal, RenameResult, RenameStep, apply as apply_batch,
+    is_temporary as is_batch_temporary,
+};
 use std::{
     ffi::{CString, OsStr},
     fs::{self, File, OpenOptions},

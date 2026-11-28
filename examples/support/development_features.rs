@@ -1833,6 +1833,58 @@ pub(super) fn multi_selection(app: &adw::Application) {
     let filter = widget(&window, "thumbnail-media-filter")
         .downcast::<gtk::DropDown>()
         .unwrap();
+    if std::env::args().any(|arg| arg == "--check-batch-rename") {
+        let before = ["1.png", "2.mp4", "3-photo.png"].map(|name| folder.path().join(name));
+        let after =
+            ["IMG_001.png", "IMG_002.mp4", "IMG_003.png"].map(|name| folder.path().join(name));
+        let button = |dialog: &gtk::Window, label: &str| {
+            widgets(dialog.upcast_ref())
+                .into_iter()
+                .filter_map(|w| w.downcast::<gtk::Button>().ok())
+                .find(|button| button.label().as_deref() == Some(label))
+                .unwrap()
+        };
+        let show = || {
+            wait("viewer keyboard focus", || window.is_active());
+            native_key("F2");
+            wait("batch rename dialog", || chooser(&window).is_some());
+            chooser(&window).unwrap()
+        };
+        let dialog = show();
+        let preview = widgets(dialog.upcast_ref())
+            .into_iter()
+            .find_map(|w| w.downcast::<gtk::TextView>().ok())
+            .unwrap()
+            .buffer();
+        let names = preview.text(&preview.start_iter(), &preview.end_iter(), true);
+        assert!(names.contains("1.png  →  IMG_001.png") && names.contains("2.mp4  →  IMG_002.mp4"));
+        button(&dialog, "Cancel").emit_clicked();
+        wait("dialog cancelled", || chooser(&window).is_none());
+        assert!(before.iter().all(|path| path.is_file()) && after.iter().all(|p| !p.exists()));
+        let dialog = show();
+        button(&dialog, "Rename").emit_clicked();
+        let undo = window.lookup_action("undo").unwrap();
+        wait("batch applied with active title and history", || {
+            after.iter().all(|p| p.is_file())
+                && selected(&window, "IMG_003.png")
+                && undo.is_enabled()
+        });
+        wait("batch dialog returned focus before undo", || {
+            window.is_active()
+        });
+        native_key("ctrl+z");
+        wait("batch undo restored all names and active media", || {
+            before.iter().all(|p| p.is_file())
+                && after.iter().all(|p| !p.exists())
+                && selected(&window, "3-photo.png")
+                && !undo.is_enabled()
+        });
+        window.close();
+        eprintln!(
+            "PASS batch F2 live preview, cancellation, ordered numbering, active title and grouped Ctrl+Z"
+        );
+        return;
+    }
     if std::env::args().any(|arg| arg == "--check-batch-trash") {
         let undo = window.lookup_action("undo").unwrap();
         native_key("Delete");

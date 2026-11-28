@@ -19,10 +19,20 @@ pub(super) fn install(
     window: &adw::ApplicationWindow,
     context: Rc<RefCell<FileContext>>,
     undo: Rc<undo::Undo>,
+    view: &ImageView,
 ) {
     let action = gio::SimpleAction::new("rename-media", None);
     let weak_window = window.downgrade();
+    let selected = view.clone();
     action.connect_activate(move |action, _| {
+        if selected.marked_thumbnails().len() > 1 {
+            if let Some(window) = weak_window.upgrade()
+                && let Some(batch) = window.lookup_action("batch-rename")
+            {
+                batch.activate(None);
+            }
+            return;
+        }
         let Some(path) = context
             .borrow()
             .collection

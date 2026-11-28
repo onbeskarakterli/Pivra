@@ -7,7 +7,10 @@ use super::{
 use crate::image_view::ImageView;
 use adw::prelude::*;
 use gtk::{gio, glib};
-use pivra::{media::MediaItem, rename::Reversal};
+use pivra::{
+    media::MediaItem,
+    rename::{BatchReversal, RenameResult, RenameStep, Reversal},
+};
 use std::{
     cell::{Cell, RefCell},
     collections::VecDeque,
@@ -32,11 +35,13 @@ pub(super) enum Operation {
     Trash(TrashReceipt),
     TrashGroup(batch_operations::TrashGroup),
     MoveGroup(batch_operations::MoveGroup),
+    RenameGroup(BatchReversal),
 }
 
 enum Outcome {
     Single,
     Group(batch_operations::GroupRestore),
+    Renamed(RenameResult),
 }
 
 impl Operation {
@@ -51,6 +56,7 @@ impl Operation {
             Self::Trash(trash) => trash.restore().map(|()| Outcome::Single),
             Self::TrashGroup(group) => group.restore().map(Outcome::Group),
             Self::MoveGroup(group) => group.restore().map(Outcome::Group),
+            Self::RenameGroup(group) => group.undo().map(Outcome::Renamed),
         }
     }
 }
@@ -183,6 +189,10 @@ impl Undo {
                 let (original, renamed) = rename.paths();
                 self.mark_rename(renamed, original)
             }
+            Operation::RenameGroup(_) => {
+                self.begin_rename_group();
+                None
+            }
             Operation::Trash(_) | Operation::TrashGroup(_) | Operation::MoveGroup(_) => None,
         };
         let worker_operation = operation.clone();
@@ -191,6 +201,18 @@ impl Undo {
         glib::MainContext::default().spawn_local(async move {
             let _permit = permit;
             match job.await {
+                Ok(Ok(Outcome::Renamed(result))) => {
+                    let done = result.completed.len();
+                    manager.finish_rename_group(&result.completed);
+                    if result.failed == 0 {
+                        manager.history.borrow_mut().entries.pop_back();
+                        manager.notify("Rename undone");
+                    } else {
+                        let total = done + result.failed;
+                        let error = result.error.as_deref().unwrap_or("Could not restore name");
+                        manager.notify(&format!("{done} of {total} renames undone · {error}"));
+                    }
+                }
                 Ok(Ok(Outcome::Group(restore))) => {
                     if restore.remaining == 0 {
                         manager.history.borrow_mut().entries.pop_back();
@@ -211,12 +233,17 @@ impl Undo {
                             manager.restored_many(vec![trash.path().to_owned()]);
                             manager.notify("File restored");
                         }
-                        Operation::TrashGroup(_) | Operation::MoveGroup(_) => {
+                        Operation::TrashGroup(_)
+                        | Operation::MoveGroup(_)
+                        | Operation::RenameGroup(_) => {
                             unreachable!("group result handled separately")
                         }
                     }
                 }
                 result => {
+                    if matches!(operation.as_ref(), Operation::RenameGroup(_)) {
+                        manager.finish_rename_group(&[]);
+                    }
                     manager.clear_marker(marker);
                     let message = result
                         .ok()
@@ -266,6 +293,58 @@ impl Undo {
         self.view.media_renamed(from, to);
         self.reconcile(&context, false);
         watch.schedule();
+    }
+
+    pub(super) fn begin_rename_group(&self) {
+        self.context.borrow_mut().own_batch_rename = true;
+    }
+
+    pub(super) fn finish_rename_group(&self, changed: &[RenameStep]) {
+        let mut context = self.context.borrow_mut();
+        context.own_batch_rename = false;
+        let Some(watch) = self.watches.borrow().clone() else {
+            return;
+        };
+        watch.schedule();
+        let changes: std::collections::HashMap<_, _> = changed
+            .iter()
+            .map(RenameStep::paths)
+            .filter(|(old, _)| old.parent() == Some(watch.directory()))
+            .collect();
+        if changes.is_empty() {
+            return;
+        }
+        let selection = context
+            .collection
+            .current()
+            .map(|item| item.path().to_owned());
+        let mut items: Vec<_> = context
+            .collection
+            .items()
+            .iter()
+            .map(|item| {
+                changes
+                    .get(item.path())
+                    .map_or_else(|| item.clone(), |new| MediaItem::new(*new, item.kind()))
+            })
+            .collect();
+        items.sort_by(|a, b| pivra::natural::compare_paths(a.path(), b.path()));
+        context.collection.replace_preserving(items);
+        if let Some(old) = selection
+            && let Some(new) = changes.get(old.as_path())
+        {
+            if let Some(index) = context
+                .collection
+                .items()
+                .iter()
+                .position(|item| item.path() == *new)
+            {
+                context.collection.select(index);
+                context.revision = context.revision.wrapping_add(1);
+                self.view.media_renamed(&old, new);
+            }
+        }
+        self.reconcile(&context, false);
     }
 
     pub(super) fn removed(&self, paths: &[PathBuf]) {

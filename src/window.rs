@@ -32,6 +32,8 @@ mod video_frame_export;
 
 #[path = "window/batch_operations.rs"]
 mod batch_operations;
+#[path = "window/batch_rename.rs"]
+mod batch_rename;
 #[path = "window/compare_view.rs"]
 mod compare_view;
 #[path = "window/context_menu.rs"]
@@ -81,6 +83,7 @@ fn show_latest_toast(
 
 struct FileContext {
     own_rename: Option<(PathBuf, PathBuf)>,
+    own_batch_rename: bool,
     collection: MediaCollection,
     suffix: Option<String>,
     warning: bool,
@@ -615,6 +618,7 @@ pub(super) fn build(app: &adw::Application, settings: &Settings, file: Option<Op
     {
         let context = Rc::new(RefCell::new(FileContext {
             own_rename: None,
+            own_batch_rename: false,
             collection: MediaCollection::new(
                 file.iter().map(|opened| opened.item.clone()).collect(),
             ),
@@ -846,7 +850,8 @@ pub(super) fn build(app: &adw::Application, settings: &Settings, file: Option<Op
             view.clone(),
             folder_watch.clone(),
         );
-        rename_dialog::install(&window, context.clone(), undo.clone());
+        batch_rename::install(&window, &view, &undo);
+        rename_dialog::install(&window, context.clone(), undo.clone(), &view);
         let viewer_row = gtk::Box::new(gtk::Orientation::Horizontal, 0);
         viewer_row.set_vexpand(true);
         viewer_row.append(view.widget());

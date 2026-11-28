@@ -90,6 +90,8 @@ mod slideshow_click;
 mod slideshow_effects;
 #[path = "support/toolbar_ux.rs"]
 mod toolbar_ux;
+#[path = "support/undo_integration.rs"]
+mod undo_integration;
 #[path = "support/video_frame.rs"]
 mod video_frame;
 #[path = "support/video_mouse.rs"]
@@ -383,6 +385,10 @@ fn main() {
         .flags(gio::ApplicationFlags::NON_UNIQUE)
         .build();
     app.register(None::<&gio::Cancellable>).unwrap();
+    if std::env::args().any(|s| s == "--development-combined-undo") {
+        undo_integration::run(&app);
+        return;
+    }
     if std::env::args().any(|s| s == "--development-multi-selection") {
         development_features::multi_selection(&app);
         return;

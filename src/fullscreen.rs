@@ -86,6 +86,13 @@ pub(crate) fn install(
         };
         match key {
             gdk::Key::Escape => {
+                if let Some(action) = window
+                    .lookup_action("close-comparison")
+                    .filter(|action| action.is_enabled())
+                {
+                    action.activate(None);
+                    return glib::Propagation::Stop;
+                }
                 if window
                     .lookup_action("slideshow")
                     .and_then(|a| a.state())

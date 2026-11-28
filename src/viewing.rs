@@ -292,6 +292,32 @@ impl Transform {
         self.manual = Some(g);
         true
     }
+    /// Match another view's relative zoom and normalized center across differently sized images.
+    pub fn follow_normalized(
+        &mut self,
+        source: Geometry,
+        source_base: Geometry,
+        source_viewport: (f64, f64),
+        image: (f64, f64),
+        viewport: (f64, f64),
+        mode: ViewMode,
+    ) {
+        let Some(mut target) = mode.geometry(image, viewport) else {
+            return;
+        };
+        let factor = source.width / source_base.width;
+        let scale = (target.width * factor / image.0).clamp(Self::MIN_SCALE, Self::MAX_SCALE);
+        let u = ((source_viewport.0 / 2. - source.x) / source.width).clamp(0., 1.);
+        let v = ((source_viewport.1 / 2. - source.y) / source.height).clamp(0., 1.);
+        target.width = image.0 * scale;
+        target.height = image.1 * scale;
+        target.x = viewport.0 / 2. - u * target.width;
+        target.y = viewport.1 / 2. - v * target.height;
+        Self::constrain(&mut target, viewport);
+        self.viewport = viewport;
+        self.manual = Some(target);
+    }
+
     pub fn pan(
         &mut self,
         image: (f64, f64),
@@ -318,6 +344,29 @@ impl Transform {
 #[cfg(test)]
 mod transform_tests {
     use super::*;
+    #[test]
+    fn comparison_matches_normalized_position_without_distortion() {
+        let image = (1000., 800.);
+        let other = (500., 600.);
+        let viewport = (250., 200.);
+        let mode = ViewMode::Fit;
+        let mut source = Transform::default();
+        let mut target = Transform::default();
+        assert!(source.zoom(image, viewport, mode, (125., 100.), -6.));
+        assert!(source.pan(image, viewport, mode, (-30., 20.)));
+        let first = source.geometry(image, viewport, mode).unwrap();
+        let first_base = mode.geometry(image, viewport).unwrap();
+        let other_base = mode.geometry(other, viewport).unwrap();
+        target.follow_normalized(first, first_base, viewport, other, viewport, mode);
+        let second = target.geometry(other, viewport, mode).unwrap();
+        let x = |g: Geometry| (125. - g.x) / g.width;
+        let y = |g: Geometry| (100. - g.y) / g.height;
+        assert!((x(first) - x(second)).abs() < 1e-9);
+        assert!((y(first) - y(second)).abs() < 1e-9);
+        assert!((first.width / first_base.width - second.width / other_base.width).abs() < 1e-9);
+        assert!((second.width / second.height - other.0 / other.1).abs() < 1e-9);
+    }
+
     #[test]
     fn zoom_preserves_source_point_unless_bounds_require_clamping() {
         let mut t = Transform::default();

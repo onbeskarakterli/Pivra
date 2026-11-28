@@ -383,6 +383,10 @@ fn main() {
         .flags(gio::ApplicationFlags::NON_UNIQUE)
         .build();
     app.register(None::<&gio::Cancellable>).unwrap();
+    if std::env::args().any(|s| s == "--development-comparison") {
+        development_features::comparison(&app);
+        return;
+    }
     if std::env::args().any(|s| s == "--development-video-frame") {
         video_frame::run_export(&app);
         return;

@@ -30,6 +30,8 @@ mod undo;
 #[path = "video_frame_export.rs"]
 mod video_frame_export;
 
+#[path = "window/compare_view.rs"]
+mod compare_view;
 #[path = "window/context_menu.rs"]
 mod context_menu;
 #[path = "window/empty_state.rs"]
@@ -567,7 +569,11 @@ pub(super) fn build(app: &adw::Application, settings: &Settings, file: Option<Op
     let content = gtk::Box::new(gtk::Orientation::Vertical, 0);
     content.append(&header);
     let toast_overlay = adw::ToastOverlay::new();
-    toast_overlay.set_child(Some(&viewport));
+    let pages = gtk::Stack::new();
+    pages.set_hhomogeneous(false);
+    pages.set_vhomogeneous(false);
+    pages.add_named(&viewport, Some("viewer"));
+    toast_overlay.set_child(Some(&pages));
     toast_overlay.set_hexpand(true);
     toast_overlay.set_vexpand(true);
     content.append(&toast_overlay);
@@ -1023,6 +1029,7 @@ pub(super) fn build(app: &adw::Application, settings: &Settings, file: Option<Op
             &toast_overlay,
             current_toast.clone(),
         );
+        compare_view::install(&window, &pages, &view, undo.clone());
         let keys = gtk::EventControllerKey::new();
         keys.set_propagation_phase(gtk::PropagationPhase::Capture);
         let weak_window = window.downgrade();
@@ -1032,6 +1039,12 @@ pub(super) fn build(app: &adw::Application, settings: &Settings, file: Option<Op
                 && weak_window.upgrade().is_some_and(|w| editing(&w))
             {
                 return glib::Propagation::Proceed;
+            }
+            if weak_window
+                .upgrade()
+                .is_some_and(|window| compare_view::handle_key(&window, key, modifiers))
+            {
+                return glib::Propagation::Stop;
             }
             if key.to_lower() == gdk::Key::s
                 && !modifiers.intersects(

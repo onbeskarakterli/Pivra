@@ -1,7 +1,7 @@
 //! Per-window presentation and cancellation. Glycin alone applies orientation.
 
 #[path = "actual_paintable.rs"]
-mod actual_paintable;
+pub(super) mod actual_paintable;
 #[path = "animation.rs"]
 mod animation;
 #[path = "gpu_video.rs"]
@@ -83,6 +83,11 @@ pub(super) struct ImageView {
     minimap: Rc<minimap::Map>,
     video_inhibit: Rc<video_inhibit::VideoInhibit>,
 }
+#[allow(dead_code, reason = "Standalone image probes omit comparison")]
+pub(super) fn animated_source(path: &std::path::Path) -> bool {
+    animation::is_animated_file(path)
+}
+
 type VideoObserver = Box<dyn Fn(Option<&gtk::MediaFile>)>;
 
 impl ImageView {
@@ -558,6 +563,13 @@ impl ImageView {
     )]
     pub(super) fn show_information(&self, show: bool) {
         self.information.show(show);
+    }
+
+    #[allow(dead_code, reason = "Standalone image probes omit comparison")]
+    pub(super) fn ready_texture(&self, path: &std::path::Path) -> Option<gtk::gdk::Texture> {
+        (self.requested.borrow().as_deref() == Some(path))
+            .then(|| self.texture.borrow().clone())
+            .flatten()
     }
 
     #[allow(dead_code)] // Some standalone view probes never display a non-image selection.

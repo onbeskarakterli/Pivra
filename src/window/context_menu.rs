@@ -69,6 +69,13 @@ fn populate(
         "image-mode",
         pivra::viewing::ViewMode::ALL.map(|mode| (mode.id(), mode.label())),
     );
+    if !video
+        && window
+            .lookup_action(super::compare_view::OPEN)
+            .is_some_and(|action| action.is_enabled())
+    {
+        add("Compare Images...", super::compare_view::OPEN);
+    }
     add("Fullscreen", "context-fullscreen");
     let (label, name) = (
         if slideshow::active(window) {

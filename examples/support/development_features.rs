@@ -1612,3 +1612,98 @@ pub(super) fn media_undo(app: &adw::Application) {
         "PASS real GIO Trash, mixed undo order, Ctrl+Z, editing focus, collision retry, toast identity and expiration"
     );
 }
+
+pub(super) fn comparison(app: &adw::Application) {
+    let a = tempfile::tempdir().unwrap();
+    let b = tempfile::tempdir().unwrap();
+    let first = a.path().join("small.png");
+    let second = b.path().join("portrait.png");
+    for path in [&first, &second] {
+        std::fs::copy("tests/fixtures/images/wide.png", path).unwrap();
+    }
+    window::build(
+        app,
+        &Default::default(),
+        Some(input::OpenedFile::from_file(&gio::File::for_path(&first)).unwrap()),
+    );
+    let window = app
+        .active_window()
+        .and_downcast::<adw::ApplicationWindow>()
+        .unwrap();
+    photo_presented(&window);
+    wait("comparison window active", || window.is_active());
+    let original = widgets(window.upcast_ref())
+        .into_iter()
+        .filter_map(|w| w.downcast::<gtk::Overlay>().ok())
+        .find_map(|overlay| overlay.child().and_downcast::<gtk::Picture>())
+        .unwrap();
+    let ordinary = original.paintable().unwrap();
+    native_key("ctrl+shift+c");
+    wait("native comparison chooser", || {
+        chooser(&window).is_some_and(|w| w.is_active())
+    });
+    let choose = chooser(&window).unwrap();
+    native_key("ctrl+l");
+    wait("comparison location entry", || {
+        gtk::prelude::GtkWindowExt::focus(&choose).is_some_and(|w| w.is::<gtk::Editable>())
+    });
+    assert!(
+        std::process::Command::new("xdotool")
+            .args(["type", "--clearmodifiers", "--", second.to_str().unwrap()])
+            .status()
+            .unwrap()
+            .success()
+    );
+    native_key("Return");
+    let left = widget(&window, "comparison-left")
+        .downcast::<gtk::Picture>()
+        .unwrap();
+    let right = widget(&window, "comparison-right")
+        .downcast::<gtk::Picture>()
+        .unwrap();
+    wait("comparison pictures ready", || {
+        left.is_mapped() && right.is_mapped() && right.paintable().is_some()
+    });
+    let widths = || {
+        (
+            left.paintable().unwrap().intrinsic_width(),
+            right.paintable().unwrap().intrinsic_width(),
+        )
+    };
+    assert_eq!(widths(), (64, 640));
+    assert!((left.width() - right.width()).abs() <= 2);
+    assert!(selected(&window, "small.png") && !original.is_mapped());
+    let root = widget(&window, "image-comparison");
+    let swap = widgets(&root)
+        .into_iter()
+        .filter_map(|w| w.downcast::<gtk::Button>().ok())
+        .find(|button| button.label().as_deref() == Some("Swap"))
+        .unwrap();
+    swap.emit_clicked();
+    assert_eq!(widths(), (640, 64));
+    let link = widget(&window, "comparison-linked")
+        .downcast::<gtk::CheckButton>()
+        .unwrap();
+    assert!(link.is_active());
+    let modes: Vec<_> = widgets(&root)
+        .into_iter()
+        .filter_map(|w| w.downcast::<gtk::DropDown>().ok())
+        .collect();
+    modes[0].set_selected(2);
+    assert_eq!(modes[1].selected(), 2);
+    link.set_active(false);
+    modes[1].set_selected(1);
+    assert_eq!(modes[0].selected(), 2);
+    native_key("Escape");
+    wait("Escape restores original viewer", || {
+        original.is_mapped() && !root.is_mapped()
+    });
+    assert_eq!(original.paintable().unwrap(), ordinary);
+    assert!(
+        left.paintable().is_none() && right.paintable().is_none() && selected(&window, "small.png")
+    );
+    window.close();
+    eprintln!(
+        "PASS comparison shortcut and native chooser, unequal sources, swap, linked/unlinked modes, Escape and original-view restoration"
+    );
+}

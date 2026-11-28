@@ -13,9 +13,9 @@ from video_gpu.lifecycle import session, run, ROOT
 def main():
     parser=argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--session',choices=['x11','sway'],required=True)
-    parser.add_argument('--development',choices=['open','info','minimap','layout','navigation','shortcuts','zoom-state','context-menu','slideshow-click','slideshow-effects','opening','reveal','open-latency','file-actions','undo','video-mouse','video-speed','video-frame','all'])
+    parser.add_argument('--development',choices=['open','info','minimap','layout','navigation','shortcuts','zoom-state','context-menu','slideshow-click','slideshow-effects','opening','reveal','open-latency','file-actions','undo','video-mouse','video-speed','video-frame','comparison','all'])
     args=parser.parse_args()
-    if args.development in ('video-mouse', 'undo', 'video-frame') and args.session != 'x11':
+    if args.development in ('video-mouse', 'undo', 'video-frame', 'comparison') and args.session != 'x11':
         parser.error(f'{args.development} requires real X11 input from xdotool')
     if os.environ.get('PIVRA_TOOLBAR_PRIVATE_BUS')!='1':
         fixture_parent = None
@@ -37,7 +37,7 @@ def main():
                     '-c:a','aac','-x264-params',
                     'colorprim=bt709:transfer=bt709:colormatrix=bt709:fullrange=off']
     duration = {'video-mouse': '25', 'video-speed': '12', 'video-frame': '12'}.get(args.development, '1')
-    if args.development != 'undo':
+    if args.development not in ('undo', 'comparison'):
         subprocess.run(fixture + ['-t',duration,'-c:v','libx264','-pix_fmt','yuv420p',str(video)],check=True)
     subprocess.run(['cargo','build','--locked','--example','slideshow_probe'],cwd=ROOT,check=True)
     env=dict(os.environ,GTK_A11Y='none',PIVRA_TRACE_SLIDESHOW='1')

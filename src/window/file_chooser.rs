@@ -19,6 +19,10 @@ pub(super) fn set_dialogs_enabled(window: &adw::ApplicationWindow, enabled: bool
         }
     }
 }
+pub(super) fn media_dialog(title: &str) -> gtk::FileDialog {
+    gtk::FileDialog::builder().title(title).modal(true).build()
+}
+
 pub(super) fn install(window: &adw::ApplicationWindow, app: &adw::Application) {
     trace::observe_bus(app);
     let cached = Rc::new(RefCell::new(None::<gio::File>));
@@ -51,8 +55,7 @@ pub(super) fn install(window: &adw::ApplicationWindow, app: &adw::Application) {
             }
         });
     }
-    let dialog = gtk::FileDialog::new();
-    dialog.set_title("Open media");
+    let dialog = media_dialog("Open media");
     trace::created();
     let pending = Rc::new(RefCell::new(None::<gio::Cancellable>));
     let choose = gio::SimpleAction::new("choose-media", None);

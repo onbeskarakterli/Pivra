@@ -431,46 +431,39 @@ impl ImageView {
         view
     }
 
-    #[allow(dead_code)] // Used by the fullscreen thumbnail probe.
-    /// Capture the current animation texture or the live video frame, not the zoomed UI.
+    #[allow(dead_code)] // Standalone view probes do not export video frames.
+    /// Snapshot the current backend's video content at its oriented source size.
     pub(super) fn capture_frame(
         &self,
         path: &std::path::Path,
     ) -> Result<gtk::gdk::Texture, String> {
-        if self.video_path.borrow().as_deref() == Some(path) {
-            let stream = self.video_stream.borrow();
-            let media = stream.as_ref().ok_or("Video is not ready")?;
-            if !media.is_prepared() {
-                return Err("Video frame is not ready".into());
-            }
-            // MediaFile::current_image() may return an empty placeholder for
-            // GStreamer-backed video even while the Picture is rendering frames.
-            // Snapshot the live MediaFile paintable instead of its static image.
-            let width = media.intrinsic_width();
-            let height = media.intrinsic_height();
-            if width <= 0 || height <= 0 {
-                return Err("Video frame dimensions are unavailable".into());
-            }
-            let snapshot = gtk::Snapshot::new();
-            gtk::gdk::prelude::PaintableExt::snapshot(
-                media,
-                &snapshot,
-                f64::from(width),
-                f64::from(height),
-            );
-            let node = snapshot.to_node().ok_or("No video frame available")?;
-            let window = self.window.upgrade().ok_or("Window is closed")?;
-            let renderer = window.renderer().ok_or("Video renderer is unavailable")?;
-            return Ok(renderer.render_texture(&node, None));
+        if self.video_path.borrow().as_deref() != Some(path) || !self.video.is_visible() {
+            return Err("Video frame is not ready".into());
         }
-        if self.requested.borrow().as_deref() == Some(path) && animation::is_animated_file(path) {
-            return self
-                .texture
-                .borrow()
-                .clone()
-                .ok_or("Animation frame is not ready".into());
+        let stream = self.video_stream.borrow();
+        let media = stream.as_ref().ok_or("Video is not ready")?;
+        if !media.is_prepared() || media.error().is_some() {
+            return Err("Video frame is not ready".into());
         }
-        Err("Frame capture is only available for videos and animations".into())
+        // Snapshot the live MediaFile. Its static image may be empty or lack
+        // the rotation and crop applied by the backend's video paintable.
+        let width = media.intrinsic_width();
+        let height = media.intrinsic_height();
+        if width <= 0 || height <= 0 {
+            return Err("Video frame dimensions are unavailable".into());
+        }
+        let snapshot = gtk::Snapshot::new();
+        gtk::gdk::prelude::PaintableExt::snapshot(
+            media,
+            &snapshot,
+            f64::from(width),
+            f64::from(height),
+        );
+        let node = snapshot.to_node().ok_or("No video frame available")?;
+        let window = self.window.upgrade().ok_or("Window is closed")?;
+        let renderer = window.renderer().ok_or("Video renderer is unavailable")?;
+        let viewport = gtk::graphene::Rect::new(0., 0., width as f32, height as f32);
+        Ok(renderer.render_texture(&node, Some(&viewport)))
     }
 
     #[allow(
@@ -480,6 +473,22 @@ impl ImageView {
     pub(super) fn video_widget(&self) -> &gtk::Picture {
         &self.video
     }
+    #[allow(
+        dead_code,
+        reason = "Standalone probes do not install the export action"
+    )]
+    pub(super) fn on_video_visibility(&self, observe: impl Fn(Option<gtk::MediaFile>) + 'static) {
+        let stream = self.video_stream.clone();
+        self.video.connect_visible_notify(move |picture| {
+            let media = if picture.is_visible() {
+                stream.borrow().clone()
+            } else {
+                None
+            };
+            observe(media);
+        });
+    }
+
     #[allow(dead_code)] // Native production-window probes inspect the actual selected stream.
     pub(super) fn current_video(&self) -> Option<gtk::MediaFile> {
         self.video_stream.borrow().clone()

@@ -1,5 +1,5 @@
 //! Native viewport menu; existing window actions remain the operation owners.
-use super::{FileContext, slideshow};
+use super::{FileContext, slideshow, video_frame_export};
 use crate::image_view::{ImageView, video_speed};
 use adw::prelude::*;
 use gtk::{gdk, gio};
@@ -57,6 +57,7 @@ fn populate(
             "video-speed",
             video_speed::OPTIONS,
         );
+        add("Save Video Frame...", video_frame_export::ACTION);
     }
     add("Zoom", "context-zoom");
     add_submenu(

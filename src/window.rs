@@ -27,6 +27,8 @@ pub(super) mod slideshow;
 mod toolbar;
 #[path = "undo.rs"]
 mod undo;
+#[path = "video_frame_export.rs"]
+mod video_frame_export;
 
 #[path = "window/context_menu.rs"]
 mod context_menu;
@@ -979,65 +981,30 @@ pub(super) fn build(app: &adw::Application, settings: &Settings, file: Option<Op
             });
         });
         window.add_action(&delete);
-        // S saves the currently displayed video or animated-image frame beside its source.
-        let save_frame = gio::SimpleAction::new("save-current-frame", None);
         let frame_context = context.clone();
-        let frame_view = view.clone();
-        let frame_undo = undo.clone();
-        save_frame.connect_activate(move |_, _| {
-            let source = {
-                let state = frame_context.borrow();
-                state
+        let frame_toasts = toast_overlay.downgrade();
+        let frame_current_toast = current_toast.clone();
+        video_frame_export::install(
+            &window,
+            &view,
+            move || {
+                frame_context
+                    .borrow()
                     .collection
                     .current()
+                    .filter(|item| item.kind() == MediaKind::Video)
                     .map(|item| item.path().to_owned())
-            };
-            let Some(source) = source else {
-                frame_undo.notify("Could not save frame: no media selected");
-                return;
-            };
-            let result = (|| -> Result<std::path::PathBuf, String> {
-                let frame = frame_view.capture_frame(&source)?;
-                let parent = source.parent().ok_or("Source folder is unavailable")?;
-                let stem = source
-                    .file_stem()
-                    .ok_or("Source filename is unavailable")?
-                    .to_string_lossy();
-                for index in 1..=9999 {
-                    let target = parent.join(format!("{stem}_frame_{index:03}.png"));
-                    if target.exists() {
-                        continue;
-                    }
-                    // Reserve each name without overwriting existing files.
-                    let mut file = match std::fs::OpenOptions::new()
-                        .write(true)
-                        .create_new(true)
-                        .open(&target)
-                    {
-                        Ok(file) => file,
-                        Err(error) if error.kind() == std::io::ErrorKind::AlreadyExists => continue,
-                        Err(error) => return Err(error.to_string()),
-                    };
-                    use std::io::Write;
-                    let bytes = frame.save_to_png_bytes();
-                    if let Err(error) = file.write_all(bytes.as_ref()) {
-                        drop(file);
-                        let _ = std::fs::remove_file(&target);
-                        return Err(error.to_string());
-                    }
-                    return Ok(target);
+            },
+            move |message| {
+                if let Some(overlay) = frame_toasts.upgrade() {
+                    show_latest_toast(
+                        &overlay,
+                        &frame_current_toast,
+                        adw::Toast::new(&glib::markup_escape_text(message)),
+                    );
                 }
-                Err("Frame filename limit reached".into())
-            })();
-            match result {
-                Ok(target) => frame_undo.notify(&format!(
-                    "Frame saved: {}",
-                    target.file_name().unwrap_or_default().to_string_lossy()
-                )),
-                Err(error) => frame_undo.notify(&format!("Could not save frame: {error}")),
-            }
-        });
-        window.add_action(&save_frame);
+            },
+        );
         let slides = slideshow::install(
             &window,
             &title,
@@ -1065,6 +1032,22 @@ pub(super) fn build(app: &adw::Application, settings: &Settings, file: Option<Op
                 && weak_window.upgrade().is_some_and(|w| editing(&w))
             {
                 return glib::Propagation::Proceed;
+            }
+            if key.to_lower() == gdk::Key::s
+                && !modifiers.intersects(
+                    gdk::ModifierType::CONTROL_MASK
+                        | gdk::ModifierType::SHIFT_MASK
+                        | gdk::ModifierType::ALT_MASK
+                        | gdk::ModifierType::SUPER_MASK
+                        | gdk::ModifierType::META_MASK
+                        | gdk::ModifierType::HYPER_MASK,
+                )
+                && let Some(window) = weak_window.upgrade()
+                && let Some(action) = window.lookup_action(video_frame_export::ACTION)
+                && action.is_enabled()
+            {
+                action.activate(None);
+                return glib::Propagation::Stop;
             }
             if key == gdk::Key::z
                 && modifiers.contains(gdk::ModifierType::CONTROL_MASK)
@@ -1117,16 +1100,6 @@ pub(super) fn build(app: &adw::Application, settings: &Settings, file: Option<Op
                     | gdk::ModifierType::SUPER_MASK,
             ) {
                 return glib::Propagation::Proceed;
-            }
-            if matches!(key, gdk::Key::s | gdk::Key::S) {
-                if let Some(window) = weak_window.upgrade() {
-                    gio::prelude::ActionGroupExt::activate_action(
-                        &window,
-                        "save-current-frame",
-                        None,
-                    );
-                }
-                return glib::Propagation::Stop;
             }
             if key == gdk::Key::Delete {
                 if let Some(window) = weak_window.upgrade() {

@@ -13,9 +13,9 @@ from video_gpu.lifecycle import session, run, ROOT
 def main():
     parser=argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--session',choices=['x11','sway'],required=True)
-    parser.add_argument('--development',choices=['open','info','minimap','layout','navigation','shortcuts','zoom-state','context-menu','slideshow-click','slideshow-effects','opening','reveal','open-latency','file-actions','undo','video-mouse','video-speed','all'])
+    parser.add_argument('--development',choices=['open','info','minimap','layout','navigation','shortcuts','zoom-state','context-menu','slideshow-click','slideshow-effects','opening','reveal','open-latency','file-actions','undo','video-mouse','video-speed','video-frame','all'])
     args=parser.parse_args()
-    if args.development in ('video-mouse', 'undo') and args.session != 'x11':
+    if args.development in ('video-mouse', 'undo', 'video-frame') and args.session != 'x11':
         parser.error(f'{args.development} requires real X11 input from xdotool')
     if os.environ.get('PIVRA_TOOLBAR_PRIVATE_BUS')!='1':
         fixture_parent = None
@@ -30,11 +30,13 @@ def main():
     out=Path(os.environ['PIVRA_TOOLBAR_REPORT']);print('Logs:',out,flush=True)
     video=out/'video.mp4'
     fixture = ['ffmpeg','-hide_banner','-loglevel','error','-f','lavfi','-i','testsrc2=size=192x96:rate=12']
-    if args.development == 'video-speed':
+    if args.development == 'video-frame':
+        fixture[-1] = r'color=red:size=192x96:rate=12,drawbox=w=iw:h=ih:color=blue:t=fill:enable=gte(t\,4)'
+    if args.development in ('video-speed', 'video-frame'):
         fixture += ['-f','lavfi','-i','sine=frequency=440:sample_rate=48000',
                     '-c:a','aac','-x264-params',
                     'colorprim=bt709:transfer=bt709:colormatrix=bt709:fullrange=off']
-    duration = {'video-mouse': '25', 'video-speed': '12'}.get(args.development, '1')
+    duration = {'video-mouse': '25', 'video-speed': '12', 'video-frame': '12'}.get(args.development, '1')
     if args.development != 'undo':
         subprocess.run(fixture + ['-t',duration,'-c:v','libx264','-pix_fmt','yuv420p',str(video)],check=True)
     subprocess.run(['cargo','build','--locked','--example','slideshow_probe'],cwd=ROOT,check=True)
@@ -53,6 +55,11 @@ def main():
             for mode in modes:
                 result=run(mode,['target/debug/examples/slideshow_probe','--controlled','--'+mode,video],active,out,timeout=60)
                 if result['status']!='PASS':return result['exit'] if result['exit']>0 else 1
+                if args.development == 'video-frame':
+                    result = run(mode+'-stock', ['target/debug/examples/slideshow_probe', '--controlled', '--'+mode, video],
+                                 dict(active, PIVRA_VIDEO_BACKEND='stock'), out, timeout=60)
+                    if result['status'] != 'PASS':
+                        return result['exit'] if result['exit'] > 0 else 1
                 if args.development == 'open-latency':
                     import json
                     text=(out/(mode+'.log')).read_text()

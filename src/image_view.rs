@@ -543,6 +543,19 @@ impl ImageView {
     pub(super) fn on_thumbnail_select(&self, callback: impl Fn(usize) + 'static) {
         self.thumbnail_strip.on_select(callback);
     }
+    #[allow(
+        dead_code,
+        reason = "Standalone probes omit the window selection action"
+    )]
+    pub(super) fn install_thumbnail_selection(&self, window: &adw::ApplicationWindow) {
+        self.thumbnail_strip.install_selection_action(window);
+    }
+
+    #[allow(dead_code, reason = "Standalone probes omit batch commands")]
+    pub(super) fn marked_thumbnails(&self) -> Vec<PathBuf> {
+        self.thumbnail_strip.marked_paths()
+    }
+
     #[allow(dead_code)]
     pub(super) fn clear_thumbnail_select(&self) {
         self.thumbnail_strip.clear_on_select();

@@ -383,6 +383,10 @@ fn main() {
         .flags(gio::ApplicationFlags::NON_UNIQUE)
         .build();
     app.register(None::<&gio::Cancellable>).unwrap();
+    if std::env::args().any(|s| s == "--development-multi-selection") {
+        development_features::multi_selection(&app);
+        return;
+    }
     if std::env::args().any(|s| s == "--development-comparison") {
         development_features::comparison(&app);
         return;

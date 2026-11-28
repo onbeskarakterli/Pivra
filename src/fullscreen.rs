@@ -86,9 +86,13 @@ pub(crate) fn install(
         };
         match key {
             gdk::Key::Escape => {
-                if let Some(action) = window
-                    .lookup_action("close-comparison")
-                    .filter(|action| action.is_enabled())
+                if let Some(action) = ["close-comparison", "clear-thumbnail-selection"]
+                    .into_iter()
+                    .find_map(|name| {
+                        window
+                            .lookup_action(name)
+                            .filter(|action| action.is_enabled())
+                    })
                 {
                     action.activate(None);
                     return glib::Propagation::Stop;

@@ -806,6 +806,7 @@ pub(super) fn build(app: &adw::Application, settings: &Settings, file: Option<Op
                 display_selected(&select_view, &context);
             }
         });
+        view.install_thumbnail_selection(&window);
         install_navigation_arrows(view.widget());
         let current_toast = Rc::new(RefCell::new(None::<adw::Toast>));
         let undo = undo::Undo::install(

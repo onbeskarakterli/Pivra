@@ -22,6 +22,7 @@ fn install_css(display: &gtk::gdk::Display) {
             .pivra-thumbnail-cell.selected { box-shadow: none; }\n\
             .pivra-thumbnail-selection { background: transparent; border: 0; padding: 0; box-shadow: none; }\n\
             .pivra-thumbnail-selection.selected { border: 2px solid @accent_color; box-shadow: none; }\n\
+            .pivra-thumbnail-selection.marked:not(.selected) { border: 2px dashed @accent_color; box-shadow: inset 0 0 0 1px @window_bg_color; }\n\
             .pivra-thumbnail-failure-label { background-color: rgba(0,0,0,0.78); color: white; font-weight: bold; font-size: 10px; padding: 3px 5px; border-radius: 3px; }\n\
              .pivra-thumbnail-gif-badge { background-color: rgba(0,0,0,0.78); color: white; font-weight: bold; font-size: 15px; padding: 2px 6px; border-radius: 3px; }\n");
         gtk::style_context_add_provider_for_display(display,&css,gtk::STYLE_PROVIDER_PRIORITY_APPLICATION);
@@ -130,6 +131,7 @@ pub(crate) fn install(
     filter.set_widget_name("thumbnail-media-filter");
     filter.set_tooltip_text(Some("Thumbnail media filter"));
     filter.set_enable_search(false);
+    controls.prepend(thumbnails.selection_label());
     controls.prepend(&filter);
     let filtered = thumbnails.clone();
     filter.connect_selected_notify(move |filter| {

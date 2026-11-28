@@ -13,6 +13,8 @@ use std::{
     path::PathBuf,
     rc::Rc,
 };
+#[path = "thumbnail_strip/selection.rs"]
+mod selection;
 #[path = "thumbnail_strip/sizing.rs"]
 mod sizing;
 use sizing::{display_cost, display_size};
@@ -59,6 +61,10 @@ struct Inner {
     entries: RefCell<Vec<Entry>>,
     select: RefCell<Option<Selection>>,
     selected: Cell<Option<usize>>,
+    marks: RefCell<selection::Selection>,
+    mark_count: gtk::Label,
+    clear_marks: glib::WeakRef<gio::SimpleAction>,
+    click_modifiers: Cell<Option<(usize, gdk::ModifierType)>>,
     initial: Cell<Option<usize>>,
     initialized: Cell<bool>,
     restore: Cell<Option<f64>>,
@@ -96,6 +102,12 @@ pub(crate) struct ThumbnailStats {
 pub(crate) struct ThumbnailStrip(Rc<Inner>);
 impl ThumbnailStrip {
     pub(super) fn new(items: gtk::Box, scroller: gtk::ScrolledWindow) -> Self {
+        let mark_count = gtk::Label::new(None);
+        mark_count.set_widget_name("thumbnail-selection-count");
+        mark_count.add_css_class("caption");
+        mark_count.set_margin_start(6);
+        mark_count.set_margin_end(6);
+        mark_count.set_visible(false);
         let inner = Rc::new(Inner {
             filter: Cell::new(MediaFilter::All),
             items,
@@ -103,6 +115,10 @@ impl ThumbnailStrip {
             entries: RefCell::new(Vec::new()),
             select: RefCell::new(None),
             selected: Cell::new(None),
+            marks: RefCell::default(),
+            mark_count,
+            clear_marks: glib::WeakRef::new(),
+            click_modifiers: Cell::new(None),
             initial: Cell::new(None),
             initialized: Cell::new(false),
             restore: Cell::new(None),
@@ -223,16 +239,18 @@ impl ThumbnailStrip {
         press.set_button(1);
         press.set_propagation_phase(gtk::PropagationPhase::Capture);
         let weak = Rc::downgrade(&inner);
-        let pressed = Rc::new(RefCell::new(None::<(usize, u64, u64, PathBuf)>));
+        let pressed = Rc::new(RefCell::new(
+            None::<(usize, u64, u64, PathBuf, gdk::ModifierType)>,
+        ));
         let press_state = pressed.clone();
         let press_dragged = dragged.clone();
-        press.connect_pressed(move |_, _, x, y| {
+        press.connect_pressed(move |gesture, _, x, y| {
             press_dragged.set(false);
             let Some(i) = weak.upgrade() else {
                 return;
             };
             let hit = i.entries.borrow().iter().find_map(|entry| {
-                let w = entry.widgets.as_ref()?;
+                let w = entry.widgets.as_ref().filter(|w| w.button.is_mapped())?;
                 let bounds = w.button.compute_bounds(&i.scroller)?;
                 ((x as f32) >= bounds.x()
                     && (x as f32) <= bounds.x() + bounds.width()
@@ -240,9 +258,18 @@ impl ThumbnailStrip {
                     && (y as f32) <= bounds.y() + bounds.height())
                 .then_some((entry.index.get(), entry.path.clone()))
             });
-            *press_state.borrow_mut() = hit
-                .as_ref()
-                .map(|(index, path)| (*index, i.button_clicks.get(), i.epoch.get(), path.clone()));
+            let modifiers = gesture.current_event_state();
+            i.click_modifiers
+                .set(hit.as_ref().map(|(index, _)| (*index, modifiers)));
+            *press_state.borrow_mut() = hit.as_ref().map(|(index, path)| {
+                (
+                    *index,
+                    i.button_clicks.get(),
+                    i.epoch.get(),
+                    path.clone(),
+                    modifiers,
+                )
+            });
             trace_click(&format!(
                 "press-at-strip x={x:.0} y={y:.0} hit-button={:?} building={} cells={}",
                 hit.as_ref().map(|(index, _)| *index),
@@ -257,12 +284,10 @@ impl ThumbnailStrip {
         let release_weak = Rc::downgrade(&inner);
         press.connect_released(move |_, _, _, _| {
             trace_click("press-released");
-            let Some((index, count, epoch, path)) = pressed.borrow_mut().take() else {
+            let Some((index, count, epoch, path, modifiers)) = pressed.borrow_mut().take() else {
                 return;
             };
-            if dragged.get() {
-                return;
-            }
+            let was_dragged = dragged.get();
             let weak = release_weak.clone();
             // Let the native GtkButton click callback run first. If GTK's
             // scroll/drag gesture swallowed the click, deliver it once.
@@ -270,22 +295,74 @@ impl ThumbnailStrip {
                 let Some(i) = weak.upgrade() else {
                     return;
                 };
-                if i.closed.get() || i.button_clicks.get() != count {
+                if i.click_modifiers.get() == Some((index, modifiers)) {
+                    i.click_modifiers.set(None);
+                }
+                if was_dragged || i.closed.get() || i.button_clicks.get() != count {
                     return;
                 }
                 if !fallback_target_valid(epoch, i.epoch.get(), index, &path, &i.entries.borrow()) {
                     return;
                 }
                 trace_click(&format!("native-click-missed fallback index={index}"));
-                if let Some(callback) = i.select.borrow().as_ref() {
-                    callback(index);
-                }
+                i.dispatch_click(index, modifiers);
             });
         });
         press.connect_cancel(move |_, _| trace_click("press-cancel"));
         inner.scroller.add_controller(press);
+        let keys = gtk::EventControllerKey::new();
+        keys.set_propagation_phase(gtk::PropagationPhase::Capture);
+        let weak = Rc::downgrade(&inner);
+        keys.connect_key_pressed(move |_, key, _, modifiers| {
+            let relevant = modifiers
+                & (gdk::ModifierType::CONTROL_MASK
+                    | gdk::ModifierType::SHIFT_MASK
+                    | gdk::ModifierType::ALT_MASK
+                    | gdk::ModifierType::SUPER_MASK
+                    | gdk::ModifierType::META_MASK);
+            if key.to_lower() != gdk::Key::a || relevant != gdk::ModifierType::CONTROL_MASK {
+                return glib::Propagation::Proceed;
+            }
+            let Some(inner) = weak.upgrade() else {
+                return glib::Propagation::Proceed;
+            };
+            inner.marks.borrow_mut().all(&inner.visible_paths());
+            inner.redraw_marks();
+            glib::Propagation::Stop
+        });
+        inner.scroller.add_controller(keys);
         Self(inner)
     }
+    pub(super) fn selection_label(&self) -> &gtk::Label {
+        &self.0.mark_count
+    }
+    #[allow(
+        dead_code,
+        reason = "Standalone probes omit the window selection action"
+    )]
+    pub(crate) fn install_selection_action(&self, window: &impl IsA<gio::ActionMap>) {
+        let clear = gio::SimpleAction::new("clear-thumbnail-selection", None);
+        clear.set_enabled(false);
+        self.0.clear_marks.set(Some(&clear));
+        let weak = Rc::downgrade(&self.0);
+        clear.connect_activate(move |_, _| {
+            if let Some(inner) = weak.upgrade() {
+                inner.marks.borrow_mut().clear();
+                inner.redraw_marks();
+            }
+        });
+        window.add_action(&clear);
+    }
+    #[allow(dead_code, reason = "Standalone probes omit batch actions")]
+    pub(crate) fn marked_paths(&self) -> Vec<PathBuf> {
+        let marks = self.0.marks.borrow();
+        self.0
+            .visible_paths()
+            .into_iter()
+            .filter(|path| marks.contains(path))
+            .collect()
+    }
+
     pub(crate) fn refresh_hidden(&self) {
         if self.0.initialized.get() && !self.0.scroller.is_mapped() {
             self.0.warm_hidden();
@@ -314,6 +391,7 @@ impl ThumbnailStrip {
                 w.button.set_visible(i.included(entry));
             }
         }
+        i.redraw_marks();
         i.last_visible.set(None);
         i.initial.set(i.selected.get());
         i.restore.set(None);
@@ -425,6 +503,7 @@ impl ThumbnailStrip {
             e.len() == photos.len() && e.iter().zip(photos).all(|(e, (_, p))| &e.path == p)
         };
         if !same {
+            i.marks.borrow_mut().reconcile(photos);
             i.last_visible.set(None);
             i.epoch.set(i.epoch.get().wrapping_add(1));
             i.pause();
@@ -493,6 +572,7 @@ impl ThumbnailStrip {
                 }
             }
         }
+        i.redraw_marks();
         i.scroller.queue_draw();
         if i.initialized.get() && !i.scroller.is_mapped() {
             i.warm_hidden();
@@ -509,6 +589,85 @@ impl ThumbnailStrip {
     }
 }
 impl Inner {
+    fn visible_paths(&self) -> Vec<PathBuf> {
+        self.entries
+            .borrow()
+            .iter()
+            .filter(|entry| self.included(entry))
+            .map(|entry| entry.path.clone())
+            .collect()
+    }
+
+    fn redraw_marks(&self) {
+        let marks = self.marks.borrow();
+        let mut count = 0;
+        for entry in self.entries.borrow().iter() {
+            let marked = self.included(entry) && marks.contains(&entry.path);
+            count += usize::from(marked);
+            if let Some(widgets) = &entry.widgets {
+                if marked {
+                    widgets.selection.add_css_class("marked");
+                } else {
+                    widgets.selection.remove_css_class("marked");
+                }
+                widgets
+                    .button
+                    .update_state(&[gtk::accessible::State::Selected(Some(
+                        marked || Some(entry.index.get()) == self.selected.get(),
+                    ))]);
+            }
+        }
+        self.mark_count.set_label(&format!("{count} selected"));
+        self.mark_count.set_visible(count > 1);
+        if let Some(clear) = self.clear_marks.upgrade() {
+            clear.set_enabled(marks.has_marks());
+        }
+    }
+
+    fn dispatch_click(&self, index: usize, modifiers: gdk::ModifierType) {
+        let control = modifiers.contains(gdk::ModifierType::CONTROL_MASK);
+        let shift = modifiers.contains(gdk::ModifierType::SHIFT_MASK);
+        let (path, button, active) = {
+            let entries = self.entries.borrow();
+            let Some(entry) = entries
+                .iter()
+                .find(|entry| entry.index.get() == index && self.included(entry))
+            else {
+                return;
+            };
+            let active = self
+                .selected
+                .get()
+                .and_then(|index| entries.iter().find(|entry| entry.index.get() == index))
+                .map(|entry| entry.path.clone());
+            (
+                entry.path.clone(),
+                entry.widgets.as_ref().map(|w| w.button.clone()),
+                active,
+            )
+        };
+        if control || shift {
+            self.marks.borrow_mut().modify(
+                &path,
+                &self.visible_paths(),
+                active.as_deref(),
+                control,
+                shift,
+            );
+            self.redraw_marks();
+            if let Some(button) = button {
+                button.grab_focus();
+            }
+        } else {
+            self.marks.borrow_mut().ordinary(&path);
+            self.redraw_marks();
+            if let Some(callback) = self.select.borrow().as_ref() {
+                trace_click(&format!("selection-callback index={index}"));
+                callback(index);
+            }
+        }
+    }
+
     fn included(&self, entry: &Entry) -> bool {
         self.filter
             .get()
@@ -925,6 +1084,13 @@ impl Inner {
                 if Some(entry.index.get()) == i.selected.get() {
                     selection.add_css_class("selected");
                 }
+                if i.marks.borrow().contains(&entry.path) {
+                    selection.add_css_class("marked");
+                }
+                button.update_state(&[gtk::accessible::State::Selected(Some(
+                    i.marks.borrow().contains(&entry.path)
+                        || Some(entry.index.get()) == i.selected.get(),
+                ))]);
                 let picture = gtk::Picture::new();
                 picture.set_content_fit(gtk::ContentFit::Contain);
                 picture.set_size_request(cell_width, cell_height);
@@ -1012,15 +1178,13 @@ impl Inner {
                 button.connect_clicked(move |_| {
                     if let Some(i) = weak.upgrade() {
                         i.button_clicks.set(i.button_clicks.get().wrapping_add(1));
-                    }
-                    trace_click(&format!("button-click index={}", index.get()));
-                    if let Some(i) = weak.upgrade() {
-                        if let Some(callback) = i.select.borrow().as_ref() {
-                            trace_click(&format!("selection-callback index={}", index.get()));
-                            callback(index.get());
-                        } else {
-                            trace_click("no-selection-callback");
-                        }
+                        let modifiers = i
+                            .click_modifiers
+                            .take()
+                            .filter(|(pressed, _)| *pressed == index.get())
+                            .map_or_else(gdk::ModifierType::empty, |(_, modifiers)| modifiers);
+                        trace_click(&format!("button-click index={}", index.get()));
+                        i.dispatch_click(index.get(), modifiers);
                     }
                 });
                 i.items.append(&button);

@@ -1707,3 +1707,135 @@ pub(super) fn comparison(app: &adw::Application) {
         "PASS comparison shortcut and native chooser, unequal sources, swap, linked/unlinked modes, Escape and original-view restoration"
     );
 }
+
+pub(super) fn multi_selection(app: &adw::Application) {
+    let folder = tempfile::tempdir().unwrap();
+    for name in ["1.png", "3-photo.png", "4.png"] {
+        std::fs::copy("tests/fixtures/images/wide.png", folder.path().join(name)).unwrap();
+    }
+    let video = std::env::args().find(|s| s.ends_with(".mp4")).unwrap();
+    std::fs::copy(video, folder.path().join("2.mp4")).unwrap();
+    window::build(
+        app,
+        &Default::default(),
+        Some(
+            input::OpenedFile::from_file(&gio::File::for_path(folder.path().join("1.png")))
+                .unwrap(),
+        ),
+    );
+    let window = app
+        .active_window()
+        .and_downcast::<adw::ApplicationWindow>()
+        .unwrap();
+    window.set_default_size(1150, 720);
+    photo_presented(&window);
+    pivra::settings::thumbnail_preference().set_enabled(true);
+    let pin = widget(&window, "thumbnail-controls")
+        .last_child()
+        .and_downcast::<gtk::ToggleButton>()
+        .unwrap();
+    if !pin.is_active() {
+        pin.emit_clicked();
+    }
+    let root = widget(&window, "thumbnail-items");
+    let cell = |index| {
+        widgets(&root)
+            .into_iter()
+            .find(|w| w.widget_name() == format!("thumbnail-cell-{index}") && w.is_mapped())
+    };
+    wait("the four thumbnail cells are mapped", || {
+        cell(0).is_some() && cell(3).is_some() && window.is_active()
+    });
+    let count = widget(&window, "thumbnail-selection-count")
+        .downcast::<gtk::Label>()
+        .unwrap();
+    let modifiers = |verb: &str, keys: &[&str]| {
+        assert!(
+            std::process::Command::new("xdotool")
+                .arg(verb)
+                .args(keys)
+                .status()
+                .unwrap()
+                .success()
+        );
+    };
+    let click = |index, keys: &[&str]| {
+        if !keys.is_empty() {
+            modifiers("keydown", keys);
+        }
+        let selected = cell(index).unwrap();
+        wait("thumbnail pointer target allocated", || {
+            selected.compute_bounds(&window).is_some_and(|bounds| {
+                let x = (bounds.x() + bounds.width() / 2.).round().into();
+                let y = (bounds.y() + bounds.height() / 2.).round().into();
+                window
+                    .pick(x, y, gtk::PickFlags::DEFAULT)
+                    .is_some_and(|w| w == selected || w.is_ancestor(&selected))
+            })
+        });
+        super::video_mouse::click(&window, &selected, "1", "1");
+        if !keys.is_empty() {
+            modifiers("keyup", keys);
+        }
+    };
+    click(2, &[]);
+    wait("ordinary click still changes active media", || {
+        selected(&window, "3-photo.png")
+    });
+    photo_presented(&window);
+    let loads = CONTROLLED_LOADS.load(std::sync::atomic::Ordering::SeqCst);
+    click(0, &["Control_L"]);
+    wait("control-click marks active and target", || {
+        count.is_mapped() && count.text() == "2 selected"
+    });
+    click(1, &["Control_L", "Shift_L"]);
+    wait("control-shift extends the range to video", || {
+        count.text() == "3 selected"
+    });
+    let filter = widget(&window, "thumbnail-media-filter")
+        .downcast::<gtk::DropDown>()
+        .unwrap();
+    filter.set_selected(1);
+    assert_eq!(count.text(), "2 selected");
+    filter.set_selected(0);
+    click(3, &["Shift_L"]);
+    wait("shift-click replaces the range", || {
+        count.text() == "4 selected"
+    });
+    native_key("Escape");
+    wait("Escape clears marks instead of closing", || {
+        !count.is_visible()
+    });
+    assert!(window.is_visible() && selected(&window, "3-photo.png"));
+    native_key("ctrl+a");
+    wait("Ctrl+A in strip selects visible catalog", || {
+        count.text() == "4 selected"
+    });
+    let header = widget(&window, "pivra-header")
+        .downcast::<adw::HeaderBar>()
+        .unwrap();
+    let editable = gtk::Entry::new();
+    editable.set_text("editable");
+    header.pack_start(&editable);
+    wait("editable is mapped", || editable.is_mapped());
+    assert!(editable.grab_focus());
+    editable.select_region(0, 0);
+    native_key("ctrl+a");
+    wait("Ctrl+A stays in editable", || {
+        editable.selection_bounds() == Some((0, 8))
+    });
+    header.remove(&editable);
+    std::fs::remove_file(folder.path().join("4.png")).unwrap();
+    wait("folder reconciliation prunes deleted mark", || {
+        count.text() == "3 selected"
+    });
+    assert_eq!(
+        CONTROLLED_LOADS.load(std::sync::atomic::Ordering::SeqCst),
+        loads
+    );
+    assert!(selected(&window, "3-photo.png"));
+    window.close();
+    eprintln!(
+        "PASS native X11 thumbnail clicks, Ctrl/Shift and filtered ranges, Ctrl+A focus isolation, Escape, and folder pruning without a viewer reload"
+    );
+}

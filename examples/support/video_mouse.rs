@@ -2,7 +2,12 @@
 use super::*;
 use std::{cell::Cell, process::Command, rc::Rc};
 
-fn click(window: &adw::ApplicationWindow, target: &gtk::Widget, button: &str, count: &str) {
+pub(super) fn click(
+    window: &adw::ApplicationWindow,
+    target: &gtk::Widget,
+    button: &str,
+    count: &str,
+) {
     let bounds = target.compute_bounds(window).expect("input target bounds");
     let x = (bounds.x() + bounds.width() / 2.).round();
     let y = (bounds.y() + bounds.height() / 2.).round();

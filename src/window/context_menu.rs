@@ -76,6 +76,12 @@ fn populate(
     {
         add("Compare Images...", super::compare_view::OPEN);
     }
+    if window
+        .lookup_action(super::compare_view::SELECTED)
+        .is_some_and(|action| action.is_enabled())
+    {
+        add("Compare Selected Images", super::compare_view::SELECTED);
+    }
     add("Fullscreen", "context-fullscreen");
     let (label, name) = (
         if slideshow::active(window) {

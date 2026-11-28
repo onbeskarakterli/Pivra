@@ -16,6 +16,7 @@ use std::{
 };
 
 pub(super) const OPEN: &str = "compare-images";
+pub(super) const SELECTED: &str = "compare-selected-images";
 const CLOSE: &str = "close-comparison";
 const TEXTURE_BUDGET: usize = 128 * 1024 * 1024;
 static COMPARING: AtomicBool = AtomicBool::new(false);
@@ -134,10 +135,13 @@ struct Compare {
     panes: [Pane; 2],
     linked: gtk::CheckButton,
     choose: gio::SimpleAction,
+    selected: gio::SimpleAction,
     close: gio::SimpleAction,
     pending: RefCell<Option<gio::Cancellable>>,
     permit: RefCell<Option<DecodePermit>>,
     active: Cell<bool>,
+    paused: glib::WeakRef<gtk::MediaFile>,
+    pair_available: Cell<bool>,
     available: Cell<bool>,
 }
 
@@ -148,6 +152,12 @@ impl Compare {
             pending.cancel();
         }
         self.active.set(false);
+        if let Some(media) = self.paused.upgrade() {
+            self.paused.set(None);
+            if media.is_prepared() && media.error().is_none() && !media.is_ended() {
+                media.play();
+            }
+        }
         if let Some(stack) = self.stack.upgrade() {
             stack.set_visible_child_name("viewer");
         }
@@ -163,6 +173,8 @@ impl Compare {
     fn refresh(&self) {
         let busy = self.active.get() || self.pending.borrow().is_some();
         self.choose.set_enabled(self.available.get() && !busy);
+        self.selected
+            .set_enabled(self.pair_available.get() && !busy);
         self.close.set_enabled(busy);
     }
 
@@ -215,6 +227,7 @@ impl Compare {
             return;
         }
         let permit = DecodePermit;
+        let view = view.clone();
         let ready = paths.each_ref().map(|path| view.ready_texture(path));
         let weak = Rc::downgrade(self);
         let undo = Rc::downgrade(undo);
@@ -279,6 +292,10 @@ impl Compare {
                         pane.frame.replace(Some(Frame { path, texture }));
                     }
                     compare.permit.replace(Some(permit));
+                    if let Some(media) = view.current_video().filter(|media| media.is_playing()) {
+                        compare.paused.set(Some(&media));
+                        media.pause();
+                    }
                     compare.linked.set_active(true);
                     compare.reset();
                     if let Some(stack) = compare.stack.upgrade() {
@@ -309,6 +326,11 @@ fn current_photo(window: &adw::ApplicationWindow) -> Option<PathBuf> {
         .str()
         .and_then(|uri| gio::File::for_uri(uri).path())
         .filter(|path| candidate(path))
+}
+
+fn selected_pair(view: &ImageView) -> Option<[PathBuf; 2]> {
+    let paths: [PathBuf; 2] = view.marked_thumbnails().try_into().ok()?;
+    paths.iter().all(|path| candidate(path)).then_some(paths)
 }
 
 pub(super) fn install(
@@ -360,34 +382,46 @@ pub(super) fn install(
 
     let choose = gio::SimpleAction::new(OPEN, None);
     let close = gio::SimpleAction::new(CLOSE, None);
+    let selected = gio::SimpleAction::new(SELECTED, None);
     let compare = Rc::new(Compare {
         stack: stack.downgrade(),
         panes: [left, right],
         linked,
         choose: choose.clone(),
+        selected: selected.clone(),
         close: close.clone(),
         pending: RefCell::default(),
         permit: RefCell::default(),
         active: Cell::new(false),
+        paused: glib::WeakRef::new(),
+        pair_available: Cell::new(false),
         available: Cell::new(false),
     });
-    let update = |compare: &Compare, window: &adw::ApplicationWindow| {
+    let update_view = view.clone();
+    let update = move |compare: &Compare, window: &adw::ApplicationWindow| {
+        let ordinary = !slideshow::active(window);
         compare
             .available
-            .set(!slideshow::active(window) && current_photo(window).is_some());
+            .set(ordinary && current_photo(window).is_some());
+        compare
+            .pair_available
+            .set(ordinary && selected_pair(&update_view).is_some());
         compare.refresh();
     };
     // The catalog identity signal already closes stale popup menus. It also
     // invalidates a chooser or comparison when an ordinary media action wins.
-    for name in ["context-media", "slideshow"] {
+    for name in ["context-media", "slideshow", "clear-thumbnail-selection"] {
         let weak = Rc::downgrade(&compare);
         let owner = window.downgrade();
+        let update = update.clone();
         window
             .lookup_action(name)
             .unwrap()
             .connect_notify_local(Some("state"), move |_, _| {
                 if let (Some(compare), Some(window)) = (weak.upgrade(), owner.upgrade()) {
-                    compare.stop();
+                    if name != "clear-thumbnail-selection" {
+                        compare.stop();
+                    }
                     update(&compare, &window);
                 }
             });
@@ -401,6 +435,24 @@ pub(super) fn install(
     });
     window.add_action(&close);
 
+    let weak = window.downgrade();
+    let state = compare.clone();
+    let selection_view = view.clone();
+    let selection_undo = undo.clone();
+    selected.connect_activate(move |_, _| {
+        let Some(window) = weak.upgrade().filter(|window| !slideshow::active(window)) else {
+            return;
+        };
+        let Some(paths) = selected_pair(&selection_view) else {
+            return;
+        };
+        context_menu::dismiss(&window);
+        let token = gio::Cancellable::new();
+        state.pending.replace(Some(token.clone()));
+        state.refresh();
+        state.start(paths, token, &selection_view, &selection_undo);
+    });
+    window.add_action(&selected);
     let weak = window.downgrade();
     let state = compare.clone();
     let view = view.clone();

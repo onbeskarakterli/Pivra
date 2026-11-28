@@ -341,7 +341,8 @@ impl ThumbnailStrip {
         reason = "Standalone probes omit the window selection action"
     )]
     pub(crate) fn install_selection_action(&self, window: &impl IsA<gio::ActionMap>) {
-        let clear = gio::SimpleAction::new("clear-thumbnail-selection", None);
+        let clear =
+            gio::SimpleAction::new_stateful("clear-thumbnail-selection", None, &0u64.to_variant());
         clear.set_enabled(false);
         self.0.clear_marks.set(Some(&clear));
         let weak = Rc::downgrade(&self.0);
@@ -621,6 +622,8 @@ impl Inner {
         self.mark_count.set_visible(count > 1);
         if let Some(clear) = self.clear_marks.upgrade() {
             clear.set_enabled(marks.has_marks());
+            let revision = clear.state().and_then(|v| v.get::<u64>()).unwrap_or(0);
+            clear.set_state(&revision.wrapping_add(1).to_variant());
         }
     }
 

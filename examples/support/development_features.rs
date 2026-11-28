@@ -1784,10 +1784,42 @@ pub(super) fn multi_selection(app: &adw::Application) {
     });
     photo_presented(&window);
     let loads = CONTROLLED_LOADS.load(std::sync::atomic::Ordering::SeqCst);
+    assert!(
+        !window
+            .lookup_action("compare-selected-images")
+            .unwrap()
+            .is_enabled()
+    );
     click(0, &["Control_L"]);
     wait("control-click marks active and target", || {
         count.is_mapped() && count.text() == "2 selected"
     });
+    if std::env::args().any(|arg| arg == "--check-compare-selected") {
+        let compare = window.lookup_action("compare-selected-images").unwrap();
+        assert!(compare.is_enabled());
+        compare.activate(None);
+        let root = widget(&window, "image-comparison");
+        wait("comparison started for marked photos", || root.is_mapped());
+        let labels: Vec<_> = widgets(&root)
+            .into_iter()
+            .filter_map(|w| w.downcast::<gtk::Label>().ok())
+            .filter_map(|label| label.tooltip_text())
+            .collect();
+        assert!(labels[0].ends_with("1.png") && labels[1].ends_with("3-photo.png"));
+        native_key("Escape");
+        wait("comparison returns to marked selection", || {
+            !root.is_mapped() && compare.is_enabled()
+        });
+        click(1, &["Control_L", "Shift_L"]);
+        wait("mixed or additional selections disable comparison", || {
+            !compare.is_enabled()
+        });
+        window.close();
+        eprintln!(
+            "PASS marked-photo comparison preserves filtered visible order and disables unsupported sets"
+        );
+        return;
+    }
     click(1, &["Control_L", "Shift_L"]);
     wait("control-shift extends the range to video", || {
         count.text() == "3 selected"
